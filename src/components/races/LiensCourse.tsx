@@ -29,7 +29,7 @@ export function LiensCourse({ detail, course, d, couleur }: {
       {insc && (
         <a href={insc.url} target="_blank" rel="noopener noreferrer nofollow"
           className={couleur
-            ? "flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white transition-all hover:opacity-90"
+            ? "flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
             : "btn-secondary w-full justify-center text-sm"}
           style={couleur ? { backgroundColor: couleur } : undefined}>
           <ExternalLink className="h-4 w-4" />{libelle}

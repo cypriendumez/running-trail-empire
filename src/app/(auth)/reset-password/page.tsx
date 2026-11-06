@@ -58,7 +58,7 @@ export default function ResetPasswordPage() {
             <Logo size={40} />
             <Wordmark className="text-xl" />
           </div>
-          <h1 className="text-2xl font-bold text-zinc-900">{L.title}</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900">{L.title}</h1>
           <p className="text-zinc-500 text-sm mt-1">{L.subtitle}</p>
           {apresInscription && (
             <p role="status" className="mt-4 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{L.apresInscription}</p>

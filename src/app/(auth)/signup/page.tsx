@@ -161,10 +161,10 @@ export default function SignupPage() {
     return (
       <AuthShell>
         <div className="text-center">
-          <div className="w-16 h-16 bg-emerald-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+          <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <Check className="w-8 h-8 text-emerald-600" />
           </div>
-          <h1 className="text-2xl font-bold text-zinc-900 mb-3">{L.verifyTitle}</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900 mb-3">{L.verifyTitle}</h1>
           <p className="text-zinc-500 mb-8">
             {pre}<strong className="text-zinc-900">{form.email}</strong>{post}
           </p>
@@ -201,7 +201,7 @@ export default function SignupPage() {
             <Logo size={40} />
             <Wordmark className="text-xl" />
           </Link>
-          <h1 className="text-2xl font-bold text-zinc-900">{L.title}</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900">{L.title}</h1>
           {/* La durée vient de JOURS_ESSAI, jamais d'une constante recopiée : la page
               annonçait « 30 jours », la page d'accueil « 7 », les réglages « 14 ». */}
           <p className="text-zinc-500 text-sm mt-1">{L.subtitle.replace("{n}", String(JOURS_ESSAI))}</p>

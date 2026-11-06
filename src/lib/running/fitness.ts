@@ -174,7 +174,7 @@ export function vo2maxEstimate(opts: { vma?: number | null; maxHr?: number | nul
 }
 
 export const vo2maxLabel = (v: number): string =>
-  v >= 65 ? "🏆 Élite" : v >= 56 ? "✅ Excellent" : v >= 46 ? "👍 Bon" : v >= 36 ? "📈 Moyen" : "🌱 En progression";
+  v >= 65 ? "Élite" : v >= 56 ? "Excellent" : v >= 46 ? "Bon" : v >= 36 ? "Moyen" : "En progression";
 
 // Temps prédit (secondes) sur une distance, depuis la VMA.
 export function predictRaceSec(vma: number, distanceKm: number, socle?: number | Socle | null): number {

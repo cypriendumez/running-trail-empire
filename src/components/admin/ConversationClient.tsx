@@ -54,7 +54,7 @@ export function ConversationClient({ userId, nom }: { userId: string; nom: strin
     <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden flex flex-col" style={{ maxHeight: 520 }}>
       <div className="px-5 py-4 border-b border-zinc-100 flex items-center gap-2">
         <MessagesSquare className="w-4 h-4 text-violet-600" />
-        <h3 className="font-bold text-zinc-900 text-sm">Conversation</h3>
+        <h3 className="font-semibold text-zinc-900 text-sm">Conversation</h3>
         <span className="text-xs text-zinc-400">avec {nom}</span>
       </div>
 

@@ -323,7 +323,7 @@ export function ComptaClient() {
       {/* ─── Barre d'action ─────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
         <div>
-          <h2 className="text-xl font-bold text-zinc-900">Comptabilité</h2>
+          <h2 className="text-xl font-semibold text-zinc-900">Comptabilité</h2>
           <p className="text-sm text-zinc-400">Toutes les entrées et sorties d'argent, tenues à la main.</p>
         </div>
         <div className="flex-1" />
@@ -439,7 +439,7 @@ export function ComptaClient() {
             {(["sortie", "entree"] as Sens[]).map((s) => (
               <button key={s}
                 onClick={() => setB({ ...b, sens: s, categorie: CATEGORIES.find((c) => c.sens === s)!.id, recurrente: false })}
-                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
                   b.sens === s ? (s === "entree" ? "bg-white text-emerald-700 shadow-sm" : "bg-white text-rose-700 shadow-sm") : "text-zinc-500"}`}>
                 {s === "entree" ? "Recette" : "Dépense"}
               </button>
@@ -576,7 +576,7 @@ export function ComptaClient() {
       {ecritures.length === 0 && !formOuvert && (
         <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
           <Wallet className="mx-auto h-9 w-9 text-zinc-200" />
-          <h3 className="mt-4 text-lg font-bold text-zinc-900">Ton journal est vide</h3>
+          <h3 className="mt-4 text-lg font-semibold text-zinc-900">Ton journal est vide</h3>
           <p className="mx-auto mt-2 max-w-lg text-sm text-zinc-500">
             Commence par ce que tu paies déjà : hébergement, nom de domaine, API. Coche « charge mensuelle » et
             elles se reporteront en un clic chaque mois. Les encaissements Stripe, eux, s'inscriront tout seuls.
@@ -603,7 +603,7 @@ export function ComptaClient() {
           <div className="flex items-center gap-2 text-xs font-semibold text-zinc-400">
             <FileText className="h-3.5 w-3.5" />Résultat {annee === "toutes" ? "" : annee}
           </div>
-          <div className={`mt-2 text-4xl font-extrabold tracking-tight ${t.resultatCents < 0 ? "text-rose-600" : "text-emerald-700"}`}>
+          <div className={`mt-2 text-4xl font-semibold tracking-tight ${t.resultatCents < 0 ? "text-rose-600" : "text-emerald-700"}`}>
             {euros(t.resultatCents, true)}
           </div>
           <Ecart actuel={t.resultatCents} precedent={precedent?.resultatCents} annee={annee} />
@@ -694,7 +694,7 @@ export function ComptaClient() {
             </>
           ) : (
             <>
-              <div className="mt-1 text-2xl font-bold text-zinc-900">{euros(cotis)}</div>
+              <div className="mt-1 text-2xl font-semibold text-zinc-900">{euros(cotis)}</div>
               {/* Détail par période : pendant l'ACRE et après, deux taux, deux assiettes. */}
               {cot.tranches.filter((x) => x.recettesCents > 0).map((x) => (
                 <p key={x.libelle} className="mt-1 text-xs text-zinc-400">
@@ -709,7 +709,7 @@ export function ComptaClient() {
         {/* Charges fixes */}
         <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400"><Repeat className="w-3 h-3" />Charges fixes mensuelles</div>
-          <div className="mt-1 text-2xl font-bold text-zinc-900">{euros(t.chargesFixesMensuellesCents)}</div>
+          <div className="mt-1 text-2xl font-semibold text-zinc-900">{euros(t.chargesFixesMensuellesCents)}</div>
           <p className="mt-1 text-xs text-zinc-400">soit {euros(t.chargesFixesMensuellesCents * 12)} sur un an</p>
           <p className="mt-2 text-xs text-zinc-500">
             Calculé sur la <b>dernière</b> occurrence de chaque charge cochée « mensuelle », pas sur leur somme —
@@ -720,7 +720,7 @@ export function ComptaClient() {
         {/* Seuil */}
         <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
           <div className="text-xs font-semibold text-zinc-400">Chiffre d'affaires</div>
-          <div className="mt-1 text-2xl font-bold text-zinc-900">{euros(t.entreesCents)}</div>
+          <div className="mt-1 text-2xl font-semibold text-zinc-900">{euros(t.entreesCents)}</div>
           {reglages.seuilCA ? (() => {
             const seuilC = reglages.seuilCA * 100;
             const pct = Math.min(100, Math.round((t.entreesCents / seuilC) * 100));
@@ -813,7 +813,7 @@ export function ComptaClient() {
             {trimestres.map((q) => (
               <div key={q.periode} className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
                 <div className="text-xs font-semibold text-zinc-400">{q.periode.replace("-", " ")}</div>
-                <div className="mt-1 text-lg font-bold text-zinc-900">{euros(q.recettesCents)}</div>
+                <div className="mt-1 text-lg font-semibold text-zinc-900">{euros(q.recettesCents)}</div>
                 <div className="text-[11px] text-zinc-400">dépenses {euros(q.depensesCents)}</div>
               </div>
             ))}
@@ -970,7 +970,7 @@ function Carte({ titre, valeur, icone, fond, sous, accent, ecart }: {
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
       <div className={`mb-3 flex h-8 w-8 items-center justify-center rounded-xl ${fond}`}>{icone}</div>
-      <div className={`text-2xl font-bold ${accent ?? "text-zinc-900"}`}>{valeur}</div>
+      <div className={`text-2xl font-semibold ${accent ?? "text-zinc-900"}`}>{valeur}</div>
       <div className="mt-0.5 text-xs text-zinc-400">{titre}</div>
       {ecart}
       {sous && <div className="mt-1 text-[11px] text-zinc-400">{sous}</div>}

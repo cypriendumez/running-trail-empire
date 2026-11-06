@@ -76,30 +76,31 @@
   .state-optimal   { background-color: var(--state-optimal); }
   .state-competition { background-color: var(--state-competition); }
 
-  /* Bento card — finition premium : ombre douce en couches + léger soulèvement au survol */
+  /* Carte du tableau de bord — surface blanche, filet discret, ombre neutre et courte.
+     Passe « unslop » (06/11/2026) : plus de soulèvement au survol ni d'ombre en couches ;
+     rayon 16 px (cartes 12 à 16), le survol ne change que la bordure. */
   /* ⚠️ 16 px sur téléphone, 24 px au-delà (29/09/2026, Cyprien : « tu perds trop de
      place, on défile trop, surtout sur téléphone »). 78 cartes : 16 px gagnés en haut
      et en bas de chacune, c'est un écran entier sur un tableau de bord. */
   .bento-card {
-    @apply bg-white rounded-3xl border border-zinc-200/70 p-4 md:p-6
-           shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_30px_-14px_rgba(16,24,40,0.12)]
-           transition-all duration-300
-           hover:-translate-y-0.5 hover:border-zinc-200
-           hover:shadow-[0_2px_6px_rgba(0,0,0,0.05),0_20px_44px_-18px_rgba(16,24,40,0.20)];
+    @apply bg-white rounded-2xl border border-zinc-200/80 p-4 md:p-6
+           shadow-[0_1px_2px_rgba(0,0,0,0.04)]
+           transition-[border-color,box-shadow] duration-150
+           hover:border-zinc-300;
   }
 
   .bento-card-dark {
-    @apply bg-zinc-900 rounded-3xl border border-zinc-800 p-4 md:p-6
-           transition-all duration-300;
+    @apply bg-zinc-900 rounded-2xl border border-zinc-800 p-4 md:p-6;
   }
 
   /* Metric display */
   .metric-value {
-    @apply text-3xl md:text-4xl font-bold tabular-nums tracking-tight;
+    @apply text-3xl md:text-4xl font-semibold tabular-nums tracking-tight;
   }
 
+  /* Petit titre de carte : casse de phrase, sans capitales espacées (unslop, 06/11/2026). */
   .metric-label {
-    @apply text-[11px] uppercase tracking-widest text-zinc-400 font-semibold;
+    @apply text-[13px] font-medium text-zinc-500;
   }
 
   /* Zone pills */
@@ -122,11 +123,6 @@
   .league-gold     { @apply text-yellow-600 bg-yellow-50 border border-yellow-200; }
   .league-platinum { @apply text-cyan-600 bg-cyan-50 border border-cyan-200; }
   .league-diamond  { @apply text-violet-600 bg-violet-50 border border-violet-200; }
-
-  /* Gradient text */
-  .gradient-text {
-    @apply bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent;
-  }
 
   /* Glass effect */
   .glass {

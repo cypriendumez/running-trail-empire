@@ -35,7 +35,7 @@ export default async function IndexChaussures() {
   return (
     <main className="mx-auto max-w-4xl px-5 py-12">
       <header className="border-b border-zinc-200 pb-6 dark:border-zinc-800">
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           {t("index.titre")}
         </h1>
         <p className="mt-3 max-w-2xl text-zinc-600 dark:text-zinc-400">
@@ -50,7 +50,7 @@ export default async function IndexChaussures() {
 
       {parMarque.map(({ marque, modeles }) => (
         <section key={marque} className="mt-8">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+          <h2 className="mb-3 text-sm font-semibold text-zinc-500 first-letter:uppercase">
             {marque} <span className="font-normal text-zinc-400">· {modeles.length}</span>
           </h2>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -71,7 +71,7 @@ export default async function IndexChaussures() {
       ))}
 
       <section className="mt-12 rounded-xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900 dark:bg-emerald-950/40">
-        <h2 className="text-base font-bold text-emerald-900 dark:text-emerald-200">{t("porte.titreIndex")}</h2>
+        <h2 className="text-base font-semibold text-emerald-900 dark:text-emerald-200">{t("porte.titreIndex")}</h2>
         <p className="mt-2 max-w-2xl text-sm text-emerald-900/80 dark:text-emerald-100/70">
           {t("porte.texteIndex")}
         </p>

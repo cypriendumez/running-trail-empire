@@ -96,7 +96,7 @@ export function MicroPanel() {
     <div className="mx-auto w-full max-w-5xl p-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="flex items-center gap-2 text-lg font-bold text-zinc-900"><Landmark className="h-5 w-5 text-emerald-600" /> Micro-entreprise</h2>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Landmark className="h-5 w-5 text-emerald-600" /> Micro-entreprise</h2>
           <p className="mt-1 max-w-2xl text-xs text-zinc-500">
             Ton chiffre d&apos;affaires encaissé, prêt à recopier dans la déclaration URSSAF. Recettes hors apports personnels, par date d&apos;opération. Les taux sont ceux que tu saisis — jamais devinés.
           </p>
@@ -108,7 +108,7 @@ export function MicroPanel() {
           <div className="flex items-center gap-1 rounded-xl bg-zinc-100 p-1">
             {(["trimestriel", "mensuel"] as const).map((mode) => (
               <button key={mode} onClick={() => majReglages({ periodiciteUrssaf: mode })} disabled={sauvegarde}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-all ${periodicite === mode ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition ${periodicite === mode ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
                 {mode}
               </button>
             ))}
@@ -124,21 +124,21 @@ export function MicroPanel() {
           {/* Bilan annuel */}
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5 shadow-sm">
-              <div className="text-2xl font-bold tabular-nums text-emerald-700">{euros(bilan.caCents)}</div>
+              <div className="text-2xl font-semibold tabular-nums text-emerald-700">{euros(bilan.caCents)}</div>
               <div className="mt-0.5 text-xs font-medium text-zinc-600">CA encaissé {annee}</div>
               <div className="text-[11px] text-zinc-400">cumul de l&apos;année</div>
             </div>
             <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-              <div className="text-2xl font-bold tabular-nums text-zinc-900">{bilan.cotisationsCents === null ? "—" : euros(bilan.cotisationsCents)}</div>
+              <div className="text-2xl font-semibold tabular-nums text-zinc-900">{bilan.cotisationsCents === null ? "—" : euros(bilan.cotisationsCents)}</div>
               <div className="mt-0.5 text-xs font-medium text-zinc-600">Cotisations estimées {annee}</div>
               <div className="text-[11px] text-zinc-400">{tauxManque ? "saisis ton taux ci-dessous" : `au taux de ${reglages.tauxCotisations}%`}</div>
             </div>
             <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
               {partPlafond === null ? (
-                <><div className="text-2xl font-bold text-zinc-300">—</div><div className="mt-0.5 text-xs font-medium text-zinc-600">Plafond de franchise</div><div className="text-[11px] text-zinc-400">saisis ton plafond ci-dessous</div></>
+                <><div className="text-2xl font-semibold text-zinc-300">—</div><div className="mt-0.5 text-xs font-medium text-zinc-600">Plafond de franchise</div><div className="text-[11px] text-zinc-400">saisis ton plafond ci-dessous</div></>
               ) : (
                 <>
-                  <div className="flex items-baseline justify-between"><div className="text-2xl font-bold tabular-nums text-zinc-900">{partPlafond}%</div><div className="text-[11px] text-zinc-400">de {euros(bilan.seuilCents ?? 0)}</div></div>
+                  <div className="flex items-baseline justify-between"><div className="text-2xl font-semibold tabular-nums text-zinc-900">{partPlafond}%</div><div className="text-[11px] text-zinc-400">de {euros(bilan.seuilCents ?? 0)}</div></div>
                   <div className="mt-2 h-1.5 rounded-full bg-zinc-100"><div className="h-1.5 rounded-full" style={{ width: `${Math.min(100, partPlafond)}%`, background: partPlafond >= 90 ? "#dc2626" : partPlafond >= 70 ? "#f59e0b" : "#059669" }} /></div>
                   <div className="mt-1 text-[11px] text-zinc-400">part du plafond micro-entreprise</div>
                 </>
@@ -149,7 +149,7 @@ export function MicroPanel() {
           {/* Accueil quand rien n'est encore encaissé : on explique le remplissage auto. */}
           {anneeVide && (
             <div className="mb-6 rounded-2xl border border-sky-100 bg-sky-50/50 p-5">
-              <h3 className="flex items-center gap-2 text-sm font-bold text-zinc-900"><Zap className="h-4 w-4 text-sky-600" /> Rien à déclarer pour l&apos;instant</h3>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-zinc-900"><Zap className="h-4 w-4 text-sky-600" /> Rien à déclarer pour l&apos;instant</h3>
               <p className="mt-1.5 text-xs leading-relaxed text-zinc-600">
                 Dès que les paiements Stripe seront activés, <b>chaque abonnement payé s&apos;inscrira ici automatiquement</b> (via la comptabilité) et ton CA à déclarer se mettra à jour tout seul. En attendant, tu peux saisir une recette à la main ci-dessous (coaching, vente ponctuelle…).
               </p>
@@ -161,12 +161,12 @@ export function MicroPanel() {
             <div className="mb-6 rounded-2xl border-2 border-emerald-300 bg-emerald-50/40 p-6 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700"><CalendarClock className="h-3.5 w-3.5" /> À déclarer maintenant</div>
-                  <div className="mt-1 text-lg font-bold capitalize text-zinc-900">{aDeclarer.libelle}</div>
+                  <div className="flex items-center gap-2 text-[11px] font-semibold text-emerald-700 first-letter:uppercase"><CalendarClock className="h-3.5 w-3.5" /> À déclarer maintenant</div>
+                  <div className="mt-1 text-lg font-semibold capitalize text-zinc-900">{aDeclarer.libelle}</div>
                   <div className="text-[11px] text-zinc-500">échéance URSSAF indicative ≈ {dateFr(aDeclarer.echeanceIndicative)}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-3xl font-bold tabular-nums text-emerald-700">{euros(aDeclarer.caCents)}</div>
+                  <div className="text-3xl font-semibold tabular-nums text-emerald-700">{euros(aDeclarer.caCents)}</div>
                   <div className="text-[11px] text-zinc-500">à recopier · {aDeclarer.cotisationsCents === null ? "cotisations : saisis ton taux" : `cotisations ≈ ${euros(aDeclarer.cotisationsCents)}`}</div>
                 </div>
               </div>
@@ -182,7 +182,7 @@ export function MicroPanel() {
           )}
 
           {/* Historique des périodes */}
-          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-zinc-900"><CalendarClock className="h-4 w-4 text-zinc-400" /> Toutes les périodes ({periodicite})</div>
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900"><CalendarClock className="h-4 w-4 text-zinc-400" /> Toutes les périodes ({periodicite})</div>
           {periodes.length === 0 ? (
             <p className="mb-6 rounded-2xl border border-zinc-100 bg-white p-5 text-sm text-zinc-400 shadow-sm">Aucune période commencée pour {annee}.</p>
           ) : (
@@ -194,11 +194,11 @@ export function MicroPanel() {
                       <div className="font-semibold capitalize text-zinc-900">{p.libelle}</div>
                       <div className="text-[11px] text-zinc-400">{dateFr(p.debut)} → {dateFr(p.fin)}</div>
                     </div>
-                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${p.close ? "bg-zinc-100 text-zinc-500" : "bg-emerald-50 text-emerald-700"}`}>{p.close ? "close" : "en cours"}</span>
+                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${p.close ? "bg-zinc-100 text-zinc-500" : "bg-emerald-50 text-emerald-700"}`}>{p.close ? "close" : "en cours"}</span>
                   </div>
                   <div className="mt-3 flex items-end justify-between gap-3">
                     <div>
-                      <div className="text-2xl font-bold tabular-nums text-zinc-900">{euros(p.caCents)}</div>
+                      <div className="text-2xl font-semibold tabular-nums text-zinc-900">{euros(p.caCents)}</div>
                       <div className="text-[11px] text-zinc-400">CA à déclarer · {p.nbEcritures} recette(s)</div>
                     </div>
                     <button onClick={() => copier(p.cle, p.caCents)} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50">
@@ -216,7 +216,7 @@ export function MicroPanel() {
 
           {/* Ajout rapide de recette */}
           <div className="mb-6 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-zinc-900"><Plus className="h-4 w-4 text-emerald-600" /> Encaisser une recette</h3>
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900"><Plus className="h-4 w-4 text-emerald-600" /> Encaisser une recette</h3>
             <div className="flex flex-wrap items-end gap-3">
               <div>
                 <label htmlFor="m-montant" className="mb-1 block text-[11px] font-medium text-zinc-500">Montant (€)</label>
@@ -241,7 +241,7 @@ export function MicroPanel() {
 
           {/* Réglages micro-entreprise */}
           <details className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-            <summary className="cursor-pointer text-sm font-bold text-zinc-900">Mes taux et mon identité</summary>
+            <summary className="cursor-pointer text-sm font-semibold text-zinc-900">Mes taux et mon identité</summary>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <ChampNombre label="Taux de cotisations (%)" aide="relevé sur urssaf.fr — pendant l'ACRE, le taux réduit" valeur={reglages.tauxCotisations} onSave={(v) => majReglages({ tauxCotisations: v })} />
               <ChampNombre label="Plafond de franchise (€)" aide="seuil de ton régime, relevé sur impots.gouv.fr" valeur={reglages.seuilCA} onSave={(v) => majReglages({ seuilCA: v })} />

@@ -40,12 +40,12 @@ export function NewsletterComposer({ subscriberCount }: { subscriberCount: numbe
       <div className="mt-4 flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50"><Mail className="h-5 w-5 text-emerald-600" /></span>
         <div>
-          <h1 className="text-xl font-bold text-zinc-900">Nouvel article / newsletter</h1>
+          <h1 className="text-xl font-semibold text-zinc-900">Nouvel article / newsletter</h1>
           <p className="flex items-center gap-1.5 text-sm text-zinc-500"><Users className="h-3.5 w-3.5" /> {subscriberCount} abonné(s) à la newsletter</p>
         </div>
       </div>
 
-      <div className="mt-6 space-y-4 rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <div className="mt-6 space-y-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div>
           <label htmlFor={`${cid}-c0`} className="mb-1 block text-xs font-semibold text-zinc-500">Titre</label>
           <input id={`${cid}-c0`} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120}

@@ -40,7 +40,7 @@ export default async function AdminMessagesPage({ searchParams }: { searchParams
     <div className="flex h-screen flex-col bg-zinc-50 p-4 sm:p-6">
       <header className="mb-4 flex-shrink-0">
         <Link href="/admin/coach" className="mb-2 inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800"><ArrowLeft className="h-4 w-4" /> Retour au coach</Link>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-zinc-900"><MessagesSquare className="h-6 w-6 text-emerald-600" /> Messages clients</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold text-zinc-900"><MessagesSquare className="h-6 w-6 text-emerald-600" /> Messages clients</h1>
       </header>
       <div className="min-h-0 flex-1">
         <AdminMessages conversations={conversations} initialClient={initialClient} />

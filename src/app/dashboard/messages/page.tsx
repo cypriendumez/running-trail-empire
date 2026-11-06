@@ -53,7 +53,7 @@ export default async function MessagesPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-3">
-        <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight text-zinc-900">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-zinc-900">
           <MessagesSquare className="h-5 w-5 text-emerald-600" aria-hidden />{l.title}
         </h1>
         <p className="mt-0.5 text-sm text-zinc-500">{l.subtitle}</p>

@@ -122,7 +122,7 @@ export function MobileTabBar({ unreadMessages = 0, estEditeur, avertissement }: 
         style={{ bottom: `calc(${HAUTEUR} + env(safe-area-inset-bottom))` }}
       >
         <div className="sticky top-0 flex items-center justify-between border-b border-zinc-100 bg-white px-5 py-3" style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}>
-          <span className="text-sm font-bold text-zinc-900">{d.tout}</span>
+          <span className="text-sm font-semibold text-zinc-900">{d.tout}</span>
           <button type="button" onClick={() => setOuvert(false)} aria-label={d.fermer} className="rounded-full p-1.5 text-zinc-500 active:bg-zinc-100">
             <X className="h-5 w-5" />
           </button>
@@ -139,7 +139,7 @@ export function MobileTabBar({ unreadMessages = 0, estEditeur, avertissement }: 
             if (items.length === 0) return null;
             return (
               <section key={g.titleKey ?? "racine"} className="mb-4" aria-label={g.titleKey ? t(g.titleKey) : undefined}>
-                {g.titleKey && <h2 className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">{t(g.titleKey)}</h2>}
+                {g.titleKey && <h2 className="mb-1.5 px-1 text-[10px] font-semibold text-zinc-500 first-letter:uppercase">{t(g.titleKey)}</h2>}
                 <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-zinc-50 divide-y divide-zinc-100">
                   {items.map((it) => {
                     const actif = estActive(pathname, it.href);
@@ -149,7 +149,7 @@ export function MobileTabBar({ unreadMessages = 0, estEditeur, avertissement }: 
                         <it.icon className={cn("h-5 w-5 shrink-0", actif ? "text-white" : "text-zinc-500")} />
                         <span className="flex-1 truncate">{titre(it.tk)}</span>
                         {badge > 0 && (
-                          <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-white">{badge > 9 ? "9+" : badge}</span>
+                          <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-semibold text-white">{badge > 9 ? "9+" : badge}</span>
                         )}
                         <ChevronRight className={cn("h-4 w-4 shrink-0", actif ? "text-white/70" : "text-zinc-400")} />
                       </Link>
@@ -162,7 +162,7 @@ export function MobileTabBar({ unreadMessages = 0, estEditeur, avertissement }: 
 
           {/* Le compte : mêmes entrées que le pied de la barre latérale, en dernier bloc. */}
           <section className="mb-4" aria-label={t("group.account")}>
-            <h2 className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">{t("group.account")}</h2>
+            <h2 className="mb-1.5 px-1 text-[10px] font-semibold text-zinc-500 first-letter:uppercase">{t("group.account")}</h2>
             <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-zinc-50 divide-y divide-zinc-100">
               {estEditeur && (
                 <Link href="/admin" className={cn(LIGNE, "bg-emerald-50 font-semibold text-emerald-700 active:bg-emerald-100")}>

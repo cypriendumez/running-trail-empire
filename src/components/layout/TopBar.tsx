@@ -157,7 +157,7 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
     <header className="h-16 border-b border-zinc-100 bg-white md:bg-white/80 md:backdrop-blur-sm flex items-center px-6 gap-4 sticky top-0 z-30">
       {/* Recherche globale — courses + parcours, résultats en direct */}
       <div ref={searchRef} className="relative flex-1 max-w-md">
-        <div className="flex items-center gap-2 px-3.5 py-2.5 bg-zinc-50 rounded-2xl border border-zinc-200 focus-within:ring-2 focus-within:ring-emerald-500/40 focus-within:border-emerald-400 transition-all">
+        <div className="flex h-9 items-center gap-2 px-3 bg-zinc-50 rounded-lg border border-zinc-200/80 focus-within:bg-white focus-within:border-zinc-300 focus-within:ring-2 focus-within:ring-zinc-900/5 transition-colors">
           {searching ? <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" /> : <Search className="w-4 h-4 text-zinc-400" />}
           <input
             value={q}
@@ -173,20 +173,20 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
         </div>
 
         {openSearch && (
-          <div className="absolute left-0 right-0 top-full mt-2 max-h-[26rem] overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl z-50">
+          <div className="absolute left-0 right-0 top-full mt-2 max-h-[26rem] overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] z-50">
             {raceHits.length === 0 && parcoursHits.length === 0 ? (
               <div className="px-4 py-6 text-center text-sm text-zinc-400">{t("topbar.noResult", { q: q.trim() })}</div>
             ) : (
               <>
                 {raceHits.length > 0 && (
                   <div>
-                    <div className="px-4 pt-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-400">{t("nav.races")}</div>
+                    <div className="px-4 pt-3 pb-1.5 text-xs font-medium text-zinc-400">{t("nav.races")}</div>
                     {raceHits.map((r, i) => (
                       <button key={i} onClick={() => goRace(r.name)}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-zinc-50">
-                        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-amber-50"><Flag className="h-4 w-4 text-amber-600" /></span>
+                        <Flag className="h-4 w-4 flex-shrink-0 text-zinc-400" strokeWidth={1.5} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold text-zinc-800">{r.name}</span>
+                          <span className="block truncate text-sm font-medium text-zinc-900">{r.name}</span>
                           <span className="block truncate text-[11px] text-zinc-500">
                             {[r.city, r.distanceKm != null ? `${r.distanceKm} km` : "", r.date && !r.date.startsWith("2099") ? formatDateCivile(r.date, lang, { day: "numeric", month: "short", year: "numeric" }) : (RX[lang] ?? RX.fr).dateTBD].filter(Boolean).join(" · ")}
                           </span>
@@ -197,13 +197,13 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
                 )}
                 {parcoursHits.length > 0 && (
                   <div className={raceHits.length > 0 ? "border-t border-zinc-100" : ""}>
-                    <div className="px-4 pt-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-400">{t("topbar.routes")}</div>
+                    <div className="px-4 pt-3 pb-1.5 text-xs font-medium text-zinc-400">{t("topbar.routes")}</div>
                     {parcoursHits.map((p) => (
                       <button key={p.id} onClick={() => goParcours(p.nom)}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-zinc-50">
-                        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-50"><RouteIcon className="h-4 w-4 text-emerald-600" /></span>
+                        <RouteIcon className="h-4 w-4 flex-shrink-0 text-zinc-400" strokeWidth={1.5} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold text-zinc-800">{p.nom}</span>
+                          <span className="block truncate text-sm font-medium text-zinc-900">{p.nom}</span>
                           <span className="block truncate text-[11px] text-zinc-500">{[p.distance_km ? fmtKm(p.distance_km, lang, 1) : "", p.localisation?.departement].filter(Boolean).join(" · ")}</span>
                         </span>
                       </button>
@@ -229,7 +229,7 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
           >
             <Bell className="w-4 h-4 text-zinc-600" />
             {unread > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold text-white bg-red-500 rounded-full ring-2 ring-white">
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[11px] font-medium tabular-nums text-white bg-red-600 rounded-full ring-2 ring-white">
                 {unread > 9 ? "9+" : unread}
               </span>
             )}
@@ -240,7 +240,7 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
               {/* ⚠️ SUR TÉLÉPHONE, LE PANNEAU PREND TOUTE LA LARGEUR sous la barre (une
                   feuille), au lieu d'un menu de 320 px accroché à la cloche qui sortait
                   de l'écran ; à partir de sm, le menu d'avant. Cyprien, 21/09/2026. */}
-              <div className="fixed inset-x-3 top-[4.5rem] z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-h-[26rem]">
+              <div className="fixed inset-x-3 top-[4.5rem] z-50 max-h-[70vh] overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-h-[26rem]">
                 <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-zinc-100 sticky top-0 bg-white">
                   <span className="font-semibold text-sm text-zinc-900">{t("topbar.notifs")}</span>
                   <span className="flex items-center gap-2">
@@ -291,7 +291,7 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
             onClick={() => { setOpenMenu((v) => !v); setOpenNotif(false); }}
             className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-2xl hover:bg-zinc-50 transition-colors"
           >
-            <div className="w-9 h-9 rounded-2xl overflow-hidden flex items-center justify-center font-semibold text-sm shadow-sm" style={{ background: ac.bg, color: ac.fg }}>
+            <div className="w-9 h-9 rounded-full overflow-hidden flex items-center justify-center font-medium text-sm" style={{ background: ac.bg, color: ac.fg }}>
               {avatarSrc
                 // eslint-disable-next-line @next/next/no-img-element
                 ? <img src={avatarSrc} alt="" className="w-full h-full object-cover" />
@@ -307,7 +307,7 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
           {openMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setOpenMenu(false)} />
-              <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-zinc-200 bg-white shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-56 rounded-xl border border-zinc-200 bg-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-zinc-100">
                   <div className="text-sm font-semibold text-zinc-900 truncate">{name || t("topbar.account")}</div>
                   {email && <div className="text-xs text-zinc-400 truncate">{email}</div>}

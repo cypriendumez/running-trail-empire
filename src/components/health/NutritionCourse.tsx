@@ -160,7 +160,7 @@ export function NutritionCourse({ courses = [], poidsKg = null }: { courses?: Co
         <div className="flex items-start gap-3">
           <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700"><Utensils className="h-[18px] w-[18px]" /></span>
           <div>
-            <h3 className="text-base font-bold text-zinc-900">{t("titre")}</h3>
+            <h3 className="text-base font-semibold text-zinc-900">{t("titre")}</h3>
             <p className="mt-0.5 text-sm text-zinc-500">{t("sous")}</p>
           </div>
         </div>
@@ -223,7 +223,7 @@ export function NutritionCourse({ courses = [], poidsKg = null }: { courses?: Co
               ].map((x) => (
                 <div key={x.l} className="px-2 text-center first:pl-0 last:pr-0">
                   <x.icone className={`mx-auto h-4 w-4 ${x.c}`} aria-hidden />
-                  <div className="mt-1.5 text-2xl font-bold tabular-nums text-zinc-900">{x.v.toLocaleString(lang)}<span className="ml-0.5 text-sm font-semibold text-zinc-400">{x.u}</span></div>
+                  <div className="mt-1.5 text-2xl font-semibold tabular-nums text-zinc-900">{x.v.toLocaleString(lang)}<span className="ml-0.5 text-sm font-semibold text-zinc-400">{x.u}</span></div>
                   <div className="text-xs text-zinc-500">{x.l}</div>
                 </div>
               ))}
@@ -255,11 +255,11 @@ export function NutritionCourse({ courses = [], poidsKg = null }: { courses?: Co
               <div className="text-[13px] font-semibold text-zinc-600">{t("deroule")}</div>
               <ol className="mt-3 space-y-4 text-sm">
                 <li>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("avant")}</div>
+                  <div className="text-xs font-semibold text-zinc-400 first-letter:uppercase">{t("avant")}</div>
                   <p className="mt-1 text-zinc-700">{plan.avantCourseG != null ? t("avantPoids", { g: plan.avantCourseG }) : t("avantSans")}</p>
                 </li>
                 <li>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("pendant")}</div>
+                  <div className="text-xs font-semibold text-zinc-400 first-letter:uppercase">{t("pendant")}</div>
                   <p className="mt-1 text-zinc-700">{t("boire")}</p>
                   <ul className="mt-2 space-y-1">
                     {d.prises.slice(0, PRISES_VISIBLES).map((m) => (
@@ -273,7 +273,7 @@ export function NutritionCourse({ courses = [], poidsKg = null }: { courses?: Co
                   {d.prises.length > PRISES_VISIBLES && <p className="mt-1 pl-[4.25rem] text-xs text-zinc-500">{t("puis", { n: d.intervalleMin })}</p>}
                 </li>
                 <li>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("apres")}</div>
+                  <div className="text-xs font-semibold text-zinc-400 first-letter:uppercase">{t("apres")}</div>
                   <p className="mt-1 text-zinc-700">{t("apresTxt")}</p>
                 </li>
               </ol>

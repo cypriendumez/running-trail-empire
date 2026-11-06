@@ -45,7 +45,7 @@ function Avatar({ author, size = 40 }: { author?: Author | null; size?: number }
     return <img src={author.avatar_url} alt="" style={s} className="rounded-full object-cover ring-2 ring-white" />;
   }
   return (
-    <div style={s} className="flex items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-xs font-bold text-white ring-2 ring-white">
+    <div style={s} className="flex items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-xs font-semibold text-white ring-2 ring-white">
       {initials(author?.full_name)}
     </div>
   );
@@ -58,7 +58,7 @@ function Avatar({ author, size = 40 }: { author?: Author | null; size?: number }
 export function SocleEnAttente() {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-16 text-center">
-      <p className="text-lg font-bold text-zinc-900">Le Club arrive</p>
+      <p className="text-lg font-semibold text-zinc-900">Le Club arrive</p>
       <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">
         Le fil social attend l&apos;activation de sa base de données. En attendant,
         l&apos;onglet Actualité fonctionne normalement.
@@ -103,7 +103,7 @@ export function SocialHub({ recentWorkouts, clubs = [], moi, suivre = null }: {
       {/* Un seul rang : le titre de la vue, et le bouton qui mène à l'autre. */}
       <header className="flex items-center justify-between gap-3 pt-4 pb-3 sm:pt-6">
         <div className="min-w-0">
-          <h1 className="truncate text-xl font-black tracking-tight text-zinc-900 sm:text-2xl">{auFil ? t("club.tab.feed") : t("nav.community")}</h1>
+          <h1 className="truncate text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">{auFil ? t("club.tab.feed") : t("nav.community")}</h1>
           {auFil && <p className="mt-0.5 hidden text-sm text-zinc-500 sm:block">{t("club.sub")}</p>}
         </div>
         <button type="button" onClick={() => setTab(auFil ? "athletes" : "feed")}
@@ -265,7 +265,7 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
 
       {workouts.length > 0 && (
         <div className="mt-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("club.attach")}</div>
+          <div className="mb-2 text-xs font-semibold text-zinc-400 first-letter:uppercase">{t("club.attach")}</div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {workouts.map((w) => {
               const sel = workoutId === w.id;
@@ -380,15 +380,15 @@ function PostCard({ post, onChange }: { post: Post; onChange: () => void }) {
 
       {post.workout && (
         <div className="mx-4 mb-3 rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-800 p-4 text-white">
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-emerald-400">
+          <div className="mb-3 text-xs font-semibold text-emerald-400 first-letter:uppercase">
             {post.workout.title || post.workout.type || t("club.session")}
           </div>
           {stats.length > 0 ? (
             <div className="grid grid-cols-3 gap-2">
               {stats.map((s) => (
                 <div key={s.label}>
-                  <div className="text-xl font-bold leading-tight">{s.value}</div>
-                  <div className="text-[10px] uppercase tracking-wide text-zinc-400">{s.label}</div>
+                  <div className="text-xl font-semibold leading-tight">{s.value}</div>
+                  <div className="text-[10px] text-zinc-400 first-letter:uppercase">{s.label}</div>
                 </div>
               ))}
             </div>

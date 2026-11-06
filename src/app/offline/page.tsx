@@ -22,10 +22,10 @@ export default function OfflinePage() {
         <Logo size={40} />
         <Wordmark className="text-xl" />
       </div>
-      <div className="w-16 h-16 bg-zinc-100 rounded-3xl flex items-center justify-center mb-6">
+      <div className="w-16 h-16 bg-zinc-100 rounded-2xl flex items-center justify-center mb-6">
         <WifiOff className="w-8 h-8 text-zinc-500" />
       </div>
-      <h1 className="text-2xl font-bold text-zinc-900 mb-3">{L.offlineTitle}</h1>
+      <h1 className="text-2xl font-semibold text-zinc-900 mb-3">{L.offlineTitle}</h1>
       <p className="text-zinc-500 max-w-sm mb-8">{L.offlineBody}</p>
       <button
         type="button"

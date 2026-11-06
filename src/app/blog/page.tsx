@@ -126,8 +126,8 @@ export default function BlogPage() {
 
       {/* HERO */}
       <Container className="pt-16 pb-10 text-center sm:pt-20">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#047857]">{B.heroEyebrow}</p>
-        <h1 className="mx-auto mt-3 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
+        <p className="text-[11px] font-semibold text-[#047857] first-letter:uppercase">{B.heroEyebrow}</p>
+        <h1 className="mx-auto mt-3 max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl">
           {B.heroTitleA}<span className="text-[#059669]">{B.heroAccent}</span>.
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-zinc-500">{B.heroSubtitle}</p>
@@ -140,7 +140,7 @@ export default function BlogPage() {
             <button
               key={c}
               onClick={() => setCat(c)}
-              className={`whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${
                 cat === c ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
               }`}
             >
@@ -155,24 +155,24 @@ export default function BlogPage() {
           {/* FEATURED */}
           {showFeatured && (
             <div className="mb-16 grid items-center gap-10 lg:grid-cols-2">
-              <Link href={lienDe(featured.key)} className="group relative block aspect-[4/3] overflow-hidden rounded-3xl">
+              <Link href={lienDe(featured.key)} className="group relative block aspect-[4/3] overflow-hidden rounded-2xl">
                 <img src={featured.img} alt={B.posts[featured.key].title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                 {!estEcrit(featured.key) && <BadgeAVenir t={B.bientot} />}
               </Link>
               <div>
                 <CatBadge code={featured.cat} label={B.cats[featured.cat]} />
-                <h2 className="mt-4 text-3xl font-bold leading-tight tracking-tight lg:text-4xl">{B.posts[featured.key].title}</h2>
+                <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-tight lg:text-4xl">{B.posts[featured.key].title}</h2>
                 <p className="mt-4 leading-relaxed text-zinc-500">{B.posts[featured.key].excerpt}</p>
 
                 <Card className="mt-7 p-6">
-                  <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">{B.manifesto.label}</p>
+                  <p className="text-xs font-semibold text-zinc-400 first-letter:uppercase">{B.manifesto.label}</p>
                   <div className="mt-4 grid grid-cols-2 gap-5">
                     {[
                       { label: B.manifesto.humanLabel, brand: false, items: B.manifesto.human },
                       { label: B.manifesto.aiLabel, brand: true, items: B.manifesto.ai },
                     ].map((col) => (
                       <div key={col.label}>
-                        <div className={`mb-3 text-xs font-bold uppercase tracking-wider ${col.brand ? "text-[#059669]" : "text-zinc-900"}`}>{col.label}</div>
+                        <div className={`mb-3 text-xs font-semibold uppercase tracking-wider ${col.brand ? "text-[#059669]" : "text-zinc-900"}`}>{col.label}</div>
                         <ul className="space-y-1.5">
                           {col.items.map((item) => (
                             <li key={item} className="flex items-center gap-2 text-xs text-zinc-500">

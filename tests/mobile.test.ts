@@ -307,7 +307,7 @@ test("l'accueil s'ouvre sur la séance du jour, pas sur une demande d'avis", () 
   // ⚠️ VISER LA BONNE CARTE : `coachKey.subtitle` existe dans DEUX variantes (compacte et
   // complète). Une assertion sur le fichier entier se satisfait de l'autre — mutation
   // passée au vert le 23/09/2026.
-  const iVerte = b.indexOf('order-first relative mb-5 overflow-hidden rounded-3xl p-5');
+  const iVerte = b.indexOf('order-first relative mb-5 overflow-hidden rounded-2xl p-5');
   assert.ok(iVerte > 0, "la carte complète de la séance du jour a disparu");
   const carte = b.slice(iVerte, b.indexOf("</motion.div>", iVerte));
   assert.match(carte, /etapesSeance\(coachKey\.subtitle\)/, "la prescription n'est plus découpée en étapes");
@@ -317,7 +317,7 @@ test("l'accueil s'ouvre sur la séance du jour, pas sur une demande d'avis", () 
   // Le badge ne se coupe pas en deux sur un écran étroit.
   // 06/11/2026 : `badgeCoach` (« Séance du jour », ou « Prochaine séance · 7 nov. » quand ce
   // n'est pas celle du jour) — sur une ligne, et tronqué plutôt que de déborder.
-  assert.match(b, /whitespace-nowrap text-\[11px\] font-bold uppercase[^"]*truncate[^"]*">\{badgeCoach\}/, "le badge de la séance se coupe de nouveau sur deux lignes");
+  assert.match(b, /whitespace-nowrap [^"]*truncate[^"]*">\{badgeCoach\}/, "le badge de la séance se coupe de nouveau sur deux lignes");
   const n = [...readFileSync("src/lib/i18n/translations.ts", "utf8").matchAll(/"dash\.coach\.pourquoi":/g)].length;
   assert.equal(n, 5, `« dash.coach.pourquoi » présent ${n} fois, attendu 5`);
 });
@@ -335,8 +335,8 @@ test("l'objectif de l'entête tient sur une rangée — et reste UN seul lien", 
   assert.ok(!/pointer-events-none/.test(bloc), "`pointer-events-none` est revenu sur la rangée : il éteint aussi ce qu'elle contient");
   assert.match(bloc, /<span className="mt-2\.5 hidden items-center[^"]*sm:inline-flex/, "le bouton « Voir mon plan » n'est plus un habillage réservé au bureau");
   // Sur téléphone : pas de libellé « Objectif », un chevron à la place du bouton.
-  assert.match(bloc, /className="hidden text-\[10px\] font-semibold uppercase[^"]*sm:block">\{hl\.goal\}/, "le libellé « Objectif » est revenu sur téléphone, où le J‑32 le dit déjà");
-  assert.match(bloc, /<ChevronRight className="h-5 w-5 flex-shrink-0 text-\[#8aa6a6\] sm:hidden"/, "le chevron qui signale que la rangée est cliquable a disparu");
+  assert.match(bloc, /className="hidden [^"]*sm:block">\{hl\.goal\}/, "le libellé « Objectif » est revenu sur téléphone, où le J‑32 le dit déjà");
+  assert.match(bloc, /<ChevronRight className="h-5 w-5 flex-shrink-0 text-zinc-400 sm:hidden"/, "le chevron qui signale que la rangée est cliquable a disparu");
 });
 
 test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les réglages en dessous", () => {
@@ -382,7 +382,7 @@ test("sur téléphone, les plans d'entraînement se lisent en petites cartes et 
   // une LISTE à vignettes (photo 112 px à gauche, texte à droite) : 4 plans par écran à
   // 375 px, autant que les deux colonnes de petites cartes d'avant, et lisibles.
   assert.match(src, /grid grid-cols-1 gap-2\.5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3/, "la grille des plans a changé sur téléphone");
-  assert.match(src, /group relative flex overflow-hidden rounded-2xl [^"]*sm:flex-col sm:rounded-3xl/, "la carte n'est plus une ligne compacte sur téléphone");
+  assert.match(src, /group relative flex overflow-hidden rounded-2xl [^"]*sm:flex-col sm:rounded-2xl/, "la carte n'est plus une ligne compacte sur téléphone");
   assert.match(src, /relative h-auto w-28 flex-shrink-0 [^"]*sm:aspect-\[4\/3\] sm:w-full/, "la vignette photo n'est plus compacte sur téléphone");
   assert.match(src, /flex min-w-0 flex-1 flex-col p-3\.5 sm:p-4/, "les cartes de plans ont repris un grand rembourrage sur téléphone");
   // Le tableau des semaines (7 colonnes) ne tient pas en 375 px : une liste empilée le remplace.

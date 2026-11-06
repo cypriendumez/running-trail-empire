@@ -51,7 +51,7 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
       <div className="mb-3 text-4xl">⚠️</div>
-      <h2 className="text-lg font-bold text-zinc-900">{t(reseau ? "err.reseau.title" : "err.title")}</h2>
+      <h2 className="text-lg font-semibold text-zinc-900">{t(reseau ? "err.reseau.title" : "err.title")}</h2>
       <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-500">
         {t(reseau ? "err.reseau.desc" : "err.desc")}
       </p>

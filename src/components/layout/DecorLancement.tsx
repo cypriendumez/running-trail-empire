@@ -40,7 +40,7 @@ export function DecorLancement({ langue }: { langue: Lang }) {
             </svg>
             <Logo size={84} className="lancement-tuile" />
           </div>
-          <div className="lancement-nom mt-8 pl-[0.32em] text-[26px] font-extrabold tracking-[0.32em] text-[#F3F1E6]">PACEVO</div>
+          <div className="lancement-nom mt-8 pl-[0.32em] text-[26px] font-semibold tracking-[0.32em] text-[#F3F1E6]">PACEVO</div>
           <div className="lancement-slogan mt-2 text-[13px] font-medium tracking-wide text-emerald-100/75">{SLOGAN_LANCEMENT[langue]}</div>
           <svg className="lancement-route mt-10" width="220" height="42" viewBox="0 0 220 42">
             <path d={ROUTE_LANCEMENT} fill="none" stroke="rgba(243,241,230,.16)" strokeWidth="3" strokeLinecap="round" />

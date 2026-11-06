@@ -155,15 +155,14 @@ const total = CATALOG.reduce((s, c) => s + c.workouts.length, 0);
 export default function EntrainementsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
-      <div className="relative overflow-hidden text-white" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 45%,#0d9488 100%)" }}>
-        <div className="pointer-events-none absolute -top-24 -right-16 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />
+      <div className="relative overflow-hidden text-white" style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}>
         <div className="relative z-10 mx-auto max-w-5xl px-5 py-8">
           <Link href="/admin/coach" className="inline-flex items-center gap-1.5 text-sm text-white/80 transition-colors hover:text-white"><ArrowLeft className="h-4 w-4" /> Retour au coach</Link>
           <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/20 backdrop-blur-md">
             <Library className="h-3.5 w-3.5 text-amber-300" />
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-50">Bibliothèque coach · {total} entraînements</span>
+            <span className="text-[11px] font-semibold text-amber-50 first-letter:uppercase">Bibliothèque coach · {total} entraînements</span>
           </div>
-          <h1 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight drop-shadow-sm">Tous les entraînements</h1>
+          <h1 className="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight">Tous les entraînements</h1>
           <p className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-white/85">Le répertoire complet dans lequel l'IA pioche pour bâtir des plans <b>personnalisés</b> — selon le profil, l'objectif, l'historique, le sommeil et la forme de chaque coureur. Allures calculées depuis sa VMA. Pour progresser, sans se blesser.</p>
         </div>
       </div>
@@ -176,7 +175,7 @@ export default function EntrainementsPage() {
                 <cat.icon className="h-5 w-5" />
               </span>
               <div>
-                <h2 className="text-lg font-bold leading-tight text-zinc-900">{cat.title} <span className="text-sm font-normal text-zinc-400">· {cat.workouts.length}</span></h2>
+                <h2 className="text-lg font-semibold leading-tight text-zinc-900">{cat.title} <span className="text-sm font-normal text-zinc-400">· {cat.workouts.length}</span></h2>
                 <p className="text-sm text-zinc-500">{cat.intro}</p>
               </div>
             </div>
@@ -184,8 +183,8 @@ export default function EntrainementsPage() {
               {cat.workouts.map((w) => (
                 <div key={w.name} className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-bold text-zinc-900">{w.name}</h3>
-                    <span className="flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: `${cat.from}14`, color: cat.from }}>{w.tag}</span>
+                    <h3 className="font-semibold text-zinc-900">{w.name}</h3>
+                    <span className="flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: `${cat.from}14`, color: cat.from }}>{w.tag}</span>
                   </div>
                   <p className="mt-2 text-sm leading-relaxed text-zinc-600"><b className="text-zinc-700">Objectif :</b> {w.objective}</p>
                   <p className="mt-1.5 text-sm leading-relaxed text-zinc-600"><b className="text-zinc-700">Structure :</b> {w.structure}</p>

@@ -12,13 +12,13 @@ export async function LegalContent({ page, date }: { page: "mentions" | "terms" 
     <div className="min-h-screen bg-white font-sans text-zinc-700">
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-6 py-12 sm:py-16">
-        <h1 className="mt-4 text-3xl font-bold tracking-tight text-zinc-900">{p.heading}</h1>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-900">{p.heading}</h1>
         <p className="mt-2 text-sm text-zinc-500">{L.updatedLabel} : {date}</p>
         <div className="mt-8 space-y-7 text-[15px] leading-relaxed">
           {p.intro?.map((t, i) => <p key={`intro-${i}`}>{t}</p>)}
           {p.sections.map((s, i) => (
             <section key={i}>
-              <h2 className="mb-1.5 text-lg font-bold text-zinc-900">{s.title}</h2>
+              <h2 className="mb-1.5 text-lg font-semibold text-zinc-900">{s.title}</h2>
               <div className="space-y-2 text-zinc-700">
                 {s.paras?.map((t, j) => <p key={j}>{t}</p>)}
                 {s.list && (

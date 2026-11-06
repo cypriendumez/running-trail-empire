@@ -25,7 +25,7 @@ export function MetricChart({ titre, unite, couleur, points, resume }: {
   return (
     <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4">
       <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-sm font-bold text-zinc-900">{titre}</h2>
+        <h2 className="text-sm font-semibold text-zinc-900">{titre}</h2>
         <span className="text-xs text-zinc-400">{Math.round(min)} – {Math.round(max)} {unite}</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-28 w-full">
@@ -36,7 +36,7 @@ export function MetricChart({ titre, unite, couleur, points, resume }: {
         {resume.map((r) => (
           <div key={r.label} className="flex items-center justify-between py-1.5 text-sm">
             <span className="text-zinc-500">{r.label}</span>
-            <span className="font-bold text-zinc-900">{r.value}</span>
+            <span className="font-semibold text-zinc-900">{r.value}</span>
           </div>
         ))}
       </div>

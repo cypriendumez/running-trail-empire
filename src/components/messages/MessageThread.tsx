@@ -251,7 +251,7 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
   const mailto = `mailto:${EDITEUR.email}?subject=${encodeURIComponent("Pacevo — ")}`;
 
   return (
-    <div className="flex h-full min-h-[520px] overflow-hidden rounded-3xl border border-zinc-200 bg-white">
+    <div className="flex h-full min-h-[520px] overflow-hidden rounded-2xl border border-zinc-200 bg-white">
       {/* ░░ Conversations ░░ */}
       <aside className={`${ouverte ? "hidden" : "flex"} w-full flex-shrink-0 flex-col border-r border-zinc-100 md:flex md:w-80`}>
         <div className="px-4 pb-2 pt-4">
@@ -268,7 +268,7 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
             return (
               <Fragment key={c.id}>
                 {c.id !== COACH && conversations.findIndex((x) => x.id !== COACH) === conversations.indexOf(c) && (
-                  <div className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{d["amis"]}</div>
+                  <div className="px-3 pb-1 pt-4 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["amis"]}</div>
                 )}
                 <button onClick={() => ouvrir(c.id)}
                   className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors ${active || (conv === c.id && !ouverte) ? "bg-zinc-100 md:bg-zinc-100" : "hover:bg-zinc-50"}`}>
@@ -333,7 +333,7 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}
-                  <div className={`max-w-[78%] rounded-3xl px-4 py-2 text-[15px] leading-relaxed ${moi ? "rounded-br-lg bg-emerald-600 text-white" : "rounded-bl-lg bg-zinc-100 text-zinc-900"}`}>
+                  <div className={`max-w-[78%] rounded-2xl px-4 py-2 text-[15px] leading-relaxed ${moi ? "rounded-br-lg bg-emerald-600 text-white" : "rounded-bl-lg bg-zinc-100 text-zinc-900"}`}>
                     {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
                     {m.attachments.length > 0 && (
                       <div className="mt-1.5 flex flex-col gap-1">
@@ -392,7 +392,7 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
             onChange={(e) => { setBody(e.target.value); e.target.style.height = "auto"; e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`; }}
             // Entrée envoie, Maj+Entrée va à la ligne — comme dans toute messagerie.
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void doSend(); } }}
-            className="max-h-40 min-h-[40px] flex-1 resize-none rounded-3xl border border-zinc-200 bg-white px-4 py-2 text-[15px] leading-relaxed text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20" />
+            className="max-h-40 min-h-[40px] flex-1 resize-none rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-[15px] leading-relaxed text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20" />
           <button type="submit" disabled={sending || (!body.trim() && pending.length === 0)} aria-label={d["envoyer"]}
             className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white transition-colors hover:bg-emerald-700 disabled:bg-zinc-200 disabled:text-zinc-400">
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

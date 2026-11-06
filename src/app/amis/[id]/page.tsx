@@ -64,9 +64,9 @@ export default async function AmiPage({ params }: { params: Promise<{ id: string
             // eslint-disable-next-line @next/next/no-img-element
             <img src={athlete.avatar_url} alt="" className="mt-8 h-20 w-20 rounded-full object-cover ring-4 ring-white shadow" />
           ) : (
-            <div className="mt-8 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-2xl font-bold text-white ring-4 ring-white shadow">{initiale}</div>
+            <div className="mt-8 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-2xl font-semibold text-white ring-4 ring-white shadow">{initiale}</div>
           )}
-          <h1 className="mt-5 text-2xl font-black tracking-tight text-zinc-900">{avec(L.titre)}</h1>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight text-zinc-900">{avec(L.titre)}</h1>
           <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-500">{avec(L.sous)}</p>
           <div className="mt-7 flex w-full max-w-xs flex-col gap-2">
             <Link href={`/login?next=${encodeURIComponent(`/amis/${valide}`)}`} className="rounded-full bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">{L.connexion}</Link>
@@ -75,7 +75,7 @@ export default async function AmiPage({ params }: { params: Promise<{ id: string
         </>
       ) : (
         <>
-          <h1 className="mt-8 text-2xl font-black tracking-tight text-zinc-900">{L.introuvable}</h1>
+          <h1 className="mt-8 text-2xl font-semibold tracking-tight text-zinc-900">{L.introuvable}</h1>
           <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-500">{L.introuvableSous}</p>
           <Link href="/" className="mt-7 rounded-full bg-zinc-900 px-6 py-3 text-sm font-semibold text-white">{L.decouvrir}</Link>
         </>

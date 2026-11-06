@@ -69,21 +69,21 @@ export function StreakCard({ streak }: { streak: StreakResult | null }) {
     new Date(`${iso}T12:00:00Z`).toLocaleDateString(lang, { day: "numeric", month: "short" });
 
   return (
-    <div className="mb-5 overflow-hidden rounded-3xl border border-[#e3eef0] bg-white shadow-[0_10px_36px_-28px_rgba(16,24,40,0.35)]">
+    <div className="mb-5 overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
       <div className="flex flex-col gap-5 px-5 py-5 sm:flex-row sm:items-center sm:gap-7 sm:px-6">
         {/* Le compteur */}
-        <div className="flex flex-shrink-0 items-center gap-3.5 sm:w-[8.5rem] sm:border-r sm:border-[#eef4f5] sm:pr-5">
+        <div className="flex flex-shrink-0 items-center gap-3.5 sm:w-[8.5rem] sm:border-r sm:border-zinc-100 sm:pr-5">
           <span
-            className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl ${n > 0 ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-sm" : "bg-zinc-100 text-zinc-300"}`}
+            className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${n > 0 ? "bg-zinc-50 text-zinc-500" : "bg-zinc-50 text-zinc-300"}`}
           >
-            <Flame className="h-6 w-6" />
+            <Flame className="h-[18px] w-[18px]" strokeWidth={1.5} />
           </span>
           <div className="min-w-0">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-[2rem] font-black leading-none tabular-nums text-[#11201d]">{n}</span>
-              <span className="text-sm font-semibold text-[#8aa6a6]">{n === 1 ? t("streak.unit1") : t("streak.unit")}</span>
+              <span className="text-[2rem] font-semibold leading-none tracking-tight tabular-nums text-zinc-900">{n}</span>
+              <span className="text-sm text-zinc-400">{n === 1 ? t("streak.unit1") : t("streak.unit")}</span>
             </div>
-            <div className="mt-1 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8aa6a6]">
+            <div className="mt-1 whitespace-nowrap text-[13px] text-zinc-500">
               {t("streak.title")}
             </div>
           </div>
@@ -104,7 +104,7 @@ export function StreakCard({ streak }: { streak: StreakResult | null }) {
                   <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full ring-1 sm:h-7 sm:w-7 ${s.dot} ${s.ring}`}>
                     <Icone className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5" strokeWidth={2.5} />
                   </span>
-                  <span className="text-[9px] font-medium uppercase leading-none text-[#a9bfbd]">
+                  <span className="text-[11px] leading-none text-zinc-400">
                     {dt.toLocaleDateString(lang, { weekday: "narrow" })}
                   </span>
                 </div>
@@ -116,7 +116,7 @@ export function StreakCard({ streak }: { streak: StreakResult | null }) {
             {legende.map((s) => {
               const Icone = s.icon;
               return (
-                <span key={s.legend} className="inline-flex items-center gap-1 text-[10px] text-[#8aa6a6]">
+                <span key={s.legend} className="inline-flex items-center gap-1 text-[11px] text-zinc-500">
                   <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full ring-1 ${s.dot} ${s.ring}`}>
                     <Icone className="h-2 w-2" strokeWidth={3} />
                   </span>
@@ -129,9 +129,9 @@ export function StreakCard({ streak }: { streak: StreakResult | null }) {
       </div>
 
       {/* Le contrat du jour, et ce qui pourrait l'entamer — des faits, pas une menace */}
-      <div className="border-t border-[#eef4f5] bg-[#fbfdfd] px-5 py-3 sm:px-6">
-        <p className="text-[13px] font-medium text-[#3f5b57]">{t(cleDuJour(streak.today))}</p>
-        <p className="mt-1 text-[11px] leading-relaxed text-[#8aa6a6]">
+      <div className="border-t border-zinc-100 bg-zinc-50/60 px-5 py-3 sm:px-6">
+        <p className="text-[13px] font-medium text-zinc-700">{t(cleDuJour(streak.today))}</p>
+        <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
           {streak.threat
             ? t("streak.threat", { d: dateCourte(streak.threat.date) })
             : streak.pending > 0

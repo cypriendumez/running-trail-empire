@@ -60,7 +60,7 @@ export default function ForgotPasswordPage() {
             <Logo size={40} />
             <Wordmark className="text-xl" />
           </Link>
-          <h1 className="text-2xl font-bold text-zinc-900">{L.title}</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900">{L.title}</h1>
           <p className="text-zinc-500 text-sm mt-1">{L.subtitle}</p>
         </div>
 

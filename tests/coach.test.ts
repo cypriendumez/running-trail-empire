@@ -3958,7 +3958,10 @@ test("un repli local ne se félicite JAMAIS", () => {
   const messages = [...i18n.matchAll(/"t\.savedLocal": "([^"]+)"/g)].map((m) => m[1]);
   assert.equal(messages.length, 5, "les 5 langues doivent avoir le message");
   for (const m of messages) {
-    assert.ok(/⚠️/.test(m), `message de repli sans avertissement : « ${m} »`);
+    // 06/11/2026 (passe « unslop ») : plus d'emoji ⚠️ dans le texte — c'est `toast.warning`
+    // (vérifié ci-dessus) qui porte l'icône d'avertissement. Le texte, lui, doit insister sur
+    // CE navigateur et dire que la sauvegarde en ligne a échoué.
+    assert.ok(/\b(CE|THIS|DIESEM|ESTE|NESTE)\b/.test(m) && /—/.test(m), `message de repli sans avertissement : « ${m} »`);
     assert.ok(!/^(Parcours sauvegardé localement|Route saved locally)/.test(m), `message trop rassurant : « ${m} »`);
   }
 });

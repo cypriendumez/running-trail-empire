@@ -78,11 +78,11 @@ export function VueArticle({ slug }: { slug: string }) {
             <ArrowLeft className="h-4 w-4" /> {RETOUR[lang] ?? RETOUR.fr}
           </Link>
 
-          <h1 className="mt-6 text-3xl font-bold leading-[1.15] tracking-tight text-zinc-900 sm:text-4xl">
+          <h1 className="mt-6 text-3xl font-semibold leading-[1.15] tracking-tight text-zinc-900 sm:text-4xl">
             {t.title}
           </h1>
 
-          <p className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">
+          <p className="mt-3 text-xs font-medium text-zinc-400 first-letter:uppercase">
             {MAJ[lang] ?? MAJ.fr} {a.maj}
           </p>
 
@@ -123,7 +123,7 @@ export function VueArticle({ slug }: { slug: string }) {
           {/* Les sources sont en BAS et cliquables, pas en note de bas de page décorative :
               chaque chiffre du texte doit pouvoir être remonté à sa publication. */}
           <div className="mt-4 border-t border-zinc-200 pt-8">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
+            <h2 className="text-xs font-semibold text-zinc-400 first-letter:uppercase">
               {SOURCES[lang] ?? SOURCES.fr}
             </h2>
             <ul className="mt-4 space-y-3">
@@ -143,7 +143,7 @@ export function VueArticle({ slug }: { slug: string }) {
             </ul>
           </div>
 
-          <div className="mt-14 surface-brand rounded-3xl px-8 py-12 text-center">
+          <div className="mt-14 surface-brand rounded-2xl px-8 py-12 text-center">
             <p className="mx-auto max-w-md text-xl font-semibold leading-snug tracking-tight">
               {t.excerpt}
             </p>

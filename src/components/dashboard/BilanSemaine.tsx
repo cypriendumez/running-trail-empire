@@ -45,7 +45,7 @@ export function BilanSemaine({ ouvert }: { ouvert: boolean }) {
       <div className="flex items-center gap-2">
         <CalendarRange className="h-4 w-4 text-[#059669]" />
         <div className="metric-label">{t.titre}</div>
-        <span className="ml-auto rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">Premium</span>
+        <span className="ml-auto text-[11px] text-zinc-400">Premium</span>
       </div>
       <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">{t.sous}</p>
       {etat === "verrou" ? (

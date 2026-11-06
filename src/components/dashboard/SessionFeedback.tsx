@@ -120,7 +120,7 @@ export function SessionFeedback({ seances, chaussures }: { seances: SeanceRessen
   if (!seance || masque) return null;
   if (done) {
     return (
-      <div className="mb-6 flex items-center gap-3 rounded-3xl border border-emerald-200 bg-emerald-50/70 px-5 py-4">
+      <div className="mb-6 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-5 py-4">
         <CheckCircle2 className="h-6 w-6 flex-shrink-0 text-emerald-600" />
         <p className="text-sm font-medium text-emerald-900">{t("fb.doneTitle")}</p>
       </div>
@@ -128,12 +128,12 @@ export function SessionFeedback({ seances, chaussures }: { seances: SeanceRessen
   }
 
   return (
-    <div className="mb-6 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+    <div className="mb-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
       <div className="flex items-start gap-3 border-b border-zinc-100 px-5 py-3.5">
-        <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-rose-50"><MessageSquareHeart className="h-5 w-5 text-rose-500" /></span>
+        <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-50"><MessageSquareHeart className="h-[18px] w-[18px] text-zinc-500" strokeWidth={1.5} /></span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="font-bold text-zinc-900">{t("fb.title")}</h3>
+            <h3 className="font-semibold text-zinc-900">{t("fb.title")}</h3>
             {seances.length > 1 && (
               <span className="flex-shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-zinc-600">
                 {t("fb.of", { i: index + 1, n: seances.length })}
@@ -163,7 +163,7 @@ export function SessionFeedback({ seances, chaussures }: { seances: SeanceRessen
           <div className="flex flex-wrap gap-1.5">
             {Array.from({ length: 11 }, (_, i) => (
               <button key={i} onClick={() => setRpe(i)} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}
-                className={`h-9 w-9 rounded-xl text-sm font-bold transition-all ${rpe === i ? "scale-110 text-white shadow-md" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"}`}
+                className={`h-9 w-9 rounded-xl text-sm font-semibold transition-colors ${rpe === i ? "text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"}`}
                 style={rpe === i ? { background: rpeColor(i) } : undefined}>
                 {i}
               </button>
@@ -174,7 +174,7 @@ export function SessionFeedback({ seances, chaussures }: { seances: SeanceRessen
             if (v == null) return <p className="mt-2 text-xs text-zinc-400">{t("fb.rpeScale")}</p>;
             return (
               <div className="mt-2 flex items-center gap-2.5 rounded-xl bg-zinc-50 px-3 py-2">
-                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm font-bold text-white" style={{ background: rpeColor(v) }}>{v}</span>
+                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white" style={{ background: rpeColor(v) }}>{v}</span>
                 <span className="text-sm text-zinc-600"><b className="text-zinc-800">{t(`fb.rpe${v}.t`)}</b> — {t(`fb.rpe${v}.d`)}</span>
               </div>
             );
@@ -239,7 +239,7 @@ export function SessionFeedback({ seances, chaussures }: { seances: SeanceRessen
                   return (
                     <button key={c.id} type="button" role="radio" aria-checked={choisie}
                       onClick={() => setChaussure(choisie ? null : c.id)}
-                      className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-all ${choisie
+                      className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors ${choisie
                         ? "border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-100"
                         : "border-zinc-200 bg-white hover:border-zinc-300"}`}>
                       <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border ${choisie ? "border-emerald-600 bg-emerald-600 text-white" : "border-zinc-300 bg-white"}`}>

@@ -76,7 +76,7 @@ export function MiseAJour() {
       <div className="flex items-center gap-3 rounded-full bg-zinc-900 py-1.5 pl-4 pr-1.5 text-sm text-white shadow-xl">
         <span>{d.texte}</span>
         <button type="button" onClick={() => window.location.reload()}
-          className="flex items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-bold text-zinc-950 hover:bg-emerald-400">
+          className="flex items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-emerald-400">
           <RefreshCw className="h-3.5 w-3.5" />{d.bouton}
         </button>
       </div>

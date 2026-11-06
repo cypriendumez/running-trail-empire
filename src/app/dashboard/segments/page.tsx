@@ -31,7 +31,7 @@ export default async function SegmentsPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <p className="text-lg font-bold text-zinc-900">{d["seg.off.title"]}</p>
+        <p className="text-lg font-semibold text-zinc-900">{d["seg.off.title"]}</p>
         <p className="mt-2 text-sm text-zinc-500">{d["seg.off.sub"]}</p>
       </div>
     );
@@ -67,7 +67,7 @@ export default async function SegmentsPage() {
     <div className="mx-auto w-full max-w-4xl px-4 py-8">
       <PerfTabs />
       <header className="mb-6">
-        <h1 className="text-3xl font-black tracking-tight text-zinc-900">{d["seg.title"]}</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">{d["seg.title"]}</h1>
         <p className="mt-1 text-sm text-zinc-500">
           {vues.length > 0
             ? fill(d["seg.sub"], { n: vues.length })

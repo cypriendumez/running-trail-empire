@@ -155,7 +155,7 @@ export default function PricingPage() {
                   className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
                     periode === p ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"}`}>
                   {p === "mois" ? P.mois : P.an}
-                  {p === "an" && <span className={`ml-2 text-[11px] font-bold ${periode === "an" ? "text-[#34d399]" : "text-[#059669]"}`}>{P.economie.replace("{n}", String(MOIS_OFFERTS_MAX))}</span>}
+                  {p === "an" && <span className={`ml-2 text-[11px] font-semibold ${periode === "an" ? "text-[#34d399]" : "text-[#059669]"}`}>{P.economie.replace("{n}", String(MOIS_OFFERTS_MAX))}</span>}
                 </button>
               ))}
             </div>
@@ -170,15 +170,15 @@ export default function PricingPage() {
               const vedette = plan.cle === "premium";
               return (
                 <div key={plan.cle}
-                  className={`relative flex flex-col rounded-3xl p-8 ${vedette ? "bg-zinc-950 text-white ring-2 ring-[#059669]" : "bg-white ring-1 ring-inset ring-zinc-200"}`}>
+                  className={`relative flex flex-col rounded-2xl p-8 ${vedette ? "bg-zinc-950 text-white ring-2 ring-[#059669]" : "bg-white ring-1 ring-inset ring-zinc-200"}`}>
                   {plan.badge && (
-                    <span className="absolute -top-3 left-8 rounded-full bg-[#10b981] px-3 py-1 text-[11px] font-bold text-[#04120c]">
+                    <span className="absolute -top-3 left-8 rounded-full bg-[#10b981] px-3 py-1 text-[11px] font-semibold text-[#04120c]">
                       {plan.badge}
                     </span>
                   )}
                   <div className={`text-sm font-semibold ${vedette ? "text-white/50" : "text-zinc-400"}`}>{plan.name}</div>
                   <div className="mt-2 flex items-baseline gap-1">
-                    <span className="text-5xl font-bold tracking-tight">{plan.cle === "gratuit" ? euros(0, lang)
+                    <span className="text-5xl font-semibold tracking-tight">{plan.cle === "gratuit" ? euros(0, lang)
                       : natif ? (prixStore[PRODUITS_STORES[plan.cle as "starter" | "premium"][periode]] ?? "…") : euros(grand, lang)}</span>
                     <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-400"}`}>{plan.cle === "gratuit" || natif ? "" : P.parMois}</span>
                   </div>

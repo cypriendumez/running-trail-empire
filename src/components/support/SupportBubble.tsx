@@ -91,9 +91,9 @@ export function SupportBubble() {
         body: JSON.stringify({ message: q, lang, history }),
       });
       const j = await res.json();
-      setMsgs((m) => [...m, { role: "model", text: j.reply || `⚠️ ${j.error || t("err")}`, source: j.source }]);
+      setMsgs((m) => [...m, { role: "model", text: j.reply || `${j.error || t("err")}`, source: j.source }]);
     } catch {
-      setMsgs((m) => [...m, { role: "model", text: `⚠️ ${t("err")}` }]);
+      setMsgs((m) => [...m, { role: "model", text: `${t("err")}` }]);
     } finally { setBusy(false); }
   }, [msgs, busy, lang]);
 
@@ -107,7 +107,7 @@ export function SupportBubble() {
           « 500 ml » du plan de ravitaillement, le bouton « Suivant » de la liste des
           courses). 40 px, collée au coin, à moitié effacée tant qu'on ne la survole pas. */}
       <button data-bulle-aide onClick={() => setOpen((v) => !v)} aria-label={open ? t("close") : t("open")}
-        className={`fixed bottom-3 right-3 z-50 hidden h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-white shadow-[0_6px_16px_-6px_rgba(0,0,0,0.45)] transition-all hover:scale-105 hover:opacity-100 active:scale-95 md:flex ${open ? "opacity-100" : "opacity-70"}`}>
+        className={`fixed bottom-3 right-3 z-50 hidden h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-white shadow-[0_6px_16px_-6px_rgba(0,0,0,0.45)] transition hover:opacity-100 active:scale-95 md:flex ${open ? "opacity-100" : "opacity-70"}`}>
         {open ? <X className="h-4 w-4" /> : <LifeBuoy className="h-[18px] w-[18px]" />}
       </button>
 
@@ -117,7 +117,7 @@ export function SupportBubble() {
             initial={{ opacity: 0, y: 16, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.97 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
             data-bulle-aide
-            className="fixed bottom-20 right-5 z-50 flex w-[min(420px,calc(100vw-2.5rem))] md:bottom-16 md:right-3 flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-[0_24px_60px_-15px_rgba(16,24,40,0.35)]"
+            className="fixed bottom-20 right-5 z-50 flex w-[min(420px,calc(100vw-2.5rem))] md:bottom-16 md:right-3 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-[0_24px_60px_-15px_rgba(16,24,40,0.35)]"
             style={{ maxHeight: "min(600px, calc(100vh - 8rem))" }}>
 
             {/* En-tête volontairement SOBRE. Une version précédente empilait un dégradé
@@ -180,12 +180,12 @@ export function SupportBubble() {
               {/* Suggestions : uniquement au premier écran, pour amorcer sans encombrer. */}
               {msgs.length === 0 && !busy && (
                 <div className="space-y-1.5 pt-1">
-                  <div className="px-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">{t("suggest")}</div>
+                  <div className="px-1 pb-0.5 text-[10px] font-semibold text-zinc-400 first-letter:uppercase">{t("suggest")}</div>
                   {/* Une ligne par question, alignée à gauche : en pastilles, une question
                       de huit mots se coupait sur deux lignes et devenait illisible. */}
                   {["s1", "s2", "s3"].map((k) => (
                     <button key={k} onClick={() => send(t(k))}
-                      className="group flex w-full items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-left text-[13px] font-medium text-zinc-600 transition-all hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-emerald-800">
+                      className="group flex w-full items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-left text-[13px] font-medium text-zinc-600 transition hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-emerald-800">
                       <span className="min-w-0 flex-1">{t(k)}</span>
                       <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-zinc-300 transition-colors group-hover:text-emerald-500" />
                     </button>

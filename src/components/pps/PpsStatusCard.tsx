@@ -59,7 +59,7 @@ export function PpsStatusCard({
           <Icon className={compact ? "h-4 w-4" : "h-5 w-5"} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className={`font-bold ${ton.fg} ${compact ? "text-[13px]" : "text-[15px]"} leading-snug`}>{titre}</p>
+          <p className={`font-semibold ${ton.fg} ${compact ? "text-[13px]" : "text-[15px]"} leading-snug`}>{titre}</p>
           {v.kind === "inconnu" && <p className="mt-0.5 text-[13px] text-zinc-600">{t.vInconnuAide}</p>}
           {/* Le rappel accompagne TOUT verdict chiffré : nous ne vérifions rien auprès
               de la fédération, et l'athlète doit le savoir avant de s'y fier. */}

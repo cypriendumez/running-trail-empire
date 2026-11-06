@@ -78,7 +78,7 @@ export function SiteFooter({ newsletter = true }: { newsletter?: boolean }) {
         {newsletter && (
           <div className="mx-auto mb-14 flex max-w-xl flex-col items-center gap-4 border-b border-zinc-200 pb-14 text-center">
             <Badge tone="brand">{f.badge}</Badge>
-            <h3 className="text-xl font-bold sm:text-2xl">{f.title}</h3>
+            <h3 className="text-xl font-semibold sm:text-2xl">{f.title}</h3>
             <p className="max-w-md text-sm text-zinc-500">{f.desc}</p>
             <div className="w-full max-w-md"><NewsletterSignup /></div>
           </div>
@@ -102,7 +102,7 @@ export function SiteFooter({ newsletter = true }: { newsletter?: boolean }) {
 
           {colonnes.map((col) => (
             <div key={col.titre}>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-900">{col.titre}</h3>
+              <h3 className="text-xs font-semibold text-zinc-900 first-letter:uppercase">{col.titre}</h3>
               <ul className="mt-4 space-y-3">
                 {col.liens.map((l) => (
                   <li key={l.href}>

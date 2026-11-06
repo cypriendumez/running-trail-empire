@@ -134,7 +134,7 @@ export default async function AvisPage() {
           {/* ⚠️ TITRE RESSERRÉ. À text-5xl il écrasait tout : sur une page qui n'a
               qu'un formulaire à montrer, un titre deux fois plus gros que le reste fait
               paraître le contenu accessoire. */}
-          <h1 className="mx-auto max-w-2xl text-balance text-center text-3xl font-bold leading-[1.1] tracking-tight text-zinc-900 sm:text-4xl">
+          <h1 className="mx-auto max-w-2xl text-balance text-center text-3xl font-semibold leading-[1.1] tracking-tight text-zinc-900 sm:text-4xl">
             {publies.length ? A.titrePlein : A.titre}
             <span className="text-emerald-600">{publies.length ? A.accentPlein : A.accent}</span>
           </h1>
@@ -172,10 +172,10 @@ export default async function AvisPage() {
           pas leur exactitude qui posait problème, c'est leur présence à cet endroit. */}
       <Section>
         <Container>
-          <div className="relative overflow-hidden rounded-3xl bg-zinc-950 px-8 py-20 text-center">
+          <div className="relative overflow-hidden rounded-2xl bg-zinc-950 px-8 py-20 text-center">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_120%_at_50%_0%,rgba(16,185,129,.16),transparent_60%)]" />
             <div className="relative">
-              <h2 className="mx-auto max-w-2xl text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl">
+              <h2 className="mx-auto max-w-2xl text-4xl font-semibold leading-[1.05] tracking-tight text-white sm:text-5xl">
                 {A.ctaTitre}
               </h2>
               <p className="mx-auto mt-4 max-w-md text-lg text-white/55">{A.ctaSub}</p>

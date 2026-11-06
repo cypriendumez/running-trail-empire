@@ -152,7 +152,7 @@ export function AdminWorkflow() {
     return (
       <div className="max-w-md mx-auto mt-16">
         <div className="bg-zinc-900 rounded-2xl p-8 border border-zinc-800">
-          <h2 className="text-xl font-bold mb-6 text-center">Accès Admin</h2>
+          <h2 className="text-xl font-semibold mb-6 text-center">Accès Admin</h2>
           <input
             type="password"
             placeholder="Secret admin"
@@ -232,7 +232,7 @@ export function AdminWorkflow() {
               <button
                 key={a.id}
                 onClick={() => { setSelectedAthlete(a); setGeminiAnalysis(null); setCoachAdvice(""); }}
-                className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${
+                className={`w-full text-left px-4 py-3 rounded-xl text-sm transition ${
                   selectedAthlete?.id === a.id
                     ? "bg-white text-zinc-900"
                     : "text-zinc-300 hover:bg-zinc-800"

@@ -57,7 +57,6 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
     <html lang={lang}>
       <body style={{ fontFamily: "system-ui, sans-serif", background: "#FAFAFA", color: "#18181b", display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", margin: 0 }}>
         <div style={{ textAlign: "center", padding: "2rem", maxWidth: 420 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px" }}>{d.title}</h1>
           <p style={{ color: "#71717a", fontSize: 14, margin: "0 0 20px" }}>
             {d.desc}

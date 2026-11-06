@@ -40,7 +40,7 @@ const PRESETS: { label: string; km: number }[] = [
 const champCls = "w-full rounded-xl bg-white px-3 py-2.5 text-sm text-zinc-900 ring-1 ring-inset ring-zinc-200 outline-none transition-shadow placeholder:text-zinc-400 focus:ring-2 focus:ring-[#059669]";
 const libelleCls = "mb-1.5 block text-[13px] font-medium text-zinc-700";
 // Le chrono se saisit en chiffres de course (Anton) : c'est le seul élément appuyé de la carte.
-const chiffreCls = "bg-transparent p-0 text-center font-sport text-[2.5rem] leading-none text-[#11201d] outline-none placeholder:text-zinc-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+const chiffreCls = "bg-transparent p-0 text-center font-sport text-[2.5rem] leading-none text-zinc-900 outline-none placeholder:text-zinc-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
 // Distance fiable d'une course : déduite du NOM (plus fiable que le catalogue, parfois
 // erroné — ex. « Marathon de Lille » tagué 10 km). Une distance explicite dans le nom prime.
@@ -206,7 +206,7 @@ export function ObjectiveCard({ objective, derniereCourse = null, currentVma, au
           </div>
           {/* Le chrono, en chiffres de course : c'est lui qu'on vient relire. */}
           <div className="text-right">
-            <div className="font-sport text-[1.75rem] leading-none text-[#11201d]">{objective.targetTime}</div>
+            <div className="font-sport text-[1.75rem] leading-none text-zinc-900">{objective.targetTime}</div>
             <div className="mt-1 text-[12px] tabular-nums text-zinc-500">{objective.targetPace}</div>
           </div>
           <button onClick={() => setEditing(true)} className={btnClass("secondary", "sm")}>

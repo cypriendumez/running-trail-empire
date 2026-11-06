@@ -64,10 +64,10 @@ export function PpsVerifier({
   };
 
   return (
-    <div className="rounded-3xl border border-zinc-200/70 bg-white p-6">
+    <div className="rounded-2xl border border-zinc-200/70 bg-white p-6">
       <div className="flex items-center gap-2.5">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white"><CalendarCheck className="h-4.5 w-4.5" /></span>
-        <h2 className="text-[17px] font-bold tracking-tight text-zinc-900">{t.verifTitre}</h2>
+        <h2 className="text-[17px] font-semibold tracking-tight text-zinc-900">{t.verifTitre}</h2>
       </div>
 
       <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-zinc-200 p-3.5 transition-colors hover:bg-zinc-50">
@@ -82,7 +82,7 @@ export function PpsVerifier({
       {!licensed && (
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="pps-n" className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-zinc-500">{t.champNumero}</label>
+            <label htmlFor="pps-n" className="mb-1.5 block text-[12px] font-semibold text-zinc-500 first-letter:uppercase">{t.champNumero}</label>
             <input id="pps-n" value={numero} onChange={(e) => setNumero(e.target.value)}
                    placeholder="PA00A000AA0" spellCheck={false} autoComplete="off"
                    className={`w-full rounded-xl border px-3.5 py-2.5 font-mono text-sm uppercase tracking-wider outline-none focus:ring-2 ${numeroDouteux ? "border-amber-400 focus:border-amber-500 focus:ring-amber-500/20" : "border-zinc-200 focus:border-emerald-500 focus:ring-emerald-500/20"}`} />
@@ -91,7 +91,7 @@ export function PpsVerifier({
             </p>
           </div>
           <div>
-            <label htmlFor="pps-e" className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-zinc-500">{t.champDate}</label>
+            <label htmlFor="pps-e" className="mb-1.5 block text-[12px] font-semibold text-zinc-500 first-letter:uppercase">{t.champDate}</label>
             <input id="pps-e" type="date" value={expiresAt} min={aujourdhui}
                    onChange={(e) => setExpiresAt(e.target.value)}
                    className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
@@ -102,7 +102,7 @@ export function PpsVerifier({
 
       {/* ── LA RÉPONSE ─────────────────────────────────────────────────────── */}
       <div className="mt-5 rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-200/70">
-        <p className="text-[15px] font-bold leading-snug text-zinc-900">
+        <p className="text-[15px] font-semibold leading-snug text-zinc-900">
           {licensed ? t.jusquALicencie
             : res.derniereDate ? t.jusquA(jourLisible(res.derniereDate, lang))
             : t.jusquAInconnu}
@@ -110,7 +110,7 @@ export function PpsVerifier({
 
         {(licensed || res.derniereDate) && (
           <div className="mt-4">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">{t.mesCourses}</p>
+            <p className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{t.mesCourses}</p>
             {res.courses.length === 0 ? (
               <p className="mt-2 text-[13px] text-zinc-500">{t.aucuneCourse}</p>
             ) : (

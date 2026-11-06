@@ -63,7 +63,7 @@ export default function ConsentementPage() {
         <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <ShieldCheck className="w-6 h-6 text-emerald-700" />
         </div>
-        <h1 className="text-2xl font-bold text-zinc-900">{L.title}</h1>
+        <h1 className="text-2xl font-semibold text-zinc-900">{L.title}</h1>
         <p className="text-zinc-600 text-sm mt-3 leading-relaxed">{L.intro}</p>
       </div>
 

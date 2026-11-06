@@ -92,7 +92,7 @@ export function AvisModeration({ initial }: { initial: Ligne[] }) {
       {/* ── En-tête ──────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Avis</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Avis</h1>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-zinc-500">
             La relecture ne sert qu&apos;à écarter l&apos;insulte et le spam.{" "}
             <b className="font-semibold text-zinc-700">Ne jamais retenir un avis parce que la note est basse</b> —
@@ -103,14 +103,14 @@ export function AvisModeration({ initial }: { initial: Ligne[] }) {
           <div className="flex items-center gap-4 rounded-2xl bg-white px-5 py-3 ring-1 ring-inset ring-zinc-200">
             <div>
               <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-bold tabular-nums text-zinc-900">{moyenne}</span>
+                <span className="text-2xl font-semibold tabular-nums text-zinc-900">{moyenne}</span>
                 <span className="text-sm text-zinc-400">/5</span>
               </div>
               <div className="mt-0.5 text-xs text-zinc-400">{lignes.length} avis</div>
             </div>
             <div className="h-9 w-px bg-zinc-200" />
             <div>
-              <div className="text-2xl font-bold tabular-nums text-zinc-900">{attente}</div>
+              <div className="text-2xl font-semibold tabular-nums text-zinc-900">{attente}</div>
               <div className="mt-0.5 text-xs text-zinc-400">à relire</div>
             </div>
           </div>
@@ -141,7 +141,7 @@ export function AvisModeration({ initial }: { initial: Ligne[] }) {
 
       {/* ── Vide ─────────────────────────────────────────────────────────── */}
       {!lignes.length && (
-        <div className="rounded-3xl bg-white p-12 text-center ring-1 ring-inset ring-zinc-200">
+        <div className="rounded-2xl bg-white p-12 text-center ring-1 ring-inset ring-zinc-200">
           <Inbox className="mx-auto h-8 w-8 text-zinc-300" />
           <p className="mt-4 font-semibold text-zinc-900">Aucun avis pour l&apos;instant.</p>
           {/* ⚠️ ON DIT D'OÙ ILS VIENDRONT. Sans cette phrase, un écran vide laisse croire
@@ -169,7 +169,7 @@ export function AvisModeration({ initial }: { initial: Ligne[] }) {
             <div key={l.id} className="rounded-2xl bg-white p-5 ring-1 ring-inset ring-zinc-200">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-zinc-900 text-sm font-bold text-white">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                     {l.auteur.charAt(0)}
                   </div>
                   <div>

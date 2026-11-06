@@ -16,8 +16,8 @@ function Entete({ t, sous }: { t: TextesJourJ; sous?: string }) {
     <div>
       <div className="flex items-center gap-2">
         <Flag className="h-5 w-5 text-[#059669]" />
-        <h1 className="text-2xl font-bold tracking-tight text-[#11201d]">{t.titre}</h1>
-        <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">{t.premium}</span>
+        <h1 className="text-2xl font-semibold tracking-tight text-[#11201d]">{t.titre}</h1>
+        <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{t.premium}</span>
       </div>
       {sous && <p className="mt-1 text-sm text-zinc-500">{sous}</p>}
     </div>
@@ -67,8 +67,8 @@ export function PackJourJVue({ pack, t, lang, nom, date, joursRestants, dplusM }
             <div className="mt-3 grid grid-cols-3 gap-3">
               {stats.map(([label, sec]) => (
                 <div key={label}>
-                  <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">{label}</div>
-                  <div className="text-xl font-black tabular-nums text-zinc-900">{sec == null ? "—" : temps(sec)}</div>
+                  <div className="text-[11px] font-medium text-zinc-400 first-letter:uppercase">{label}</div>
+                  <div className="text-xl font-semibold tabular-nums text-zinc-900">{sec == null ? "—" : temps(sec)}</div>
                 </div>
               ))}
             </div>
@@ -78,7 +78,7 @@ export function PackJourJVue({ pack, t, lang, nom, date, joursRestants, dplusM }
             {c.allureSecKm != null && (
               <p className="mt-3 flex items-baseline gap-2">
                 <span className="text-xs font-medium text-zinc-500">{t.allure}</span>
-                <span className="text-2xl font-black tabular-nums text-[#059669]">{temps(c.allureSecKm)}</span>
+                <span className="text-2xl font-semibold tabular-nums text-[#059669]">{temps(c.allureSecKm)}</span>
                 <span className="text-xs text-zinc-500">{t.parKm}</span>
               </p>
             )}
@@ -95,7 +95,7 @@ export function PackJourJVue({ pack, t, lang, nom, date, joursRestants, dplusM }
           <h2 className={titreCarte}><Flag className="h-4 w-4 text-[#059669]" />{t.marche}</h2>
           <p className="mt-2 text-sm leading-relaxed text-zinc-600">{pack.strategie === "longue" ? t.strategieLongue : t.strategieCourte}</p>
           <table className="mt-3 w-full text-sm">
-            <thead><tr className="text-left text-[11px] uppercase tracking-wide text-zinc-400"><th className="py-1 font-medium">{t.km}</th><th className="py-1 text-right font-medium">{t.tempsPassage}</th></tr></thead>
+            <thead><tr className="text-left text-[11px] text-zinc-400 first-letter:uppercase"><th className="py-1 font-medium">{t.km}</th><th className="py-1 text-right font-medium">{t.tempsPassage}</th></tr></thead>
             <tbody>
               {pack.passages.map((p) => (
                 <tr key={p.km} className="border-t border-zinc-100"><td className="py-1.5 tabular-nums text-zinc-600">{n(p.km)}</td><td className="py-1.5 text-right font-semibold tabular-nums text-zinc-900">{temps(p.tempsSec)}</td></tr>

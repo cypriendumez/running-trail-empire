@@ -34,7 +34,7 @@ export default async function ClubsPage() {
   if (clubsRes.error || defisRes.error) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <p className="text-lg font-bold text-zinc-900">Clubs &amp; Défis en attente d&apos;activation</p>
+        <p className="text-lg font-semibold text-zinc-900">Clubs &amp; Défis en attente d&apos;activation</p>
         <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">
           La migration 020 n&apos;a pas encore été exécutée dans Supabase. Le reste de
           l&apos;application fonctionne normalement.

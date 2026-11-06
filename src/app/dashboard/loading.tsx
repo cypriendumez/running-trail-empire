@@ -24,7 +24,7 @@ export default function DashboardLoading() {
       {/* Grille de cartes */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="overflow-hidden rounded-3xl border border-zinc-200 bg-white">
+          <div key={i} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
             <div className="h-32 bg-zinc-100" />
             <div className="space-y-2.5 p-4">
               <div className="h-4 w-3/4 rounded bg-zinc-200/80" />

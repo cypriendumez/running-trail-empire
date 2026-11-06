@@ -22,7 +22,7 @@ function fill(s: string, p?: Record<string, string | number>) {
 }
 const H: Record<string, Record<string, string>> = {
   fr: {
-    "h.enPanne": "Tes douleurs déclarées n'ont pas pu être chargées. Cet historique paraît vide, mais rien n'est perdu — réessaie dans un instant.", "h.title": "Santé & Performance", "h.subtitle": "Ton kiné IA, ta nutrition de course et ton poids — au même endroit.",
+    "h.enPanne": "Tes douleurs déclarées n'ont pas pu être chargées. Cet historique paraît vide, mais rien n'est perdu — réessaie dans un instant.", "h.title": "Santé et performance", "h.subtitle": "Ton kiné IA, ta nutrition de course et ton poids — au même endroit.",
     "tab.kine": "Kiné IA", "tab.nutrition": "Nutrition", "tab.poids": "Poids",
     "k.where": "Où as-tu mal ?", "view.face": "Face", "view.dos": "Dos",
     "k.hint": "Touche une zone sur le corps ou dans la liste, ajuste la douleur, puis demande au kiné.",
@@ -31,9 +31,9 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Protocole express", "k.protoWait": "Protocole d'attente — pour un plan précis, décris ta douleur au kiné IA ci-contre.",
     "k.suivi": "Suivi de tes douleurs", "k.suiviNone": "Aucune douleur déclarée ces 60 derniers jours.", "k.suiviSince": "depuis {n} j", "k.suiviToday": "aujourd'hui", "k.suiviAgo": "il y a {n} j", "trend.amelioration": "en amélioration", "trend.aggravation": "en aggravation", "trend.stable": "stable", "trend.inconnue": "1re déclaration", "chat.starters": "Pour démarrer", "chat.s1": "J'ai une douleur qui revient à chaque sortie longue.", "chat.s2": "Comment adapter ma semaine avec cette douleur ?", "chat.s3": "Quels exercices de prévention pour mes tendons ?",
     "chat.title": "Kiné IA", "chat.sub": "Réponses personnalisées selon ta charge & ta récup",
-    "chat.seed": "Bonjour ! Je suis votre kiné du sport. Décrivez-moi ce que vous ressentez — zone, depuis quand, à l'effort ou au repos — ou cliquez une zone sur le schéma, et je vous aide.",
+    "chat.seed": "Bonjour, je suis votre kiné du sport. Décrivez-moi ce que vous ressentez — zone, depuis quand, à l'effort ou au repos — ou cliquez une zone sur le schéma, et je vous aide.",
     "chat.thinking": "Le kiné réfléchit…", "chat.placeholder": "Ex : douleur au genou après mes sorties longues…", "chat.photoAdd": "Ajouter une photo", "chat.photoRemove": "Retirer la photo", "chat.photoReady": "Photo prête. Elle est analysée puis oubliée : rien n'est enregistré. Cadre serré sur la zone, en pleine lumière.", "chat.photoBadType": "Image illisible. Formats acceptés : JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Peux-tu regarder cette photo ?",
-    "chat.disclaimer": "⚕️ Conseils informatifs — ne remplacent pas un avis médical. Douleur forte / persistante → consultez.",
+    "chat.disclaimer": "Conseils informatifs — ne remplacent pas un avis médical. Douleur forte / persistante → consultez.",
     "chat.errNoReply": "Je n'ai pas pu répondre, réessayez.", "chat.errConn": "Connexion impossible au kiné IA. Réessayez.",
     "chat.verrou": "Le kiné IA fait partie des formules Starter et Premium.", "chat.verrouCta": "Voir les formules", "chat.quota": "Tu as utilisé tes échanges avec l'IA pour aujourd'hui : ils reviennent demain.",
     "k.askPrompt": "J'ai une douleur au niveau : {zone} (intensité {n}/10). Qu'est-ce que ça peut être, et que dois-je faire concrètement ?",
@@ -57,7 +57,7 @@ const H: Record<string, Record<string, string>> = {
     "ex.def.1n": "Mobilité articulaire douce", "ex.def.1d": "Amplitudes progressives, sans douleur", "ex.def.2n": "Protocole PEACE & LOVE", "ex.def.2d": "Protège, élève, charge progressive, vascularise",
   },
   en: {
-    "h.enPanne": "Your reported pains could not be loaded. This history looks empty, but nothing is lost — try again in a moment.", "h.title": "Health & Performance", "h.subtitle": "Your AI physio, your race nutrition and your weight — all in one place.",
+    "h.enPanne": "Your reported pains could not be loaded. This history looks empty, but nothing is lost — try again in a moment.", "h.title": "Health and performance", "h.subtitle": "Your AI physio, your race nutrition and your weight — all in one place.",
     "tab.kine": "AI Physio", "tab.nutrition": "Nutrition", "tab.poids": "Weight",
     "k.where": "Where does it hurt?", "view.face": "Front", "view.dos": "Back",
     "k.hint": "Tap a zone on the body or in the list, adjust the pain, then ask the physio.",
@@ -66,9 +66,9 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Express protocol", "k.protoWait": "Stopgap protocol — for a precise plan, describe your pain to the AI physio on the right.",
     "k.suivi": "Your pain history", "k.suiviNone": "No pain reported in the last 60 days.", "k.suiviSince": "for {n} d", "k.suiviToday": "today", "k.suiviAgo": "{n} d ago", "trend.amelioration": "improving", "trend.aggravation": "worsening", "trend.stable": "stable", "trend.inconnue": "1st report", "chat.starters": "Get started", "chat.s1": "I get a recurring pain on every long run.", "chat.s2": "How should I adjust my week with this pain?", "chat.s3": "Which prevention exercises for my tendons?",
     "chat.title": "AI Physio", "chat.sub": "Answers tailored to your load & recovery",
-    "chat.seed": "Hello! I'm your sports physio. Tell me what you feel — area, since when, on exertion or at rest — or click a zone on the diagram, and I'll help.",
+    "chat.seed": "Hello, I'm your sports physio. Tell me what you feel — area, since when, on exertion or at rest — or click a zone on the diagram, and I'll help.",
     "chat.thinking": "The physio is thinking…", "chat.placeholder": "E.g. knee pain after my long runs…", "chat.photoAdd": "Add a photo", "chat.photoRemove": "Remove photo", "chat.photoReady": "Photo ready. It is analysed then forgotten: nothing is stored. Frame the area closely, in good light.", "chat.photoBadType": "Unreadable image. Accepted: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Could you look at this photo?",
-    "chat.disclaimer": "⚕️ Informational advice — not a substitute for medical care. Severe / persistent pain → see a doctor.",
+    "chat.disclaimer": "Informational advice — not a substitute for medical care. Severe / persistent pain → see a doctor.",
     "chat.errNoReply": "I couldn't reply, please try again.", "chat.errConn": "Couldn't connect to the AI physio. Try again.",
     "chat.verrou": "The AI physio is part of the Starter and Premium plans.", "chat.verrouCta": "See the plans", "chat.quota": "You've used today's AI exchanges: they come back tomorrow.",
     "k.askPrompt": "I have pain in: {zone} (intensity {n}/10). What could it be, and what should I concretely do?",
@@ -92,7 +92,7 @@ const H: Record<string, Record<string, string>> = {
     "ex.def.1n": "Gentle joint mobility", "ex.def.1d": "Progressive range of motion, pain-free", "ex.def.2n": "PEACE & LOVE protocol", "ex.def.2d": "Protect, elevate, progressive load, perfuse",
   },
   de: {
-    "h.enPanne": "Deine gemeldeten Schmerzen konnten nicht geladen werden. Der Verlauf wirkt leer, es ist aber nichts verloren — versuch es gleich nochmal.", "h.title": "Gesundheit & Leistung", "h.subtitle": "Dein KI-Physio, deine Wettkampfernährung und dein Gewicht — alles an einem Ort.",
+    "h.enPanne": "Deine gemeldeten Schmerzen konnten nicht geladen werden. Der Verlauf wirkt leer, es ist aber nichts verloren — versuch es gleich nochmal.", "h.title": "Gesundheit und Leistung", "h.subtitle": "Dein KI-Physio, deine Wettkampfernährung und dein Gewicht — alles an einem Ort.",
     "tab.kine": "KI-Physio", "tab.nutrition": "Ernährung", "tab.poids": "Gewicht",
     "k.where": "Wo tut es weh?", "view.face": "Vorne", "view.dos": "Hinten",
     "k.hint": "Tippe eine Zone am Körper oder in der Liste an, stelle die Schmerzen ein und frage den Physio.",
@@ -101,9 +101,9 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Express-Protokoll", "k.protoWait": "Überbrückungs-Protokoll — für einen genauen Plan beschreibe deine Schmerzen rechts dem KI-Physio.",
     "k.suivi": "Verlauf deiner Schmerzen", "k.suiviNone": "In den letzten 60 Tagen keine Schmerzen gemeldet.", "k.suiviSince": "seit {n} T", "k.suiviToday": "heute", "k.suiviAgo": "vor {n} T", "trend.amelioration": "bessert sich", "trend.aggravation": "verschlechtert sich", "trend.stable": "stabil", "trend.inconnue": "1. Meldung", "chat.starters": "Zum Einstieg", "chat.s1": "Bei jedem langen Lauf kommt derselbe Schmerz zurück.", "chat.s2": "Wie passe ich meine Woche mit diesem Schmerz an?", "chat.s3": "Welche Präventionsübungen für meine Sehnen?",
     "chat.title": "KI-Physio", "chat.sub": "Antworten passend zu deiner Belastung & Erholung",
-    "chat.seed": "Hallo! Ich bin dein Sportphysio. Beschreibe mir, was du spürst — Bereich, seit wann, bei Belastung oder in Ruhe — oder klicke eine Zone im Schema an, und ich helfe dir.",
+    "chat.seed": "Hallo, ich bin dein Sportphysio. Beschreibe mir, was du spürst — Bereich, seit wann, bei Belastung oder in Ruhe — oder klicke eine Zone im Schema an, und ich helfe dir.",
     "chat.thinking": "Der Physio überlegt…", "chat.placeholder": "Z. B. Knieschmerzen nach langen Läufen…", "chat.photoAdd": "Foto hinzufügen", "chat.photoRemove": "Foto entfernen", "chat.photoReady": "Foto bereit. Es wird analysiert und dann verworfen: nichts wird gespeichert. Bereich nah und gut ausgeleuchtet aufnehmen.", "chat.photoBadType": "Bild nicht lesbar. Erlaubt: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Kannst du dir dieses Foto ansehen?",
-    "chat.disclaimer": "⚕️ Informative Hinweise — kein Ersatz für ärztlichen Rat. Starke / anhaltende Schmerzen → zum Arzt.",
+    "chat.disclaimer": "Informative Hinweise — kein Ersatz für ärztlichen Rat. Starke / anhaltende Schmerzen → zum Arzt.",
     "chat.errNoReply": "Ich konnte nicht antworten, bitte erneut versuchen.", "chat.errConn": "Keine Verbindung zum KI-Physio. Versuche es erneut.",
     "chat.verrou": "Die KI-Physio ist Teil der Tarife Starter und Premium.", "chat.verrouCta": "Tarife ansehen", "chat.quota": "Deine KI-Dialoge für heute sind aufgebraucht: morgen gibt es neue.",
     "k.askPrompt": "Ich habe Schmerzen im Bereich: {zone} (Intensität {n}/10). Was könnte es sein, und was soll ich konkret tun?",
@@ -127,7 +127,7 @@ const H: Record<string, Record<string, string>> = {
     "ex.def.1n": "Sanfte Gelenkmobilität", "ex.def.1d": "Progressive Bewegungsamplitude, schmerzfrei", "ex.def.2n": "PEACE & LOVE Protokoll", "ex.def.2d": "Schützen, hochlagern, progressiv belasten, durchbluten",
   },
   es: {
-    "h.enPanne": "Tus dolores declarados no se han podido cargar. Este historial parece vacío, pero no se ha perdido nada — inténtalo de nuevo en un momento.", "h.title": "Salud y Rendimiento", "h.subtitle": "Tu fisio IA, tu nutrición de carrera y tu peso — todo en un solo lugar.",
+    "h.enPanne": "Tus dolores declarados no se han podido cargar. Este historial parece vacío, pero no se ha perdido nada — inténtalo de nuevo en un momento.", "h.title": "Salud y rendimiento", "h.subtitle": "Tu fisio IA, tu nutrición de carrera y tu peso — todo en un solo lugar.",
     "tab.kine": "Fisio IA", "tab.nutrition": "Nutrición", "tab.poids": "Peso",
     "k.where": "¿Dónde te duele?", "view.face": "Frente", "view.dos": "Espalda",
     "k.hint": "Toca una zona del cuerpo o de la lista, ajusta el dolor y pregunta al fisio.",
@@ -136,9 +136,9 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Protocolo exprés", "k.protoWait": "Protocolo de espera — para un plan preciso, describe tu dolor al fisio IA a la derecha.",
     "k.suivi": "Seguimiento de tus dolores", "k.suiviNone": "Ningún dolor declarado en los últimos 60 días.", "k.suiviSince": "desde hace {n} d", "k.suiviToday": "hoy", "k.suiviAgo": "hace {n} d", "trend.amelioration": "mejorando", "trend.aggravation": "empeorando", "trend.stable": "estable", "trend.inconnue": "1.ª declaración", "chat.starters": "Para empezar", "chat.s1": "Tengo un dolor que vuelve en cada tirada larga.", "chat.s2": "¿Cómo adapto mi semana con este dolor?", "chat.s3": "¿Qué ejercicios de prevención para mis tendones?",
     "chat.title": "Fisio IA", "chat.sub": "Respuestas adaptadas a tu carga y recuperación",
-    "chat.seed": "¡Hola! Soy tu fisio del deporte. Cuéntame qué sientes — zona, desde cuándo, en esfuerzo o en reposo — o haz clic en una zona del esquema, y te ayudo.",
+    "chat.seed": "Hola, soy tu fisio del deporte. Cuéntame qué sientes — zona, desde cuándo, en esfuerzo o en reposo — o haz clic en una zona del esquema, y te ayudo.",
     "chat.thinking": "El fisio está pensando…", "chat.placeholder": "Ej.: dolor de rodilla tras mis tiradas largas…", "chat.photoAdd": "Añadir una foto", "chat.photoRemove": "Quitar la foto", "chat.photoReady": "Foto lista. Se analiza y se descarta: no se guarda nada. Encuadra la zona de cerca y con buena luz.", "chat.photoBadType": "Imagen ilegible. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "¿Puedes mirar esta foto?",
-    "chat.disclaimer": "⚕️ Consejos informativos — no sustituyen un consejo médico. Dolor fuerte / persistente → consulta.",
+    "chat.disclaimer": "Consejos informativos — no sustituyen un consejo médico. Dolor fuerte / persistente → consulta.",
     "chat.errNoReply": "No he podido responder, inténtalo de nuevo.", "chat.errConn": "No se pudo conectar con el fisio IA. Inténtalo de nuevo.",
     "chat.verrou": "El fisio IA forma parte de los planes Starter y Premium.", "chat.verrouCta": "Ver los planes", "chat.quota": "Has usado tus intercambios con la IA de hoy: vuelven mañana.",
     "k.askPrompt": "Tengo dolor en: {zone} (intensidad {n}/10). ¿Qué puede ser y qué debo hacer concretamente?",
@@ -162,7 +162,7 @@ const H: Record<string, Record<string, string>> = {
     "ex.def.1n": "Movilidad articular suave", "ex.def.1d": "Amplitudes progresivas, sin dolor", "ex.def.2n": "Protocolo PEACE & LOVE", "ex.def.2d": "Protege, eleva, carga progresiva, vasculariza",
   },
   pt: {
-    "h.enPanne": "As tuas dores declaradas não puderam ser carregadas. Este histórico parece vazio, mas nada se perdeu — tenta novamente daqui a pouco.", "h.title": "Saúde e Desempenho", "h.subtitle": "O teu fisio IA, a tua nutrição de prova e o teu peso — tudo no mesmo sítio.",
+    "h.enPanne": "As tuas dores declaradas não puderam ser carregadas. Este histórico parece vazio, mas nada se perdeu — tenta novamente daqui a pouco.", "h.title": "Saúde e desempenho", "h.subtitle": "O teu fisio IA, a tua nutrição de prova e o teu peso — tudo no mesmo sítio.",
     "tab.kine": "Fisio IA", "tab.nutrition": "Nutrição", "tab.poids": "Peso",
     "k.where": "Onde te dói?", "view.face": "Frente", "view.dos": "Costas",
     "k.hint": "Toca numa zona do corpo ou na lista, ajusta a dor e pergunta ao fisio.",
@@ -171,9 +171,9 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Protocolo expresso", "k.protoWait": "Protocolo de espera — para um plano preciso, descreve a tua dor ao fisio IA à direita.",
     "k.suivi": "Acompanhamento das tuas dores", "k.suiviNone": "Nenhuma dor declarada nos últimos 60 dias.", "k.suiviSince": "há {n} d", "k.suiviToday": "hoje", "k.suiviAgo": "há {n} d", "trend.amelioration": "a melhorar", "trend.aggravation": "a piorar", "trend.stable": "estável", "trend.inconnue": "1.ª declaração", "chat.starters": "Para começar", "chat.s1": "Tenho uma dor que volta em cada treino longo.", "chat.s2": "Como adapto a minha semana com esta dor?", "chat.s3": "Que exercícios de prevenção para os meus tendões?",
     "chat.title": "Fisio IA", "chat.sub": "Respostas adaptadas à tua carga e recuperação",
-    "chat.seed": "Olá! Sou o teu fisio do desporto. Conta-me o que sentes — zona, desde quando, em esforço ou em repouso — ou clica numa zona no esquema, e eu ajudo.",
+    "chat.seed": "Olá, sou o teu fisio do desporto. Conta-me o que sentes — zona, desde quando, em esforço ou em repouso — ou clica numa zona no esquema, e eu ajudo.",
     "chat.thinking": "O fisio está a pensar…", "chat.placeholder": "Ex.: dor no joelho após os meus treinos longos…", "chat.photoAdd": "Adicionar uma foto", "chat.photoRemove": "Remover a foto", "chat.photoReady": "Foto pronta. É analisada e depois descartada: nada é guardado. Enquadra a zona de perto e com boa luz.", "chat.photoBadType": "Imagem ilegível. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Podes olhar para esta foto?",
-    "chat.disclaimer": "⚕️ Conselhos informativos — não substituem aconselhamento médico. Dor forte / persistente → consulta.",
+    "chat.disclaimer": "Conselhos informativos — não substituem aconselhamento médico. Dor forte / persistente → consulta.",
     "chat.errNoReply": "Não consegui responder, tenta novamente.", "chat.errConn": "Não foi possível ligar ao fisio IA. Tenta novamente.",
     "chat.verrou": "O fisio IA faz parte dos planos Starter e Premium.", "chat.verrouCta": "Ver os planos", "chat.quota": "Usaste as tuas trocas com a IA de hoje: voltam amanhã.",
     "k.askPrompt": "Tenho dor em: {zone} (intensidade {n}/10). O que pode ser e o que devo fazer concretamente?",
@@ -448,9 +448,9 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
         : json.error === "quota_indisponible" ? tr("chat.errNoReply")
         : json.error || tr("chat.errNoReply");
       if (json.reply) { setMessages((m) => [...m, { role: "model", text: json.reply }]); setBilan(json.bilan ?? null); }
-      else setMessages((m) => [...m, { role: "model", text: "⚠️ " + erreur }]);
+      else setMessages((m) => [...m, { role: "model", text: "" + erreur }]);
     } catch {
-      setMessages((m) => [...m, { role: "model", text: "⚠️ " + tr("chat.errConn") }]);
+      setMessages((m) => [...m, { role: "model", text: "" + tr("chat.errConn") }]);
     } finally {
       setSending(false);
     }
@@ -500,11 +500,11 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
       )}
       {/* En-tête — hero */}
       <div className="flex items-center gap-3.5">
-        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white sm:h-12 sm:w-12 shadow-[0_10px_26px_-10px_rgba(16,185,129,0.65)]">
-          <Heart className="h-6 w-6" />
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-zinc-200/80 bg-white text-zinc-500 sm:h-11 sm:w-11">
+          <Heart className="h-5 w-5" strokeWidth={1.5} />
         </span>
         <div className="min-w-0">
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">{tr("h.title")}</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">{tr("h.title")}</h1>
           <p className="mt-0.5 line-clamp-2 text-[13px] text-zinc-500 sm:text-sm">{tr("h.subtitle")}</p>
         </div>
       </div>
@@ -588,7 +588,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                           fill: on ? teinteDouleur(painLevel) : teinteVue ? teinteVue.fond : "url(#bodyGrad)",
                           stroke: on ? "#b91c1c" : teinteVue ? teinteVue.trait : "#cbd1d8",
                           strokeWidth: on || vu ? 1.5 : 1,
-                          className: "cursor-pointer transition-all hover:opacity-70",
+                          className: "cursor-pointer transition hover:opacity-70",
                           onClick: () => setSelectedSlot(on ? null : slot),
                         };
                         return tag === "ellipse"
@@ -601,7 +601,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                   <div className="col-span-7 max-h-[430px] overflow-y-auto pr-1 space-y-2">
                     {GROUP_ORDER.map((g) => (
                       <div key={g}>
-                        <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400 mb-1">{tr(g)}</div>
+                        <div className="text-[10px] font-semibold text-zinc-400 mb-1 first-letter:uppercase">{tr(g)}</div>
                         <div className="flex flex-wrap gap-1">
                           {Object.entries(zoneMap).filter(([, z]) => z.groupKey === g).map(([slot, z]) => (
                             <button key={slot} onClick={() => setSelectedSlot(selectedSlot === slot ? null : slot)}
@@ -623,7 +623,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                 </div>
                 {selectedZone ? (
                   <div className="mt-3 pt-3 border-t border-zinc-100">
-                    <label htmlFor={`${cid}-r0`} className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("k.pain")} — <span className="font-semibold text-zinc-800">{tr(selectedZone.labelKey)}</span> : <span className="font-bold" style={{ color: teinteDouleur(painLevel) }}>{painLevel}/10</span></label>
+                    <label htmlFor={`${cid}-r0`} className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("k.pain")} — <span className="font-semibold text-zinc-800">{tr(selectedZone.labelKey)}</span> : <span className="font-semibold" style={{ color: teinteDouleur(painLevel) }}>{painLevel}/10</span></label>
                     {/* Le curseur porte la MÊME couleur que la zone sur la silhouette : deux
                         barèmes différents pour une seule douleur se contrediraient à l'écran. */}
                     <input id={`${cid}-r0`} type="range" min={1} max={10} value={painLevel} onChange={(e) => setPainLevel(+e.target.value)}
@@ -666,7 +666,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                           {/* ⚠️ On montre « 7 → 4 » seulement s'il y a DEUX déclarations.
                               Avec une seule, une flèche laisserait croire à une évolution
                               qui n'a jamais été mesurée. */}
-                          <div className="flex items-center gap-1 text-[13px] font-bold tabular-nums text-zinc-700">
+                          <div className="flex items-center gap-1 text-[13px] font-semibold tabular-nums text-zinc-700">
                             {z.signalements > 1 && <><span className="text-zinc-400">{z.premier}</span><span className="text-zinc-300">→</span></>}
                             <span>{z.dernier}</span><span className="text-[11px] font-medium text-zinc-400">/10</span>
                           </div>
@@ -732,7 +732,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                   <div className="space-y-2">
                     {rehabProtocol.map((ex, i) => (
                       <div key={i} className="flex items-start gap-2.5 p-2.5 bg-zinc-50 rounded-xl">
-                        <div className="w-6 h-6 bg-zinc-900 text-white rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</div>
+                        <div className="w-6 h-6 bg-zinc-900 text-white rounded-lg flex items-center justify-center text-xs font-semibold flex-shrink-0">{i + 1}</div>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-zinc-900 text-sm">{tr(ex.nameKey)}</div>
                           <div className="text-xs text-zinc-500">{tr(ex.descKey)}</div>
@@ -793,7 +793,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                 {/* Une consultation commence par une phrase, pas par une page blanche. */}
                 {messages.length <= 1 && !sending && (
                   <div className="pt-1">
-                    <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-zinc-400">{tr("chat.starters")}</div>
+                    <div className="mb-2 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{tr("chat.starters")}</div>
                     <div className="flex flex-wrap gap-2">
                       {(["chat.s1", "chat.s2", "chat.s3"] as const).map((k) => (
                         <button key={k} onClick={() => send(tr(k))}
@@ -862,7 +862,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                 <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
                   <div className="flex items-center gap-2">
                     <ClipboardList className="h-4 w-4 text-emerald-700" aria-hidden />
-                    <h4 className="text-sm font-bold text-emerald-900">{tr("bilan.title")}</h4>
+                    <h4 className="text-sm font-semibold text-emerald-900">{tr("bilan.title")}</h4>
                   </div>
                   {bilan.urgence && (
                     <p className="mt-2 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] font-semibold leading-relaxed text-rose-800">
@@ -871,11 +871,11 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                   )}
                   {bilan.hypotheses.length > 0 && (
                     <div className="mt-3">
-                      <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-800/70">{tr("bilan.hyp")}</div>
+                      <div className="text-[11px] font-semibold text-emerald-800/70 first-letter:uppercase">{tr("bilan.hyp")}</div>
                       <ul className="mt-1 space-y-1">
                         {bilan.hypotheses.map((h) => (
                           <li key={h.nom} className="flex items-center gap-2 text-[13px] text-zinc-800">
-                            <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${h.probabilite === "haute" ? "bg-emerald-600 text-white" : h.probabilite === "moyenne" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-600"}`}>
+                            <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${h.probabilite === "haute" ? "bg-emerald-600 text-white" : h.probabilite === "moyenne" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-600"}`}>
                               {tr(`bilan.proba.${h.probabilite}`)}
                             </span>
                             {h.nom}
@@ -886,7 +886,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                   )}
                   {bilan.exercices.length > 0 && (
                     <div className="mt-3">
-                      <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-800/70">{tr("bilan.exos")}</div>
+                      <div className="text-[11px] font-semibold text-emerald-800/70 first-letter:uppercase">{tr("bilan.exos")}</div>
                       <ul className="mt-1 space-y-1">
                         {bilan.exercices.map((e) => (
                           <li key={e.nom} className="text-[13px] text-zinc-800">

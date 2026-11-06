@@ -134,11 +134,11 @@ export function FeuilleInvitation({ ouverte, onFermer, invitation }: { ouverte: 
     <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center" role="presentation">
       <button type="button" aria-label={d.fermer} onClick={onFermer} className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
       <div ref={boite} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="titre-invitation"
-        className="relative w-full max-w-md rounded-t-3xl bg-white px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl outline-none sm:rounded-3xl sm:pb-5">
+        className="relative w-full max-w-md rounded-t-3xl bg-white px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl outline-none sm:rounded-2xl sm:pb-5">
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-200 sm:hidden" />
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 id="titre-invitation" className="text-lg font-bold text-zinc-900">{d.titre}</h2>
+            <h2 id="titre-invitation" className="text-lg font-semibold text-zinc-900">{d.titre}</h2>
             <p className="text-sm text-zinc-500">{d.sous}</p>
           </div>
           <button type="button" onClick={onFermer} aria-label={d.fermer} className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700">

@@ -44,7 +44,7 @@ function Rich({ text }: { text: string }) {
         const isHead = !isBullet && body.length > 2 && body.length < 60 && body === body.toUpperCase() && /[A-ZÀ-Ý]/.test(body);
         const frags = body.split(/(\*\*[^*]+\*\*)/g).map((s, j) => s.startsWith("**") && s.endsWith("**")
           ? <strong key={j} className="font-semibold text-zinc-900">{s.slice(2, -2)}</strong> : <span key={j}>{s}</span>);
-        if (isHead) return <div key={i} className="pt-2.5 text-[13px] font-bold uppercase tracking-wide text-violet-700">{frags}</div>;
+        if (isHead) return <div key={i} className="pt-2.5 text-[13px] font-semibold text-violet-700 first-letter:uppercase">{frags}</div>;
         if (isBullet) return <div key={i} className="flex gap-2 text-sm leading-relaxed text-zinc-700"><span className="mt-1 text-violet-400">•</span><span>{frags}</span></div>;
         return <p key={i} className="text-sm leading-relaxed text-zinc-700">{frags}</p>;
       })}
@@ -132,7 +132,7 @@ function Chart({ data, dataKey, label, color, unit, reversed }: { data: SeriesPo
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-3.5">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-wide text-zinc-500">{label}</span>
+        <span className="text-xs font-semibold text-zinc-500 first-letter:uppercase">{label}</span>
         <span className="text-[10px] text-zinc-300">{unit}</span>
       </div>
       <ResponsiveContainer width="100%" height={150}>
@@ -338,16 +338,14 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
       {/* Hero */}
-      <div className="relative overflow-hidden text-white" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 45%,#0d9488 100%)" }}>
-        <div className="pointer-events-none absolute -top-24 -right-16 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 -left-10 h-80 w-80 rounded-full bg-teal-300/10 blur-3xl" />
+      <div className="relative overflow-hidden text-white" style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}>
         <div className="relative z-10 mx-auto max-w-6xl px-5 py-6 sm:py-8">
           <Link href={clientMode ? "/dashboard" : "/admin/coach"} className="inline-flex items-center gap-1.5 text-sm text-white/80 hover:text-white transition-colors">
             <ArrowLeft className="h-4 w-4" /> {clientMode ? "Retour au tableau de bord" : "Retour aux clients"}
           </Link>
           <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight drop-shadow-sm">{title || (a?.name as string) || "Séance"}</h1>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">{title || (a?.name as string) || "Séance"}</h1>
               <p className="mt-1 text-sm text-white/75 first-letter:uppercase">{new Date(date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
             </div>
             {!clientMode && (
@@ -372,8 +370,8 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
             <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-6">
               {headline.map((h) => (
                 <div key={h.label} className="rounded-2xl bg-white/10 px-3 py-2.5 ring-1 ring-white/15 backdrop-blur-md">
-                  <div className="text-[10px] uppercase tracking-wide text-white/60">{h.label}</div>
-                  <div className="text-lg font-bold leading-tight">{h.val}{h.unit ? <span className="text-xs font-normal text-white/60"> {h.unit}</span> : null}</div>
+                  <div className="text-[10px] text-white/60 first-letter:uppercase">{h.label}</div>
+                  <div className="text-lg font-semibold leading-tight">{h.val}{h.unit ? <span className="text-xs font-normal text-white/60"> {h.unit}</span> : null}</div>
                 </div>
               ))}
             </div>
@@ -411,8 +409,8 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
                       {readiness.level === "rouge" && <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: ui.dot }} />}
                       <span className="relative inline-flex h-3 w-3 rounded-full" style={{ background: ui.dot }} />
                     </span>
-                    <span className={`font-bold ${ui.fg}`}>{ui.label}</span>
-                    <span className="text-[11px] uppercase tracking-wide text-zinc-400">état du jour</span>
+                    <span className={`font-semibold ${ui.fg}`}>{ui.label}</span>
+                    <span className="text-[11px] text-zinc-400 first-letter:uppercase">état du jour</span>
                   </div>
                   <p className={`mt-1.5 text-sm leading-relaxed ${ui.fg}`}>{readiness.advice}</p>
                   {readiness.reasons.length > 0 && (
@@ -447,17 +445,17 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
 
             {/* Analyse du coach IA */}
             {analysis && (
-              <div className="rounded-3xl border border-violet-100 bg-violet-50/50 p-5 sm:p-6">
-                <div className="mb-2 flex items-center gap-2 text-sm font-bold text-violet-700"><Sparkles className="h-4 w-4" /> Analyse du coach IA</div>
+              <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-5 sm:p-6">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-violet-700"><Sparkles className="h-4 w-4" /> Analyse du coach IA</div>
                 <Rich text={analysis} />
               </div>
             )}
 
             {/* Prochaine séance + plan de la semaine — message chaleureux, prêt à envoyer au client */}
             {plan?.nextSession && (
-              <div className="overflow-hidden rounded-3xl border border-emerald-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-white" style={{ background: "linear-gradient(135deg,#047857,#0d9488)" }}>
-                  <span className="flex items-center gap-2 font-bold"><Sparkles className="h-4 w-4 text-amber-200" /> Prochaine séance recommandée</span>
+                  <span className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-amber-200" /> Prochaine séance recommandée</span>
                   <div className="flex flex-wrap items-center gap-2">
                     <button onClick={sendToClient} disabled={sendingClient}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold ring-1 ring-white/25 backdrop-blur-md transition-colors hover:bg-white/25 disabled:opacity-50">
@@ -473,7 +471,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
                   </div>
                 </div>
                 <div className="p-5">
-                  <h3 className="text-lg font-bold text-zinc-900">{plan.nextSession.title}</h3>
+                  <h3 className="text-lg font-semibold text-zinc-900">{plan.nextSession.title}</h3>
                   {plan.nextSession.tags.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {plan.nextSession.tags.map((t) => <span key={t} className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">{t}</span>)}
@@ -485,7 +483,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
                 </div>
                 {plan.week.length > 1 && (
                   <div className="border-t border-zinc-100 px-5 py-4">
-                    <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-zinc-400">Le reste de la semaine</div>
+                    <div className="mb-2.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">Le reste de la semaine</div>
                     <div className="space-y-2">
                       {plan.week.slice(1).map((d, i) => {
                         const c = TYPE_COLOR(d.type);
@@ -494,7 +492,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
                         return (
                           <div key={i} className="flex items-center gap-3 text-sm">
                             <span className="w-28 flex-shrink-0 font-semibold text-zinc-700 capitalize">{dateLabel}</span>
-                            <span className="flex-shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold" style={{ background: c.bg, color: c.fg }}>{d.type}</span>
+                            <span className="flex-shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold" style={{ background: c.bg, color: c.fg }}>{d.type}</span>
                             <span className="text-zinc-600">{d.desc}</span>
                           </div>
                         );
@@ -507,9 +505,9 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
 
             {/* Plan macro périodisé — bloc complet jusqu'au jour J */}
             {macro.length > 0 && (
-              <div className="overflow-hidden rounded-3xl border border-indigo-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-2xl border border-indigo-200 bg-white shadow-sm">
                 <button onClick={() => setShowMacro((v) => !v)} className="flex w-full items-center justify-between gap-2 px-5 py-3.5 text-left transition-colors hover:bg-indigo-50/40">
-                  <span className="flex flex-wrap items-center gap-2 font-bold text-indigo-700">
+                  <span className="flex flex-wrap items-center gap-2 font-semibold text-indigo-700">
                     <TrendingUp className="h-4 w-4" /> Plan complet jusqu&apos;au jour J
                     <span className="text-xs font-normal text-zinc-400">· {macro.length} semaines{objective?.race ? ` · ${objective.race}` : ""} (base → dév → spécifique → affûtage)</span>
                   </span>
@@ -520,7 +518,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="text-left text-[11px] uppercase tracking-wide text-zinc-400">
+                          <tr className="text-left text-[11px] text-zinc-400 first-letter:uppercase">
                             <th className="py-2 pr-3 font-semibold">Sem.</th><th className="py-2 pr-3 font-semibold">Phase</th>
                             <th className="py-2 pr-3 font-semibold">Volume</th><th className="py-2 pr-3 font-semibold">Qualité</th>
                             <th className="py-2 pr-3 font-semibold">Sortie longue</th><th className="py-2 font-semibold">Focus</th>
@@ -532,7 +530,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
                             return (
                               <tr key={w.week} className="border-t border-zinc-50">
                                 <td className="py-2 pr-3 font-semibold text-zinc-400">S{w.week}</td>
-                                <td className="py-2 pr-3"><span className="inline-block rounded-md px-2 py-0.5 text-[11px] font-bold" style={{ background: c.bg, color: c.fg }}>{w.phase}</span></td>
+                                <td className="py-2 pr-3"><span className="inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold" style={{ background: c.bg, color: c.fg }}>{w.phase}</span></td>
                                 <td className="py-2 pr-3 font-semibold tabular-nums text-zinc-800">{w.volumeKm} km</td>
                                 <td className="py-2 pr-3 text-zinc-600">{w.quality.join(" + ")}</td>
                                 <td className="py-2 pr-3 tabular-nums text-zinc-500">{w.longRunKm} km</td>
@@ -552,16 +550,16 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
             {/* Sections de métriques */}
             <div className="grid gap-4 lg:grid-cols-2">
               {sections.map((sec) => (
-                <div key={sec.title} className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+                <div key={sec.title} className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
                   <div className="mb-3 flex items-center gap-2.5">
                     <span className="flex h-8 w-8 items-center justify-center rounded-xl text-white" style={{ background: sec.color }}><sec.icon className="h-4 w-4" /></span>
-                    <h2 className="font-bold text-zinc-900">{sec.title}</h2>
+                    <h2 className="font-semibold text-zinc-900">{sec.title}</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {sec.items.map((m) => (
                       <div key={m.label} className="rounded-xl bg-zinc-50 px-3 py-2">
-                        <div className="text-[10px] uppercase tracking-wide text-zinc-400 leading-tight">{m.label}</div>
-                        <div className="text-[15px] font-bold text-zinc-900 leading-tight">{m.val}{m.unit ? <span className="text-[11px] font-normal text-zinc-400"> {m.unit}</span> : null}</div>
+                        <div className="text-[10px] text-zinc-400 leading-tight first-letter:uppercase">{m.label}</div>
+                        <div className="text-[15px] font-semibold text-zinc-900 leading-tight">{m.val}{m.unit ? <span className="text-[11px] font-normal text-zinc-400"> {m.unit}</span> : null}</div>
                       </div>
                     ))}
                   </div>
@@ -571,8 +569,8 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
 
             {/* Zones FC */}
             {zones && zTot > 0 && (
-              <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <h2 className="mb-3 font-bold text-zinc-900">Temps par zone de fréquence cardiaque</h2>
+              <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+                <h2 className="mb-3 font-semibold text-zinc-900">Temps par zone de fréquence cardiaque</h2>
                 <div className="mb-3 flex h-4 overflow-hidden rounded-full bg-zinc-100">
                   {zones.map((s, i) => (s > 0 ? <div key={i} style={{ width: `${(s / zTot) * 100}%`, background: ZONE_COLORS[i % ZONE_COLORS.length] }} title={`${ZONE_LABELS[i] ?? `Z${i + 1}`} : ${Math.round(s / 60)} min`} /> : null))}
                 </div>
@@ -589,8 +587,8 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
 
             {/* Graphiques */}
             {series && series.length > 4 && (
-              <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <h2 className="mb-3 font-bold text-zinc-900">Courbes de la séance <span className="text-xs font-normal text-zinc-400">· axe = distance (km)</span></h2>
+              <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+                <h2 className="mb-3 font-semibold text-zinc-900">Courbes de la séance <span className="text-xs font-normal text-zinc-400">· axe = distance (km)</span></h2>
                 <div className="grid gap-3 lg:grid-cols-2">
                   <Chart data={series} dataKey="pace" label="Allure" unit="/km" color="#2563eb" reversed />
                   <Chart data={series} dataKey="hr" label="Fréquence cardiaque" unit="bpm" color="#ef4444" />
@@ -603,12 +601,12 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
 
             {/* Tours / splits */}
             {laps && laps.length > 1 && (
-              <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <h2 className="mb-3 font-bold text-zinc-900">Tours / intervalles <span className="text-xs font-normal text-zinc-400">({laps.length})</span></h2>
+              <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+                <h2 className="mb-3 font-semibold text-zinc-900">Tours / intervalles <span className="text-xs font-normal text-zinc-400">({laps.length})</span></h2>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-zinc-100 text-left text-[11px] uppercase tracking-wide text-zinc-400">
+                      <tr className="border-b border-zinc-100 text-left text-[11px] text-zinc-400 first-letter:uppercase">
                         <th className="py-2 pr-3 font-semibold">#</th>
                         <th className="py-2 pr-3 font-semibold">Distance</th>
                         <th className="py-2 pr-3 font-semibold">Temps</th>
@@ -635,7 +633,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
                           <td className="py-2 pr-3 text-zinc-600">{l.cad ?? "—"}</td>
                           {hasLapPower && <td className="py-2 pr-3 text-zinc-600">{l.power != null ? `${l.power} W` : "—"}</td>}
                           <td className="py-2 pr-3 text-zinc-400">{l.elev != null ? `${l.elev}m` : "—"}</td>
-                          <td className="py-2">{l.zone != null ? <span className="inline-block rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white" style={{ background: ZONE_COLORS[(l.zone - 1) % ZONE_COLORS.length] }}>Z{l.zone}</span> : "—"}</td>
+                          <td className="py-2">{l.zone != null ? <span className="inline-block rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-white" style={{ background: ZONE_COLORS[(l.zone - 1) % ZONE_COLORS.length] }}>Z{l.zone}</span> : "—"}</td>
                         </tr>
                       ))}
                     </tbody>

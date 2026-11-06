@@ -91,7 +91,7 @@ export function MiniBarres({ barres, libelle, unite = "km", lang = "fr" }: {
       </div>
       <div className="mt-1.5 flex gap-[4%] px-1">
         {barres.map((b, i) => (
-          <div key={i} className="flex-1 text-center text-[10px] leading-none text-zinc-400">{b.jour}</div>
+          <div key={i} className="flex-1 text-center text-[11px] leading-none text-zinc-400">{b.jour}</div>
         ))}
       </div>
     </div>

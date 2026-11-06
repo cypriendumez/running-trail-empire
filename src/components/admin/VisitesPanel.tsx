@@ -103,7 +103,7 @@ function Liste({ titre, lignes, vide, icone: Icone, total, rendreCle }: { titre:
   const max = Math.max(1, ...lignes.map((l) => l.vues));
   return (
     <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-zinc-900"><Icone className="h-4 w-4 text-zinc-400" /> {titre}</h3>
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900"><Icone className="h-4 w-4 text-zinc-400" /> {titre}</h3>
       {lignes.length === 0 ? <p className="text-xs text-zinc-400">{vide}</p> : (
         <ul className="space-y-2">
           {lignes.map((l) => {
@@ -162,7 +162,7 @@ export function VisitesPanel() {
     <div className="mx-auto w-full max-w-6xl p-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="flex items-center gap-2 text-lg font-bold text-zinc-900"><Globe className="h-5 w-5 text-sky-600" /> Visites</h2>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Globe className="h-5 w-5 text-sky-600" /> Visites</h2>
           <p className="mt-1 max-w-2xl text-xs text-zinc-500">
             Mesure maison, sans cookie ni tiers : empreinte quotidienne, adresse IP jamais stockée, robots et éditeur exclus. Tendance comparée aux {jours} jours précédents.
           </p>
@@ -171,7 +171,7 @@ export function VisitesPanel() {
           <div className="flex items-center gap-1 rounded-xl bg-zinc-100 p-1">
             {([7, 30, 90] as const).map((j) => (
               <button key={j} onClick={() => setJours(j)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${jours === j ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${jours === j ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
                 {j} j
               </button>
             ))}
@@ -198,7 +198,7 @@ export function VisitesPanel() {
         {kpis.map((k) => (
           <div key={k.label} className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
             <div className="flex items-baseline justify-between gap-2">
-              <div className={`text-2xl font-bold tabular-nums ${k.fort ? "text-emerald-700" : "text-zinc-900"}`}>{chargement && !rep ? "…" : (k.value ?? "—")}</div>
+              <div className={`text-2xl font-semibold tabular-nums ${k.fort ? "text-emerald-700" : "text-zinc-900"}`}>{chargement && !rep ? "…" : (k.value ?? "—")}</div>
               {k.actuel !== undefined && k.precedent !== undefined && <Tendance actuel={k.actuel} precedent={k.precedent} />}
             </div>
             <div className="mt-0.5 text-xs font-medium text-zinc-600">{k.label}</div>
@@ -211,7 +211,7 @@ export function VisitesPanel() {
       {t && t.vues > 0 && (
         <div className="mb-6 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-zinc-900">Site public vs application</h3>
+            <h3 className="text-sm font-semibold text-zinc-900">Site public vs application</h3>
             <div className="flex items-center gap-4 text-[11px] text-zinc-500">
               <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: COULEUR.site }} /> Site {100 - partApp}%</span>
               <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: COULEUR.app }} /> App {partApp}%</span>
@@ -229,7 +229,7 @@ export function VisitesPanel() {
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm lg:col-span-2">
           <div className="mb-3 flex items-baseline justify-between">
-            <h3 className="text-sm font-bold text-zinc-900">Visiteurs par jour</h3>
+            <h3 className="text-sm font-semibold text-zinc-900">Visiteurs par jour</h3>
             <div className="flex items-center gap-3 text-[11px] text-zinc-500">
               <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: COULEUR.site }} /> Site</span>
               <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: COULEUR.app }} /> App</span>
@@ -239,7 +239,7 @@ export function VisitesPanel() {
             : rep ? <BarresJour jours={rep.jours} /> : null}
         </div>
         <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-zinc-900"><Clock className="h-4 w-4 text-zinc-400" /> Affluence par heure</h3>
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900"><Clock className="h-4 w-4 text-zinc-400" /> Affluence par heure</h3>
           {rep ? <BarresHeure heures={rep.heures} /> : null}
         </div>
       </div>

@@ -430,7 +430,7 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
       {/* Bandeau de chiffres — même esprit que la vidéo de référence, mais on
           n'affiche QUE ce qui est mesuré : pas d'altitude si la trace n'en porte pas. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/70 to-transparent p-5 text-white">
-        <div className="text-center text-sm font-semibold drop-shadow">{stats.title}</div>
+        <div className="text-center text-sm font-semibold">{stats.title}</div>
         <div className="mt-3 flex justify-center gap-10">
           {paceTexte && (
             <Chiffre libelle={paceAct != null ? "Allure" : "Allure moy."} valeur={paceTexte} unite="/km" />
@@ -486,7 +486,7 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
 function Groupe({ titre, children }: { titre: string; children: ReactNode }) {
   return (
     <div className="flex items-center gap-1 rounded-full bg-black/45 px-2 py-1 backdrop-blur">
-      <span className="px-1 text-[10px] font-semibold uppercase tracking-wide text-white/50">{titre}</span>
+      <span className="px-1 text-[10px] font-semibold text-white/50 first-letter:uppercase">{titre}</span>
       {children}
     </div>
   );
@@ -495,7 +495,7 @@ function Groupe({ titre, children }: { titre: string; children: ReactNode }) {
 function Pastille({ actif, onClick, children }: { actif: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button onClick={onClick}
-      className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
         actif ? "bg-emerald-500 text-white" : "text-white/70 hover:bg-white/15"}`}>
       {children}
     </button>
@@ -504,9 +504,9 @@ function Pastille({ actif, onClick, children }: { actif: boolean; onClick: () =>
 
 function Chiffre({ libelle, valeur, unite }: { libelle: string; valeur: string; unite: string }) {
   return (
-    <div className="text-center drop-shadow">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-white/70">{libelle}</div>
-      <div className="text-3xl font-black leading-tight">{valeur}</div>
+    <div className="text-center">
+      <div className="text-[10px] font-semibold text-white/70 first-letter:uppercase">{libelle}</div>
+      <div className="text-3xl font-semibold leading-tight">{valeur}</div>
       <div className="text-[10px] text-white/70">{unite}</div>
     </div>
   );

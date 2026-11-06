@@ -1073,10 +1073,10 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
       {chocDetecte && (
         <div className="fixed inset-0 z-[3000] flex flex-col items-center justify-center gap-6 bg-red-600 px-6 text-center text-white" role="alertdialog" aria-live="assertive">
           <AlertTriangle className="h-16 w-16" aria-hidden />
-          <p className="text-2xl font-black leading-tight">{d["veille.choc"]}</p>
-          <p className="text-lg font-bold tabular-nums">{tg("veille.rebours", { n: rebours })}</p>
+          <p className="text-2xl font-semibold leading-tight">{d["veille.choc"]}</p>
+          <p className="text-lg font-semibold tabular-nums">{tg("veille.rebours", { n: rebours })}</p>
           <button type="button" onClick={jeVaisBien}
-            className="w-full max-w-xs rounded-2xl bg-white px-6 py-5 text-lg font-bold text-red-700 shadow-lg">
+            className="w-full max-w-xs rounded-2xl bg-white px-6 py-5 text-lg font-semibold text-red-700 shadow-lg">
             {d["veille.jeVaisBien"]}
           </button>
           {contact.tel.trim() && (
@@ -1157,7 +1157,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         style={plein ? { margin: 0 } : undefined}
         className={plein
           ? "fixed inset-0 z-[2000] bg-white"
-          : "relative -mx-3 -mt-3 md:mx-0 md:mt-0 md:overflow-hidden md:rounded-3xl md:border md:border-zinc-200"}
+          : "relative -mx-3 -mt-3 md:mx-0 md:mt-0 md:overflow-hidden md:rounded-2xl md:border md:border-zinc-200"}
       >
         <CarteDirect
           position={positionCarte}
@@ -1197,22 +1197,22 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             <div className="mx-auto mb-2.5 flex max-w-lg items-center justify-center gap-2 rounded-full bg-zinc-900 px-3 py-1.5 text-[12px] font-semibold text-white md:mx-0 md:max-w-sm">
               <MapPin className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
               <span className="truncate">{d["map.geoOff"]}</span>
-              <button type="button" onClick={demanderPosition} className="ml-1 flex-shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-zinc-900">
+              <button type="button" onClick={demanderPosition} className="ml-1 flex-shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-900">
                 {d["map.geoBtn"]}
               </button>
             </div>
           )}
           <div className="mx-auto max-w-lg rounded-[26px] md:mx-0 md:max-w-sm border border-black/5 bg-white px-4 py-3 shadow-[0_20px_45px_-20px_rgba(9,9,11,0.55)]">
-            <p className="truncate text-center text-[13px] font-bold text-zinc-900">{titreCarte}</p>
+            <p className="truncate text-center text-[13px] font-semibold text-zinc-900">{titreCarte}</p>
             {/* 2 colonnes en libre (rien d'imposé), 3 sinon. Classe dynamique impossible
                 avec Tailwind : la grille se donne en style. */}
             <div className="mt-1.5 grid" style={{ gridTemplateColumns: `repeat(${chiffresCarte.length}, minmax(0, 1fr))` }}>
               {chiffresCarte.map((c) => (
                 <div key={c.l} className="min-w-0 text-center">
-                  <div className="text-[22px] font-black leading-none tabular-nums text-zinc-900">
-                    {c.v}{c.u && <span className="ml-0.5 text-[11px] font-bold text-zinc-400">{c.u}</span>}
+                  <div className="text-[22px] font-semibold leading-none tabular-nums text-zinc-900">
+                    {c.v}{c.u && <span className="ml-0.5 text-[11px] font-semibold text-zinc-400">{c.u}</span>}
                   </div>
-                  <div className="mt-1 truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">{c.l}</div>
+                  <div className="mt-1 truncate text-[10px] font-semibold text-zinc-400 first-letter:uppercase">{c.l}</div>
                 </div>
               ))}
             </div>
@@ -1242,7 +1242,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                   </ActionCarte>
                 </>
               ) : (
-                <button type="button" onClick={nouvelleSession} className="rounded-2xl bg-zinc-900 px-6 py-3 text-sm font-bold text-white">
+                <button type="button" onClick={nouvelleSession} className="rounded-2xl bg-zinc-900 px-6 py-3 text-sm font-semibold text-white">
                   {d["ct.new"]}
                 </button>
               )}
@@ -1288,10 +1288,10 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             )}
             {/* Séances du coach — faisables ici sans montre (allure/FC ciblée + voix) */}
             {coachSessions.length > 0 && (
-              <div className="mb-5 rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5">
+              <div className="mb-5 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5">
                 <div className="flex items-center gap-2">
                   <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600/10"><ClipboardList className="h-4 w-4 text-emerald-700" /></span>
-                  <h3 className="font-bold text-zinc-900">{d["co.title"]}</h3>
+                  <h3 className="font-semibold text-zinc-900">{d["co.title"]}</h3>
                 </div>
                 <p className="mb-3 mt-0.5 text-sm text-zinc-500">{d["co.sub"]}</p>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -1300,15 +1300,15 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                     const isToday = s.date === jourCivil(new Date(), fuseau);
                     return (
                       <button key={i} onClick={() => applyCoachSession(s)}
-                        className="group flex items-start gap-3 rounded-2xl border border-zinc-200 bg-white p-3.5 text-left transition-all hover:border-emerald-400 hover:shadow-sm">
+                        className="group flex items-start gap-3 rounded-2xl border border-zinc-200 bg-white p-3.5 text-left transition hover:border-emerald-400 hover:shadow-sm">
                         <div className="flex h-11 w-11 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                          <span className="text-[9px] font-bold uppercase leading-none">{dt.toLocaleDateString(lang, { month: "short" })}</span>
-                          <span className="text-base font-black leading-none">{dt.getDate()}</span>
+                          <span className="text-[9px] font-semibold uppercase leading-none">{dt.toLocaleDateString(lang, { month: "short" })}</span>
+                          <span className="text-base font-semibold leading-none">{dt.getDate()}</span>
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="truncate font-semibold text-zinc-900">{s.i18n?.[lang]?.title ?? s.title}</span>
-                            {isToday && <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">{d["co.today"]}</span>}
+                            {isToday && <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-semibold text-white">{d["co.today"]}</span>}
                           </div>
                           <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{s.i18n?.[lang]?.subtitle || s.detail || d["co.fallback"]}</p>
                         </div>
@@ -1324,7 +1324,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             <div className="mb-4 flex gap-1 p-1 bg-zinc-100 rounded-2xl w-fit">
               {([["pace", Zap, d["md.pace"]], ["hr", Heart, d["md.hr"]]] as const).map(([m, Icon, l]) => (
                 <button key={m} onClick={() => setTargetMode(m)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${targetMode === m ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${targetMode === m ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
                   <Icon className={`h-4 w-4 ${targetMode === m ? (m === "hr" ? "text-rose-500" : "text-emerald-600") : ""}`} /> {l}
                 </button>
               ))}
@@ -1338,7 +1338,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               <div className="flex gap-1 rounded-2xl bg-zinc-100 p-1">
                 {([[false, d["md.objectif"]], [true, d["md.libre"]]] as const).map(([v, l]) => (
                   <button key={String(v)} onClick={() => setLibre(v)}
-                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${libre === v ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${libre === v ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
                     {l}
                   </button>
                 ))}
@@ -1352,15 +1352,15 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
 
             {targetMode === "pace" && libre ? (
             /* ── ALLURE LIBRE : une seule chose à régler, l'allure ── */
-            <div className="mb-6 rounded-3xl border border-emerald-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
+            <div className="mb-6 rounded-2xl border border-emerald-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
               <div className="flex items-center justify-between">
-                <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600"><Zap className="h-3.5 w-3.5" /> {d["lb.paceLibre"]}</label>
+                <label className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 first-letter:uppercase"><Zap className="h-3.5 w-3.5" /> {d["lb.paceLibre"]}</label>
                 <div className="flex gap-1">
-                  <button onClick={() => setPaceLibre((v) => Math.min(PACE_LIBRE_MAX, Math.round((v + 1 / 12) * 120) / 120))} aria-label="−" className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">−</button>
-                  <button onClick={() => setPaceLibre((v) => Math.max(PACE_LIBRE_MIN, Math.round((v - 1 / 12) * 120) / 120))} aria-label="+" className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">+</button>
+                  <button onClick={() => setPaceLibre((v) => Math.min(PACE_LIBRE_MAX, Math.round((v + 1 / 12) * 120) / 120))} aria-label="−" className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 font-semibold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">−</button>
+                  <button onClick={() => setPaceLibre((v) => Math.max(PACE_LIBRE_MIN, Math.round((v - 1 / 12) * 120) / 120))} aria-label="+" className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 font-semibold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">+</button>
                 </div>
               </div>
-              <div className="mb-3 mt-1 text-5xl font-black tabular-nums text-zinc-900">{formatPace(paceLibre)}<span className="ml-1 text-base font-semibold text-zinc-400">/km</span></div>
+              <div className="mb-3 mt-1 text-5xl font-semibold tabular-nums text-zinc-900">{formatPace(paceLibre)}<span className="ml-1 text-base font-semibold text-zinc-400">/km</span></div>
               {/* ⚠️ JUSQU'À 15:00/km : le curseur d'objectif s'arrête à 10:00, ce qui exclut
                   la marche rapide et le trail en montée — deux allures parfaitement réelles. */}
               <input aria-label={d["lb.paceLibre"]} type="range" min={PACE_LIBRE_MIN} max={PACE_LIBRE_MAX} step={1 / 60}
@@ -1394,18 +1394,18 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                     key={p.name}
                     onClick={() => { setDistance(p.distance); setTargetTime(p.targetTime); }}
                     title={tg("feas.title", { l: feas.l, v: vma })}
-                    className={`group rounded-2xl border p-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 ${
+                    className={`group rounded-2xl border p-3.5 text-left transition duration-200 ${
                       active
                         ? "border-emerald-500 bg-emerald-50/70 shadow-[0_10px_30px_-14px_rgba(5,150,105,0.55)] ring-1 ring-emerald-200"
                         : "border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-md"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`text-lg font-bold leading-tight ${active ? "text-emerald-700" : "text-zinc-900"}`}>{p.name === "Semi" ? d["pr.semi"] : p.name}</span>
+                      <span className={`text-lg font-semibold leading-tight ${active ? "text-emerald-700" : "text-zinc-900"}`}>{p.name === "Semi" ? d["pr.semi"] : p.name}</span>
                       <span className="h-2 w-2 rounded-full" style={{ background: feas.c }} />
                     </div>
                     <div className={`mt-0.5 text-xs font-semibold tabular-nums ${active ? "text-emerald-600" : "text-zinc-500"}`}>{formatPace(pace)} /km</div>
-                    <div className={`mt-1.5 text-[10px] font-bold uppercase tracking-[0.14em] ${active ? "text-emerald-600/70" : "text-zinc-400"}`}>{p.goal}</div>
+                    <div className={`mt-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${active ? "text-emerald-600/70" : "text-zinc-400"}`}>{p.goal}</div>
                   </button>
                 );
               })}
@@ -1414,15 +1414,15 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             {/* Réglages faciles : choisis distance + allure, le temps se calcule tout seul */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               {/* Distance */}
-              <div className="rounded-3xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
+              <div className="rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400"><MapPin className="h-3.5 w-3.5" /> {d["lb.dist"]}</label>
+                  <label className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase"><MapPin className="h-3.5 w-3.5" /> {d["lb.dist"]}</label>
                   <div className="flex gap-1">
-                    <button onClick={() => setDistanceKeepPace(distance - 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">−</button>
-                    <button onClick={() => setDistanceKeepPace(distance + 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">+</button>
+                    <button onClick={() => setDistanceKeepPace(distance - 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-semibold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">−</button>
+                    <button onClick={() => setDistanceKeepPace(distance + 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-semibold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">+</button>
                   </div>
                 </div>
-                <div className="mb-3 text-4xl font-black tabular-nums text-zinc-900">{distance}<span className="ml-1 text-base font-semibold text-zinc-400">km</span></div>
+                <div className="mb-3 text-4xl font-semibold tabular-nums text-zinc-900">{distance}<span className="ml-1 text-base font-semibold text-zinc-400">km</span></div>
                 <input aria-label={d["lb.dist"]} type="range" min={1} max={50} step={0.5} value={Math.min(distance, 50)} onChange={(e) => setDistanceKeepPace(parseFloat(e.target.value))} className="w-full accent-emerald-600" />
                 <div className="mt-3 flex flex-wrap gap-1">
                   {[5, 10, 21.1, 42.2].map((dd) => (
@@ -1432,63 +1432,63 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               </div>
 
               {/* Allure cible — commande principale (accents émeraude) */}
-              <div className="relative overflow-hidden rounded-3xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
+              <div className="relative overflow-hidden rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
                 <div className="relative">
                   <div className="flex items-center justify-between mb-2">
-                    <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600"><Zap className="h-3.5 w-3.5" /> {d["lb.pace"]}</label>
+                    <label className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 first-letter:uppercase"><Zap className="h-3.5 w-3.5" /> {d["lb.pace"]}</label>
                     <div className="flex gap-1">
-                      <button onClick={() => setPaceMinKm(targetPace - 5 / 60)} title={d["faster"]} className="flex h-7 items-center justify-center rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white">−5s</button>
-                      <button onClick={() => setPaceMinKm(targetPace + 5 / 60)} title={d["slower"]} className="flex h-7 items-center justify-center rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white">+5s</button>
+                      <button onClick={() => setPaceMinKm(targetPace - 5 / 60)} title={d["faster"]} className="flex h-7 items-center justify-center rounded-full bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white">−5s</button>
+                      <button onClick={() => setPaceMinKm(targetPace + 5 / 60)} title={d["slower"]} className="flex h-7 items-center justify-center rounded-full bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white">+5s</button>
                     </div>
                   </div>
-                  <div className="mb-3 text-4xl font-black tabular-nums text-zinc-900">{formatPace(targetPace)}<span className="ml-1 text-base font-semibold text-zinc-400">/km</span></div>
+                  <div className="mb-3 text-4xl font-semibold tabular-nums text-zinc-900">{formatPace(targetPace)}<span className="ml-1 text-base font-semibold text-zinc-400">/km</span></div>
                   <input aria-label={d["lb.pace"]} type="range" min={150} max={540} step={5} value={Math.round(Math.min(9, Math.max(2.5, targetPace)) * 60)} onChange={(e) => setPaceMinKm(parseInt(e.target.value) / 60)} className="w-full accent-emerald-600" />
                   <div className="mt-1 flex justify-between text-[10px] font-medium text-zinc-400"><span>{d["fast"]}</span><span>{d["slow"]}</span></div>
                 </div>
               </div>
 
               {/* Temps visé — calculé automatiquement */}
-              <div className="rounded-3xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
+              <div className="rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400"><Timer className="h-3.5 w-3.5" /> {d["lb.time"]}</label>
+                  <label className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase"><Timer className="h-3.5 w-3.5" /> {d["lb.time"]}</label>
                   <div className="flex gap-1">
-                    <button onClick={() => bumpTime(-60)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">−</button>
-                    <button onClick={() => bumpTime(60)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">+</button>
+                    <button onClick={() => bumpTime(-60)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-semibold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">−</button>
+                    <button onClick={() => bumpTime(60)} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-semibold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">+</button>
                   </div>
                 </div>
-                <div className="mb-3 text-4xl font-black tabular-nums text-zinc-900">{formatTime(targetTime)}</div>
+                <div className="mb-3 text-4xl font-semibold tabular-nums text-zinc-900">{formatTime(targetTime)}</div>
                 <div className="inline-flex items-center gap-1.5 rounded-full bg-zinc-50 px-2.5 py-1 text-[11px] font-medium text-zinc-400">{d["calc"]}</div>
               </div>
             </div>
 
             {/* Dénivelé — profil de parcours (reflète le D+ choisi) + réglage du total */}
-            <div className="mb-6 rounded-3xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
+            <div className="mb-6 rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
               <div className="mb-3 flex items-center justify-between">
-                <label htmlFor={`${cid}-r0`} className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400"><TrendingUp className="h-3.5 w-3.5 text-orange-500" /> {d["lb.elev"]}</label>
-                <span className="text-lg font-black tabular-nums text-zinc-900">{elevation}<span className="ml-0.5 text-xs font-semibold text-zinc-400">m D+</span></span>
+                <label htmlFor={`${cid}-r0`} className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase"><TrendingUp className="h-3.5 w-3.5 text-orange-500" /> {d["lb.elev"]}</label>
+                <span className="text-lg font-semibold tabular-nums text-zinc-900">{elevation}<span className="ml-0.5 text-xs font-semibold text-zinc-400">m D+</span></span>
               </div>
               <ElevationProfile elevation={elevation} distance={distance} />
               <input id={`${cid}-r0`} type="range" min={0} max={3000} step={50} value={Math.min(elevation, 3000)} onChange={(e) => setElevation(parseInt(e.target.value))} className="mt-3 w-full accent-orange-500" />
             </div>
 
             {/* Pace zones reference */}
-            <div className="mb-6 rounded-3xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
+            <div className="mb-6 rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
               <div className="mb-3.5 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-zinc-900">{d["ref.title"]}</h3>
-                <span className="rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums text-white shadow-sm" style={{ background: "linear-gradient(135deg,#059669,#0d9488)" }}>VMA {vma} km/h</span>
+                <h3 className="text-sm font-semibold text-zinc-900">{d["ref.title"]}</h3>
+                <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white shadow-sm" style={{ background: "linear-gradient(135deg,#059669,#0d9488)" }}>VMA {vma} km/h</span>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {zoneBands.map((z) => (
                   <button
                     key={z.label}
                     onClick={() => setTargetTime(Math.round(((z.paceSlow + z.paceFast) / 2) * 60 * distance))}
-                    className="group rounded-2xl border border-zinc-200/80 bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md"
+                    className="group rounded-2xl border border-zinc-200/80 bg-white p-3 text-left transition hover:border-zinc-300 hover:shadow-md"
                   >
                     <div className="mb-1.5 flex items-center gap-1.5">
                       <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg" style={{ background: `${z.tint}1a`, color: z.tint }}><z.Icon className="h-3.5 w-3.5" /></span>
                       <span className="truncate text-[11px] font-semibold" style={{ color: z.tint }}>{z.label}</span>
                     </div>
-                    <div className="text-[13px] font-bold tabular-nums text-zinc-900">{formatPace(z.paceFast)} – {formatPace(z.paceSlow)}<span className="text-[10px] font-medium text-zinc-300"> /km</span></div>
+                    <div className="text-[13px] font-semibold tabular-nums text-zinc-900">{formatPace(z.paceFast)} – {formatPace(z.paceSlow)}<span className="text-[10px] font-medium text-zinc-300"> /km</span></div>
                   </button>
                 ))}
               </div>
@@ -1497,17 +1497,17 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             </>
             ) : libre ? (
             /* ── FRÉQUENCE CARDIAQUE LIBRE : la fourchette qu'on veut, en battements ── */
-            <div className="mb-6 rounded-3xl border border-rose-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
-              <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-600"><Heart className="h-3.5 w-3.5" /> {d["lb.fcLibre"]}</label>
-              <div className="mb-3 mt-1 text-5xl font-black tabular-nums text-zinc-900">{Math.min(fcLo, fcHi)}<span className="mx-1 text-2xl text-zinc-300">–</span>{Math.max(fcLo, fcHi)}<span className="ml-1 text-base font-semibold text-zinc-400">bpm</span></div>
+            <div className="mb-6 rounded-2xl border border-rose-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
+              <label className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 first-letter:uppercase"><Heart className="h-3.5 w-3.5" /> {d["lb.fcLibre"]}</label>
+              <div className="mb-3 mt-1 text-5xl font-semibold tabular-nums text-zinc-900">{Math.min(fcLo, fcHi)}<span className="mx-1 text-2xl text-zinc-300">–</span>{Math.max(fcLo, fcHi)}<span className="ml-1 text-base font-semibold text-zinc-400">bpm</span></div>
               <div className="grid grid-cols-2 gap-4">
                 {([["lo", fcLo, setFcLo], ["hi", fcHi, setFcHi]] as const).map(([cle, val, set]) => (
                   <div key={cle}>
                     <div className="mb-1 flex items-center justify-between">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{cle === "lo" ? d["libre.bas"] : d["libre.haut"]}</span>
+                      <span className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{cle === "lo" ? d["libre.bas"] : d["libre.haut"]}</span>
                       <div className="flex gap-1">
-                        <button onClick={() => set((v) => Math.max(FC_MIN, v - 1))} aria-label={`− ${cle}`} className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-600 hover:bg-rose-500 hover:text-white">−</button>
-                        <button onClick={() => set((v) => Math.min(FC_MAX, v + 1))} aria-label={`+ ${cle}`} className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-600 hover:bg-rose-500 hover:text-white">+</button>
+                        <button onClick={() => set((v) => Math.max(FC_MIN, v - 1))} aria-label={`− ${cle}`} className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-600 hover:bg-rose-500 hover:text-white">−</button>
+                        <button onClick={() => set((v) => Math.min(FC_MAX, v + 1))} aria-label={`+ ${cle}`} className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-600 hover:bg-rose-500 hover:text-white">+</button>
                       </div>
                     </div>
                     <input aria-label={cle === "lo" ? d["libre.bas"] : d["libre.haut"]} type="range" min={FC_MIN} max={FC_MAX} step={1}
@@ -1527,12 +1527,12 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[11px] text-zinc-400">{maxHr != null ? tg("hr.max", { n: Math.round(maxHr) }) : d["hr.maxInconnue"]}</p>
                 {hrSensor === "on" ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700">
                     <Bluetooth className="h-3 w-3" /> {d["hr.on"]}{liveHr != null ? ` · ${liveHr} bpm` : ""}
                   </span>
                 ) : (
                   <button onClick={connectHrSensor} disabled={hrSensor === "connecting"}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white transition-colors hover:bg-emerald-500 disabled:opacity-50">
+                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-500 disabled:opacity-50">
                     {hrSensor === "connecting" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bluetooth className="h-3 w-3" />}
                     {d["hr.connect"]}
                   </button>
@@ -1543,15 +1543,15 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             /* ── Mode FRÉQUENCE CARDIAQUE : durée + zone cardiaque ── */
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
               {/* Durée */}
-              <div className="rounded-3xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
+              <div className="rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400"><Timer className="h-3.5 w-3.5" /> {d["lb.dur"]}</label>
+                  <label className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase"><Timer className="h-3.5 w-3.5" /> {d["lb.dur"]}</label>
                   <div className="flex gap-1">
-                    <button onClick={() => setDurationMin((d) => Math.max(5, d - 5))} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">−</button>
-                    <button onClick={() => setDurationMin((d) => Math.min(240, d + 5))} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-bold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">+</button>
+                    <button onClick={() => setDurationMin((d) => Math.max(5, d - 5))} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-semibold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">−</button>
+                    <button onClick={() => setDurationMin((d) => Math.min(240, d + 5))} className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 font-semibold text-zinc-600 transition-colors hover:bg-emerald-600 hover:text-white">+</button>
                   </div>
                 </div>
-                <div className="mb-3 text-4xl font-black tabular-nums text-zinc-900">{durationMin}<span className="ml-1 text-base font-semibold text-zinc-400">min</span></div>
+                <div className="mb-3 text-4xl font-semibold tabular-nums text-zinc-900">{durationMin}<span className="ml-1 text-base font-semibold text-zinc-400">min</span></div>
                 <input aria-label={d["lb.dur"]} type="range" min={10} max={180} step={5} value={Math.min(durationMin, 180)} onChange={(e) => setDurationMin(parseInt(e.target.value))} className="w-full accent-emerald-600" />
                 <div className="mt-3 flex flex-wrap gap-1">
                   {[30, 45, 60, 90].map((d) => (
@@ -1560,14 +1560,13 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                 </div>
               </div>
               {/* Zone FC cible (héros) */}
-              <div className="relative overflow-hidden rounded-3xl border border-rose-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_20px_46px_-26px_rgba(244,63,94,0.4)] ring-1 ring-rose-100">
-                <div className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-rose-400/10 blur-2xl" />
+              <div className="relative overflow-hidden rounded-2xl border border-rose-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_20px_46px_-26px_rgba(244,63,94,0.4)] ring-1 ring-rose-100">
                 <div className="relative">
-                  <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-600"><Heart className="h-3.5 w-3.5" /> {d["hr.zone"]}</label>
+                  <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 first-letter:uppercase"><Heart className="h-3.5 w-3.5" /> {d["hr.zone"]}</label>
                   <div className="space-y-1.5">
                     {HR_ZONES.map((z) => (
                       <button key={z.z} onClick={() => setHrZone(z.z)}
-                        className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-sm transition-all ${hrZone === z.z ? "bg-rose-500 text-white shadow-sm" : "bg-zinc-50 text-zinc-700 hover:bg-zinc-100"}`}>
+                        className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-sm transition ${hrZone === z.z ? "bg-rose-500 text-white shadow-sm" : "bg-zinc-50 text-zinc-700 hover:bg-zinc-100"}`}>
                         <span className="font-semibold">{zn(z.z)}</span>
                         <span className={`text-xs tabular-nums ${hrZone === z.z ? "text-rose-100" : "text-zinc-400"}`}>{bpmZone(z)}{maxHr != null ? " bpm" : ""}</span>
                       </button>
@@ -1576,12 +1575,12 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                     <p className="text-[11px] text-zinc-400">{maxHr != null ? tg("hr.max", { n: Math.round(maxHr) }) : d["hr.maxInconnue"]}</p>
                     {hrSensor === "on" ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-600 ring-1 ring-rose-200">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-600 ring-1 ring-rose-200">
                         <Bluetooth className="h-3 w-3" /> {d["hr.on"]}{liveHr != null ? ` · ${liveHr} bpm` : ""}
                       </span>
                     ) : (
                       <button onClick={connectHrSensor} disabled={hrSensor === "connecting"}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white transition-colors hover:bg-emerald-500 disabled:opacity-60">
+                        className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-500 disabled:opacity-60">
                         {hrSensor === "connecting" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bluetooth className="h-3 w-3" />}
                         {d["hr.connect"]}
                       </button>
@@ -1593,27 +1592,26 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             )}
 
             {/* Summary — bandeau émeraude (langage du dashboard) */}
-            <div className="relative overflow-hidden rounded-3xl p-5 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-white/10 flex flex-wrap items-center justify-between gap-4 mb-6" style={{ background: "linear-gradient(120deg,#064e3b 0%,#047857 48%,#0d9488 100%)" }}>
-              <div className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl" />
+            <div className="relative overflow-hidden rounded-2xl p-5 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-white/10 flex flex-wrap items-center justify-between gap-4 mb-6" style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}>
               <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
               {libre ? (
                 <div className="flex items-center gap-6 sm:gap-8">
                   {targetMode === "pace"
-                    ? <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.pace"]}</div><div className="text-2xl font-bold">{formatPace(paceLibre)} /km</div></div>
-                    : <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.target"]}</div><div className="text-2xl font-bold tabular-nums">{Math.min(fcLo, fcHi)}–{Math.max(fcLo, fcHi)} bpm</div></div>}
-                  <div><div className="text-emerald-100/80 text-sm mb-1">{targetMode === "pace" ? d["lb.dist"] : d["lb.dur"]}</div><div className="text-2xl font-bold">{d["libre.valeur"]}</div></div>
+                    ? <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.pace"]}</div><div className="text-2xl font-semibold">{formatPace(paceLibre)} /km</div></div>
+                    : <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.target"]}</div><div className="text-2xl font-semibold tabular-nums">{Math.min(fcLo, fcHi)}–{Math.max(fcLo, fcHi)} bpm</div></div>}
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{targetMode === "pace" ? d["lb.dist"] : d["lb.dur"]}</div><div className="text-2xl font-semibold">{d["libre.valeur"]}</div></div>
                 </div>
               ) : targetMode === "pace" ? (
                 <div className="flex items-center gap-6 sm:gap-8">
-                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.pace"]}</div><div className="text-2xl font-bold">{formatPace(targetPace)} /km</div></div>
-                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.dist"]}</div><div className="text-2xl font-bold">{distance} km</div></div>
-                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.goal"]}</div><div className="text-2xl font-bold">{formatTime(targetTime)}</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.pace"]}</div><div className="text-2xl font-semibold">{formatPace(targetPace)} /km</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.dist"]}</div><div className="text-2xl font-semibold">{distance} km</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.goal"]}</div><div className="text-2xl font-semibold">{formatTime(targetTime)}</div></div>
                 </div>
               ) : (
                 <div className="flex items-center gap-6 sm:gap-8">
-                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.dur"]}</div><div className="text-2xl font-bold">{durationMin} min</div></div>
-                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.hrZone"]}</div><div className="text-2xl font-bold">{zn(hrZone)}</div></div>
-                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.target"]}</div><div className="text-2xl font-bold tabular-nums">{bpmZone(HR_ZONES[hrZone - 1])}</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["lb.dur"]}</div><div className="text-2xl font-semibold">{durationMin} min</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.hrZone"]}</div><div className="text-2xl font-semibold">{zn(hrZone)}</div></div>
+                  <div><div className="text-emerald-100/80 text-sm mb-1">{d["sm.target"]}</div><div className="text-2xl font-semibold tabular-nums">{bpmZone(HR_ZONES[hrZone - 1])}</div></div>
                 </div>
               )}
               <div className="flex items-center gap-3">
@@ -1627,7 +1625,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                   onClick={sendToWatch}
                   disabled={sendingWatch}
                   title={d["watch.tooltip"]}
-                  className="flex items-center gap-2 rounded-2xl bg-white/10 px-5 py-4 text-sm font-semibold text-white ring-1 ring-white/20 transition-all hover:bg-white/20 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-2xl bg-white/10 px-5 py-4 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20 disabled:opacity-50"
                 >
                   {sendingWatch ? <Loader2 className="w-5 h-5 animate-spin" /> : <Watch className="w-5 h-5" />}
                   {sendingWatch ? d["watch.sending"] : d["watch.send"]}
@@ -1639,7 +1637,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                 )}
                 <button
                   onClick={() => (targetMode === "hr" ? startHrSession() : startSession())}
-                  className="bg-white hover:bg-emerald-50 text-emerald-700 font-bold px-8 py-4 rounded-2xl flex items-center gap-3 text-lg shadow-md transition-all"
+                  className="bg-white hover:bg-emerald-50 text-emerald-700 font-semibold px-8 py-4 rounded-2xl flex items-center gap-3 text-lg shadow-md transition"
                 >
                   <Play className="w-6 h-6" />
                   {d["start"]}
@@ -1655,7 +1653,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               >
                 <Watch className="h-5 w-5 flex-shrink-0 text-zinc-500" />
                 <div className="min-w-0 flex-1">
-                  <span className="block text-sm font-bold text-zinc-900">{d["acc.title"]}</span>
+                  <span className="block text-sm font-semibold text-zinc-900">{d["acc.title"]}</span>
                   {watchStatus && (
                     <span className={`mt-0.5 flex items-center gap-1.5 text-xs font-semibold ${watchStatus.pushReady ? "text-emerald-700" : watchStatus.lecture ? "text-sky-700" : watchStatus.connected ? "text-amber-700" : "text-zinc-500"}`}>
                       <span className={`h-2 w-2 flex-shrink-0 rounded-full ${watchStatus.pushReady ? "bg-emerald-500" : watchStatus.lecture ? "bg-sky-500" : watchStatus.connected ? "bg-amber-500" : "bg-zinc-400"}`} />
@@ -1689,12 +1687,12 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                       <ol className="space-y-2.5 text-sm text-zinc-700">
                         {(GUIDE[lang] ?? GUIDE.fr).map((txt, i) => (
                           <li key={i} className="flex gap-2.5">
-                            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-bold text-white">{i + 1}</span>
+                            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-semibold text-white">{i + 1}</span>
                             <span>{txt}</span>
                           </li>
                         ))}
                       </ol>
-                      <a href="/dashboard/sync" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800">
+                      <a href="/dashboard/sync" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800">
                         {d["acc.cta"]}
                       </a>
                       <p className="mt-2 text-[11px] text-zinc-400">{GUIDE_TIP[lang] ?? GUIDE_TIP.fr}</p>
@@ -1739,16 +1737,15 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               const avg = hrNRef.current > 0 ? Math.round(hrSumRef.current / hrNRef.current) : null;
               return (
             <div className="relative overflow-hidden rounded-[28px] border border-zinc-200/70 bg-white p-7 sm:p-10 mb-6 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_30px_70px_-34px_rgba(16,24,40,0.22)]">
-              <div className="pointer-events-none absolute -top-32 left-1/2 h-64 w-[34rem] -translate-x-1/2 rounded-full blur-3xl opacity-[0.15] transition-colors duration-500" style={{ background: accent }} />
               <div className="relative z-10">
                 <div className="text-center">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-zinc-400">{liveHr != null ? d["md.hr"] : d["lv.elapsed"]}</div>
+                  <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{liveHr != null ? d["md.hr"] : d["lv.elapsed"]}</div>
                   {liveHr != null ? (
-                    <div className="mt-2 text-7xl sm:text-[8rem] font-extrabold tabular-nums leading-[0.95] tracking-tight transition-colors duration-300" style={{ color: phase === "finished" ? "#18181b" : accent }}>
-                      {liveHr}<span className="align-top text-2xl font-bold text-zinc-300"> bpm</span>
+                    <div className="mt-2 text-7xl sm:text-[8rem] font-semibold tabular-nums leading-[0.95] tracking-tight transition-colors duration-300" style={{ color: phase === "finished" ? "#18181b" : accent }}>
+                      {liveHr}<span className="align-top text-2xl font-semibold text-zinc-300"> bpm</span>
                     </div>
                   ) : (
-                    <div className="mt-2 text-7xl sm:text-[8rem] font-extrabold tabular-nums leading-[0.95] tracking-tight text-zinc-900">{formatTime(elapsed)}</div>
+                    <div className="mt-2 text-7xl sm:text-[8rem] font-semibold tabular-nums leading-[0.95] tracking-tight text-zinc-900">{formatTime(elapsed)}</div>
                   )}
                   {phase === "running" && (
                     <div className="mt-4 inline-flex flex-wrap items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold" style={{ background: "#f8fafc", color: accent }}>
@@ -1765,16 +1762,16 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
 
                 <div className="mt-8 grid grid-cols-3 gap-4 text-center">
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{d["lv.time"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-extrabold tabular-nums text-zinc-900">{formatTime(elapsed)}</div>
+                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lv.time"]}</div>
+                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums text-zinc-900">{formatTime(elapsed)}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{d["lv.left"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-extrabold tabular-nums text-zinc-900">{formatTime(remaining)}</div>
+                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lv.left"]}</div>
+                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums text-zinc-900">{formatTime(remaining)}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{gpsStatus === "live" ? d["lb.dist"] : d["lv.avgHr"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-extrabold tabular-nums text-zinc-900">
+                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{gpsStatus === "live" ? d["lb.dist"] : d["lv.avgHr"]}</div>
+                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums text-zinc-900">
                       {gpsStatus === "live"
                         ? <>{currentKm.toFixed(2)}<span className="text-sm text-zinc-300"> km</span></>
                         : avg != null ? <>{avg}<span className="text-sm text-zinc-300"> bpm</span></> : "—"}
@@ -1799,13 +1796,12 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               const soft = onPace ? "#eff6ff" : ahead ? "#ecfdf5" : "#fff7ed";
               return (
             <div className="relative overflow-hidden rounded-[28px] border border-zinc-200/70 bg-white p-7 sm:p-10 mb-6 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_30px_70px_-34px_rgba(16,24,40,0.22)]">
-              <div className="pointer-events-none absolute -top-32 left-1/2 h-64 w-[34rem] -translate-x-1/2 rounded-full blur-3xl opacity-[0.15] transition-colors duration-500" style={{ background: accent }} />
               <div className="relative z-10">
                 {/* Allure GÉANTE, teinte raffinée */}
                 <div className="text-center">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-zinc-400">{d["lv.curPace"]}</div>
-                  <div className="mt-2 text-7xl sm:text-[8rem] font-extrabold tabular-nums leading-[0.95] tracking-tight transition-colors duration-300" style={{ color: phase === "finished" ? "#18181b" : accent }}>
-                    {formatPace(currentPace)}<span className="align-top text-2xl font-bold text-zinc-300"> /km</span>
+                  <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lv.curPace"]}</div>
+                  <div className="mt-2 text-7xl sm:text-[8rem] font-semibold tabular-nums leading-[0.95] tracking-tight transition-colors duration-300" style={{ color: phase === "finished" ? "#18181b" : accent }}>
+                    {formatPace(currentPace)}<span className="align-top text-2xl font-semibold text-zinc-300"> /km</span>
                   </div>
                   {phase === "running" && (
                     <div className="mt-4 inline-flex flex-wrap items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold" style={{ background: soft, color: accent }}>
@@ -1820,7 +1816,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
 
                 {/* Avance / retard cumulé — sur QUOI, en libre ? Rien n'est visé. */}
                 {phase === "running" && !libreRef.current && Math.abs(timeDelta) > 3 && (
-                  <div className="mt-4 text-center text-base font-bold" style={{ color: isAhead ? "#047857" : "#c2410c" }}>
+                  <div className="mt-4 text-center text-base font-semibold" style={{ color: isAhead ? "#047857" : "#c2410c" }}>
                     {isAhead ? tg("lv.aheadGoal", { t: formatTime(Math.abs(timeDelta)) }) : tg("lv.behindGoal", { t: formatTime(Math.abs(timeDelta)) })}
                   </div>
                 )}
@@ -1828,26 +1824,26 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                 {/* Stats secondaires */}
                 <div className="mt-8 grid grid-cols-3 gap-4 text-center">
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{d["lv.time"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-extrabold tabular-nums text-zinc-900">{formatTime(elapsed)}</div>
+                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lv.time"]}</div>
+                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums text-zinc-900">{formatTime(elapsed)}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{d["lb.dist"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-extrabold tabular-nums text-zinc-900">{currentKm.toFixed(2)}<span className="text-sm text-zinc-300"> km</span></div>
+                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lb.dist"]}</div>
+                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums text-zinc-900">{currentKm.toFixed(2)}<span className="text-sm text-zinc-300"> km</span></div>
                   </div>
                   {/* ⚠️ PAS DE « FIN PRÉVUE » SANS DISTANCE VISÉE : ce serait un chiffre
                       inventé. On montre à la place l'allure moyenne, qui, elle, se mesure. */}
                   {libreRef.current ? (
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{d["lv.avgPace"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-extrabold tabular-nums text-zinc-900">
-                      {currentKm > 0.05 ? formatPace(elapsed / 60 / currentKm) : "—"}<span className="ml-0.5 text-sm font-bold text-zinc-300">/km</span>
+                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lv.avgPace"]}</div>
+                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums text-zinc-900">
+                      {currentKm > 0.05 ? formatPace(elapsed / 60 / currentKm) : "—"}<span className="ml-0.5 text-sm font-semibold text-zinc-300">/km</span>
                     </div>
                   </div>
                   ) : (
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{d["lv.eta"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-extrabold tabular-nums flex items-center justify-center gap-1" style={{ color: isAhead ? "#047857" : isBehind ? "#c2410c" : "#0369a1" }}>
+                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lv.eta"]}</div>
+                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums flex items-center justify-center gap-1" style={{ color: isAhead ? "#047857" : isBehind ? "#c2410c" : "#0369a1" }}>
                       {formatTime(predictedFinish)}
                       {isAhead ? <TrendingDown className="w-4 h-4" /> : isBehind ? <TrendingUp className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
                     </div>
@@ -1915,14 +1911,14 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                 <>
                   <button
                     onClick={pauseSession}
-                    className="flex-1 flex items-center justify-center gap-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold py-3 rounded-2xl transition-all"
+                    className="flex-1 flex items-center justify-center gap-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold py-3 rounded-2xl transition"
                   >
                     {paused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
                     {paused ? d["ct.resume"] : d["ct.pause"]}
                   </button>
                   <button
                     onClick={arreterSession}
-                    className="flex items-center justify-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 font-semibold px-6 py-3 rounded-2xl transition-all"
+                    className="flex items-center justify-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 font-semibold px-6 py-3 rounded-2xl transition"
                   >
                     <StopCircle className="w-5 h-5" />
                     {d["ct.stop"]}
@@ -1932,7 +1928,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               {phase === "finished" && (
                 <button
                   onClick={nouvelleSession}
-                  className="flex-1 flex items-center justify-center gap-2 bg-white text-zinc-700 font-semibold py-3 rounded-2xl border border-zinc-200 hover:border-zinc-400 transition-all"
+                  className="flex-1 flex items-center justify-center gap-2 bg-white text-zinc-700 font-semibold py-3 rounded-2xl border border-zinc-200 hover:border-zinc-400 transition"
                 >
                   {d["ct.new"]}
                 </button>
@@ -1980,7 +1976,7 @@ function GrosBouton({ label, teinte, onClick, children }: { label: string; teint
       <span className={`flex h-[60px] w-[60px] items-center justify-center rounded-full text-white transition-transform active:scale-95 ${vert ? "bg-emerald-600 shadow-[0_12px_26px_-10px_rgba(5,150,105,0.95)]" : "bg-red-600 shadow-[0_12px_26px_-10px_rgba(220,38,38,0.95)]"}`}>
         {children}
       </span>
-      <span className={`w-full truncate text-center text-[11px] font-bold ${vert ? "text-emerald-700" : "text-red-700"}`}>{label}</span>
+      <span className={`w-full truncate text-center text-[11px] font-semibold ${vert ? "text-emerald-700" : "text-red-700"}`}>{label}</span>
     </button>
   );
 }

@@ -147,7 +147,7 @@ export default async function ActivitesPage({ searchParams }: { searchParams: Pr
     <div className="mx-auto w-full max-w-3xl sm:px-4 sm:py-8">
       <PerfTabs />
       <header className="mb-6">
-        <h1 className="text-3xl font-black tracking-tight text-zinc-900">{d["feed.title"]}</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">{d["feed.title"]}</h1>
         <p className="mt-1 text-sm text-zinc-500">
           {lignes.length
             ? (total != null && total > lignes.length

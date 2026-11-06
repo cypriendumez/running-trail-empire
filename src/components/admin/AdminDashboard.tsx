@@ -38,7 +38,7 @@ function Avatar({ user, size = "md" }: { user: User; size?: "sm" | "md" | "lg" }
   const colors = ["from-violet-500 to-indigo-500", "from-emerald-500 to-teal-500", "from-rose-500 to-pink-500", "from-amber-500 to-orange-500", "from-blue-500 to-cyan-500"];
   const color = colors[letter.charCodeAt(0) % colors.length];
   return (
-    <div className={`${sizes[size]} rounded-full bg-gradient-to-br ${color} flex items-center justify-center text-white font-bold flex-shrink-0`}>
+    <div className={`${sizes[size]} rounded-full bg-gradient-to-br ${color} flex items-center justify-center text-white font-semibold flex-shrink-0`}>
       {letter}
     </div>
   );
@@ -188,7 +188,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
               héberge, pas à un panneau d'administration anonyme. */}
           <Logo size={32} />
           <div>
-            <span className="font-bold text-zinc-900 text-sm">Espace coach</span>
+            <span className="font-semibold text-zinc-900 text-sm">Espace coach</span>
             <span className="text-zinc-400 text-xs ml-2">Pacevo</span>
           </div>
           {/* ⚠️ LE LIEN « NEWSLETTER » A ÉTÉ RETIRÉ : la lettre part toute seule chaque
@@ -212,7 +212,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
             { key: "micro", label: "Micro-entreprise", icon: Landmark },
           ].map(({ key, label, icon: Icon }) => (
             <button key={key} onClick={() => setTab(key as Onglet)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
                 tab === key ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
               }`}>
               <Icon className="w-4 h-4" />{label}
@@ -253,7 +253,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-3 bg-${color}-50`}>
                   <Icon className={`w-4 h-4 text-${color}-500`} />
                 </div>
-                <div className="text-2xl font-bold text-zinc-900">{value}</div>
+                <div className="text-2xl font-semibold text-zinc-900">{value}</div>
                 <div className="text-xs text-zinc-400 mt-0.5">{label}</div>
               </div>
             ))}
@@ -268,7 +268,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-zinc-50 text-xs text-zinc-400 uppercase tracking-wide">
+                  <tr className="border-b border-zinc-50 text-xs text-zinc-400 first-letter:uppercase">
                     <th className="text-left px-6 py-3 font-medium">Utilisateur</th>
                     <th className="text-left px-6 py-3 font-medium">Plan</th>
                     <th className="text-left px-6 py-3 font-medium">Mode</th>
@@ -352,7 +352,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
               )}
               {filtered.map(u => (
                 <button key={u.id} onClick={() => setSelected(u)}
-                  className={`w-full text-left px-4 py-3.5 border-b border-zinc-50 flex items-center gap-3 transition-all hover:bg-zinc-50 ${
+                  className={`w-full text-left px-4 py-3.5 border-b border-zinc-50 flex items-center gap-3 transition hover:bg-zinc-50 ${
                     selected?.id === u.id ? "bg-violet-50 border-l-2 border-l-violet-500" : ""
                   }`}>
                   <Avatar user={u} size="sm" />
@@ -384,7 +384,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
                   <div className="flex items-center gap-5">
                     <Avatar user={selected} size="lg" />
                     <div className="flex-1">
-                      <h2 className="text-xl font-bold text-zinc-900">{selected.full_name || "Sans nom"}</h2>
+                      <h2 className="text-xl font-semibold text-zinc-900">{selected.full_name || "Sans nom"}</h2>
                       <p className="text-zinc-500 text-sm mt-0.5">{selected.email}</p>
                       <div className="flex flex-wrap items-center gap-2 mt-3">
                         <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${tierBadge[selected.subscription_tier ?? "free"] ?? "bg-zinc-100 text-zinc-500"}`}>
@@ -531,7 +531,7 @@ export function AdminDashboard({ users }: { users: User[] }) {
 
                     <button onClick={sendEmail}
                       disabled={sending || !emailSubject || !emailBody}
-                      className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition-all text-sm">
+                      className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition text-sm">
                       {sending
                         ? <><RefreshCw className="w-4 h-4 animate-spin" /> Envoi en cours...</>
                         : <><Send className="w-4 h-4" /> Envoyer l&apos;email</>}

@@ -75,8 +75,8 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
         <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-4">
           {chiffres.map((c) => (
             <div key={c.label} className="bg-white p-4">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{c.label}</div>
-              <div className="mt-1 text-2xl font-black tracking-tight text-zinc-900">{c.value}</div>
+              <div className="text-[10px] font-semibold text-zinc-500 first-letter:uppercase">{c.label}</div>
+              <div className="mt-1 text-2xl font-semibold tracking-tight text-zinc-900">{c.value}</div>
             </div>
           ))}
           {combler(chiffres.length).map((_, i) => <div key={`vide-${i}`} className="hidden bg-white sm:block" />)}
@@ -86,7 +86,7 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
       {efforts.length > 0 && (
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
           <div className="border-b border-zinc-100 px-4 py-3">
-            <h2 className="text-sm font-bold text-zinc-900">{t("eff.titre")}</h2>
+            <h2 className="text-sm font-semibold text-zinc-900">{t("eff.titre")}</h2>
             {/* La nuance compte : ce n'est PAS le premier kilomètre, c'est le plus rapide. */}
             <p className="mt-0.5 text-xs text-zinc-500">{t("eff.sous")}</p>
           </div>
@@ -94,7 +94,7 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
             {efforts.map((e) => (
               <li key={e.cle} className="flex items-baseline gap-3 px-4 py-2.5">
                 <span className="w-28 shrink-0 text-sm font-semibold text-zinc-700">{e.label}</span>
-                <span className="text-lg font-black tabular-nums tracking-tight text-zinc-900">{e.chrono}</span>
+                <span className="text-lg font-semibold tabular-nums tracking-tight text-zinc-900">{e.chrono}</span>
                 <span className="ml-auto text-sm font-medium tabular-nums text-zinc-500">{e.allure}</span>
               </li>
             ))}
@@ -105,14 +105,14 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
       {forme.length > 0 && (
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
           <div className="border-b border-zinc-100 px-4 py-3">
-            <h2 className="text-sm font-bold text-zinc-900">{t("act.forme")}</h2>
+            <h2 className="text-sm font-semibold text-zinc-900">{t("act.forme")}</h2>
             <p className="mt-0.5 text-xs text-zinc-500">{t("act.formeSous")}</p>
           </div>
           <div className="grid grid-cols-2 gap-px bg-zinc-100 sm:grid-cols-4">
             {forme.map((c) => (
               <div key={c.label} className="bg-white px-4 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{c.label}</div>
-                <div className="mt-0.5 text-xl font-black tracking-tight text-zinc-900">{c.value}</div>
+                <div className="text-[10px] font-semibold text-zinc-500 first-letter:uppercase">{c.label}</div>
+                <div className="mt-0.5 text-xl font-semibold tracking-tight text-zinc-900">{c.value}</div>
               </div>
             ))}
             {combler(forme.length).map((_, i) => <div key={`vide-${i}`} className="hidden bg-white sm:block" />)}
@@ -124,8 +124,8 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
 
       {splits.length > 0 && (
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-          <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-bold text-zinc-900">{t("act.splits")}</h2>
-          <div className="grid grid-cols-[2.5rem_3.5rem_1fr_3rem] gap-2 border-b border-zinc-100 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+          <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-900">{t("act.splits")}</h2>
+          <div className="grid grid-cols-[2.5rem_3.5rem_1fr_3rem] gap-2 border-b border-zinc-100 px-4 py-2 text-[10px] font-semibold text-zinc-400 first-letter:uppercase">
             <span>Km</span><span>{enVitesse ? "km/h" : t("feed.pace")}</span><span /><span className="text-right">{t("act.elev")}</span>
           </div>
           <div className="divide-y divide-zinc-50">
@@ -191,7 +191,7 @@ function ProfilAltitude({ points }: { points: { d: number; alt: number }[] }) {
   return (
     <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4">
       <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-sm font-bold text-zinc-900">Altitude</h2>
+        <h2 className="text-sm font-semibold text-zinc-900">Altitude</h2>
         <span className="text-xs text-zinc-400">{Math.round(min)} – {Math.round(max)} m</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-32 w-full">

@@ -75,7 +75,7 @@ export default async function PpsPage() {
       <div className="flex items-center gap-3">
         <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-zinc-900 text-emerald-400"><ShieldCheck className="h-5 w-5" /></span>
         <div className="min-w-0">
-          <h1 className="text-xl font-black tracking-tight text-zinc-900 sm:text-2xl">{t.titre}</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">{t.titre}</h1>
           <p className="text-[13px] leading-snug text-zinc-500">
             <span className="font-semibold text-emerald-700">{t.prixEtDuree(PPS_PRIX_EUR, PPS_VALIDITE_MOIS)}</span> · {t.sousTitre}
           </p>
@@ -94,7 +94,7 @@ export default async function PpsPage() {
       {/* ── Les 4 étapes : une carte, quatre lignes ──────────────────────────── */}
       <section className="mt-5 rounded-2xl border border-zinc-200/70 bg-white p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[12px] font-bold uppercase tracking-widest text-zinc-400">{t.etapesTitre}</h2>
+          <h2 className="text-[12px] font-semibold text-zinc-400 first-letter:uppercase">{t.etapesTitre}</h2>
           <a href={PPS_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[12px] font-semibold text-zinc-500 hover:text-zinc-900">
             pps.athle.fr <ExternalLink className="h-3 w-3" />
           </a>
@@ -102,7 +102,7 @@ export default async function PpsPage() {
         <ol className="mt-3 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
           {t.etapes.map((e, i) => (
             <li key={i} className="flex gap-3">
-              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-900 text-[11px] font-black text-white">{i + 1}</span>
+              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-900 text-[11px] font-semibold text-white">{i + 1}</span>
               <span className="text-[13.5px] leading-snug text-zinc-700">{e}</span>
             </li>
           ))}
@@ -117,11 +117,11 @@ export default async function PpsPage() {
       {/* ── Ce que c'est / qui est concerné — à lire une fois, en bas ────────── */}
       <section className="mt-5 grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-zinc-200/70 bg-white p-4">
-          <h2 className="text-[12px] font-bold uppercase tracking-widest text-zinc-400">{t.quoiTitre}</h2>
+          <h2 className="text-[12px] font-semibold text-zinc-400 first-letter:uppercase">{t.quoiTitre}</h2>
           <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-700">{t.quoi}</p>
         </div>
         <div className="rounded-2xl border border-zinc-200/70 bg-white p-4">
-          <h2 className="text-[12px] font-bold uppercase tracking-widest text-zinc-400">{t.quiTitre}</h2>
+          <h2 className="text-[12px] font-semibold text-zinc-400 first-letter:uppercase">{t.quiTitre}</h2>
           <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-700">{t.qui}</p>
           <div className="mt-3 space-y-2">
             <p className="flex gap-2.5 text-[13px] leading-relaxed text-zinc-600">

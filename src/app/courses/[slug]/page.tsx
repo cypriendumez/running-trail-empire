@@ -174,7 +174,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
         {c.region && <> · <Link href={`/courses?region=${encodeURIComponent(regionCanonique(c.region))}`} className="hover:text-zinc-900">{nomRegion(c.region)}</Link></>}
       </nav>
 
-      <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">{nomAffichable(c.name)}</h1>
+      <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl">{nomAffichable(c.name)}</h1>
       <p className="mt-2 text-lg text-zinc-600">
         {/* ⚠️ JAMAIS DE DATE INVENTÉE. « 2099-01-01 » est le repère interne de
             « prochaine édition non annoncée » : l'écrire tel quel donnerait
@@ -193,7 +193,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
 
       {!aUneDate(c) && (
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-          <h2 className="text-sm font-bold text-amber-900">{t("sansDate.titre")}</h2>
+          <h2 className="text-sm font-semibold text-amber-900">{t("sansDate.titre")}</h2>
           <p className="mt-1 text-sm text-amber-900/80">{t("sansDate.texte")}</p>
         </div>
       )}
@@ -263,7 +263,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
       </p>
 
       <section className="mt-12 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6">
-        <h2 className="text-lg font-bold text-zinc-900">{t("prep.titre")}</h2>
+        <h2 className="text-lg font-semibold text-zinc-900">{t("prep.titre")}</h2>
         <p className="mt-1.5 text-sm text-zinc-600">
           {t("prep.texte")}
         </p>

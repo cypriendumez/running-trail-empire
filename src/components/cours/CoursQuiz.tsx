@@ -92,18 +92,17 @@ export function CoursQuiz({ bank, ui }: { bank: QuizQuestion[]; ui: CoursUI["qui
   const wrongChapters = [...new Map(wrong.map((w) => [w.anchor, w.chapitre])).entries()];
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
-      <div className="relative overflow-hidden px-5 py-4 text-white" style={{ background: "linear-gradient(135deg,#18181b 0%,#27272a 60%,#064e3b 100%)" }}>
-        <div className="pointer-events-none absolute -top-10 -right-8 h-32 w-32 rounded-full bg-emerald-400/15 blur-2xl" />
+    <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <div className="relative overflow-hidden px-5 py-4 text-white" style={{ background: "linear-gradient(170deg,#27272a 0%,#18181b 100%)" }}>
         <div className="relative z-10 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15"><Trophy className="h-5 w-5 text-amber-300" /></span>
             <div>
-              <h3 className="font-bold leading-tight">{ui.title}</h3>
+              <h3 className="font-semibold leading-tight">{ui.title}</h3>
               <p className="text-[13px] text-white/75">{fill(ui.sub, { n: bank.length })}</p>
             </div>
           </div>
-          {phase === "play" && <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold tabular-nums ring-1 ring-white/15">{idx + 1} / {qs.length}</span>}
+          {phase === "play" && <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tabular-nums ring-1 ring-white/15">{idx + 1} / {qs.length}</span>}
         </div>
       </div>
 
@@ -111,21 +110,21 @@ export function CoursQuiz({ bank, ui }: { bank: QuizQuestion[]; ui: CoursUI["qui
         {phase === "start" && (
           <div className="grid gap-3 sm:grid-cols-2">
             <button onClick={() => start("express")}
-              className="group rounded-2xl border border-zinc-200 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
+              className="group rounded-2xl border border-zinc-200 p-5 text-left transition hover:border-emerald-300 hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50"><Zap className="h-4 w-4 text-emerald-600" /></span>
-                {best.express != null && <span className="text-xs font-bold text-zinc-400">{fill(ui.record, { score: best.express, total: 10 })}</span>}
+                {best.express != null && <span className="text-xs font-semibold text-zinc-400">{fill(ui.record, { score: best.express, total: 10 })}</span>}
               </div>
-              <div className="mt-3 font-bold text-zinc-900">{ui.express}</div>
+              <div className="mt-3 font-semibold text-zinc-900">{ui.express}</div>
               <p className="mt-0.5 text-xs text-zinc-500">{ui.expressSub}</p>
             </button>
             <button onClick={() => start("complet")}
-              className="group rounded-2xl border border-zinc-200 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
+              className="group rounded-2xl border border-zinc-200 p-5 text-left transition hover:border-emerald-300 hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50"><BookOpen className="h-4 w-4 text-amber-600" /></span>
-                {best.complet != null && <span className="text-xs font-bold text-zinc-400">{fill(ui.record, { score: best.complet, total: bank.length })}</span>}
+                {best.complet != null && <span className="text-xs font-semibold text-zinc-400">{fill(ui.record, { score: best.complet, total: bank.length })}</span>}
               </div>
-              <div className="mt-3 font-bold text-zinc-900">{ui.complet}</div>
+              <div className="mt-3 font-semibold text-zinc-900">{ui.complet}</div>
               <p className="mt-0.5 text-xs text-zinc-500">{fill(ui.completSub, { n: bank.length })}</p>
             </button>
           </div>
@@ -134,7 +133,7 @@ export function CoursQuiz({ bank, ui }: { bank: QuizQuestion[]; ui: CoursUI["qui
         {phase === "play" && q && (
           <>
             <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-zinc-100">
-              <div className="h-full rounded-full bg-emerald-500 transition-all duration-300" style={{ width: `${((idx + (picked != null ? 1 : 0)) / qs.length) * 100}%` }} />
+              <div className="h-full rounded-full bg-emerald-500 transition duration-300" style={{ width: `${((idx + (picked != null ? 1 : 0)) / qs.length) * 100}%` }} />
             </div>
             <p className="font-semibold text-zinc-900">{q.q}</p>
             <div className="mt-3 space-y-2">
@@ -144,7 +143,7 @@ export function CoursQuiz({ bank, ui }: { bank: QuizQuestion[]; ui: CoursUI["qui
                 const state = picked == null ? "idle" : isAnswer ? "good" : isPicked ? "bad" : "dim";
                 return (
                   <button key={i} onClick={() => pick(i)} disabled={picked != null}
-                    className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-all ${
+                    className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm transition ${
                       state === "idle" ? "border-zinc-200 bg-white text-zinc-700 hover:border-emerald-300 hover:bg-emerald-50/50"
                       : state === "good" ? "border-emerald-300 bg-emerald-50 font-semibold text-emerald-800"
                       : state === "bad" ? "border-rose-300 bg-rose-50 text-rose-700"
@@ -152,7 +151,7 @@ export function CoursQuiz({ bank, ui }: { bank: QuizQuestion[]; ui: CoursUI["qui
                     }`}>
                     {state === "good" ? <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-600" />
                       : state === "bad" ? <XCircle className="h-4 w-4 flex-shrink-0 text-rose-500" />
-                      : <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border border-zinc-300 text-[10px] font-bold text-zinc-400">{String.fromCharCode(65 + i)}</span>}
+                      : <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border border-zinc-300 text-[10px] font-semibold text-zinc-400">{String.fromCharCode(65 + i)}</span>}
                     {opt}
                   </button>
                 );
@@ -181,17 +180,17 @@ export function CoursQuiz({ bank, ui }: { bank: QuizQuestion[]; ui: CoursUI["qui
 
         {phase === "done" && (
           <div className="py-2 text-center">
-            <div className="text-5xl font-black tabular-nums text-zinc-900">{score}<span className="text-2xl text-zinc-300"> / {qs.length}</span></div>
+            <div className="text-5xl font-semibold tabular-nums text-zinc-900">{score}<span className="text-2xl text-zinc-300"> / {qs.length}</span></div>
             <p className="mt-2 font-semibold text-zinc-700">{verdict}</p>
-            {newRecord && <p className="mt-1 text-sm font-bold text-amber-600">{ui.newRecord}</p>}
+            {newRecord && <p className="mt-1 text-sm font-semibold text-amber-600">{ui.newRecord}</p>}
             {badge && (
-              <div className="mx-auto mt-3 inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 ring-1 ring-amber-200">
+              <div className="mx-auto mt-3 inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 ring-1 ring-amber-200">
                 {ui.badgeUnlocked} {ui.badgeName}
               </div>
             )}
             {wrongChapters.length > 0 && (
               <div className="mx-auto mt-4 max-w-md">
-                <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">{ui.toReview}</p>
+                <p className="text-xs font-semibold text-zinc-400 first-letter:uppercase">{ui.toReview}</p>
                 <div className="mt-2 flex flex-wrap justify-center gap-2">
                   {wrongChapters.map(([anchor, title]) => (
                     <a key={anchor} href={`#${anchor}`} className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:border-emerald-300 hover:text-emerald-700">

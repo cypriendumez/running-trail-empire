@@ -126,7 +126,7 @@ export function GrapheIndicateur({ g, lang }: { g: Graphe; lang: string }) {
             <div key={li} className="mt-0.5 flex items-center gap-1.5 tabular-nums">
               <span className="h-2 w-2 rounded-full" style={{ background: l.couleur }} />
               {g.lignes.length > 1 && <span className="text-white/70">{l.libelle}</span>}
-              <span className="font-bold">{fmt(l.points[survol].valeur)}</span>
+              <span className="font-semibold">{fmt(l.points[survol].valeur)}</span>
               <span className="text-white/60">{g.unite}</span>
             </div>
           ))}

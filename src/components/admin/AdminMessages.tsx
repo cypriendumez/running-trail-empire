@@ -109,8 +109,8 @@ export function AdminMessages({ conversations, initialClient }: { conversations:
       {/* ░░ Liste des conversations ░░ */}
       <div className={`w-full flex-shrink-0 flex-col border-r border-zinc-100 md:flex md:w-[360px] ${sel ? "hidden md:flex" : "flex"}`}>
         <div className="flex h-[60px] flex-shrink-0 items-center justify-between gap-2 border-b border-zinc-100 px-4">
-          <h2 className="flex items-center gap-2 text-[15px] font-bold text-zinc-900">Conversations
-            {totalUnread > 0 && <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[11px] font-bold text-white">{totalUnread}</span>}
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-zinc-900">Conversations
+            {totalUnread > 0 && <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[11px] font-semibold text-white">{totalUnread}</span>}
           </h2>
           <span className="text-xs text-zinc-400">{convs.length}</span>
         </div>
@@ -130,13 +130,13 @@ export function AdminMessages({ conversations, initialClient }: { conversations:
             return (
               <button key={c.userId} onClick={() => selectConv(c.userId)}
                 className={`flex w-full gap-3 border-b border-zinc-50 px-4 py-3 text-left transition-colors ${active ? "bg-emerald-50" : "hover:bg-zinc-50"}`}>
-                <span className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
+                <span className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 font-semibold text-emerald-700">
                   {c.name.charAt(0).toUpperCase()}
                   {c.unread > 0 && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" />}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className={`truncate text-sm ${c.unread > 0 ? "font-bold text-zinc-900" : "font-semibold text-zinc-700"}`}>{c.name}</span>
+                    <span className={`truncate text-sm ${c.unread > 0 ? "font-semibold text-zinc-900" : "font-semibold text-zinc-700"}`}>{c.name}</span>
                     <span className="flex-shrink-0 text-[11px] text-zinc-400" title={fmtFull(c.lastTs)}>{timeAgo(c.lastTs)}</span>
                   </div>
                   <div className={`truncate text-xs ${c.unread > 0 ? "font-medium text-zinc-600" : "text-zinc-400"}`}>{last?.from === "coach" ? "Toi : " : ""}{last?.body || (last?.attachments.length ? "📎 pièce jointe" : "—")}</div>
@@ -153,9 +153,9 @@ export function AdminMessages({ conversations, initialClient }: { conversations:
           <>
             <div className="flex h-[60px] flex-shrink-0 items-center gap-3 border-b border-zinc-100 px-4">
               <button onClick={() => setSel(null)} className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 md:hidden"><ChevronLeft className="h-5 w-5" /></button>
-              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">{current.name.charAt(0).toUpperCase()}</span>
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 font-semibold text-emerald-700">{current.name.charAt(0).toUpperCase()}</span>
               <div className="min-w-0">
-                <div className="truncate font-bold text-zinc-900">{current.name}</div>
+                <div className="truncate font-semibold text-zinc-900">{current.name}</div>
                 <div className="truncate text-xs text-zinc-400">{current.email}</div>
               </div>
             </div>
@@ -165,7 +165,7 @@ export function AdminMessages({ conversations, initialClient }: { conversations:
                 return (
                   <div key={i} className={`flex ${coach ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm ${coach ? "rounded-br-md bg-emerald-600 text-white" : "rounded-bl-md bg-white text-zinc-800 ring-1 ring-zinc-100"}`}>
-                      <div className={`mb-0.5 text-[10px] font-bold uppercase tracking-wide ${coach ? "text-emerald-100" : "text-zinc-400"}`}>{coach ? "Toi (coach)" : current.name.split(" ")[0]}{m.subject ? ` · ${m.subject}` : ""}</div>
+                      <div className={`mb-0.5 text-[10px] font-semibold uppercase tracking-wide ${coach ? "text-emerald-100" : "text-zinc-400"}`}>{coach ? "Toi (coach)" : current.name.split(" ")[0]}{m.subject ? ` · ${m.subject}` : ""}</div>
                       {m.body && <div className="whitespace-pre-line">{m.body}</div>}
                       <Atts atts={m.attachments} dark={coach} />
                       <div className="mt-1 text-right text-[10px] opacity-70" title={fmtFull(m.ts)}>{timeAgo(m.ts)}</div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Sparkles, ArrowRight, X } from "lucide-react";
+import { ListChecks, ArrowRight, X } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 // Les comptes créés AVANT l'ajout du questionnaire complet ont `onboarding_completed = true` :
@@ -57,20 +57,20 @@ export function ProfileCompletionBanner({ profile }: { profile: Record<string, u
         <X className="h-3.5 w-3.5" />
       </button>
       <div className="flex flex-col gap-3 pr-6 sm:flex-row sm:items-center">
-        <span className="hidden h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#ecfdf5] sm:flex">
-          <Sparkles className="h-4 w-4 text-[#059669]" />
+        <span className="hidden h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-50 sm:flex">
+          <ListChecks className="h-[18px] w-[18px] text-zinc-500" strokeWidth={1.5} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-zinc-900">{missing.length === 1 ? t.title1 : t.title.replace("{n}", String(missing.length))}</p>
           <p className="mt-0.5 text-[13px] leading-relaxed text-zinc-500">{t.sub}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {missing.map((m) => (
-              <span key={m} className="rounded-full bg-zinc-50 px-2.5 py-0.5 text-xs font-medium text-zinc-600 ring-1 ring-inset ring-zinc-200">{m}</span>
+              <span key={m} className="rounded-md bg-zinc-50 px-2 py-0.5 text-xs text-zinc-600 ring-1 ring-inset ring-zinc-200">{m}</span>
             ))}
           </div>
         </div>
         <Link href="/dashboard/profile"
-          className="inline-flex w-fit flex-shrink-0 items-center gap-1.5 rounded-xl bg-zinc-900 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-800">
+          className="inline-flex w-fit flex-shrink-0 items-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800">
           {t.cta} <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>

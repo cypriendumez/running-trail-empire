@@ -13,32 +13,32 @@ type Msg = { role: "user" | "model"; text: string };
 const D: Record<string, { title: string; sub: string; hint: string; ph: string; thinking: string; errReply: string; errConn: string; sug: string[]; verrou: string; verrouCta: string; quota: string }> = {
   fr: {
     title: "Pose ta question au coach IA", sub: "Une réponse claire, pour tous les niveaux — même grand débutant.",
-    hint: "Choisis une question ou écris la tienne 👇", ph: "Écris ta question… (ex : comment gérer une côte ?)",
-    thinking: "Le coach réfléchit…", errReply: "Désolé, je n'ai pas pu répondre. Réessaie dans un instant 🙏", errConn: "Connexion impossible pour le moment.", verrou: "Poser tes questions au coach sur les cours fait partie des formules Starter et Premium.", verrouCta: "Voir les formules", quota: "Tu as atteint ta limite d'échanges avec l'IA pour aujourd'hui.",
+    hint: "Choisis une question ou écris la tienne", ph: "Écris ta question… (ex : comment gérer une côte ?)",
+    thinking: "Le coach réfléchit…", errReply: "Désolé, je n'ai pas pu répondre. Réessaie dans un instant", errConn: "Connexion impossible pour le moment.", verrou: "Poser tes questions au coach sur les cours fait partie des formules Starter et Premium.", verrouCta: "Voir les formules", quota: "Tu as atteint ta limite d'échanges avec l'IA pour aujourd'hui.",
     sug: ["C'est quoi la VMA, simplement ?", "Combien de fois courir par semaine pour débuter ?", "Que manger avant et pendant une course longue ?", "Comment choisir mes chaussures de running ?", "Pourquoi courir lentement me fait progresser ?", "Comment préparer mon premier trail ?"],
   },
   en: {
     title: "Ask the AI coach", sub: "A clear answer, for every level — even complete beginners.",
-    hint: "Pick a question or write your own 👇", ph: "Type your question… (e.g. how do I handle hills?)",
-    thinking: "The coach is thinking…", errReply: "Sorry, I couldn't answer. Try again in a moment 🙏", errConn: "Connection unavailable right now.", verrou: "Asking the coach about the lessons is part of the Starter and Premium plans.", verrouCta: "See the plans", quota: "You've reached today's AI limit.",
+    hint: "Pick a question or write your own", ph: "Type your question… (e.g. how do I handle hills?)",
+    thinking: "The coach is thinking…", errReply: "Sorry, I couldn't answer. Try again in a moment", errConn: "Connection unavailable right now.", verrou: "Asking the coach about the lessons is part of the Starter and Premium plans.", verrouCta: "See the plans", quota: "You've reached today's AI limit.",
     sug: ["What is MAS (VMA), simply?", "How many runs per week to get started?", "What should I eat before and during a long race?", "How do I choose my running shoes?", "Why does running slow make me faster?", "How do I prepare my first trail race?"],
   },
   de: {
     title: "Frag den KI-Coach", sub: "Eine klare Antwort, für jedes Niveau — auch für absolute Anfänger.",
-    hint: "Wähle eine Frage oder schreibe deine eigene 👇", ph: "Schreibe deine Frage… (z. B. wie laufe ich Anstiege?)",
-    thinking: "Der Coach überlegt…", errReply: "Entschuldige, ich konnte nicht antworten. Versuch es gleich nochmal 🙏", errConn: "Verbindung derzeit nicht möglich.", verrou: "Dem Coach Fragen zu den Kursen zu stellen ist Teil der Tarife Starter und Premium.", verrouCta: "Tarife ansehen", quota: "Du hast dein KI-Tageslimit erreicht.",
+    hint: "Wähle eine Frage oder schreibe deine eigene", ph: "Schreibe deine Frage… (z. B. wie laufe ich Anstiege?)",
+    thinking: "Der Coach überlegt…", errReply: "Entschuldige, ich konnte nicht antworten. Versuch es gleich nochmal", errConn: "Verbindung derzeit nicht möglich.", verrou: "Dem Coach Fragen zu den Kursen zu stellen ist Teil der Tarife Starter und Premium.", verrouCta: "Tarife ansehen", quota: "Du hast dein KI-Tageslimit erreicht.",
     sug: ["Was ist die vVO2max (MAS), einfach erklärt?", "Wie oft pro Woche laufen für den Einstieg?", "Was essen vor und während eines langen Laufs?", "Wie wähle ich meine Laufschuhe?", "Warum macht langsames Laufen mich schneller?", "Wie bereite ich meinen ersten Trail vor?"],
   },
   es: {
     title: "Pregunta al coach IA", sub: "Una respuesta clara, para todos los niveles — incluso principiantes.",
-    hint: "Elige una pregunta o escribe la tuya 👇", ph: "Escribe tu pregunta… (ej.: ¿cómo gestiono una cuesta?)",
-    thinking: "El coach está pensando…", errReply: "Lo siento, no pude responder. Inténtalo de nuevo en un momento 🙏", errConn: "Conexión no disponible ahora mismo.", verrou: "Hacer preguntas al coach sobre los cursos forma parte de los planes Starter y Premium.", verrouCta: "Ver los planes", quota: "Has alcanzado tu límite diario de IA.",
+    hint: "Elige una pregunta o escribe la tuya", ph: "Escribe tu pregunta… (ej.: ¿cómo gestiono una cuesta?)",
+    thinking: "El coach está pensando…", errReply: "Lo siento, no pude responder. Inténtalo de nuevo en un momento", errConn: "Conexión no disponible ahora mismo.", verrou: "Hacer preguntas al coach sobre los cursos forma parte de los planes Starter y Premium.", verrouCta: "Ver los planes", quota: "Has alcanzado tu límite diario de IA.",
     sug: ["¿Qué es la VAM, explicado simple?", "¿Cuántas veces correr por semana para empezar?", "¿Qué comer antes y durante una carrera larga?", "¿Cómo elegir mis zapatillas de running?", "¿Por qué correr despacio me hace progresar?", "¿Cómo preparar mi primer trail?"],
   },
   pt: {
     title: "Pergunta ao coach IA", sub: "Uma resposta clara, para todos os níveis — mesmo principiantes.",
-    hint: "Escolhe uma pergunta ou escreve a tua 👇", ph: "Escreve a tua pergunta… (ex.: como gerir uma subida?)",
-    thinking: "O coach está a pensar…", errReply: "Desculpa, não consegui responder. Tenta novamente daqui a pouco 🙏", errConn: "Ligação indisponível de momento.", verrou: "Fazer perguntas ao coach sobre os cursos faz parte dos planos Starter e Premium.", verrouCta: "Ver os planos", quota: "Atingiste o teu limite diário de IA.",
+    hint: "Escolhe uma pergunta ou escreve a tua", ph: "Escreve a tua pergunta… (ex.: como gerir uma subida?)",
+    thinking: "O coach está a pensar…", errReply: "Desculpa, não consegui responder. Tenta novamente daqui a pouco", errConn: "Ligação indisponível de momento.", verrou: "Fazer perguntas ao coach sobre os cursos faz parte dos planos Starter e Premium.", verrouCta: "Ver os planos", quota: "Atingiste o teu limite diário de IA.",
     sug: ["O que é a VAM, explicado de forma simples?", "Quantas vezes correr por semana para começar?", "O que comer antes e durante uma prova longa?", "Como escolher as minhas sapatilhas de corrida?", "Porque é que correr devagar me faz progredir?", "Como preparar o meu primeiro trail?"],
   },
 };
@@ -93,16 +93,15 @@ export function CoursChat() {
   sendRef.current = send;
 
   return (
-    <div id="cours-chat" className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm scroll-mt-24">
+    <div id="cours-chat" className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm scroll-mt-24">
       {/* En-tête */}
-      <div className="relative overflow-hidden px-5 py-4 text-white" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 50%,#0d9488 100%)" }}>
-        <div className="pointer-events-none absolute -top-12 -right-8 h-32 w-32 rounded-full bg-emerald-300/20 blur-2xl" />
+      <div className="relative overflow-hidden px-5 py-4 text-white" style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}>
         <div className="relative z-10 flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-md">
             <GraduationCap className="h-5 w-5 text-amber-200" />
           </span>
           <div>
-            <h3 className="font-bold leading-tight">{d.title}</h3>
+            <h3 className="font-semibold leading-tight">{d.title}</h3>
             <p className="text-[13px] text-white/80">{d.sub}</p>
           </div>
         </div>

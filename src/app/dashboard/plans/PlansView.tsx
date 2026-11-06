@@ -59,7 +59,7 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
     return (
       <div className="space-y-8">
         <header>
-          <h1 className="text-2xl font-bold text-zinc-900 sm:text-3xl">{t.titre}</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900 sm:text-3xl">{t.titre}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-500">{t.sousTitre}</p>
         </header>
 
@@ -71,8 +71,8 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
               <Gauge className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{t.niveau}</div>
-              <div className="text-base font-bold leading-tight text-zinc-900 sm:text-lg">{t.niveaux[niveau]}</div>
+              <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{t.niveau}</div>
+              <div className="text-base font-semibold leading-tight text-zinc-900 sm:text-lg">{t.niveaux[niveau]}</div>
             </div>
           </div>
           <div className="flex items-center gap-2.5 rounded-2xl bg-white px-3 py-3 ring-1 ring-inset ring-zinc-200 sm:gap-3 sm:px-5 sm:py-4">
@@ -80,8 +80,8 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
               <TrendingUp className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{t.volumeActuel}</div>
-              <div className="text-base font-bold leading-tight text-zinc-900 sm:text-lg">
+              <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{t.volumeActuel}</div>
+              <div className="text-base font-semibold leading-tight text-zinc-900 sm:text-lg">
                 {volumeKm} <span className="text-sm font-medium text-zinc-400">{t.parSemaine}</span>
               </div>
             </div>
@@ -90,7 +90,7 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
 
         {GROUPES.map((groupe) => (
           <section key={groupe.cle} className="space-y-4">
-            <h2 className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            <h2 className="flex items-center gap-3 text-xs font-semibold text-zinc-400 first-letter:uppercase">
               {groupe.cle === "course" ? t.groupeCourse : t.groupeSansCourse}
               <span aria-hidden className="h-px flex-1 bg-zinc-200" />
             </h2>
@@ -104,7 +104,7 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
                   <button
                     key={cle}
                     onClick={() => { setChoisi(cle); setSemaines(prog.semaines[0]); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                    className="group relative flex overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-inset ring-zinc-200 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:ring-zinc-300 sm:flex-col sm:rounded-3xl"
+                    className="group relative flex overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-inset ring-zinc-200 transition duration-300 hover:shadow-xl hover:ring-zinc-300 sm:flex-col sm:rounded-2xl"
                   >
                     {/* ── LA PHOTO ── vignette carrée sur téléphone (une liste se parcourt
                         plus vite que neuf grandes cartes), grande image à partir de 640 px. */}
@@ -119,7 +119,7 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
                       />
                       <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
                       {distance && (
-                        <span className="absolute right-3 top-3 hidden rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-bold tabular-nums text-zinc-900 shadow-sm sm:inline-block">
+                        <span className="absolute right-3 top-3 hidden rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-zinc-900 shadow-sm sm:inline-block">
                           {distance}
                         </span>
                       )}
@@ -127,17 +127,17 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
                       <div className="absolute inset-x-0 bottom-0 hidden p-4 sm:block">
                         <div className="flex items-center gap-2 text-white/80">
                           <Icone className="h-4 w-4" />
-                          <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">{prog.semaines[0]} {t.semaines}</span>
+                          <span className="text-[11px] font-semibold first-letter:uppercase">{prog.semaines[0]} {t.semaines}</span>
                         </div>
-                        <h3 className="mt-1 text-xl font-extrabold uppercase leading-tight tracking-tight text-white drop-shadow-sm">{t.noms[cle]}</h3>
+                        <h3 className="mt-1 text-xl font-semibold leading-tight tracking-tight text-white">{t.noms[cle]}</h3>
                       </div>
                     </div>
 
                     <div className="flex min-w-0 flex-1 flex-col p-3.5 sm:p-4">
                       {/* Sur téléphone, le titre et la distance vivent ici (la vignette est trop petite). */}
                       <div className="flex items-start justify-between gap-2 sm:hidden">
-                        <h3 className="text-sm font-bold leading-snug text-zinc-900">{t.noms[cle]}</h3>
-                        {distance && <span className="flex-shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold tabular-nums text-zinc-600">{distance}</span>}
+                        <h3 className="text-sm font-semibold leading-snug text-zinc-900">{t.noms[cle]}</h3>
+                        {distance && <span className="flex-shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-zinc-600">{distance}</span>}
                       </div>
                       <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-500 sm:mt-0 sm:text-sm">{t.pitchs[cle]}</p>
                       <div className="mt-2.5 flex w-full flex-wrap items-center gap-1.5 sm:mt-3.5">
@@ -145,7 +145,7 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
                         <span className="contents sm:hidden"><Chip>{prog.semaines[0]} {t.semaines}</Chip></span>
                         {prog.marcheCourse && <Chip icone={<Footprints className="h-3 w-3" />}>{t.marcheCourse}</Chip>}
                         {prog.sansImpactPct > 0 && <Chip icone={<Bike className="h-3 w-3" />}>{prog.sansImpactPct} %</Chip>}
-                        <ChevronRight className="ml-auto h-4 w-4 text-zinc-300 transition-all group-hover:translate-x-0.5 group-hover:text-emerald-600" />
+                        <ChevronRight className="ml-auto h-4 w-4 text-zinc-300 transition group-hover:translate-x-0.5 group-hover:text-emerald-600" />
                       </div>
                     </div>
                   </button>
@@ -168,7 +168,7 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
       </button>
 
       {/* Bandeau : la même photo que la carte — on sait où l'on est sans relire le titre. */}
-      <header className="relative overflow-hidden rounded-3xl bg-zinc-900 shadow-sm">
+      <header className="relative overflow-hidden rounded-2xl bg-zinc-900 shadow-sm">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={photoUnsplash(PHOTOS_PROGRAMMES[PHOTO[choisi]], 1200, 0.42)}
@@ -179,17 +179,17 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
         />
         <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10" />
         <div className="relative flex min-h-[180px] flex-col justify-end p-5 sm:min-h-[240px] sm:p-7">
-          <h1 className="text-2xl font-extrabold uppercase tracking-tight text-white sm:text-4xl">{t.noms[choisi]}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-4xl">{t.noms[choisi]}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/85">{t.pitchs[choisi]}</p>
         </div>
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">{t.duree}</span>
+        <span className="mr-1 text-xs font-semibold text-zinc-400 first-letter:uppercase">{t.duree}</span>
         {prog.semaines.map((n) => (
           <button
             key={n} onClick={() => setSemaines(n)}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors ${
+            className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
               (semaines ?? prog.semaines[0]) === n ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
             }`}
           >{n} {t.semaines}</button>
@@ -205,7 +205,7 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
       <div className="space-y-1.5 sm:hidden">
         {plan.map((w) => (
           <div key={w.semaine} className="flex items-center gap-3 rounded-2xl bg-white px-3.5 py-2.5 ring-1 ring-inset ring-zinc-200">
-            <span className="w-7 flex-shrink-0 text-sm font-bold tabular-nums text-zinc-900">S{w.semaine}</span>
+            <span className="w-7 flex-shrink-0 text-sm font-semibold tabular-nums text-zinc-900">S{w.semaine}</span>
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${TEINTE[w.phase]}`}>{t.phases[w.phase]}{w.decharge ? " ↓" : ""}</span>
             <span className="ml-auto text-sm font-semibold tabular-nums text-zinc-900">{w.volumeKm} km</span>
             <span className="text-xs tabular-nums text-zinc-500">
@@ -214,15 +214,15 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
             <span className="w-7 text-right text-xs tabular-nums text-zinc-500">{w.qualites > 0 ? `${w.qualites}×` : "—"}</span>
           </div>
         ))}
-        <div className="flex items-center justify-between rounded-2xl bg-zinc-50 px-3.5 py-2.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+        <div className="flex items-center justify-between rounded-2xl bg-zinc-50 px-3.5 py-2.5 text-xs font-semibold text-zinc-400 first-letter:uppercase">
           <span>{t.total}</span><span className="text-sm normal-case tracking-normal text-zinc-900">{volumeTotal(plan)} km</span>
         </div>
       </div>
 
-      <div className="hidden overflow-x-auto rounded-3xl bg-white shadow-sm ring-1 ring-inset ring-zinc-200 sm:block">
+      <div className="hidden overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-inset ring-zinc-200 sm:block">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
-            <tr className="border-b border-zinc-100 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            <tr className="border-b border-zinc-100 text-left text-xs font-semibold text-zinc-400 first-letter:uppercase">
               <th className="px-5 py-3">{t.colSemaine}</th>
               <th className="px-5 py-3">{t.colPhase}</th>
               <th className="px-5 py-3">{t.colVolume}</th>
@@ -250,8 +250,8 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
           </tbody>
           <tfoot>
             <tr className="bg-zinc-50/70">
-              <td className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-400" colSpan={2}>{t.total}</td>
-              <td className="px-5 py-3 font-bold text-zinc-900" colSpan={3}>{volumeTotal(plan)} km</td>
+              <td className="px-5 py-3 text-xs font-semibold text-zinc-400 first-letter:uppercase" colSpan={2}>{t.total}</td>
+              <td className="px-5 py-3 font-semibold text-zinc-900" colSpan={3}>{volumeTotal(plan)} km</td>
             </tr>
           </tfoot>
         </table>

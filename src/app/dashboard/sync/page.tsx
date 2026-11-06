@@ -298,7 +298,7 @@ export default function SyncPage() {
               <Watch className="h-6 w-6" />
             </span>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{d["title"]}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">{d["title"]}</h1>
               <p className="mt-0.5 text-sm text-zinc-500">
                 Garmin · COROS · Polar via <strong className="font-semibold text-zinc-600">Intervals.icu</strong>
               </p>
@@ -325,7 +325,7 @@ export default function SyncPage() {
         </div>
 
         {/* ── Sync bar ── */}
-        <div className="rounded-3xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_14px_36px_-22px_rgba(16,24,40,0.18)]">
+        <div className="rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_14px_36px_-22px_rgba(16,24,40,0.18)]">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex flex-wrap items-center gap-2">
               <label className="text-sm font-medium text-zinc-600">{d["period"]}</label>
@@ -353,7 +353,7 @@ export default function SyncPage() {
               <button
                 onClick={handleSync}
                 disabled={syncing || !configured}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-br from-zinc-800 to-zinc-950 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(16,24,40,0.5)] transition-all hover:shadow-[0_10px_22px_-8px_rgba(16,24,40,0.6)] active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-br from-zinc-800 to-zinc-950 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(16,24,40,0.5)] transition hover:shadow-[0_10px_22px_-8px_rgba(16,24,40,0.6)] active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
               >
                 <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
                 {syncing ? d["syncing"] : d["syncNow"]}
@@ -455,7 +455,7 @@ export default function SyncPage() {
         {activeTab === "activities" && (
           <div className="space-y-4">
             {/* Upload GPX */}
-            <div className="rounded-3xl border border-dashed border-zinc-300 bg-white p-5 transition-colors hover:border-zinc-400">
+            <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-5 transition-colors hover:border-zinc-400">
               <label className="group flex cursor-pointer items-center gap-3">
                 <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-100 to-zinc-200 text-zinc-500 transition-colors group-hover:from-zinc-200 group-hover:to-zinc-300">
                   <Upload className="h-5 w-5" />
@@ -474,7 +474,7 @@ export default function SyncPage() {
                 <RefreshCw className="w-6 h-6 animate-spin text-zinc-300" />
               </div>
             ) : activities.length === 0 ? (
-              <div className="flex flex-col items-center rounded-3xl border border-zinc-200 bg-white py-16 text-center">
+              <div className="flex flex-col items-center rounded-2xl border border-zinc-200 bg-white py-16 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-50 to-zinc-100 ring-1 ring-zinc-100"><Activity className="h-7 w-7 text-zinc-300" /></div>
                 <p className="mt-3 text-sm text-zinc-400">{d["act.empty"]}</p>
               </div>
@@ -490,23 +490,23 @@ export default function SyncPage() {
                   <div className="grid grid-cols-3 gap-3">
                     <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-emerald-50 p-4 text-center">
                       <Activity className="mx-auto mb-1.5 h-5 w-5 text-emerald-500" />
-                      <div className="text-2xl font-bold tabular-nums text-emerald-700">{Math.round(totalKm)}</div>
+                      <div className="text-2xl font-semibold tabular-nums text-emerald-700">{Math.round(totalKm)}</div>
                       <div className="text-xs text-zinc-500">km</div>
                     </div>
                     <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-sky-50 p-4 text-center">
                       <Clock className="mx-auto mb-1.5 h-5 w-5 text-blue-500" />
-                      <div className="text-2xl font-bold tabular-nums text-blue-700">{fmtDuration(totalMin * 60)}</div>
+                      <div className="text-2xl font-semibold tabular-nums text-blue-700">{fmtDuration(totalMin * 60)}</div>
                       <div className="text-xs text-zinc-500">{d["u.duration"]}</div>
                     </div>
                     <div className="rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50 to-red-50 p-4 text-center">
                       <Heart className="mx-auto mb-1.5 h-5 w-5 text-rose-500" />
-                      <div className="text-2xl font-bold tabular-nums text-rose-600">{avgHr ?? "—"}</div>
+                      <div className="text-2xl font-semibold tabular-nums text-rose-600">{avgHr ?? "—"}</div>
                       <div className="text-xs text-zinc-500">{d["u.avgHr"]}</div>
                     </div>
                   </div>
                 );
               })()}
-              <div className="overflow-hidden rounded-3xl border border-zinc-200/70 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_14px_36px_-24px_rgba(16,24,40,0.16)]">
+              <div className="overflow-hidden rounded-2xl border border-zinc-200/70 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_14px_36px_-24px_rgba(16,24,40,0.16)]">
                 <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-3">
                   <h2 className="text-sm font-semibold text-zinc-900">{ty("act.count", { n: activities.length })}</h2>
                   <span className="text-xs text-zinc-400">{ty("act.over", { d: days })}</span>
@@ -546,7 +546,7 @@ export default function SyncPage() {
                           </div>
                         )}
                         {act.training_effect && (
-                          <div className={`text-center font-bold ${act.training_effect >= 4 ? "text-red-500" : act.training_effect >= 3 ? "text-orange-500" : "text-emerald-500"}`}>
+                          <div className={`text-center font-semibold ${act.training_effect >= 4 ? "text-red-500" : act.training_effect >= 3 ? "text-orange-500" : "text-emerald-500"}`}>
                             <div>{act.training_effect.toFixed(1)}</div>
                             <div className="font-normal">TE</div>
                           </div>
@@ -627,7 +627,7 @@ export default function SyncPage() {
                               {new Date(w.date + "T12:00:00").toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "short" })}
                             </td>
                             <td className="px-3 py-3 text-center">
-                              {w.hrv ? <span className={`font-bold ${etat?.valeur ?? "text-zinc-700"}`}>{w.hrv} ms</span> : <span className="text-zinc-300">—</span>}
+                              {w.hrv ? <span className={`font-semibold ${etat?.valeur ?? "text-zinc-700"}`}>{w.hrv} ms</span> : <span className="text-zinc-300">—</span>}
                             </td>
                             <td className="px-3 py-3 text-center">
                               {w.sleep_h ? <span className="font-semibold text-zinc-800">{w.sleep_h.toFixed(1)}h</span> : <span className="text-zinc-300">—</span>}
@@ -697,7 +697,7 @@ export default function SyncPage() {
                     <Watch className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="font-bold text-lg leading-tight">{d["wiz.title"]}</h2>
+                    <h2 className="font-semibold text-lg leading-tight">{d["wiz.title"]}</h2>
                     <p className="text-zinc-300 text-sm mt-0.5">{d["wiz.sub"]}</p>
                   </div>
                 </div>
@@ -715,7 +715,7 @@ export default function SyncPage() {
               <div className="p-6 space-y-0">
                 {/* STEP 1 */}
                 <div className="relative pl-14 pb-8">
-                  <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-bold text-sm">1</div>
+                  <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-semibold text-sm">1</div>
                   <div className="absolute left-[17px] top-9 bottom-0 w-0.5 bg-zinc-100" />
                   <h3 className="font-semibold text-zinc-900 text-sm">{d["s1.title"]}</h3>
                   <p className="text-sm text-zinc-500 mt-1">
@@ -747,7 +747,7 @@ export default function SyncPage() {
 
                 {/* STEP 2 */}
                 <div className="relative pl-14 pb-8">
-                  <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-bold text-sm">2</div>
+                  <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-semibold text-sm">2</div>
                   <div className="absolute left-[17px] top-9 bottom-0 w-0.5 bg-zinc-100" />
                   <h3 className="font-semibold text-zinc-900 text-sm">{d["s2.title"]}</h3>
                   <p className="text-sm text-zinc-500 mt-1">
@@ -796,7 +796,7 @@ export default function SyncPage() {
                 <div hidden={oauth && !voirCleManuelle}>
                 {/* STEP 3 */}
                 <div className="relative pl-14 pb-8">
-                  <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-bold text-sm">3</div>
+                  <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-semibold text-sm">3</div>
                   <div className="absolute left-[17px] top-9 bottom-0 w-0.5 bg-zinc-100" />
                   <h3 className="font-semibold text-zinc-900 text-sm">{d["s3.title"]}</h3>
                   <p className="text-sm text-zinc-500 mt-1">
@@ -817,7 +817,7 @@ export default function SyncPage() {
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-emerald-50 border-2 border-emerald-300 rounded-lg px-3 py-2 animate-pulse">
                           <p className="text-[10px] text-emerald-500 font-medium">API Key</p>
-                          <p className="font-mono text-xs font-bold text-emerald-700 truncate">a1b2c3d4e5f6…</p>
+                          <p className="font-mono text-xs font-semibold text-emerald-700 truncate">a1b2c3d4e5f6…</p>
                         </div>
                         <div className="flex items-center gap-1 text-emerald-600 w-20">
                           <ArrowDown className="w-4 h-4 flex-shrink-0 rotate-90" />
@@ -839,7 +839,7 @@ export default function SyncPage() {
 
                 {/* STEP 4 — the form */}
                 <div className="relative pl-14">
-                  <div className={`absolute left-0 top-0 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${configured ? "bg-emerald-500 text-white" : "bg-zinc-900 text-white"}`}>
+                  <div className={`absolute left-0 top-0 w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm ${configured ? "bg-emerald-500 text-white" : "bg-zinc-900 text-white"}`}>
                     {configured ? <CheckCircle2 className="w-5 h-5" /> : "4"}
                   </div>
                   <h3 className="font-semibold text-zinc-900 text-sm">{d["s4.title"]}</h3>
@@ -897,7 +897,7 @@ export default function SyncPage() {
                     )}
 
                     <button type="submit" disabled={savingCreds || !keyValid}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 hover:bg-zinc-700 text-white rounded-xl text-sm font-semibold disabled:opacity-40 transition-all">
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 hover:bg-zinc-700 text-white rounded-xl text-sm font-semibold disabled:opacity-40 transition">
                       {savingCreds ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                       {savingCreds ? d["f.checking"] : existingCreds?.athleteId ? d["f.update"] : d["f.connect"]}
                     </button>
@@ -926,7 +926,7 @@ export default function SyncPage() {
                   { logo: "H", name: "Huawei", color: "bg-rose-600", models: "Watch GT, Watch Ultimate" },
                 ].map(d => (
                   <div key={d.name} className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-50">
-                    <div className={`w-8 h-8 ${d.color} text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0`}>{d.logo}</div>
+                    <div className={`w-8 h-8 ${d.color} text-white rounded-lg flex items-center justify-center font-semibold text-sm flex-shrink-0`}>{d.logo}</div>
                     <div>
                       <p className="text-xs font-semibold text-zinc-800">{d.name}</p>
                       <p className="text-xs text-zinc-400 leading-tight mt-0.5">{d.models}</p>

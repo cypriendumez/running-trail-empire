@@ -13,7 +13,7 @@ import type { Textes } from "@/lib/indicateurs/textes";
 import { GrapheIndicateur } from "./GrapheIndicateur";
 
 const TON: Record<Ton, { texte: string; barre: string; pastille: string; fond: string }> = {
-  excellent: { texte: "text-emerald-700", barre: "#059669", pastille: "bg-emerald-50 text-emerald-700 ring-emerald-200", fond: "linear-gradient(135deg,#064e3b 0%,#047857 48%,#0d9488 100%)" },
+  excellent: { texte: "text-emerald-700", barre: "#059669", pastille: "bg-emerald-50 text-emerald-700 ring-emerald-200", fond: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" },
   bon: { texte: "text-teal-700", barre: "#0d9488", pastille: "bg-teal-50 text-teal-700 ring-teal-200", fond: "linear-gradient(135deg,#134e4a 0%,#0f766e 50%,#14b8a6 100%)" },
   moyen: { texte: "text-amber-700", barre: "#d97706", pastille: "bg-amber-50 text-amber-700 ring-amber-200", fond: "linear-gradient(135deg,#78350f 0%,#b45309 52%,#d97706 100%)" },
   alerte: { texte: "text-rose-700", barre: "#e11d48", pastille: "bg-rose-50 text-rose-700 ring-rose-200", fond: "linear-gradient(135deg,#881337 0%,#be123c 52%,#e11d48 100%)" },
@@ -22,8 +22,8 @@ const TON: Record<Ton, { texte: string; barre: string; pastille: string; fond: s
 
 function Section({ icone: Icone, titre, children, className = "", id }: { icone: typeof Info; titre: string; children: React.ReactNode; className?: string; id?: string }) {
   return (
-    <section id={id} className={`scroll-mt-24 rounded-3xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:p-6 ${className}`}>
-      <h2 className="mb-4 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-400">
+    <section id={id} className={`scroll-mt-24 rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:p-6 ${className}`}>
+      <h2 className="mb-4 flex items-center gap-2 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">
         <Icone className="h-3.5 w-3.5" aria-hidden /> {titre}
       </h2>
       {children}
@@ -58,12 +58,10 @@ export function FicheIndicateur({ fiche: f, titres, textes: c, lang, pannes = []
 
       {/* ── Le héros : la valeur, son état, son verdict ── */}
       <header className="relative overflow-hidden rounded-[2rem] p-6 text-white shadow-2xl shadow-emerald-950/20 ring-1 ring-white/10 sm:p-8" style={{ background: ton.fond }}>
-        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 -left-16 h-72 w-72 rounded-full bg-emerald-200/10 blur-3xl" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
         <div className="relative">
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/75">{f.titre}</h1>
+            <h1 className="text-[12px] font-semibold text-white/75 first-letter:uppercase">{f.titre}</h1>
             {f.statut && (
               <span className="rounded-full bg-white/15 px-3 py-1 text-[12px] font-semibold text-white ring-1 ring-white/25 backdrop-blur-md">{f.statut.libelle}</span>
             )}
@@ -73,7 +71,7 @@ export function FicheIndicateur({ fiche: f, titres, textes: c, lang, pannes = []
           ) : (
             <>
               <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-6xl font-black leading-none tracking-tight tabular-nums drop-shadow-sm sm:text-7xl">{f.valeur}</span>
+                <span className="text-6xl font-semibold leading-none tracking-tight tabular-nums sm:text-7xl">{f.valeur}</span>
                 {f.unite && <span className="text-xl font-semibold text-white/70">{f.unite}</span>}
               </div>
               <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-white/90 sm:text-base">{f.verdict}</p>
@@ -96,10 +94,10 @@ export function FicheIndicateur({ fiche: f, titres, textes: c, lang, pannes = []
               {f.composantes.map((co) => {
                 const t = TON[co.ton];
                 return (
-                  <div key={co.libelle} className="rounded-3xl border border-zinc-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{co.libelle}</div>
+                  <div key={co.libelle} className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{co.libelle}</div>
                     <div className="mt-1.5 flex items-baseline gap-1">
-                      <span className={`text-3xl font-bold tabular-nums ${co.ton === "neutre" ? "text-zinc-900" : t.texte}`}>{co.valeur}</span>
+                      <span className={`text-3xl font-semibold tabular-nums ${co.ton === "neutre" ? "text-zinc-900" : t.texte}`}>{co.valeur}</span>
                       {co.unite && <span className="text-sm text-zinc-400">{co.unite}</span>}
                     </div>
                     {co.part != null && (
@@ -149,7 +147,7 @@ export function FicheIndicateur({ fiche: f, titres, textes: c, lang, pannes = []
               <ol className="space-y-3">
                 {f.calcul.map((ligne, i) => (
                   <li key={i} className="flex gap-3">
-                    <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[11px] font-bold text-zinc-500">{i + 1}</span>
+                    <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[11px] font-semibold text-zinc-500">{i + 1}</span>
                     <p className="text-[14px] leading-relaxed text-zinc-700">{ligne}</p>
                   </li>
                 ))}
@@ -198,7 +196,7 @@ export function FicheIndicateur({ fiche: f, titres, textes: c, lang, pannes = []
 
           {f.sources && f.sources.length > 0 && (
             <div className="px-1">
-              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-400">{c.sources}</div>
+              <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{c.sources}</div>
               <ul className="mt-2 space-y-1">
                 {f.sources.map((s) => <li key={s} className="text-[12px] leading-relaxed text-zinc-400">{s}</li>)}
               </ul>

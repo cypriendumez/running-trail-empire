@@ -384,7 +384,7 @@ export function WeightMode() {
               </div>
               {plan.caps.length > 0 && (
                 <div className="mt-4 rounded-xl bg-emerald-50 p-3">
-                  <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-700"><ShieldCheck className="h-3.5 w-3.5" /> {tr("caps")}</div>
+                  <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-emerald-700 first-letter:uppercase"><ShieldCheck className="h-3.5 w-3.5" /> {tr("caps")}</div>
                   <ul className="space-y-1 text-xs leading-relaxed text-emerald-900">
                     {plan.capCodes.map((c, i) => <li key={i}>· {tr(`c.${c.code}`, c.params && { ...c.params, bmi: c.params.bmi != null ? dec(Number(c.params.bmi)) : "" })}</li>)}
                   </ul>
@@ -443,7 +443,7 @@ export function WeightMode() {
 
           {/* ── Ce qui est supposé : affiché, pas caché ── */}
           <div className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4">
-            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Info className="h-3.5 w-3.5" /> {tr("assumptions")}</div>
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-zinc-500 first-letter:uppercase"><Info className="h-3.5 w-3.5" /> {tr("assumptions")}</div>
             <ul className="space-y-1.5 text-xs leading-relaxed text-zinc-600">
               {plan.assumptionCodes.map((a, i) => <li key={i}>· {tr(`a.${a.code}`, a.params && { ...a.params, factor: dec(Number(a.params.factor ?? 0)) })}</li>)}
               {plan.currentSource === "profil" && <li>· {tr("fromProfile")}</li>}
@@ -494,9 +494,9 @@ function StatCard({ icon, label, value, hint, accent }: { icon: React.ReactNode;
   return (
     <div className="bento-card !p-4">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">{label}</span>{icon}
+        <span className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{label}</span>{icon}
       </div>
-      <div className={`text-2xl font-bold tabular-nums ${tone}`}>{value}</div>
+      <div className={`text-2xl font-semibold tabular-nums ${tone}`}>{value}</div>
       <div className="mt-0.5 text-xs text-zinc-500">{hint}</div>
     </div>
   );
@@ -508,7 +508,7 @@ function Row({ label, value, sub, strong, accent }: { label: string; value: stri
       <span className={`${strong ? "font-semibold text-zinc-900" : "text-zinc-600"}`}>
         {label}{sub && <span className="ml-1.5 text-xs text-zinc-400">{sub}</span>}
       </span>
-      <span className={`tabular-nums ${accent ? "font-bold text-emerald-600" : strong ? "font-semibold text-zinc-900" : "text-zinc-700"}`}>{value}</span>
+      <span className={`tabular-nums ${accent ? "font-semibold text-emerald-600" : strong ? "font-semibold text-zinc-900" : "text-zinc-700"}`}>{value}</span>
     </div>
   );
 }
@@ -516,8 +516,8 @@ function Row({ label, value, sub, strong, accent }: { label: string; value: stri
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-zinc-100 bg-zinc-50/70 p-3">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">{label}</div>
-      <div className="mt-1 text-base font-bold text-zinc-900">{value}</div>
+      <div className="text-[11px] font-medium text-zinc-400 first-letter:uppercase">{label}</div>
+      <div className="mt-1 text-base font-semibold text-zinc-900">{value}</div>
     </div>
   );
 }

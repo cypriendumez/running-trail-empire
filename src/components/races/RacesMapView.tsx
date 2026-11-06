@@ -263,7 +263,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
 
         {/* Compteur : à droite sur ordinateur, à côté du retour sur téléphone. */}
         <div className="ml-auto flex flex-shrink-0 items-baseline gap-1.5 sm:order-last" aria-live="polite">
-          <span className="text-sm font-bold tabular-nums text-zinc-900">{nbEvenements.toLocaleString(lang)}</span>
+          <span className="text-sm font-semibold tabular-nums text-zinc-900">{nbEvenements.toLocaleString(lang)}</span>
           <span className="text-xs text-zinc-500">{nbEvenements > 1 ? d["events"] : d["f.event"]}</span>
           <span className="hidden text-xs text-zinc-400 md:inline">· {filtered.length.toLocaleString(lang)} {filtered.length > 1 ? d["courses"] : d["course"]}</span>
         </div>
@@ -327,7 +327,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
               <div className="p-5 border-b border-zinc-100">
                 <div className="flex items-start justify-between mb-3">
                   <span
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold text-white"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white"
                     style={{ backgroundColor: TYPE_COLORS[correctedRaceType(selected.distance_km, selected.type, selected.name)] || "#22c55e" }}
                   >
                     {d[`rts.${correctedRaceType(selected.distance_km, selected.type, selected.name)}`] ?? selected.type}
@@ -340,7 +340,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
                     <X className="w-4 h-4 text-zinc-400" />
                   </button>
                 </div>
-                <h2 className="text-lg font-bold text-zinc-900 leading-snug">{selected.name}</h2>
+                <h2 className="text-lg font-semibold text-zinc-900 leading-snug">{selected.name}</h2>
                 {details[selected.id]?.organization && (
                   <p className="text-xs text-zinc-400 mt-0.5">{details[selected.id]?.organization}</p>
                 )}
@@ -367,7 +367,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
                     <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium mb-0.5">
                       {m.icon} {m.label}
                     </div>
-                    <div className="font-bold text-zinc-900 text-sm leading-snug">{m.value}</div>
+                    <div className="font-semibold text-zinc-900 text-sm leading-snug">{m.value}</div>
                   </div>
                 ))}
               </div>
@@ -388,11 +388,11 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
                 )}
                 {Array.isArray(details[selected.id]?.time_limits) && (details[selected.id]?.time_limits as Array<{ checkpoint: string; km: number; time_limit_seconds: number }>)[0]?.time_limit_seconds > 0 && (
                   <div>
-                    <div className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2">{d["timeLimits"]}</div>
+                    <div className="text-xs font-semibold text-zinc-400 mb-2 first-letter:uppercase">{d["timeLimits"]}</div>
                     {(details[selected.id]?.time_limits as Array<{ checkpoint: string; km: number; time_limit_seconds: number }>).map(tl => (
                       <div key={tl.checkpoint} className="flex items-center justify-between text-xs py-1.5 border-b border-zinc-100">
                         <span className="text-zinc-600">{tl.checkpoint}</span>
-                        <span className="font-bold text-zinc-900">
+                        <span className="font-semibold text-zinc-900">
                           {Math.floor(tl.time_limit_seconds / 3600)}h{String(Math.floor((tl.time_limit_seconds % 3600) / 60)).padStart(2, "0")}
                         </span>
                       </div>
@@ -410,7 +410,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
                   <button
                     onClick={() => onCancel?.(selected)}
                     disabled={busy}
-                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold bg-red-50 text-red-600 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60 transition-all"
+                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold bg-red-50 text-red-600 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60 transition"
                   >
                     {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
                     {d["cancelTrain"]}
@@ -419,7 +419,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
                   <button
                     onClick={() => onTrain?.(selected)}
                     disabled={busy}
-                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold bg-zinc-900 text-white hover:bg-zinc-800 disabled:opacity-60 transition-all"
+                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold bg-zinc-900 text-white hover:bg-zinc-800 disabled:opacity-60 transition"
                   >
                     {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flag className="w-4 h-4" />}
                     {d["train"]}
@@ -433,7 +433,7 @@ export function RacesMapView({ races: initialRaces, onClose, findPlanned, onTrai
 
       {/* ── Legend ───────────────────────────────────────────────────────── */}
       <div className="absolute bottom-6 left-4 hidden bg-white/95 rounded-2xl shadow-lg border border-zinc-200/80 p-3 z-[1000] sm:block">
-        <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">{d["legendTitle"]}</div>
+        <div className="text-xs font-semibold text-zinc-500 mb-2 first-letter:uppercase">{d["legendTitle"]}</div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
           {Object.entries(TYPE_COLORS).map(([type, color]) => (
             <div key={type} className="flex items-center gap-1.5">

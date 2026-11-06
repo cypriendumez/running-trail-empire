@@ -42,7 +42,7 @@ const NOTES: Record<string, string[]> = {
 /** Une seule enveloppe pour les trois états : la carte ne doit pas changer de forme
  *  entre « connecte-toi », « écris » et « merci ». */
 const CARTE =
-  "mx-auto max-w-xl rounded-3xl bg-white p-7 shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_24px_-12px_rgba(0,0,0,.10)] ring-1 ring-inset ring-zinc-200/80 sm:p-8";
+  "mx-auto max-w-xl rounded-2xl bg-white p-7 shadow-[0_1px_2px_rgba(0,0,0,.04),0_8px_24px_-12px_rgba(0,0,0,.10)] ring-1 ring-inset ring-zinc-200/80 sm:p-8";
 
 export function AvisForm() {
   const { lang } = useT();
@@ -116,7 +116,7 @@ export function AvisForm() {
   const affichee = survol ?? note;
   return (
     <div className={CARTE}>
-      <h3 className="text-xl font-bold tracking-tight text-zinc-900">{t.titre}</h3>
+      <h3 className="text-xl font-semibold tracking-tight text-zinc-900">{t.titre}</h3>
       <p className="mt-1.5 text-sm leading-relaxed text-zinc-500">{t.sousTitre}</p>
 
       {/* ── LA NOTE ───────────────────────────────────────────────────────────────
@@ -136,7 +136,7 @@ export function AvisForm() {
               <button
                 key={n} type="button" onClick={() => setNote(n)} onMouseEnter={() => setSurvol(n)}
                 aria-label={`${n}/5`} aria-pressed={note === n}
-                className="rounded-lg p-0.5 outline-none transition-transform duration-150 hover:scale-110 focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-95"
+                className="rounded-lg p-0.5 outline-none transition-transform duration-150 focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-95"
               >
                 <Star
                   className={`h-8 w-8 transition-colors duration-150 ${
@@ -177,7 +177,7 @@ export function AvisForm() {
           dit la bonne chose, et le compteur au-dessus explique ce qui manque. */}
       <button
         onClick={envoyer} disabled={etat === "envoi" || manque > 0}
-        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
       >
         {etat === "envoi" && <Loader2 className="h-4 w-4 animate-spin" />}
         {etat === "envoi" ? t.envoi : t.envoyer}

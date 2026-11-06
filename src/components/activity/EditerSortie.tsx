@@ -74,7 +74,7 @@ export function EditerSortie({ id, titreAffiche, titrePerso, description, textes
   return (
     <div className="mx-auto w-full max-w-4xl px-4">
       <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-        <label className="block text-xs font-semibold uppercase tracking-wide text-zinc-600" htmlFor="sortie-nom">
+        <label className="block text-xs font-semibold text-zinc-600 first-letter:uppercase" htmlFor="sortie-nom">
           {textes.nom}
         </label>
         <input id="sortie-nom" value={titre} maxLength={TITRE_MAX} placeholder={titreAffiche || textes.placeholderNom}
@@ -82,7 +82,7 @@ export function EditerSortie({ id, titreAffiche, titrePerso, description, textes
           className="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-emerald-500" />
         <p className="mt-1 text-xs text-zinc-500">{textes.aide}</p>
 
-        <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-zinc-600" htmlFor="sortie-descr">
+        <label className="mt-4 block text-xs font-semibold text-zinc-600 first-letter:uppercase" htmlFor="sortie-descr">
           {textes.descr}
         </label>
         <textarea id="sortie-descr" value={descr} maxLength={DESCRIPTION_MAX} rows={4} placeholder={textes.placeholderDescr}

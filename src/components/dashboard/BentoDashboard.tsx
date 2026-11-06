@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  Activity, Heart, Trophy, Target,
+  Activity, Heart, Target,
   Calendar, Footprints, Moon, ChevronRight,
-  Gauge, Mountain, Timer, Flame, Rocket, Award, TrendingUp, AlertTriangle, Shield, Users,
+  Gauge, Mountain, Timer, Flame, TrendingUp, AlertTriangle, Shield, Users,
   type LucideIcon,
 } from "lucide-react";
 // ⚠️ PLUS DE recharts ICI (22/09/2026) : ≈ 500 kB de JS pour deux petits dessins, sur
@@ -371,31 +371,30 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
     <div className="bento-card h-full">
       <div className="mb-3 flex items-center justify-between">
         <div className="metric-label">{t("dash.sleep.title")}</div>
-        <Moon className="h-4 w-4 text-indigo-400" />
       </div>
       <div className="mb-3 grid grid-cols-2 gap-3">
         <div>
-          <div className="text-2xl font-bold text-zinc-900">{hm(freshSleep.total_sleep_min)}</div>
+          <div className="text-2xl font-semibold tracking-tight tabular-nums text-zinc-900">{hm(freshSleep.total_sleep_min)}</div>
           <div className="text-xs text-zinc-400">{t("dash.sleep.total")}</div>
         </div>
         <div>
-          <div className="text-2xl font-bold text-zinc-900">{freshSleep.sleep_score}/100</div>
+          <div className="text-2xl font-semibold tracking-tight tabular-nums text-zinc-900">{freshSleep.sleep_score}<span className="text-sm font-normal text-zinc-400">/100</span></div>
           <div className="text-xs text-zinc-400">{t("dash.sleep.score")}</div>
         </div>
       </div>
       {(freshSleep.deep_sleep_min > 0 || freshSleep.rem_sleep_min > 0) && (
         <div className="space-y-1.5">
           {[
-            { label: t("dash.sleep.deep"), min: freshSleep.deep_sleep_min, color: "bg-indigo-500" },
-            { label: t("dash.sleep.rem"), min: freshSleep.rem_sleep_min, color: "bg-violet-400" },
-            { label: t("dash.sleep.light"), min: Math.max(0, freshSleep.total_sleep_min - freshSleep.deep_sleep_min - freshSleep.rem_sleep_min), color: "bg-blue-300" },
+            { label: t("dash.sleep.deep"), min: freshSleep.deep_sleep_min, color: "bg-zinc-800" },
+            { label: t("dash.sleep.rem"), min: freshSleep.rem_sleep_min, color: "bg-zinc-500" },
+            { label: t("dash.sleep.light"), min: Math.max(0, freshSleep.total_sleep_min - freshSleep.deep_sleep_min - freshSleep.rem_sleep_min), color: "bg-zinc-300" },
           ].map((s) => (
             <div key={s.label} className="flex items-center gap-2 text-xs">
               <span className="w-12 text-zinc-500">{s.label}</span>
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
                 <div className={`h-full ${s.color} rounded-full`} style={{ width: `${Math.min(100, (s.min / freshSleep.total_sleep_min) * 100)}%` }} />
               </div>
-              <span className="w-10 text-right text-zinc-600">{hm(s.min)}</span>
+              <span className="w-10 text-right tabular-nums text-zinc-600">{hm(s.min)}</span>
             </div>
           ))}
         </div>
@@ -408,14 +407,14 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
         <div className="flex items-center gap-2">
           <div className="metric-label">{t("dash.key.title")}</div>
           {aiSession ? (
-            <span className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">{t("dash.key.aiCoach")}</span>
+            <span className="text-[11px] text-zinc-400">{t("dash.key.aiCoach")}</span>
           ) : !aiTried ? (
-            <span className="animate-pulse text-[10px] font-semibold text-zinc-300">{t("dash.key.aiLoading")}</span>
+            <span className="animate-pulse text-[11px] text-zinc-300">{t("dash.key.aiLoading")}</span>
           ) : null}
         </div>
-        <Calendar className="h-4 w-4 text-zinc-400" />
+        <Calendar className="h-4 w-4 text-zinc-400" strokeWidth={1.5} />
       </div>
-      <div className="text-base font-semibold" style={{ color: displaySession.accent }}>{displaySession.title}</div>
+      <div className="text-base font-semibold text-zinc-900">{displaySession.title}</div>
       <div className="mt-1 text-sm text-zinc-500">{displaySession.subtitle}</div>
       <div className="mt-3 flex flex-wrap gap-2">
         {displaySession.tags.map((tg) => (
@@ -430,10 +429,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   ) });
   if (records) {
     const rows = ([
-      { icon: Footprints, label: t("dash.records.longest"), value: `${nf(records.longest)} km`, color: "text-emerald-600", bg: "bg-emerald-50" },
-      records.bestPace != null ? { icon: TrendingUp, label: t("dash.records.pace"), value: `${fmtPaceSec(records.bestPace)}/km`, color: "text-sky-600", bg: "bg-sky-50" } : null,
-      records.maxElev > 0 ? { icon: Mountain, label: t("dash.records.climb"), value: `${Math.round(records.maxElev)} m`, color: "text-orange-600", bg: "bg-orange-50" } : null,
-      records.longestSec > 0 ? { icon: Timer, label: t("dash.records.duration"), value: fmtTime(records.longestSec), color: "text-violet-600", bg: "bg-violet-50" } : null,
+      { icon: Footprints, label: t("dash.records.longest"), value: `${nf(records.longest)} km`, color: "", bg: "" },
+      records.bestPace != null ? { icon: TrendingUp, label: t("dash.records.pace"), value: `${fmtPaceSec(records.bestPace)}/km`, color: "", bg: "" } : null,
+      records.maxElev > 0 ? { icon: Mountain, label: t("dash.records.climb"), value: `${Math.round(records.maxElev)} m`, color: "", bg: "" } : null,
+      records.longestSec > 0 ? { icon: Timer, label: t("dash.records.duration"), value: fmtTime(records.longestSec), color: "", bg: "" } : null,
     ] as ({ icon: LucideIcon; label: string; value: string; color: string; bg: string } | null)[])
       .filter((r): r is { icon: LucideIcon; label: string; value: string; color: string; bg: string } => r !== null)
       .slice(0, 4);
@@ -441,15 +440,14 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
       <div className="bento-card h-full">
         <div className="mb-1 flex items-center justify-between">
           <div className="metric-label">{t("dash.records.title")}</div>
-          <Award className="h-4 w-4 text-amber-400" />
         </div>
         <div className="mb-3 text-[11px] text-zinc-400">{t("dash.records.sub")}</div>
         <div className="space-y-2.5">
           {rows.map((r) => (
             <div key={r.label} className="flex items-center gap-3">
-              <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${r.bg}`}><r.icon className={`h-4 w-4 ${r.color}`} /></span>
+              <r.icon className="h-4 w-4 flex-shrink-0 text-zinc-400" strokeWidth={1.5} />
               <span className="flex-1 text-sm text-zinc-500">{r.label}</span>
-              <span className="text-sm font-bold tabular-nums text-zinc-900">{r.value}</span>
+              <span className="text-sm font-medium tabular-nums text-zinc-900">{r.value}</span>
             </div>
           ))}
         </div>
@@ -514,10 +512,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
     // un calcul au milieu d'un bloc qui n'a rien à voir.
     const fl0 = FORME_LABELS[lang] ?? FORME_LABELS.fr;
     const cs = [
-      { label: fl0.endurance, val: forme.endurance, c: "#059669" },
-      { label: fl0.speed, val: forme.speed, c: "#2563eb" },
-      { label: fl0.recovery, val: forme.recovery, c: "#7c3aed" },
-      { label: fl0.regularity, val: forme.regularity, c: "#ea580c" },
+      { label: fl0.endurance, val: forme.endurance, c: "#18181b" },
+      { label: fl0.speed, val: forme.speed, c: "#18181b" },
+      { label: fl0.recovery, val: forme.recovery, c: "#18181b" },
+      { label: fl0.regularity, val: forme.regularity, c: "#18181b" },
     ].filter((c): c is { label: string; val: number; c: string } => c.val != null).sort((a, b) => b.val - a.val);
     const fort = cs[0], faible = cs[cs.length - 1];
     return { fort, faible, plat: fort.val - faible.val < 5 };
@@ -576,7 +574,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   const noData = !enPanne && workouts.length === 0 && hrv.length === 0;
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-zinc-50 to-white">
+    <div className="min-h-full">
 
       {/* ⚠️ Une lecture a échoué : on le DIT, plutôt que d'afficher des zéros qui
           donneraient à croire que les données ont disparu. */}
@@ -614,40 +612,38 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           qui défile, anneau à 64 px, pastille de série retirée (la carte Série est juste
           dessous). À partir de `sm`, rien ne change. */}
       <div
-        className="relative mb-4 overflow-hidden rounded-3xl border border-[#e3eef0] shadow-[0_12px_44px_-26px_rgba(16,24,40,0.22)] sm:mb-6"
-        style={{ background: "linear-gradient(120deg,#ecfdf5 0%,#eef6ff 58%,#ffffff 100%)" }}
+        className="relative mb-4 overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:mb-6"
       >
         {/* Photo de coureur — panneau net à droite, fondu doux vers le dégradé */}
         <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[32%] overflow-hidden xl:block">
           <img src="https://images.unsplash.com/photo-1486218119243-13883505764c?w=900&q=75&fit=crop&crop=entropy" alt="" className="h-full w-full object-cover" />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to right, #eef6ff 0%, rgba(238,246,255,0.45) 26%, rgba(238,246,255,0) 64%)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to right, #ffffff 0%, rgba(255,255,255,0.55) 24%, rgba(255,255,255,0) 60%)" }} />
         </div>
-        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0ea5e9]/10 blur-3xl" />
         <div className="relative z-10 flex flex-wrap items-center justify-between gap-x-10 gap-y-3 px-5 py-4 sm:gap-y-7 sm:px-9 sm:py-8 xl:pr-[34%]">
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#6e8a86] first-letter:uppercase">
+            {/* ⚠️ LE TITRE NOMME LE JOUR, PAS L'ATHLÈTE (passe « unslop », 06/11/2026). « Bonjour,
+                Cyprien » ne disait rien que la barre du haut ne dise déjà (nom et niveau) ; le jour
+                est le contexte de tout ce qui suit : la séance, la forme, la semaine. */}
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 first-letter:uppercase sm:text-[2.25rem] sm:leading-[1.15]">
               {jourAujourdhui
                 ? formatDateCivile(jourAujourdhui, lang, { weekday: "long", day: "numeric", month: "long" })
                 : new Date().toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
-            </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#11201d] sm:mt-2 sm:text-[2.5rem]">
-              {t("dash.greeting")}, {profile?.full_name?.split(" ")[0] ?? t("dash.champion")}
             </h1>
-            <p className="mt-1.5 flex items-center gap-2 text-[13px] text-[#5f7d79] sm:mt-2 sm:text-sm">
+            <p className="mt-1.5 flex items-center gap-2 text-[13px] text-zinc-500 sm:mt-2 sm:text-sm">
               <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: readiness.accent }} />
               {readiness.tagline}
             </p>
             <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mt-4 sm:flex-wrap sm:overflow-visible">
-              <span className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600">
-                <Gauge className="h-3.5 w-3.5 text-[#059669]" /> {levelLabel}
+              <span className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium tabular-nums text-zinc-600">
+                <Gauge className="h-3.5 w-3.5 text-zinc-400" strokeWidth={1.5} /> {levelLabel}
               </span>
-              <span className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600">
-                <Activity className="h-3.5 w-3.5 text-[#059669]" /> {weeklyKm.toFixed(0)} km · {hl.sept}
+              <span className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium tabular-nums text-zinc-600">
+                <Activity className="h-3.5 w-3.5 text-zinc-400" strokeWidth={1.5} /> {weeklyKm.toFixed(0)} km · {hl.sept}
               </span>
               {/* Série du jour — visible dès le premier coup d'œil, sans quitter l'en-tête. */}
               {streak && streak.current > 0 && (
-                <span className="hidden flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-200/80 bg-amber-50/80 px-3 py-1 text-xs font-semibold text-amber-700 sm:inline-flex">
-                  <Flame className="h-3.5 w-3.5 text-amber-500" />
+                <span className="hidden flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium tabular-nums text-zinc-600 sm:inline-flex">
+                  <Flame className="h-3.5 w-3.5 text-zinc-400" strokeWidth={1.5} />
                   {streak.current} {streak.current === 1 ? t("streak.unit1") : t("streak.unit")}
                 </span>
               )}
@@ -663,36 +659,36 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             <Link href="/dashboard/calendrier" className="group/obj -mx-1 flex w-full items-center gap-3 rounded-2xl px-1 py-1 transition-colors active:bg-white/40 sm:mx-0 sm:w-auto sm:gap-5 sm:px-0 sm:py-0">
               <div className="relative h-14 w-14 flex-shrink-0 sm:h-[92px] sm:w-[92px]">
                 <svg className="h-full w-full -rotate-90" viewBox="0 0 92 92">
-                  <circle cx="46" cy="46" r="40" fill="none" stroke="#e3eef0" strokeWidth="7" />
+                  <circle cx="46" cy="46" r="40" fill="none" stroke="#f4f4f5" strokeWidth="7" />
                   <circle cx="46" cy="46" r="40" fill="none" stroke="#059669" strokeWidth="7" strokeLinecap="round"
                     strokeDasharray={`${(2 * Math.PI * 40 * (objProgress ?? 0)) / 100} ${2 * Math.PI * 40}`}
-                    className="transition-all duration-1000" />
+                    className="transition-[stroke-dasharray] duration-700" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-                  <span className="text-sm font-bold tabular-nums text-[#11201d] sm:text-base">{objProgress ?? "—"}<span className="text-[10px] text-[#8aa6a6]">%</span></span>
-                  <span className="mt-0.5 hidden text-[8px] font-semibold uppercase tracking-[0.12em] text-[#8aa6a6] sm:mt-1 sm:block">{hl.prep}</span>
+                  <span className="text-sm font-semibold tabular-nums text-zinc-900 sm:text-base">{objProgress ?? "—"}<span className="text-[10px] text-zinc-400">%</span></span>
+                  <span className="mt-0.5 hidden text-[11px] text-zinc-400 sm:mt-1 sm:block">{hl.prep}</span>
                 </div>
               </div>
               <div className="min-w-0 flex-1">
                 {/* Le libellé « Objectif » ne tient pas sur téléphone : le J‑32 et le nom de
                     la course le disent déjà. */}
-                <div className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8aa6a6] sm:mt-1.5 sm:block">{hl.goal}</div>
+                <div className="hidden text-[13px] text-zinc-500 sm:mt-1.5 sm:block">{hl.goal}</div>
                 <div className="flex items-baseline gap-2 sm:block">
-                  <span className="text-[1.5rem] font-black leading-none tabular-nums text-[#11201d] sm:text-[2.25rem]">J‑{objDaysTo}</span>
-                  <span className="min-w-0 truncate text-sm font-bold text-[#11201d] sm:mt-1 sm:block">{objective.race}</span>
+                  <span className="text-[1.5rem] font-semibold leading-none tracking-tight tabular-nums text-zinc-900 sm:text-[2.25rem]">J‑{objDaysTo}</span>
+                  <span className="min-w-0 truncate text-sm font-medium text-zinc-900 sm:mt-1 sm:block">{objective.race}</span>
                 </div>
                 {/* La distance : un objectif nommé « sub 16 min » ne dit pas sur quelle course. */}
-                <div className="text-xs text-[#5f7d79]">
+                <div className="text-xs tabular-nums text-zinc-500">
                   {objective.distanceKm > 0 && <>{objective.distanceKm.toLocaleString(lang)} km · </>}
                   {formatDateCivile(objective.raceDate, lang, { day: "numeric", month: "long", year: "numeric" })}
                 </div>
                 {/* Un habillage, plus un lien : la rangée entière mène déjà au plan, et un
                     lien dans un lien est du HTML invalide. */}
-                <span className="mt-2.5 hidden items-center gap-1.5 rounded-xl bg-[#11201d] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors group-hover/obj:bg-[#0b1714] sm:inline-flex sm:px-3.5 sm:py-2">
+                <span className="mt-2.5 hidden items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors group-hover/obj:bg-zinc-800 sm:inline-flex sm:px-3.5 sm:py-2">
                   {hl.plan} <ChevronRight className="h-3.5 w-3.5" />
                 </span>
               </div>
-              <ChevronRight className="h-5 w-5 flex-shrink-0 text-[#8aa6a6] sm:hidden" aria-hidden />
+              <ChevronRight className="h-5 w-5 flex-shrink-0 text-zinc-400 sm:hidden" aria-hidden />
             </Link>
           ) : (
             /* ⚠️ `w-full` SUR TÉLÉPHONE (06/11/2026) : sans lui, les quatre chiffres restaient
@@ -701,10 +697,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             <div className="flex w-full flex-wrap gap-x-7 gap-y-4 sm:w-auto sm:gap-x-9">
               {heroStats.map((s) => (
                 <div key={s.label}>
-                  <div className="text-2xl font-bold tabular-nums text-[#11201d] sm:text-[1.7rem]">
-                    {s.value}{s.unit && <span className="ml-0.5 text-sm font-medium text-[#8aa6a6]">{s.unit}</span>}
+                  <div className="text-2xl font-semibold tabular-nums text-zinc-900 sm:text-[1.7rem]">
+                    {s.value}{s.unit && <span className="ml-0.5 text-sm font-normal text-zinc-400">{s.unit}</span>}
                   </div>
-                  <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8aa6a6]">{s.label}</div>
+                  <div className="mt-0.5 text-[13px] text-zinc-500">{s.label}</div>
                 </div>
               ))}
             </div>
@@ -730,7 +726,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
         <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5">
           <Shield className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
           <div className="flex-1">
-            <p className="font-bold text-red-800">{t("dash.deload.title")}</p>
+            <p className="font-semibold text-red-800">{t("dash.deload.title")}</p>
             <p className="mt-0.5 text-sm text-red-600">{loadRisk.reason}. {t("dash.deload.desc")}</p>
           </div>
         </div>
@@ -759,8 +755,8 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             <Calendar className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{nx.next}</div>
-            <div className="truncate text-sm font-bold text-zinc-900">{displaySession.title}</div>
+            <div className="text-[13px] text-zinc-500">{nx.next}</div>
+            <div className="truncate text-sm font-semibold text-zinc-900">{displaySession.title}</div>
             {displaySession.subtitle && <div className="truncate text-xs text-zinc-500">{displaySession.subtitle}</div>}
           </div>
           <Link href="/dashboard/calendrier" className="flex-shrink-0 rounded-xl bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-zinc-800">
@@ -776,62 +772,56 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
         <motion.div
           initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className="order-first relative mb-5 flex items-center gap-4 overflow-hidden rounded-3xl px-5 py-4 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-white/10 sm:px-6"
-          style={{ background: "linear-gradient(120deg,#064e3b 0%,#047857 48%,#0d9488 100%)" }}
+          className="order-first relative mb-5 flex items-center gap-4 overflow-hidden rounded-2xl px-5 py-4 text-white shadow-[0_1px_2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.08)] sm:px-6"
+          style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}
         >
-          <div className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-          <span className="relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20 backdrop-blur-md"><Moon className="h-5 w-5 text-white" /></span>
+          <span className="relative z-10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/10"><Moon className="h-[18px] w-[18px] text-white/90" strokeWidth={1.5} /></span>
           <div className="relative z-10 min-w-0 flex-1">
-            <span className="block truncate text-[10px] font-bold uppercase tracking-[0.16em] text-amber-100/90">{badgeCoach}</span>
-            <h2 className="text-xl font-bold leading-tight tracking-tight drop-shadow-sm sm:text-[1.4rem]">{coachKey.title}</h2>
+            <span className="block truncate text-[13px] text-emerald-100/75">{badgeCoach}</span>
+            <h2 className="text-xl font-semibold leading-tight tracking-tight sm:text-[1.4rem]">{coachKey.title}</h2>
             {coachKey.subtitle && <p className="mt-0.5 truncate text-[13px] text-white/85">{coachKey.subtitle}</p>}
           </div>
           <Link href="/dashboard/calendrier" title={t("dash.viewCalendar")}
-            className="relative z-10 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15 backdrop-blur-md transition-colors hover:bg-white/25">
-            <Calendar className="h-4 w-4 text-white/80" />
+            className="relative z-10 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/10 transition-colors hover:bg-white/20">
+            <Calendar className="h-4 w-4 text-white/80" strokeWidth={1.5} />
           </Link>
         </motion.div>
       )}
       {coachKey && !coachMinimal && (
         <motion.div
-          initial={{ opacity: 0, y: 18, scale: 0.99 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="order-first relative mb-5 overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-2xl shadow-emerald-900/40 ring-1 ring-white/10"
-          style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 44%,#0d9488 100%)" }}
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="order-first relative mb-5 overflow-hidden rounded-2xl p-5 sm:p-6 text-white shadow-[0_1px_2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.08)]"
+          style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}
         >
-          {/* Halos lumineux — profondeur premium */}
-          <div className="pointer-events-none absolute -top-24 -right-16 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-28 -left-16 h-80 w-80 rounded-full bg-teal-300/10 blur-3xl" />
-          <div className="pointer-events-none absolute -top-6 right-12 h-40 w-40 rounded-full bg-amber-200/10 blur-2xl" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+          {/* Le moment fort de l'écran (passe « unslop », 06/11/2026) : un vert profond, une seule
+              teinte. Plus de halos flous, d'ombre colorée ni de liseré brillant. */}
 
           <div className="relative z-10">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/20 backdrop-blur-md">
-                <Trophy className="h-3.5 w-3.5 flex-shrink-0 text-amber-300" />
-                <span className="whitespace-nowrap text-[11px] font-bold uppercase tracking-[0.16em] text-amber-50 truncate">{badgeCoach}</span>
+              <span className="inline-flex min-w-0 items-center">
+                <span className="whitespace-nowrap text-[13px] text-emerald-100/75 truncate">{badgeCoach}</span>
               </span>
               <Link href="/dashboard/calendrier" title={t("dash.viewCalendar")}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15 backdrop-blur-md transition-colors hover:bg-white/25">
-                <Calendar className="h-4 w-4 text-white/80" />
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 transition-colors hover:bg-white/20">
+                <Calendar className="h-4 w-4 text-white/80" strokeWidth={1.5} />
               </Link>
             </div>
 
-            <h2 className="text-[1.4rem] font-bold leading-[1.1] tracking-tight drop-shadow-sm sm:text-[1.7rem]">{coachKey.title}</h2>
+            <h2 className="text-[1.4rem] font-semibold leading-[1.15] tracking-tight sm:text-[1.75rem]">{coachKey.title}</h2>
             {/* La prescription en ÉTAPES quand le coach l'a chaînée par des flèches
                 (lib/dashboard/etapes) ; sinon, la phrase telle quelle. */}
             {coachKey.subtitle && (() => {
               const etapes = etapesSeance(coachKey.subtitle);
-              if (!etapes) return <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-white/85 sm:text-[15px]">{coachKey.subtitle}</p>;
+              if (!etapes) return <p className="mt-2 max-w-2xl text-[14px] leading-relaxed tabular-nums text-white/85 sm:text-[15px]">{coachKey.subtitle}</p>;
               return (
                 <ol className="mt-3.5 max-w-2xl space-y-2" aria-label={coachKey.subtitle}>
                   {etapes.map((e, i) => (
                     <li key={i} className="relative flex gap-3 pl-0.5">
                       {i < etapes.length - 1 && <span aria-hidden className="absolute left-[9px] top-5 h-[calc(100%-4px)] w-px bg-white/20" />}
-                      <span aria-hidden className={`relative mt-1 flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold tabular-nums ${e.coeur ? "bg-white text-emerald-800" : "bg-white/10 text-white/70 ring-1 ring-white/25"}`}>{i + 1}</span>
-                      <p className={`min-w-0 leading-relaxed ${e.coeur ? "text-[14px] font-medium text-white sm:text-[15px]" : "text-[13px] text-white/70 sm:text-[13.5px]"}`}>
-                        {e.libelle && <span className="mr-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-100/80">{e.libelle}</span>}
+                      <span aria-hidden className={`relative mt-1 flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full text-[10px] font-medium tabular-nums ${e.coeur ? "bg-white text-emerald-900" : "bg-white/10 text-white/70"}`}>{i + 1}</span>
+                      <p className={`min-w-0 leading-relaxed tabular-nums ${e.coeur ? "text-[14px] font-medium text-white sm:text-[15px]" : "text-[13px] text-white/70 sm:text-[14px]"}`}>
+                        {e.libelle && <span className="mr-1.5 text-white/60">{e.libelle}</span>}
                         {e.texte}
                       </p>
                     </li>
@@ -843,7 +833,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             {coachKey.tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {coachKey.tags.map((t, i) => (
-                  <span key={`${i}-${t.l}`} className={`rounded-full px-2.5 py-1 text-xs font-semibold backdrop-blur-sm ring-1 ${i === 0 ? "bg-amber-300/15 text-amber-50 ring-amber-200/30" : "bg-white/10 text-white/90 ring-white/15"}`}>{t.l}</span>
+                  <span key={`${i}-${t.l}`} className="rounded-md bg-white/10 px-2 py-1 text-xs font-medium tabular-nums text-white/90">{t.l}</span>
                 ))}
               </div>
             )}
@@ -857,14 +847,11 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 entre le rendu serveur et le navigateur. */}
             {coachKey.why && (
               <details className="group mt-4 border-t border-white/15 pt-3.5">
-                <summary className="flex cursor-pointer list-none items-center gap-2.5 text-[13px] font-semibold text-white/85 [&::-webkit-details-marker]:hidden">
-                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15">
-                    <Target className="h-3.5 w-3.5 text-emerald-100" />
-                  </span>
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] font-medium text-white/85 transition-colors hover:text-white [&::-webkit-details-marker]:hidden">
                   {t("dash.coach.pourquoi")}
                   <ChevronRight className="h-4 w-4 text-white/60 transition-transform group-open:rotate-90" aria-hidden />
                 </summary>
-                <p className="mt-2.5 pl-[2.1rem] text-[13px] leading-relaxed text-white/80">{coachKey.why}</p>
+                <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-white/75">{coachKey.why}</p>
               </details>
             )}
           </div>
@@ -884,7 +871,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           <div className="flex items-center justify-between mb-4">
             <div className="metric-label">{fl.title}</div>
             <VersFiche cle="forme" titre={fl.title} lang={lang} />
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500"><Target className="h-4 w-4" /></span>
           </div>
           {forme.hasData ? (
             <>
@@ -895,29 +881,29 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                   <circle cx="50" cy="50" r="42" fill="none" stroke={readiness.accent} strokeWidth="9"
                     strokeLinecap="round"
                     strokeDasharray={`${2 * Math.PI * 42 * forme.total / 100} ${2 * Math.PI * 42}`}
-                    className="transition-all duration-1000" />
+                    className="transition-[stroke-dasharray] duration-700" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[2rem] font-bold leading-none tabular-nums text-zinc-900">{forme.total}</span>
+                  <span className="text-[2rem] font-semibold leading-none tracking-tight tabular-nums text-zinc-900">{forme.total}</span>
                   <span className="mt-0.5 text-[11px] text-zinc-400">{fl.of}</span>
-                  <span className="mt-1 text-[10px] font-semibold" style={{ color: readiness.accent }}>{fl.rate(forme.total)}</span>
+                  <span className="mt-1 text-[11px] font-medium text-zinc-500">{fl.rate(forme.total)}</span>
                 </div>
               </div>
               <div className="flex-1 space-y-2.5">
                 {[
-                  { label: fl.endurance, val: forme.endurance, c: "#059669" },
-                  { label: fl.speed, val: forme.speed, c: "#2563eb" },
-                  { label: fl.recovery, val: forme.recovery, c: "#7c3aed" },
-                  { label: fl.regularity, val: forme.regularity, c: "#ea580c" },
+                  { label: fl.endurance, val: forme.endurance, c: "#3f3f46" },
+                  { label: fl.speed, val: forme.speed, c: "#3f3f46" },
+                  { label: fl.recovery, val: forme.recovery, c: "#3f3f46" },
+                  { label: fl.regularity, val: forme.regularity, c: "#3f3f46" },
                 ].map(m => (
                   <div key={m.label}>
                     {/* `gap-2` + `truncate` : « Récupération72% » collé sur une carte étroite. */}
                     <div className="mb-1 flex justify-between gap-2 text-xs">
                       <span className="min-w-0 truncate text-zinc-500">{m.label}</span>
-                      <span className="flex-shrink-0 font-semibold tabular-nums text-zinc-900">{m.val == null ? "—" : `${m.val}%`}</span>
+                      <span className="flex-shrink-0 font-medium tabular-nums text-zinc-900">{m.val == null ? "—" : `${m.val}%`}</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-zinc-100">
-                      <div className="h-full rounded-full transition-all duration-700"
+                      <div className="h-full rounded-full"
                         style={{ width: `${m.val ?? 0}%`, backgroundColor: m.c }} />
                     </div>
                   </div>
@@ -930,7 +916,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 10 km parfaitement préparé lisait 40 % d'endurance. La carte dit désormais
                 sur quoi elle compte — et quand elle n'a pas d'objectif, elle le dit aussi
                 au lieu de faire passer un repère générique pour la mesure de l'athlète. */}
-            <div className="mt-3 border-t border-zinc-100 pt-2.5 text-[10px] leading-relaxed text-zinc-400">
+            <div className="mt-3 border-t border-zinc-100 pt-2.5 text-[11px] leading-relaxed text-zinc-400">
               {forme.reference === "objectif" && forme.cibleLongueKm != null
                 ? (forme.cibleVolumeKm != null
                   ? t("dash.forme.ref", { l: forme.cibleLongueKm, v: forme.cibleVolumeKm })
@@ -954,7 +940,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 <div className="text-[11px] font-medium text-zinc-400">{fl.fort}</div>
                 <div className="mt-0.5 flex items-baseline gap-1.5">
                   <span className="text-sm font-semibold text-zinc-900">{formeExtremes.fort.label}</span>
-                  <span className="text-xs tabular-nums" style={{ color: formeExtremes.fort.c }}>{formeExtremes.fort.val}%</span>
+                  <span className="text-xs tabular-nums text-zinc-500">{formeExtremes.fort.val}%</span>
                 </div>
               </div>
               <div>
@@ -965,7 +951,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                   ) : (
                     <>
                       <span className="text-sm font-semibold text-zinc-900">{formeExtremes.faible.label}</span>
-                      <span className="text-xs tabular-nums" style={{ color: formeExtremes.faible.c }}>{formeExtremes.faible.val}%</span>
+                      <span className="text-xs tabular-nums text-zinc-500">{formeExtremes.faible.val}%</span>
                     </>
                   )}
                 </div>
@@ -974,8 +960,8 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-6 text-center">
-              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-50">
-                <Target className="h-6 w-6 text-zinc-300" />
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-50">
+                <Target className="h-[18px] w-[18px] text-zinc-400" strokeWidth={1.5} />
               </div>
               <p className="text-sm font-medium text-zinc-600">{t("dash.discipline.emptyTitle")}</p>
               <p className="mt-1 max-w-[210px] text-xs text-zinc-400">{t("dash.discipline.emptyDesc")}</p>
@@ -999,11 +985,11 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               <div className="metric-label">{t("dash.hrv.title")}</div>
             <VersFiche cle="vfc" titre={t("dash.hrv.title")} lang={lang} />
               <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-3xl font-bold tabular-nums text-zinc-900">
+                <span className="text-3xl font-semibold tracking-tight tabular-nums text-zinc-900">
                   {hrvLatest != null ? hrvLatest.toFixed(0) : "—"} <span className="text-sm font-normal text-zinc-400">ms</span>
                 </span>
                 {hrvDelta != null && (
-                  <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${hrvDansNorme ? "bg-zinc-100 text-zinc-600" : hrvDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+                  <span className={`inline-flex items-center gap-0.5 text-xs font-medium tabular-nums ${hrvDansNorme ? "text-zinc-500" : hrvDelta >= 0 ? "text-emerald-700" : "text-amber-700"}`}>
                     {hrvDansNorme ? "≈" : hrvDelta >= 0 ? "↑" : "↓"} {Math.round(Math.abs(hrvDelta))} ms
                   </span>
                 )}
@@ -1028,7 +1014,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 <div className="mt-1 max-w-[16rem] text-[11px] leading-snug text-zinc-400">{t("dash.hrv.sdnn")}</div>
               )}
             </div>
-            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-400"><Heart className="h-4 w-4 animate-heartbeat" /></span>
           </div>
           {/* `min-h` garde une courbe lisible quand la rangée est courte (mobile, cartes
               voisines vides) ; `flex-1` absorbe le reste de la hauteur imposée. */}
@@ -1045,19 +1030,19 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             <div className="mt-3 grid grid-cols-2 gap-2.5">
               {restingHr > 0 && (
                 <div className="flex items-center gap-2.5 rounded-xl bg-zinc-50 px-3 py-2.5">
-                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-400"><Heart className="h-4 w-4" /></span>
+                  <Heart className="h-4 w-4 flex-shrink-0 text-zinc-400" strokeWidth={1.5} />
                   <div className="min-w-0">
-                    <div className="text-sm font-bold tabular-nums text-zinc-900">{Math.round(restingHr)}<span className="ml-0.5 text-[11px] font-normal text-zinc-400">bpm</span></div>
-                    <div className="truncate text-[10px] text-zinc-400">{vit.hr}</div>
+                    <div className="text-sm font-semibold tabular-nums text-zinc-900">{Math.round(restingHr)}<span className="ml-0.5 text-[11px] font-normal text-zinc-400">bpm</span></div>
+                    <div className="truncate text-[11px] text-zinc-500">{vit.hr}</div>
                   </div>
                 </div>
               )}
               {freshSleep && (
                 <div className="flex items-center gap-2.5 rounded-xl bg-zinc-50 px-3 py-2.5">
-                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-400"><Moon className="h-4 w-4" /></span>
+                  <Moon className="h-4 w-4 flex-shrink-0 text-zinc-400" strokeWidth={1.5} />
                   <div className="min-w-0">
-                    <div className="text-sm font-bold tabular-nums text-zinc-900">{hm(freshSleep.total_sleep_min)}</div>
-                    <div className="truncate text-[10px] text-zinc-400">{t("dash.sleep.title")}</div>
+                    <div className="text-sm font-semibold tabular-nums text-zinc-900">{hm(freshSleep.total_sleep_min)}</div>
+                    <div className="truncate text-[11px] text-zinc-500">{t("dash.sleep.title")}</div>
                   </div>
                 </div>
               )}
@@ -1073,12 +1058,11 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           <div className="mb-3 flex items-center justify-between">
             <div className="metric-label">{t("dash.vma.title")}</div>
             <VersFiche cle="vitesse" titre={t("dash.vma.title")} lang={lang} />
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#ecfdf5] text-[#059669]"><Rocket className="h-4 w-4" /></span>
           </div>
           {predictions ? (
             <>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-4xl font-bold tabular-nums text-zinc-900">{nf(currentVma ?? 0)}</span>
+                <span className="text-4xl font-semibold tracking-tight tabular-nums text-zinc-900">{nf(currentVma ?? 0)}</span>
                 <span className="text-sm text-zinc-400">km/h</span>
               </div>
               <div className="text-[11px] text-zinc-400">{t("dash.vma.sub")}</div>
@@ -1099,17 +1083,17 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               )}
               <div className="mt-4 grid grid-cols-2 gap-2.5">
                 {predictions.map((p) => (
-                  <div key={p.label} className="rounded-xl bg-gradient-to-b from-zinc-50 to-white px-3 py-2.5 ring-1 ring-inset ring-zinc-100 transition-shadow hover:shadow-sm">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{p.label}</div>
-                    <div className="mt-0.5 text-lg font-bold tabular-nums text-zinc-900">{p.time}</div>
-                    <div className="text-[10px] tabular-nums text-zinc-400">{p.pace}</div>
+                  <div key={p.label} className="rounded-xl bg-zinc-50 px-3 py-2.5">
+                    <div className="text-[12px] text-zinc-500">{p.label}</div>
+                    <div className="mt-0.5 text-lg font-semibold tabular-nums text-zinc-900">{p.time}</div>
+                    <div className="text-[11px] tabular-nums text-zinc-400">{p.pace}</div>
                   </div>
                 ))}
               </div>
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-50"><Rocket className="h-6 w-6 text-zinc-300" /></div>
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-50"><Gauge className="h-[18px] w-[18px] text-zinc-400" strokeWidth={1.5} /></div>
               <p className="max-w-[210px] text-xs text-zinc-400">{t("dash.vma.empty")}</p>
             </div>
           )}
@@ -1170,7 +1154,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               <div className="grid grid-cols-3 gap-x-4 gap-y-5 sm:grid-cols-4">
                 {lastMetrics.map((m) => (
                   <div key={m.label} className="text-center">
-                    <div className="text-2xl font-bold leading-none text-zinc-900">
+                    <div className="text-2xl font-semibold leading-none text-zinc-900">
                       {m.value}<span className="ml-0.5 text-sm font-normal text-zinc-400">{m.unit}</span>
                     </div>
                     <div className="mt-1.5 text-xs text-zinc-500">{m.label}</div>
@@ -1277,7 +1261,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             <VersFiche cle="acwr" titre={t("dash.acwr.title")} lang={lang} />
               <div className="mt-0.5 text-[11px] text-zinc-400">{t("dash.acwr.sub")}</div>
             </div>
-            <Gauge className="h-5 w-5 text-zinc-300" />
           </div>
           {acwr > 0 ? (() => {
             const zone = acwr < 0.8 ? { l: t("dash.acwr.under"), c: "#0284C7" }
@@ -1289,7 +1272,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             return (
               <div className="mt-auto pt-2">
                 <div className="flex items-end gap-3">
-                  <span className="text-4xl font-bold tabular-nums" style={{ color: zone.c }}>{nf(acwr, 2)}</span>
+                  <span className="text-4xl font-semibold tabular-nums" style={{ color: zone.c }}>{nf(acwr, 2)}</span>
                   <span className="mb-1 text-sm font-semibold" style={{ color: zone.c }}>{zone.l}</span>
                 </div>
                 <div className="relative mt-4 mb-6">
@@ -1301,7 +1284,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                   </div>
                   <div className="absolute h-4 w-1.5 rounded-full bg-zinc-900 ring-2 ring-white" style={{ top: -3, left: `calc(${pos}% - 3px)` }} />
                   {ticks.map((tk) => (
-                    <span key={tk.v} className="absolute top-4 -translate-x-1/2 text-[10px] tabular-nums text-zinc-400" style={{ left: `${tk.p}%` }}>{tk.v}</span>
+                    <span key={tk.v} className="absolute top-4 -translate-x-1/2 text-[11px] tabular-nums text-zinc-400" style={{ left: `${tk.p}%` }}>{tk.v}</span>
                   ))}
                 </div>
                 <div className="flex items-center gap-3 text-xs">
@@ -1313,7 +1296,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             );
           })() : (
             <div className="flex flex-1 flex-col items-center justify-center py-6 text-center">
-              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-50"><Gauge className="h-6 w-6 text-zinc-300" /></div>
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-50"><Gauge className="h-[18px] w-[18px] text-zinc-400" strokeWidth={1.5} /></div>
               <p className="max-w-[230px] text-xs text-zinc-400">{t("dash.acwr.empty")}</p>
             </div>
           )}
@@ -1327,13 +1310,12 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           <div className="mb-2 flex items-center justify-between">
             <div className="metric-label">{t("dash.volume.title")}</div>
             <VersFiche cle="volume" titre={t("dash.volume.title")} lang={lang} />
-            <TrendingUp className="h-4 w-4 text-zinc-300" />
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="metric-value text-zinc-900">{nf(weeklyKm)}</span>
             <span className="text-sm text-zinc-400">km</span>
             {volumeDelta != null && Math.abs(volumeDelta) >= 0.5 && (
-              <span className={`ml-auto inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold ${volumeDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+              <span className={`ml-auto inline-flex items-center gap-0.5 text-xs font-medium tabular-nums ${volumeDelta >= 0 ? "text-emerald-700" : "text-amber-700"}`}>
                 {volumeDelta >= 0 ? "↑" : "↓"} {Math.abs(volumeDelta).toFixed(0)} km
               </span>
             )}
@@ -1341,19 +1323,19 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           <div className="text-[11px] text-zinc-400">{volumeDelta != null ? t(volumeRefLabel) : " "}</div>
           <div className="mt-3 flex h-14 items-end gap-1.5">
             {volumeTrend.map((v, i) => (
-              <div key={i} className="flex-1 rounded-t-md transition-all"
+              <div key={i} className="flex-1 rounded-t-md"
                 style={{ height: `${Math.max(4, (v.km / trendMax) * 56)}px`, background: v.isCurrent ? "#059669" : "#D1FAE5" }}
                 title={`${nf(v.km)} km`} />
             ))}
           </div>
-          <div className="mt-1 text-center text-[10px] text-zinc-400">{t("dash.volume.trend")}</div>
+          <div className="mt-1 text-center text-[11px] text-zinc-400">{t("dash.volume.trend")}</div>
           {/* ⚠️ PLUS DE 60 KM ÉCRITS EN DUR (06/11/2026). La barre se remplissait par rapport à
               60 km pour TOUT LE MONDE, sous « Objectif : selon plan ». Elle se mesure à la cible
               de la semaine fixée par le coach ; sinon à la capacité démontrée ; sinon, pas de
               barre — on ne dessine pas de progression vers un objectif qui n'existe pas. */}
           {refVolume != null && refVolume > 0 && (
             <div className="mt-3 h-1.5 rounded-full bg-zinc-100">
-              <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min((weeklyKm / refVolume) * 100, 100)}%` }} />
+              <div className="h-full rounded-full bg-[#059669]" style={{ width: `${Math.min((weeklyKm / refVolume) * 100, 100)}%` }} />
             </div>
           )}
           <div className="mt-1 text-xs text-zinc-400">{t("dash.volume.goal")}{deuxPoints}{refVolume != null && refVolume > 0 ? `${nf(refVolume, 0)} km${cibleVolumeKm != null && cibleVolumeKm > 0 ? ` · ${t("dash.volume.perPlan")}` : ""}` : t("dash.volume.goalNone")}</div>
@@ -1367,7 +1349,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           <div className="mb-1 flex items-center justify-between">
             <div className="metric-label">{zl.title}</div>
             <VersFiche cle="zones" titre={zl.title} lang={lang} />
-            <Flame className="h-4 w-4 text-orange-400" />
           </div>
           <div className="mb-3 text-[11px] text-zinc-400">{zl.sub}</div>
           {hrZones.total > 0 ? (() => {
@@ -1390,12 +1371,12 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                       {segs.map((sg, i) => sg.len > 0 && (
                         <circle key={i} cx="40" cy="40" r={r} fill="none" stroke={sg.color} strokeWidth="10"
                           strokeDasharray={`${Math.max(sg.len - 1.5, 0)} ${C}`} strokeDashoffset={-sg.off}
-                          className="transition-all duration-700" />
+                          className="transition-[stroke-dasharray] duration-700" />
                       ))}
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-lg font-bold tabular-nums text-zinc-900">{easyPct}%</span>
-                      <span className="text-[9px] text-zinc-400">Z1–Z2</span>
+                      <span className="text-lg font-semibold tabular-nums text-zinc-900">{easyPct}%</span>
+                      <span className="text-[11px] text-zinc-400">Z1–Z2</span>
                     </div>
                   </div>
                   {/* ⚠️ `min-w-0` — SANS LUI, LES MINUTES SORTENT DE LA CARTE. Un élément
@@ -1412,7 +1393,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                       <div key={i} className="flex items-center gap-2">
                         <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: sg.color }} />
                         <span className="min-w-0 flex-1 truncate text-zinc-500">{zl.z[i]}</span>
-                        <span className="flex-shrink-0 font-semibold tabular-nums text-zinc-900">{sg.min}<span className="ml-0.5 text-[10px] font-normal text-zinc-400">{zl.min}</span></span>
+                        <span className="flex-shrink-0 font-semibold tabular-nums text-zinc-900">{sg.min}<span className="ml-0.5 text-[11px] font-normal text-zinc-400">{zl.min}</span></span>
                       </div>
                     ))}
                   </div>
@@ -1420,7 +1401,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 {/* Sur quoi ce graphe est calculé, écrit noir sur blanc. Un verdict
                     « Trop d'intensité » qui n'annonce pas son échantillon n'est pas
                     vérifiable — et celui-ci s'appuyait jusqu'ici sur des randonnées. */}
-                <div className="mt-2.5 text-[10px] text-zinc-400">
+                <div className="mt-2.5 text-[11px] text-zinc-400">
                   {t(hrZones.seances > 1 ? "dash.zones.basis" : "dash.zones.basis1", { n: hrZones.seances })}
                 </div>
                 <div className="mt-2 border-t border-zinc-100 pt-2.5 text-xs font-semibold" style={{ color: good ? "#059669" : "#EA580C" }}>
@@ -1430,7 +1411,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             );
           })() : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-50"><Flame className="h-6 w-6 text-zinc-300" /></div>
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-50"><Flame className="h-[18px] w-[18px] text-zinc-400" strokeWidth={1.5} /></div>
               <p className="max-w-[200px] text-xs text-zinc-400">{t("dash.intensity.empty")}</p>
             </div>
           )}
@@ -1477,7 +1458,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             ) : (
               <p className="mt-2.5 text-sm leading-relaxed text-zinc-500">{al.pasEncore}</p>
             )}
-            <Link href={lienSeance(analyse.seance)} className="relative z-[3] mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#059669] transition-colors hover:text-[#047857]">
+            <Link href={lienSeance(analyse.seance)} className="relative z-[3] mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#059669] transition-colors hover:text-[#047857]">
               {analyse.texte ? al.lire : al.analyser} <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -1494,7 +1475,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               { v: fmtTime(weekSummary.sec), u: "", l: t("dash.metric.duration") },
             ].map((s) => (
               <div key={s.l}>
-                <div className="text-lg font-bold leading-none tabular-nums text-zinc-900">{s.v}<span className="ml-0.5 text-xs font-normal text-zinc-400">{s.u}</span></div>
+                <div className="text-lg font-semibold leading-none tabular-nums text-zinc-900">{s.v}<span className="ml-0.5 text-xs font-normal text-zinc-400">{s.u}</span></div>
                 <div className="mt-1 text-[11px] text-zinc-500">{s.l}</div>
               </div>
             ))}
@@ -1516,9 +1497,9 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 <circle cx="50" cy="50" r="42" fill="none" stroke="#F4F4F5" strokeWidth="9" />
                 <circle cx="50" cy="50" r="42" fill="none" stroke={readiness.accent} strokeWidth="9" strokeLinecap="round"
                   strokeDasharray={`${(2 * Math.PI * 42 * (disc.hasData ? disc.total : 0)) / 100} ${2 * Math.PI * 42}`}
-                  className="transition-all duration-1000" />
+                  className="transition-[stroke-dasharray] duration-700" />
               </svg>
-              <div className="absolute inset-0 flex items-center justify-center text-lg font-bold tabular-nums text-zinc-900">
+              <div className="absolute inset-0 flex items-center justify-center text-lg font-semibold tabular-nums text-zinc-900">
                 {disc.hasData ? disc.total : "—"}<span className="text-xs text-zinc-400">%</span>
               </div>
             </div>
@@ -1540,7 +1521,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             </div>
           </div>
           {disc.hasData && (disc.precision == null || disc.consistency == null || disc.recovery == null) && (
-            <p className="mt-2 text-[10px] leading-snug text-zinc-400">{t("dash.discipline.absent")}</p>
+            <p className="mt-2 text-[11px] leading-snug text-zinc-400">{t("dash.discipline.absent")}</p>
           )}
           {/* Les conseils de CE score, dans sa page détaillée — le bouton ouvrait le Kiné IA
               (Santé), sans rapport avec lui, alors que le reste de la carte mène déjà ici. */}
@@ -1564,18 +1545,18 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 <div key={pr.label} className="flex items-center justify-between gap-2">
                   <span className="text-sm text-zinc-500">{pr.label}</span>
                   <span className="flex items-center gap-2">
-                    <span className="text-sm font-bold tabular-nums text-zinc-900">{pr.time}</span>
-                    <span className="hidden text-[10px] text-zinc-400 sm:inline" title={pr.course ?? undefined}>{pr.date}</span>
+                    <span className="text-sm font-medium tabular-nums text-zinc-900">{pr.time}</span>
+                    <span className="hidden text-[11px] tabular-nums text-zinc-400 sm:inline" title={pr.course ?? undefined}>{pr.date}</span>
                     {/* « Déclaré » : saisi par l'athlète, pas mesuré — on ne le fait jamais
                         passer pour une donnée de montre. */}
                     {pr.source === "declare" ? (
                       <button type="button" onClick={() => retirerRecord(pr.cle)} disabled={retrait === pr.cle}
                         title={t("dash.rec.retirer")}
-                        className="rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-700 hover:bg-sky-100 disabled:opacity-50">
+                        className="rounded px-1 text-[11px] text-zinc-500 underline decoration-zinc-300 underline-offset-2 transition-colors hover:text-zinc-900 disabled:opacity-50">
                         {t("dash.rec.declare")}
                       </button>
                     ) : (
-                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">{ABREV_RECORD[lang] ?? "RP"}</span>
+                      <span className="w-6 text-right text-[11px] text-zinc-400">{ABREV_RECORD[lang] ?? "RP"}</span>
                     )}
                   </span>
                 </div>
@@ -1609,21 +1590,23 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               <div className="metric-label">{rl.badges}</div>
               <Link href="/dashboard/leagues" className="text-xs font-medium text-[#059669] hover:text-[#047857]">{t("dash.league.cta")}</Link>
             </div>
-            <div className="mt-3 flex justify-around gap-2">
+            {/* LES DOSSARDS (passe « unslop », 06/11/2026) : la distance courue s'épingle comme un
+                dossard, l'objet que tout coureur connaît. Gagné : bandeau vert et numéro plein ;
+                à venir : papier vide. Remplace trois hexagones dégradés (vert, violet, ambre). */}
+            <div className="mt-3 grid grid-cols-3 gap-2">
               {[
-                { seuil: 9.9, l: "10K", rim: "#a7f3d0", grad: "linear-gradient(145deg,#10b981,#059669)" },
-                { seuil: 21, l: "21K", rim: "#c7d2fe", grad: "linear-gradient(145deg,#818cf8,#6366f1)" },
-                { seuil: 42, l: "42K", rim: "#fde68a", grad: "linear-gradient(145deg,#fbbf24,#d97706)" },
+                { seuil: 9.9, l: "10K" },
+                { seuil: 21, l: "21K" },
+                { seuil: 42, l: "42K" },
               ].map((b) => {
                 const earned = plusLongueConnue >= b.seuil;
-                const HEX = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
                 return (
-                  <div key={b.l} className="flex flex-col items-center gap-1.5">
-                    <div className="flex h-[52px] w-[46px] items-center justify-center" style={{ clipPath: HEX, background: earned ? b.rim : "#e4e4e7" }}>
-                      <div className="flex h-[44px] w-[39px] items-center justify-center text-[11px] font-black" style={{ clipPath: HEX, background: earned ? b.grad : "#f4f4f5", color: earned ? "#fff" : "#a1a1aa" }}>
-                        {b.l}
-                      </div>
-                    </div>
+                  <div key={b.l} className={`relative overflow-hidden rounded-md border ${earned ? "border-zinc-200 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]" : "border-dashed border-zinc-200 bg-zinc-50"}`}>
+                    <div className={`h-1.5 ${earned ? "bg-[#059669]" : "bg-transparent"}`} />
+                    {[["left-1.5", "top-3"], ["right-1.5", "top-3"], ["left-1.5", "bottom-1.5"], ["right-1.5", "bottom-1.5"]].map(([x, y]) => (
+                      <span key={x + y} aria-hidden className={`absolute ${x} ${y} h-1 w-1 rounded-full ${earned ? "bg-zinc-300" : "bg-zinc-200"}`} />
+                    ))}
+                    <div className={`py-2.5 text-center text-[17px] font-semibold tracking-tight tabular-nums ${earned ? "text-zinc-900" : "text-zinc-300"}`}>{b.l}</div>
                   </div>
                 );
               })}
@@ -1638,11 +1621,11 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             <Link href="/dashboard/communaute" className="text-xs font-medium text-[#059669] hover:text-[#047857]">{rl.see}</Link>
           </div>
           <div className="mt-3 flex items-center gap-3">
-            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#ecfdf5] text-[#059669]"><Users className="h-5 w-5" /></span>
+            <Users className="h-[18px] w-[18px] flex-shrink-0 text-zinc-400" strokeWidth={1.5} />
             <div className="min-w-0">
               {newMembersWeek && newMembersWeek > 0 ? (
                 <>
-                  <div className="text-lg font-bold tabular-nums text-zinc-900">+{newMembersWeek}</div>
+                  <div className="text-lg font-semibold tabular-nums text-zinc-900">+{newMembersWeek}</div>
                   <div className="text-xs text-zinc-400">{rl.newWeek}</div>
                 </>
               ) : (
@@ -1887,7 +1870,7 @@ function VersPage({ href, titre, lang }: { href: string; titre: string; lang: st
   const l = DETAIL_LIBELLE[lang] ?? DETAIL_LIBELLE.fr;
   return (
     <Link href={href} aria-label={`${titre} — ${l}`} title={l}
-      className="absolute inset-0 z-[1] rounded-3xl ring-emerald-400/40 transition-shadow duration-200 group-hover:ring-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2" />
+      className="absolute inset-0 z-[1] rounded-2xl ring-zinc-300 transition-shadow duration-150 group-hover:ring-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2" />
   );
 }
 function VersFiche({ cle, titre, lang }: { cle: CleIndicateur; titre: string; lang: string }) {
@@ -1896,10 +1879,9 @@ function VersFiche({ cle, titre, lang }: { cle: CleIndicateur; titre: string; la
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="col-span-12 flex items-center gap-2.5 pt-2 first:pt-0">
-      <span className="h-1 w-1 flex-shrink-0 rounded-full bg-[#10b981]" />
-      <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400">{children}</span>
-      <span className="h-px flex-1 bg-gradient-to-r from-zinc-200 to-transparent" />
+    <div className="col-span-12 flex items-center gap-3 pt-4 first:pt-0">
+      <span className="text-[15px] font-semibold text-zinc-900">{children}</span>
+      <span className="h-px flex-1 bg-zinc-200/80" />
     </div>
   );
 }

@@ -10,7 +10,7 @@ export function Card({
     <div
       className={cn(
         "rounded-2xl bg-white ring-1 ring-inset ring-zinc-200/80",
-        hover && "transition-all duration-300 hover:ring-zinc-300 hover:shadow-[0_18px_40px_-22px_rgba(16,24,40,.25)]",
+        hover && "transition duration-300 hover:ring-zinc-300 hover:shadow-[0_18px_40px_-22px_rgba(16,24,40,.25)]",
         className,
       )}
       {...props}

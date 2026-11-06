@@ -31,7 +31,7 @@ export function AppareilGate({ configure, reconnu, motif }: { configure: boolean
       <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] p-6">
         <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
           <Laptop className="h-8 w-8 text-zinc-900" />
-          <h1 className="mt-4 text-lg font-bold text-zinc-900">Cet appareil n&apos;est pas reconnu</h1>
+          <h1 className="mt-4 text-lg font-semibold text-zinc-900">Cet appareil n&apos;est pas reconnu</h1>
           <p className="mt-1 text-sm text-zinc-500">
             {motif ? `${motif} ` : ""}Ton mot de passe ne suffit pas à ouvrir l&apos;espace coach : il donne accès aux
             factures de tes clients et à ton chiffre d&apos;affaires. Saisis le code d&apos;autorisation pour rendre

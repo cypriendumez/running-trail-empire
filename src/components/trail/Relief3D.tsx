@@ -441,7 +441,7 @@ export function Relief3D({ trace, centre, textes }: {
           </svg>
         </button>
         <button onClick={() => setRelief((v) => !v)} aria-pressed={!relief}
-          className="border-b border-zinc-200 px-3 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800">
+          className="border-b border-zinc-200 px-3 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800">
           {relief ? "2D" : "3D"}
         </button>
         <button onClick={() => setPanneau((p) => (p ? null : "cartes"))} title={t("relief.couches")} aria-label={t("relief.couches")}
@@ -568,7 +568,7 @@ function Bascule({ actif, onChange, label }: { actif: boolean; onChange: () => v
   return (
     <button role="switch" aria-checked={actif} aria-label={label} onClick={onChange}
       className={`relative h-6 w-11 shrink-0 rounded-full transition ${actif ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700"}`}>
-      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${actif ? "left-[22px]" : "left-0.5"}`} />
+      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${actif ? "left-[22px]" : "left-0.5"}`} />
     </button>
   );
 }
