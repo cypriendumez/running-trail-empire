@@ -8,7 +8,7 @@ import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { computeStreak, coursesDeLObjectif, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
 import { lecturesEnEchec } from "@/lib/dashboard/lectures";
 
-export const metadata = { title: "Ligues & Gamification" };
+export const metadata = { title: "Ligues et badges" };
 
 export default async function LeaguesPage() {
   const supabase = await createClient();

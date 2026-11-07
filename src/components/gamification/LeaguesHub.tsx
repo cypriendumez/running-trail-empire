@@ -187,12 +187,13 @@ export function LeaguesHub({
           ] as { label: string; value: number | string; unit: string; icon: React.ReactNode; grad: string; ic: string; num: string }[]
         ).map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05, duration: 0.3 }}
-            className={`rounded-2xl border bg-gradient-to-br p-4 transition-transform ${s.grad}`}>
-            <div className="mb-2 flex items-center gap-2">
-              <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${s.ic}`}>{s.icon}</span>
-              <span className="text-xs font-medium text-zinc-500">{s.label}</span>
+            className="rounded-2xl border border-zinc-200/80 bg-white p-4">
+            {/* Une carte de chiffre = un libellé et un nombre, sans couleur propre (passe « unslop »). */}
+            <div className="mb-2 flex items-center gap-2 text-zinc-400">
+              {s.icon}
+              <span className="text-[13px] text-zinc-500">{s.label}</span>
             </div>
-            <div className={`text-2xl font-semibold tabular-nums ${s.num}`}>{s.value}<span className="ml-1 text-sm font-normal text-zinc-400">{s.unit}</span></div>
+            <div className="text-2xl font-semibold tracking-tight tabular-nums text-zinc-900">{s.value}<span className="ml-1 text-sm font-normal text-zinc-400">{s.unit}</span></div>
           </motion.div>
         ))}
       </div>

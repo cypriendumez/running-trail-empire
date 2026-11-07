@@ -288,9 +288,9 @@ function StatCard({ label, value, unit, icon, color }: {
   label: string; value: string | number; unit?: string; icon: React.ReactNode; color: string;
 }) {
   return (
-    <div className={`rounded-2xl p-4 ${color} flex flex-col gap-1`}>
-      <div className="flex items-center gap-1.5 text-xs font-medium opacity-70">{icon}{label}</div>
-      <div className="text-2xl font-semibold text-zinc-900">
+    <div className="flex flex-col gap-1 rounded-2xl border border-zinc-200/80 bg-white p-4">
+      <div className="flex items-center gap-1.5 text-[13px] text-zinc-500"><span className="text-zinc-400">{icon}</span>{label}</div>
+      <div className="text-2xl font-semibold tracking-tight tabular-nums text-zinc-900">
         {value}<span className="text-sm font-medium text-zinc-500 ml-1">{unit}</span>
       </div>
     </div>

@@ -480,19 +480,19 @@ export default function SyncPage() {
                 const avgHr = hrs.length ? Math.round(hrs.reduce((s, h) => s + h, 0) / hrs.length) : null;
                 return (
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-2xl border border-emerald-100 bg-zinc-50 p-4 text-center">
-                      <Activity className="mx-auto mb-1.5 h-5 w-5 text-emerald-500" />
-                      <div className="text-2xl font-semibold tabular-nums text-emerald-700">{Math.round(totalKm)}</div>
+                    <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 text-center">
+                      <Activity className="mx-auto mb-1.5 h-[18px] w-[18px] text-zinc-400" strokeWidth={1.5} />
+                      <div className="text-2xl font-semibold tabular-nums text-zinc-900">{Math.round(totalKm)}</div>
                       <div className="text-xs text-zinc-500">km</div>
                     </div>
-                    <div className="rounded-2xl border border-blue-100 bg-zinc-50 p-4 text-center">
-                      <Clock className="mx-auto mb-1.5 h-5 w-5 text-blue-500" />
-                      <div className="text-2xl font-semibold tabular-nums text-blue-700">{fmtDuration(totalMin * 60)}</div>
+                    <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 text-center">
+                      <Clock className="mx-auto mb-1.5 h-[18px] w-[18px] text-zinc-400" strokeWidth={1.5} />
+                      <div className="text-2xl font-semibold tabular-nums text-zinc-900">{fmtDuration(totalMin * 60)}</div>
                       <div className="text-xs text-zinc-500">{d["u.duration"]}</div>
                     </div>
-                    <div className="rounded-2xl border border-rose-100 bg-zinc-50 p-4 text-center">
-                      <Heart className="mx-auto mb-1.5 h-5 w-5 text-rose-500" />
-                      <div className="text-2xl font-semibold tabular-nums text-rose-600">{avgHr ?? "—"}</div>
+                    <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 text-center">
+                      <Heart className="mx-auto mb-1.5 h-[18px] w-[18px] text-zinc-400" strokeWidth={1.5} />
+                      <div className="text-2xl font-semibold tabular-nums text-zinc-900">{avgHr ?? "—"}</div>
                       <div className="text-xs text-zinc-500">{d["u.avgHr"]}</div>
                     </div>
                   </div>
