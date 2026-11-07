@@ -140,7 +140,7 @@ export default function BlogPage() {
             <button
               key={c}
               onClick={() => setCat(c)}
-              className={`whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${
+              className={`whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-semiboldr transition ${
                 cat === c ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
               }`}
             >
@@ -172,7 +172,7 @@ export default function BlogPage() {
                       { label: B.manifesto.aiLabel, brand: true, items: B.manifesto.ai },
                     ].map((col) => (
                       <div key={col.label}>
-                        <div className={`mb-3 text-xs font-semibold uppercase tracking-wider ${col.brand ? "text-[#059669]" : "text-zinc-900"}`}>{col.label}</div>
+                        <div className={`mb-3 text-xs font-semiboldr ${col.brand ? "text-[#059669]" : "text-zinc-900"}`}>{col.label}</div>
                         <ul className="space-y-1.5">
                           {col.items.map((item) => (
                             <li key={item} className="flex items-center gap-2 text-xs text-zinc-500">

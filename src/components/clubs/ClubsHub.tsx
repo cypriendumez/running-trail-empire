@@ -116,7 +116,7 @@ function CarteDefi({ d }: { d: DefiVue }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-semibold text-zinc-900">{d.name}</h2>
-            {d.done && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-700">{t("clubs.done")}</span>}
+            {d.done && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{t("clubs.done")}</span>}
             {d.clubName && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">{d.clubName}</span>}
           </div>
           <p className="mt-0.5 text-xs text-zinc-500">
@@ -205,7 +205,7 @@ function CarteClub({ c }: { c: ClubVue }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-semibold text-zinc-900">{c.name}</h2>
-            {c.role === "owner" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-700">{t("clubs.owner")}</span>}
+            {c.role === "owner" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">{t("clubs.owner")}</span>}
             {c.visibility === "private" && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">{t("clubs.private")}</span>}
           </div>
           <p className="mt-0.5 flex items-center gap-2 text-xs text-zinc-500">

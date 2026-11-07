@@ -464,7 +464,7 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
           {tab === "compte" && (
             <>
               <Card title={t("set.sub.title")}>
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 p-4 ring-1 ring-emerald-100">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
                   <div>
                     <div className="text-xs font-semibold text-emerald-700 first-letter:uppercase">{t("set.sub.current")}</div>
                     <div className="text-lg font-semibold capitalize text-zinc-900">{tier === "free" ? t("set.sub.free") : tier}</div>

@@ -194,7 +194,7 @@ export function MicroPanel() {
                       <div className="font-semibold capitalize text-zinc-900">{p.libelle}</div>
                       <div className="text-[11px] text-zinc-400">{dateFr(p.debut)} → {dateFr(p.fin)}</div>
                     </div>
-                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${p.close ? "bg-zinc-100 text-zinc-500" : "bg-emerald-50 text-emerald-700"}`}>{p.close ? "close" : "en cours"}</span>
+                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${p.close ? "bg-zinc-100 text-zinc-500" : "bg-emerald-50 text-emerald-700"}`}>{p.close ? "close" : "en cours"}</span>
                   </div>
                   <div className="mt-3 flex items-end justify-between gap-3">
                     <div>

@@ -285,7 +285,7 @@ export function CommunityFeed({ initial }: { initial?: Item[] | null }) {
 
       {/* Lettre d'information : APRÈS le fil. On vient ici pour lire l'actualité ; l'encart
           d'inscription en tête repoussait le premier article sous la ligne de flottaison. */}
-      <div className="mt-6 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-4 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:p-5">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-emerald-100 bg-white p-4 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:p-5">
         <div className="mb-3 flex items-start gap-3 sm:mb-0">
           <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100"><Mail className="h-4 w-4 text-emerald-600" /></span>
           <div>

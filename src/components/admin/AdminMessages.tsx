@@ -165,7 +165,7 @@ export function AdminMessages({ conversations, initialClient }: { conversations:
                 return (
                   <div key={i} className={`flex ${coach ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm ${coach ? "rounded-br-md bg-emerald-600 text-white" : "rounded-bl-md bg-white text-zinc-800 ring-1 ring-zinc-100"}`}>
-                      <div className={`mb-0.5 text-[10px] font-semibold uppercase tracking-wide ${coach ? "text-emerald-100" : "text-zinc-400"}`}>{coach ? "Toi (coach)" : current.name.split(" ")[0]}{m.subject ? ` · ${m.subject}` : ""}</div>
+                      <div className={`mb-0.5 text-[10px] font-semibold ${coach ? "text-emerald-100" : "text-zinc-400"}`}>{coach ? "Toi (coach)" : current.name.split(" ")[0]}{m.subject ? ` · ${m.subject}` : ""}</div>
                       {m.body && <div className="whitespace-pre-line">{m.body}</div>}
                       <Atts atts={m.attachments} dark={coach} />
                       <div className="mt-1 text-right text-[10px] opacity-70" title={fmtFull(m.ts)}>{timeAgo(m.ts)}</div>

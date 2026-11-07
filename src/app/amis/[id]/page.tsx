@@ -64,7 +64,7 @@ export default async function AmiPage({ params }: { params: Promise<{ id: string
             // eslint-disable-next-line @next/next/no-img-element
             <img src={athlete.avatar_url} alt="" className="mt-8 h-20 w-20 rounded-full object-cover ring-4 ring-white shadow" />
           ) : (
-            <div className="mt-8 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-2xl font-semibold text-white ring-4 ring-white shadow">{initiale}</div>
+            <div className="mt-8 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-700 text-2xl font-semibold text-white ring-4 ring-white shadow">{initiale}</div>
           )}
           <h1 className="mt-5 text-2xl font-semibold tracking-tight text-zinc-900">{avec(L.titre)}</h1>
           <p className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-500">{avec(L.sous)}</p>

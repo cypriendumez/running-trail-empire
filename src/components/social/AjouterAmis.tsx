@@ -119,7 +119,7 @@ function Avatar({ a, size = 40 }: { a: { full_name?: string | null; avatar_url?:
     return <img src={a.avatar_url} alt="" style={s} className="shrink-0 rounded-full object-cover" />;
   }
   return (
-    <div style={s} className="flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-xs font-semibold text-white">
+    <div style={s} className="flex shrink-0 items-center justify-center rounded-full bg-emerald-700 text-xs font-semibold text-white">
       {initials(a.full_name)}
     </div>
   );

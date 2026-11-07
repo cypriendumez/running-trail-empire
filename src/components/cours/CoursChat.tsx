@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Send, Loader2, Sparkles, GraduationCap, Lock } from "lucide-react";
+import { Send, Loader2, GraduationCap, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RichText } from "@/components/ui/RichText";
@@ -141,7 +141,7 @@ export function CoursChat() {
         {loading && (
           <div className="flex justify-start">
             <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-zinc-100 px-3.5 py-2.5 text-sm text-zinc-500">
-              <Sparkles className="h-3.5 w-3.5 animate-pulse text-emerald-500" /> {d.thinking}
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-400" /> {d.thinking}
             </div>
           </div>
         )}

@@ -39,7 +39,7 @@ export function WaitlistSection() {
 
         {/* Le formulaire dans un PANNEAU BLANC net posé sur le vert : lisible, « produit »,
             à l'opposé de la carte sombre translucide qu'on avait. */}
-        <div className="mx-auto mt-8 max-w-md rounded-2xl bg-white p-6 text-left shadow-2xl shadow-emerald-900/30 sm:p-7">
+        <div className="mx-auto mt-8 max-w-md rounded-2xl bg-white p-6 text-left shadow-[0_8px_24px_rgba(0,0,0,0.10)] sm:p-7">
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center text-sm font-medium text-emerald-800">
             {injecte(L.offer)}
           </div>

@@ -721,7 +721,7 @@ export default function LandingPage() {
               <button
                 key={code}
                 onClick={() => setActiveCategory(code)}
-                className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider transition ${
+                className={`rounded-full px-4 py-2 text-xs font-semiboldr transition ${
                   activeCategory === code ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                 }`}
               >
@@ -744,7 +744,7 @@ export default function LandingPage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 p-6">
-                    <h3 className="text-2xl font-semibold uppercase leading-tight text-white">{it.title}</h3>
+                    <h3 className="text-2xl font-semibold leading-tight text-white">{it.title}</h3>
                     <p className="mt-1 text-xs font-medium text-white/60 first-letter:uppercase">{it.subtitle}</p>
                   </div>
                   <span className="absolute right-4 top-4 flex h-8 w-8 translate-y-1 items-center justify-center rounded-full bg-white opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">
@@ -788,7 +788,7 @@ export default function LandingPage() {
                   className={`rounded-2xl border p-7 ${sombre ? "surface-brand border-transparent" : "border-zinc-200 bg-white"}`}>
                   <Icon className={sombre ? "h-5 w-5 text-[#34d399]" : "h-5 w-5 text-[#059669]"} strokeWidth={1.6} />
                   <div className="mt-7 text-[1.75rem] font-semibold leading-none tracking-tight">{p.metric}</div>
-                  <div className={`mt-2 text-[10px] font-semibold uppercase tracking-[0.16em] ${sombre ? "text-white/45" : "text-zinc-500"}`}>
+                  <div className={`mt-2 text-[10px] font-semibold ${sombre ? "text-white/45" : "text-zinc-500"}`}>
                     {p.metricLabel}
                   </div>
                   <h3 className="mt-6 text-[17px] font-semibold tracking-tight">{p.title}</h3>

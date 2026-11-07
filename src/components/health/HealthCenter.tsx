@@ -2,9 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback , useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Heart, Utensils, Stethoscope, AlertTriangle, Phone, Send, Loader2, Sparkles, Scale, Camera, X, Activity, ClipboardList, CalendarPlus, RotateCcw, ChevronDown, Lock,
-} from "lucide-react";
+import { Heart, Utensils, Stethoscope, AlertTriangle, Phone, Send, Loader2, Scale, Camera, X, Activity, ClipboardList, CalendarPlus, RotateCcw, ChevronDown, Lock, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { NutritionCourse } from "@/components/health/NutritionCourse";
@@ -630,7 +628,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                       className="w-full" style={{ accentColor: teinteDouleur(painLevel) }} />
                     <div className="flex justify-between text-[10px] text-zinc-400 mt-0.5"><span>{tr("k.painLight")}</span><span>{tr("k.painHard")}</span></div>
                     <button onClick={askAboutZone} className="btn-brand w-full justify-center mt-3 text-sm">
-                      <Sparkles className="w-4 h-4" /> {tr("k.ask")}
+                      <MessageCircle className="w-4 h-4" strokeWidth={1.5} /> {tr("k.ask")}
                     </button>
                   </div>
                 ) : (

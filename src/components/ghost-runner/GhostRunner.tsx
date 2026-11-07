@@ -1288,7 +1288,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             )}
             {/* Séances du coach — faisables ici sans montre (allure/FC ciblée + voix) */}
             {coachSessions.length > 0 && (
-              <div className="mb-5 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5">
+              <div className="mb-5 rounded-2xl border border-emerald-200 bg-white p-5">
                 <div className="flex items-center gap-2">
                   <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600/10"><ClipboardList className="h-4 w-4 text-emerald-700" /></span>
                   <h3 className="font-semibold text-zinc-900">{d["co.title"]}</h3>
@@ -1302,7 +1302,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                       <button key={i} onClick={() => applyCoachSession(s)}
                         className="group flex items-start gap-3 rounded-2xl border border-zinc-200 bg-white p-3.5 text-left transition hover:border-emerald-400 hover:shadow-sm">
                         <div className="flex h-11 w-11 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                          <span className="text-[9px] font-semibold uppercase leading-none">{dt.toLocaleDateString(lang, { month: "short" })}</span>
+                          <span className="text-[9px] font-semibold leading-none">{dt.toLocaleDateString(lang, { month: "short" })}</span>
                           <span className="text-base font-semibold leading-none">{dt.getDate()}</span>
                         </div>
                         <div className="min-w-0 flex-1">
@@ -1396,7 +1396,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                     title={tg("feas.title", { l: feas.l, v: vma })}
                     className={`group rounded-2xl border p-3.5 text-left transition duration-200 ${
                       active
-                        ? "border-emerald-500 bg-emerald-50/70 shadow-[0_10px_30px_-14px_rgba(5,150,105,0.55)] ring-1 ring-emerald-200"
+                        ? "border-emerald-500 bg-emerald-50/70"
                         : "border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-md"
                     }`}
                   >
@@ -1405,7 +1405,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                       <span className="h-2 w-2 rounded-full" style={{ background: feas.c }} />
                     </div>
                     <div className={`mt-0.5 text-xs font-semibold tabular-nums ${active ? "text-emerald-600" : "text-zinc-500"}`}>{formatPace(pace)} /km</div>
-                    <div className={`mt-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${active ? "text-emerald-600/70" : "text-zinc-400"}`}>{p.goal}</div>
+                    <div className={`mt-1.5 text-[10px] font-semibold ${active ? "text-emerald-600/70" : "text-zinc-400"}`}>{p.goal}</div>
                   </button>
                 );
               })}
@@ -1475,7 +1475,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             <div className="mb-6 rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
               <div className="mb-3.5 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-zinc-900">{d["ref.title"]}</h3>
-                <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white shadow-sm" style={{ background: "linear-gradient(135deg,#059669,#0d9488)" }}>VMA {vma} km/h</span>
+                <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white shadow-sm" style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}>VMA {vma} km/h</span>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {zoneBands.map((z) => (
@@ -1592,8 +1592,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             )}
 
             {/* Summary — bandeau émeraude (langage du dashboard) */}
-            <div className="relative overflow-hidden rounded-2xl p-5 text-white shadow-xl shadow-emerald-900/30 ring-1 ring-white/10 flex flex-wrap items-center justify-between gap-4 mb-6" style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}>
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+            <div className="relative overflow-hidden rounded-2xl p-5 text-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] flex flex-wrap items-center justify-between gap-4 mb-6" style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}>
               {libre ? (
                 <div className="flex items-center gap-6 sm:gap-8">
                   {targetMode === "pace"
@@ -1973,7 +1972,7 @@ function GrosBouton({ label, teinte, onClick, children }: { label: string; teint
   const vert = teinte === "emerald";
   return (
     <button type="button" onClick={onClick} className="flex w-20 flex-col items-center gap-1.5">
-      <span className={`flex h-[60px] w-[60px] items-center justify-center rounded-full text-white transition-transform active:scale-95 ${vert ? "bg-emerald-600 shadow-[0_12px_26px_-10px_rgba(5,150,105,0.95)]" : "bg-red-600 shadow-[0_12px_26px_-10px_rgba(220,38,38,0.95)]"}`}>
+      <span className={`flex h-[60px] w-[60px] items-center justify-center rounded-full text-white transition-transform active:scale-95 ${vert ? "bg-emerald-600 shadow-[0_2px_8px_rgba(0,0,0,0.15)]" : "bg-red-600 shadow-[0_2px_8px_rgba(0,0,0,0.15)]"}`}>
         {children}
       </span>
       <span className={`w-full truncate text-center text-[11px] font-semibold ${vert ? "text-emerald-700" : "text-red-700"}`}>{label}</span>

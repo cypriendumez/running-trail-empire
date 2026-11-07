@@ -18,7 +18,7 @@
 //  mentirait sur la sortie de quelqu'un.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from "react";
-import { Heart, MessageCircle, UserPlus, Trash2, Send, Users, Sparkles, ImagePlus, X, Loader2, Rss } from "lucide-react";
+import { Heart, MessageCircle, UserPlus, Trash2, Send, Users, ImagePlus, X, Loader2, Rss } from "lucide-react";
 import { AjouterAmis } from "./AjouterAmis";
 import { timeAgo, statLine, likesLabel } from "@/lib/social/feed";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -45,7 +45,7 @@ function Avatar({ author, size = 40 }: { author?: Author | null; size?: number }
     return <img src={author.avatar_url} alt="" style={s} className="rounded-full object-cover ring-2 ring-white" />;
   }
   return (
-    <div style={s} className="flex items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-xs font-semibold text-white ring-2 ring-white">
+    <div style={s} className="flex items-center justify-center rounded-full bg-emerald-700 text-xs font-semibold text-white ring-2 ring-white">
       {initials(author?.full_name)}
     </div>
   );
@@ -169,7 +169,7 @@ function EmptyFeed({ followingCount, club, onFind }: { followingCount: number; c
   return (
     <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center">
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
-        {seul ? <Users className="h-6 w-6 text-emerald-600" /> : <Sparkles className="h-6 w-6 text-emerald-600" />}
+        {seul ? <Users className="h-6 w-6 text-emerald-600" /> : <UserPlus className="h-6 w-6 text-zinc-500" strokeWidth={1.5} />}
       </div>
       <p className="font-semibold text-zinc-900">{seul ? t("club.empty.alone") : t("club.empty.quiet")}</p>
       <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-500">
@@ -234,7 +234,7 @@ function Composer({ workouts, onPublished }: { workouts: Workout[]; onPublished:
       <button onClick={() => setOpen(true)}
         className="mb-5 flex w-full items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-left transition hover:border-emerald-300 hover:shadow-sm">
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50">
-          <Sparkles className="h-4 w-4 text-emerald-600" />
+          <UserPlus className="h-4 w-4 text-zinc-500" strokeWidth={1.5} />
         </div>
         <span className="text-sm text-zinc-500">{t("club.share")}</span>
       </button>

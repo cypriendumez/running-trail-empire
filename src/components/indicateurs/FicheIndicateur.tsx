@@ -14,10 +14,10 @@ import { GrapheIndicateur } from "./GrapheIndicateur";
 
 const TON: Record<Ton, { texte: string; barre: string; pastille: string; fond: string }> = {
   excellent: { texte: "text-emerald-700", barre: "#059669", pastille: "bg-emerald-50 text-emerald-700 ring-emerald-200", fond: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" },
-  bon: { texte: "text-teal-700", barre: "#0d9488", pastille: "bg-teal-50 text-teal-700 ring-teal-200", fond: "linear-gradient(135deg,#134e4a 0%,#0f766e 50%,#14b8a6 100%)" },
-  moyen: { texte: "text-amber-700", barre: "#d97706", pastille: "bg-amber-50 text-amber-700 ring-amber-200", fond: "linear-gradient(135deg,#78350f 0%,#b45309 52%,#d97706 100%)" },
-  alerte: { texte: "text-rose-700", barre: "#e11d48", pastille: "bg-rose-50 text-rose-700 ring-rose-200", fond: "linear-gradient(135deg,#881337 0%,#be123c 52%,#e11d48 100%)" },
-  neutre: { texte: "text-zinc-700", barre: "#52525b", pastille: "bg-zinc-100 text-zinc-700 ring-zinc-200", fond: "linear-gradient(135deg,#052e2b 0%,#065f46 50%,#0f766e 100%)" },
+  bon: { texte: "text-teal-700", barre: "#0d9488", pastille: "bg-teal-50 text-teal-700 ring-teal-200", fond: "linear-gradient(170deg,#115e59 0%,#134e4a 100%)" },
+  moyen: { texte: "text-amber-700", barre: "#d97706", pastille: "bg-amber-50 text-amber-700 ring-amber-200", fond: "linear-gradient(170deg,#92400e 0%,#78350f 100%)" },
+  alerte: { texte: "text-rose-700", barre: "#e11d48", pastille: "bg-rose-50 text-rose-700 ring-rose-200", fond: "linear-gradient(170deg,#9f1239 0%,#881337 100%)" },
+  neutre: { texte: "text-zinc-700", barre: "#52525b", pastille: "bg-zinc-100 text-zinc-700 ring-zinc-200", fond: "linear-gradient(170deg,#064e3b 0%,#052e2b 100%)" },
 };
 
 function Section({ icone: Icone, titre, children, className = "", id }: { icone: typeof Info; titre: string; children: React.ReactNode; className?: string; id?: string }) {
@@ -57,8 +57,7 @@ export function FicheIndicateur({ fiche: f, titres, textes: c, lang, pannes = []
       )}
 
       {/* ── Le héros : la valeur, son état, son verdict ── */}
-      <header className="relative overflow-hidden rounded-[2rem] p-6 text-white shadow-2xl shadow-emerald-950/20 ring-1 ring-white/10 sm:p-8" style={{ background: ton.fond }}>
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+      <header className="relative overflow-hidden rounded-2xl p-6 text-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] sm:p-8" style={{ background: ton.fond }}>
         <div className="relative">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-[12px] font-semibold text-white/75 first-letter:uppercase">{f.titre}</h1>
@@ -124,7 +123,7 @@ export function FicheIndicateur({ fiche: f, titres, textes: c, lang, pannes = []
                 <table className="w-full min-w-[420px] border-separate border-spacing-0 text-sm">
                   <thead>
                     <tr>{tab.colonnes.map((col, i) => (
-                      <th key={col} className={`px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 ${i === 0 ? "text-left" : "text-right"}`}>{col}</th>
+                      <th key={col} className={`px-2 pb-2 text-[11px] font-semiboldr text-zinc-400 ${i === 0 ? "text-left" : "text-right"}`}>{col}</th>
                     ))}</tr>
                   </thead>
                   <tbody>

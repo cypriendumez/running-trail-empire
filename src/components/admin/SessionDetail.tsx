@@ -4,11 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import {
-  ArrowLeft, Loader2, Sparkles, Activity, HeartPulse, Gauge, Zap,
-  Footprints, Mountain, Clock, TrendingUp, Thermometer, Send, CalendarDays, Watch,
-  RefreshCw, CheckCircle2,
-} from "lucide-react";
+import { ArrowLeft, Loader2, Activity, HeartPulse, Gauge, Zap, Footprints, Mountain, Clock, TrendingUp, Thermometer, Send, CalendarDays, Watch, RefreshCw, CheckCircle2, CalendarClock, FileText } from "lucide-react";
 
 type SeriesPoint = { km: number | null; min: number | null; pace: number | null; hr: number | null; power: number | null; cad: number | null; alt: number | null };
 type PowerStat = { avg: number; max: number; np: number | null } | null;
@@ -336,7 +332,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
   const nMetrics = sections.reduce((s, sec) => s + sec.items.length, 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
+    <div className="min-h-screen ">
       {/* Hero */}
       <div className="relative overflow-hidden text-white" style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}>
         <div className="relative z-10 mx-auto max-w-6xl px-5 py-6 sm:py-8">
@@ -446,7 +442,7 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
             {/* Analyse du coach IA */}
             {analysis && (
               <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-5 sm:p-6">
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-violet-700"><Sparkles className="h-4 w-4" /> Analyse du coach IA</div>
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-violet-700"><FileText className="h-4 w-4" strokeWidth={1.5} /> Analyse du coach IA</div>
                 <Rich text={analysis} />
               </div>
             )}
@@ -454,8 +450,8 @@ export function SessionDetail({ user, date, dist, title, clientMode = false }: {
             {/* Prochaine séance + plan de la semaine — message chaleureux, prêt à envoyer au client */}
             {plan?.nextSession && (
               <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-white" style={{ background: "linear-gradient(135deg,#047857,#0d9488)" }}>
-                  <span className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-amber-200" /> Prochaine séance recommandée</span>
+                <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-white" style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}>
+                  <span className="flex items-center gap-2 font-semibold"><CalendarClock className="h-4 w-4 text-white/70" strokeWidth={1.5} /> Prochaine séance recommandée</span>
                   <div className="flex flex-wrap items-center gap-2">
                     <button onClick={sendToClient} disabled={sendingClient}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold ring-1 ring-white/25 backdrop-blur-md transition-colors hover:bg-white/25 disabled:opacity-50">

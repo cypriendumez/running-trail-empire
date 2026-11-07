@@ -2,10 +2,7 @@
 
 import { useState , useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Users, Zap, MessageSquare, Send, CheckCircle, AlertCircle,
-  RefreshCw, Database, Sparkles, Copy, ChevronDown
-} from "lucide-react";
+import { Users, Zap, MessageSquare, Send, CheckCircle, AlertCircle, RefreshCw, Database, Copy, ChevronDown, Loader2 } from "lucide-react";
 
 interface Athlete {
   id: string;
@@ -273,7 +270,7 @@ export function AdminWorkflow() {
                   disabled={loading === "claude"}
                   className="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl py-2.5 text-sm flex items-center justify-center gap-2 transition disabled:opacity-50"
                 >
-                  <Sparkles className={`w-4 h-4 ${loading === "claude" ? "animate-spin" : ""}`} />
+                  {loading === "claude" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" strokeWidth={1.5} />}
                   {loading === "claude" ? "Claude rédige…" : "2. Générer conseil Claude"}
                 </button>
               )}
@@ -377,7 +374,7 @@ export function AdminWorkflow() {
 
           {loading === "claude" ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
-              <Sparkles className="w-8 h-8 text-orange-400 animate-pulse" />
+              <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
               <p className="text-xs text-zinc-500">Claude rédige le conseil…</p>
             </div>
           ) : (

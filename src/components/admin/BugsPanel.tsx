@@ -138,7 +138,7 @@ export function BugsPanel() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         {g.sources.map((s) => (
-                          <span key={s} className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TON_SOURCE[s] ?? "bg-zinc-100 text-zinc-600"}`}>{LIBELLE_SOURCE[s] ?? s}</span>
+                          <span key={s} className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${TON_SOURCE[s] ?? "bg-zinc-100 text-zinc-600"}`}>{LIBELLE_SOURCE[s] ?? s}</span>
                         ))}
                         {recent && <span className="flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"><AlertTriangle className="h-3 w-3" /> 24 h</span>}
                         <span className="text-[11px] text-zinc-400">{g.pages[0]?.url}{g.pages.length > 1 ? ` +${g.pages.length - 1}` : ""}</span>

@@ -2,10 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { jourCivil, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
-import {
-  Wallet, TrendingUp, TrendingDown, Plus, Download, X, Settings2,
-  Search, Ban, AlertCircle, Check, Repeat, Loader2, FileText, PenLine, ArrowRight, Paperclip, Sparkles, CalendarClock,
-} from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, Plus, Download, X, Settings2, Search, Ban, AlertCircle, Check, Repeat, Loader2, FileText, PenLine, ArrowRight, Paperclip, CalendarClock, Info } from "lucide-react";
 import {
   CATEGORIES, MOYENS, categorieDe, enCentimes, euros, totaux, cotisationsEstimees,
   versCSV, versLivreRecettes, valider, soldeCumule, numeroter, doublonsProbables, parTrimestre,
@@ -530,7 +527,7 @@ export function ComptaClient() {
               enregistrée. Ce bandeau dit toujours de vérifier, même quand tout est lu. */}
           {lecture !== null && (
             <div className="mt-4 flex items-start gap-2 rounded-xl bg-violet-50 p-3 text-sm text-violet-800">
-              <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
               <span>
                 <b>Lu sur la pièce — à vérifier.</b>{" "}
                 {lecture.length

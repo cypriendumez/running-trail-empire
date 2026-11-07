@@ -154,7 +154,7 @@ const total = CATALOG.reduce((s, c) => s + c.workouts.length, 0);
 
 export default function EntrainementsPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
+    <div className="min-h-screen ">
       <div className="relative overflow-hidden text-white" style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}>
         <div className="relative z-10 mx-auto max-w-5xl px-5 py-8">
           <Link href="/admin/coach" className="inline-flex items-center gap-1.5 text-sm text-white/80 transition-colors hover:text-white"><ArrowLeft className="h-4 w-4" /> Retour au coach</Link>

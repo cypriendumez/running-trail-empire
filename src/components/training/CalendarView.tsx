@@ -2,10 +2,7 @@
 
 import { useState, useRef, useMemo } from "react";
 import { toast } from "sonner";
-import {
-  Target, X, Plus, StickyNote, Flag, Loader2, Trash2,
-  ChevronLeft, ChevronRight, LayoutGrid, List, CalendarRange,
-  CalendarDays, CalendarClock, ListChecks, ArrowLeft, Sparkles, ChevronDown, AlertTriangle, Crown } from "lucide-react";
+import { Target, X, Plus, StickyNote, Flag, Loader2, Trash2, ChevronLeft, ChevronRight, LayoutGrid, List, CalendarRange, CalendarDays, CalendarClock, ListChecks, ArrowLeft, ChevronDown, AlertTriangle, Crown, Info } from "lucide-react";
 import Link from "next/link";
 import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
@@ -793,7 +790,7 @@ function CoachWhy({ state, rappel = null, lang, t, sessions, realismeMasque = nu
       <details className="group">
         <summary className="cursor-pointer list-none">
           <span className={`flex items-center gap-1.5 text-xs font-medium ${tone.dot}`}>
-            <Sparkles className="h-3.5 w-3.5" /> {t("cal.why.title")}
+            <Info className="h-3.5 w-3.5" strokeWidth={1.5} /> {t("cal.why.title")}
             <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
           </span>
           {/* La ligne actionnable, visible repliée COMME dépliée : c'est la réponse à

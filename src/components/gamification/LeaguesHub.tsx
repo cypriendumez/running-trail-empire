@@ -75,9 +75,9 @@ const RARETE_MEDAILLE: Record<string, string> = {
 
 const RARITY_CONFIG = {
   common:    { bg: "bg-zinc-50",     border: "border-zinc-200",   text: "text-zinc-500",    glow: "" },
-  rare:      { bg: "bg-blue-50",     border: "border-blue-200",   text: "text-blue-600",    glow: "shadow-blue-100" },
-  epic:      { bg: "bg-amber-50",    border: "border-amber-200",  text: "text-amber-600",   glow: "shadow-amber-100" },
-  legendary: { bg: "bg-violet-50",   border: "border-violet-200", text: "text-violet-600",  glow: "shadow-violet-100" },
+  rare:      { bg: "bg-blue-50",     border: "border-blue-200",   text: "text-blue-600",    glow: "" },
+  epic:      { bg: "bg-amber-50",    border: "border-amber-200",  text: "text-amber-600",   glow: "" },
+  legendary: { bg: "bg-violet-50",   border: "border-violet-200", text: "text-violet-600",  glow: "" },
 };
 
 function fillT(s: string, p: Record<string, string | number>): string {
@@ -92,7 +92,7 @@ function Avatar({ name, url, size = 8 }: { name: string; url?: string; size?: nu
     <div className={cls}><img src={url} alt={name} className="w-full h-full object-cover" /></div>
   );
   return (
-    <div className={`${cls} bg-gradient-to-br from-emerald-400 to-emerald-600`}>
+    <div className={`${cls} bg-emerald-700`}>
       {name.charAt(0).toUpperCase()}
     </div>
   );
@@ -411,7 +411,7 @@ export function LeaguesHub({
                   <span className="text-sm text-zinc-400">{Math.round(unlocked.length / computedBadges.length * 100)}%</span>
                 </div>
                 <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
-                  <motion.div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full"
+                  <motion.div className="h-full bg-emerald-600 rounded-full"
                     initial={{ width: 0 }} animate={{ width: `${(unlocked.length / computedBadges.length) * 100}%` }}
                     transition={{ duration: 1, ease: "easeOut" }} />
                 </div>
@@ -521,7 +521,7 @@ export function LeaguesHub({
                       <div className="mt-3">
                         <div className="h-2.5 bg-zinc-100 rounded-full overflow-hidden">
                           <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, delay: i * 0.05 }}
-                            className={`h-full rounded-full ${done ? "bg-gradient-to-r from-emerald-500 to-emerald-400" : "bg-gradient-to-r from-zinc-400 to-zinc-500"}`} />
+                            className={`h-full rounded-full ${done ? "bg-emerald-600" : "bg-zinc-400"}`} />
                         </div>
                         <div className="flex justify-between text-xs mt-1">
                           <span className={`font-semibold ${done ? "text-emerald-600" : "text-zinc-700"}`}>{c.current.toLocaleString(lang)} / {c.target.toLocaleString(lang)} {uT(c.unit)}</span>
@@ -573,7 +573,7 @@ export function LeaguesHub({
                         <div className="h-3 bg-zinc-100 rounded-full overflow-hidden">
                           <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(pct, 100)}%` }}
                             transition={{ duration: 1 }}
-                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" />
+                            className="h-full bg-emerald-600 rounded-full" />
                         </div>
                         <div className="text-right text-xs text-zinc-400 mt-1">{Math.round(pct)}%</div>
                       </div>

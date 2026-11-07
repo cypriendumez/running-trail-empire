@@ -343,7 +343,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
           </span>
           <button
             onClick={() => setShowMap(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-sm"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition bg-zinc-900 text-white hover:bg-zinc-800"
           >
             <Map className="w-3.5 h-3.5" />
             {d["map"]}
