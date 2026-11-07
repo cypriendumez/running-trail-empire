@@ -740,7 +740,7 @@ export default function LandingPage() {
                     srcSet={LARGEURS_CARTE.map((w) => `${photoCarte(p.photo, w)} ${w}w`).join(", ")}
                     sizes="(min-width:1024px) 32vw, (min-width:640px) 48vw, 92vw"
                     alt={it.title} loading="lazy" decoding="async"
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    className="h-full w-full object-cover transition-transform duration-700"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 p-6">
@@ -788,7 +788,7 @@ export default function LandingPage() {
                   className={`rounded-2xl border p-7 ${sombre ? "surface-brand border-transparent" : "border-zinc-200 bg-white"}`}>
                   <Icon className={sombre ? "h-5 w-5 text-[#34d399]" : "h-5 w-5 text-[#059669]"} strokeWidth={1.6} />
                   <div className="mt-7 text-[1.75rem] font-semibold leading-none tracking-tight">{p.metric}</div>
-                  <div className={`mt-2 text-[10px] font-semibold ${sombre ? "text-white/45" : "text-zinc-500"}`}>
+                  <div className={`mt-2 text-[11px] font-semibold ${sombre ? "text-white/45" : "text-zinc-500"}`}>
                     {p.metricLabel}
                   </div>
                   <h3 className="mt-6 text-[17px] font-semibold tracking-tight">{p.title}</h3>

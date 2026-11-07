@@ -50,7 +50,7 @@ function Chip({ actif, onClick, children }: { actif: boolean; onClick: () => voi
 function Spec({ label, valeur, vide }: { label: string; valeur: string | null; vide: string }) {
   return (
     <div>
-      <div className="text-[10px] text-zinc-500 first-letter:uppercase">{label}</div>
+      <div className="text-[11px] text-zinc-500 first-letter:uppercase">{label}</div>
       {/* Une case vide serait lue comme « zéro » : on écrit ce qu'on ne sait pas. */}
       <div className={valeur ? "text-[15px] font-semibold text-zinc-900" : "text-[13px] text-zinc-500"}>
         {valeur ?? vide}

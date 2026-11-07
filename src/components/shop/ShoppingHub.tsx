@@ -946,7 +946,7 @@ export function ShoppingHub() {
                 <img
                   src={`https://images.unsplash.com/${c.img}?w=200&h=200&fit=crop&q=75`}
                   alt={d[`cat.${c.key}`] ?? c.label}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover transition-transform duration-300"
                 />
               </div>
               <span className="text-xs font-semibold text-zinc-600 group-hover:text-zinc-900 text-center leading-tight transition-colors">{d[`cat.${c.key}`] ?? c.label}</span>
@@ -1370,7 +1370,7 @@ function ProductCard({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
         style={{ backgroundColor: p.color_accent + "18" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={p.image} alt={`${p.brand} ${p.model}`}
-          className="w-full h-full object-contain p-5 group-hover:scale-105 transition-transform duration-500"
+          className="w-full h-full object-contain p-5 transition-transform duration-500"
           onError={(e) => { (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' fill='%23f4f4f5'%3E%3C/svg%3E"; }} />
 
         {/* Bande couleur en bas (signature colorway) */}

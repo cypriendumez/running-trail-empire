@@ -464,18 +464,18 @@ function ParcoursCard({ p, near, loading, disabled, onLoad, exportGpx }: { p: Pa
         <img
           src={tileUrl(c.lat, c.lng, thumbZoomFor(p.distance_km || 10))}
           alt="" loading="lazy"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          className="w-full h-full object-cover transition-transform duration-500"
         />
         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/40 to-transparent" />
         {/* (pastille centrale supprimée : elle masquait le cœur de la mini-carte) */}
         <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-semibold ${meta.chip}`}><IconeSport sport={p.sport} className="mr-1 inline h-3 w-3 align-[-1px]" />{pr(`sport.${p.sport}`)}</span>
         <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white shadow" style={{ backgroundColor: diff.color }}>{pr(`diff.${p.difficulte}`)}</span>
         {kmAway != null && (
-          <span className="absolute bottom-2.5 left-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/90 backdrop-blur text-[10px] font-semibold text-white shadow">
+          <span className="absolute bottom-2.5 left-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/90 backdrop-blur text-[11px] font-semibold text-white shadow">
             <LocateFixed className="w-3 h-3" /> {pr("kmAway", { n: kmAway })}
           </span>
         )}
-        <span className="absolute bottom-2.5 right-3 px-2 py-0.5 rounded-full bg-black/45 backdrop-blur text-[10px] font-medium text-white">{pr(`type.${p.type_parcours}`)}</span>
+        <span className="absolute bottom-2.5 right-3 px-2 py-0.5 rounded-full bg-black/45 backdrop-blur text-[11px] font-medium text-white">{pr(`type.${p.type_parcours}`)}</span>
         {loading && (
           <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center">
             <span className="flex items-center gap-2 text-sm font-semibold text-zinc-700">

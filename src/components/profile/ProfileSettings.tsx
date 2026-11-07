@@ -1561,11 +1561,11 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
 
                   {/* VO2max — multi-sources (façon Garmin) + échelle de niveau visuelle */}
                   {vo2max && (
-                    <div className="rounded-2xl border border-violet-100 bg-zinc-50 p-4">
+                    <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 p-4">
                       <div className="flex items-center gap-4">
                         <div className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-violet-100">
-                          <div className="text-2xl font-semibold leading-none text-violet-700">{vo2max}</div>
-                          <div className="mt-0.5 text-[8px] font-semibold text-zinc-400 first-letter:uppercase">ml/kg/min</div>
+                          <div className="text-2xl font-semibold leading-none tabular-nums text-zinc-900">{vo2max}</div>
+                          <div className="mt-0.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">ml/kg/min</div>
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold text-zinc-900">{tr("perf.vo2est")}</div>
@@ -1607,7 +1607,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
             {/* Forme & charge (Garmin : Condition/Fatigue/Forme = CTL/ATL/TSB) */}
             {g && g.ctl != null && (
               <div className="bento-card space-y-3">
-                <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><Activity className="w-4 h-4 text-violet-500" /> {tr("perf.loadTitle")}</h3>
+                <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><Activity className="w-4 h-4 text-zinc-400" strokeWidth={1.5} /> {tr("perf.loadTitle")}</h3>
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { label: tr("perf.fitness"), value: g.ctl != null ? `${g.ctl}` : "—", color: "text-blue-600", bg: "bg-blue-50" },

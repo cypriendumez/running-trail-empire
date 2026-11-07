@@ -128,7 +128,7 @@ function ElevationProfile({ elevation, distance }: { elevation: number; distance
         <path d={area} fill="url(#ghost-elev)" />
         <path d={line} fill="none" stroke="#059669" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
       </svg>
-      <div className="mt-1 flex justify-between text-[10px] text-zinc-400">
+      <div className="mt-1 flex justify-between text-[11px] text-zinc-400">
         <span>0 km</span><span>{(distance / 2).toFixed(0)} km</span><span>{distance.toFixed(0)} km</span>
       </div>
     </div>
@@ -1212,7 +1212,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                   <div className="text-[22px] font-semibold leading-none tabular-nums text-zinc-900">
                     {c.v}{c.u && <span className="ml-0.5 text-[11px] font-semibold text-zinc-400">{c.u}</span>}
                   </div>
-                  <div className="mt-1 truncate text-[10px] font-semibold text-zinc-400 first-letter:uppercase">{c.l}</div>
+                  <div className="mt-1 truncate text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{c.l}</div>
                 </div>
               ))}
             </div>
@@ -1302,13 +1302,13 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                       <button key={i} onClick={() => applyCoachSession(s)}
                         className="group flex items-start gap-3 rounded-2xl border border-zinc-200 bg-white p-3.5 text-left transition hover:border-emerald-400 hover:shadow-sm">
                         <div className="flex h-11 w-11 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                          <span className="text-[9px] font-semibold leading-none">{dt.toLocaleDateString(lang, { month: "short" })}</span>
+                          <span className="text-[11px] font-semibold leading-none">{dt.toLocaleDateString(lang, { month: "short" })}</span>
                           <span className="text-base font-semibold leading-none">{dt.getDate()}</span>
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="truncate font-semibold text-zinc-900">{s.i18n?.[lang]?.title ?? s.title}</span>
-                            {isToday && <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-semibold text-white">{d["co.today"]}</span>}
+                            {isToday && <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">{d["co.today"]}</span>}
                           </div>
                           <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{s.i18n?.[lang]?.subtitle || s.detail || d["co.fallback"]}</p>
                         </div>
@@ -1405,7 +1405,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                       <span className="h-2 w-2 rounded-full" style={{ background: feas.c }} />
                     </div>
                     <div className={`mt-0.5 text-xs font-semibold tabular-nums ${active ? "text-emerald-600" : "text-zinc-500"}`}>{formatPace(pace)} /km</div>
-                    <div className={`mt-1.5 text-[10px] font-semibold ${active ? "text-emerald-600/70" : "text-zinc-400"}`}>{p.goal}</div>
+                    <div className={`mt-1.5 text-[11px] font-semibold ${active ? "text-emerald-600/70" : "text-zinc-400"}`}>{p.goal}</div>
                   </button>
                 );
               })}
@@ -1443,7 +1443,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                   </div>
                   <div className="mb-3 text-4xl font-semibold tabular-nums text-zinc-900">{formatPace(targetPace)}<span className="ml-1 text-base font-semibold text-zinc-400">/km</span></div>
                   <input aria-label={d["lb.pace"]} type="range" min={150} max={540} step={5} value={Math.round(Math.min(9, Math.max(2.5, targetPace)) * 60)} onChange={(e) => setPaceMinKm(parseInt(e.target.value) / 60)} className="w-full accent-emerald-600" />
-                  <div className="mt-1 flex justify-between text-[10px] font-medium text-zinc-400"><span>{d["fast"]}</span><span>{d["slow"]}</span></div>
+                  <div className="mt-1 flex justify-between text-[11px] font-medium text-zinc-400"><span>{d["fast"]}</span><span>{d["slow"]}</span></div>
                 </div>
               </div>
 
@@ -1488,7 +1488,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                       <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg" style={{ background: `${z.tint}1a`, color: z.tint }}><z.Icon className="h-3.5 w-3.5" /></span>
                       <span className="truncate text-[11px] font-semibold" style={{ color: z.tint }}>{z.label}</span>
                     </div>
-                    <div className="text-[13px] font-semibold tabular-nums text-zinc-900">{formatPace(z.paceFast)} – {formatPace(z.paceSlow)}<span className="text-[10px] font-medium text-zinc-300"> /km</span></div>
+                    <div className="text-[13px] font-semibold tabular-nums text-zinc-900">{formatPace(z.paceFast)} – {formatPace(z.paceSlow)}<span className="text-[11px] font-medium text-zinc-300"> /km</span></div>
                   </button>
                 ))}
               </div>

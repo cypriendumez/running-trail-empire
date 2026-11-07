@@ -91,7 +91,7 @@ function BarresHeure({ heures }: { heures: Agregat["heures"] }) {
           </div>
         ))}
       </div>
-      <div className="mt-1 flex justify-between text-[9px] text-zinc-400">
+      <div className="mt-1 flex justify-between text-[10px] text-zinc-400">
         {[0, 6, 12, 18, 23].map((h) => <span key={h}>{String(h).padStart(2, "0")} h</span>)}
       </div>
       <p className="mt-2 text-xs text-zinc-500">Pointe autour de <b className="text-zinc-800">{String(pointe.h).padStart(2, "0")} h</b> (heure de Paris).</p>

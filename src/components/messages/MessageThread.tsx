@@ -345,7 +345,7 @@ export function MessageThread({ initial }: { initial: Msg[] }) {
                         ))}
                       </div>
                     )}
-                    <div className={`mt-0.5 text-right text-[10px] ${moi ? "text-emerald-100" : "text-zinc-400"}`}>{heure(m.ts)}</div>
+                    <div className={`mt-0.5 text-right text-[11px] ${moi ? "text-emerald-100" : "text-zinc-400"}`}>{heure(m.ts)}</div>
                   </div>
                   {!moi && (
                     <button onClick={() => softDelete(m.id)} aria-label={d["suppr"]} title={d["suppr"]}

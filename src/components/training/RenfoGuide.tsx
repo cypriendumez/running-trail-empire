@@ -115,7 +115,7 @@ export function RenfoGuide() {
         })}
       </div>
 
-      <p className="text-sm italic text-zinc-500">{t(prog.introK)}</p>
+      <p className="text-sm text-zinc-500">{t(prog.introK)}</p>
 
       {prog.blocks.map((b) => (
         <div key={b.groupK} className="rounded-2xl border border-zinc-200 bg-white p-4">

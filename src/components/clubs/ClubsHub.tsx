@@ -116,8 +116,8 @@ function CarteDefi({ d }: { d: DefiVue }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-semibold text-zinc-900">{d.name}</h2>
-            {d.done && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{t("clubs.done")}</span>}
-            {d.clubName && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">{d.clubName}</span>}
+            {d.done && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{t("clubs.done")}</span>}
+            {d.clubName && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-500">{d.clubName}</span>}
           </div>
           <p className="mt-0.5 text-xs text-zinc-500">
             {metricLabel(d.metric, lang)} · {t("clubs.goal")} {nb(d.target)} {metricUnit(d.metric, lang)} · {etat}
@@ -150,7 +150,7 @@ function CarteDefi({ d }: { d: DefiVue }) {
           n'y a pas d'adversaire, et on le dit franchement. */}
       {d.classement.length > 1 ? (
         <div className="border-t border-zinc-100">
-          <div className="px-4 py-2 text-[10px] font-semibold text-zinc-400 first-letter:uppercase">
+          <div className="px-4 py-2 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">
             {t("clubs.ranking", { n: d.classement.length })}
           </div>
           <div className="divide-y divide-zinc-50">
@@ -205,8 +205,8 @@ function CarteClub({ c }: { c: ClubVue }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-semibold text-zinc-900">{c.name}</h2>
-            {c.role === "owner" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">{t("clubs.owner")}</span>}
-            {c.visibility === "private" && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">{t("clubs.private")}</span>}
+            {c.role === "owner" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">{t("clubs.owner")}</span>}
+            {c.visibility === "private" && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-500">{t("clubs.private")}</span>}
           </div>
           <p className="mt-0.5 flex items-center gap-2 text-xs text-zinc-500">
             {c.member_count > 1 ? t("clubs.members", { n: c.member_count }) : t("clubs.member1", { n: c.member_count })}

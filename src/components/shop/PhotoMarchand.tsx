@@ -30,7 +30,7 @@ export function PhotoMarchand({ src, alt, marchand, className }: {
       {/* eslint-disable-next-line @next/next/no-img-element -- voir l'en-tête : pas de recopie. */}
       <img src={src} alt={alt} loading="lazy" decoding="async" referrerPolicy="no-referrer-when-downgrade"
         className="mx-auto max-h-full w-auto object-contain" />
-      <figcaption className="mt-1 text-center text-[10.5px] text-zinc-400">© {marchand}</figcaption>
+      <figcaption className="mt-1 text-center text-[11px] text-zinc-400">© {marchand}</figcaption>
     </figure>
   );
 }

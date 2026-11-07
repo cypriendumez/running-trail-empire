@@ -665,7 +665,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                     className="transition-[stroke-dasharray] duration-700" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-                  <span className="text-sm font-semibold tabular-nums text-zinc-900 sm:text-base">{objProgress ?? "—"}<span className="text-[10px] text-zinc-400">%</span></span>
+                  <span className="text-sm font-semibold tabular-nums text-zinc-900 sm:text-base">{objProgress ?? "—"}<span className="text-[11px] text-zinc-400">%</span></span>
                   <span className="mt-0.5 hidden text-[11px] text-zinc-400 sm:mt-1 sm:block">{hl.prep}</span>
                 </div>
               </div>
@@ -819,7 +819,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                   {etapes.map((e, i) => (
                     <li key={i} className="relative flex gap-3 pl-0.5">
                       {i < etapes.length - 1 && <span aria-hidden className="absolute left-[9px] top-5 h-[calc(100%-4px)] w-px bg-white/20" />}
-                      <span aria-hidden className={`relative mt-1 flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full text-[10px] font-medium tabular-nums ${e.coeur ? "bg-white text-emerald-900" : "bg-white/10 text-white/70"}`}>{i + 1}</span>
+                      <span aria-hidden className={`relative mt-1 flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full text-[11px] font-medium tabular-nums ${e.coeur ? "bg-white text-emerald-900" : "bg-white/10 text-white/70"}`}>{i + 1}</span>
                       <p className={`min-w-0 leading-relaxed tabular-nums ${e.coeur ? "text-[14px] font-medium text-white sm:text-[15px]" : "text-[13px] text-white/70 sm:text-[14px]"}`}>
                         {e.libelle && <span className="mr-1.5 text-white/60">{e.libelle}</span>}
                         {e.texte}

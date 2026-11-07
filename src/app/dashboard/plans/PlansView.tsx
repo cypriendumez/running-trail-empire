@@ -137,7 +137,7 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
                       {/* Sur téléphone, le titre et la distance vivent ici (la vignette est trop petite). */}
                       <div className="flex items-start justify-between gap-2 sm:hidden">
                         <h3 className="text-sm font-semibold leading-snug text-zinc-900">{t.noms[cle]}</h3>
-                        {distance && <span className="flex-shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-zinc-600">{distance}</span>}
+                        {distance && <span className="flex-shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-zinc-600">{distance}</span>}
                       </div>
                       <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-500 sm:mt-0 sm:text-sm">{t.pitchs[cle]}</p>
                       <div className="mt-2.5 flex w-full flex-wrap items-center gap-1.5 sm:mt-3.5">
@@ -206,7 +206,7 @@ export function PlansView({ niveau, volumeKm }: { niveau: Niveau; volumeKm: numb
         {plan.map((w) => (
           <div key={w.semaine} className="flex items-center gap-3 rounded-2xl bg-white px-3.5 py-2.5 ring-1 ring-inset ring-zinc-200">
             <span className="w-7 flex-shrink-0 text-sm font-semibold tabular-nums text-zinc-900">S{w.semaine}</span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${TEINTE[w.phase]}`}>{t.phases[w.phase]}{w.decharge ? " ↓" : ""}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${TEINTE[w.phase]}`}>{t.phases[w.phase]}{w.decharge ? " ↓" : ""}</span>
             <span className="ml-auto text-sm font-semibold tabular-nums text-zinc-900">{w.volumeKm} km</span>
             <span className="text-xs tabular-nums text-zinc-500">
               {prog.marcheCourse ? `${w.sansImpactKm} km` : w.sortieLongueKm != null ? `SL ${w.sortieLongueKm}` : "—"}

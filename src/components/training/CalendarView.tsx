@@ -313,7 +313,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
                 « SORTIE LONGUE » au-dessus d'un texte allemand. */}
             <div className={`font-medium ${dense ? "text-[10px]" : "text-[11px]"}`} style={{ color: c.fg }}>{libelleType(s.type, lang)}</div>
             {s.confirmed === false && (
-              <span title={t("cal.provisional.hint")} className={`rounded bg-white/80 px-1 font-semibold text-zinc-400 ${dense ? "text-[8px]" : "text-[9px]"}`}>~</span>
+              <span title={t("cal.provisional.hint")} className={`rounded bg-white/80 px-1 font-semibold text-zinc-400 ${dense ? "text-[10px]" : "text-[10px]"}`}>~</span>
             )}
           </div>
           <div className={`font-semibold leading-tight text-zinc-800 ${dense ? "line-clamp-2 text-[11.5px]" : "text-sm"}`}>{s.title}</div>

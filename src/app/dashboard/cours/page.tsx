@@ -167,7 +167,7 @@ export default async function CoursPage() {
                         <div className="flex flex-wrap items-baseline gap-x-2">
                           <span className="mr-0.5 inline-block h-2 w-2 flex-shrink-0 self-center rounded-full" style={{ background: m.from }} />
                           <h3 className="font-semibold text-zinc-900">{c.term}</h3>
-                          {c.short && <span className="text-xs italic text-zinc-400">— {c.short}</span>}
+                          {c.short && <span className="text-xs text-zinc-400">— {c.short}</span>}
                         </div>
                         <p className="mt-2 text-sm leading-relaxed text-zinc-600">{c.def}</p>
                         {c.why && <p className="mt-2 text-sm leading-relaxed text-zinc-600"><b className={m.accent}>{ui.whyLabel}</b> {c.why}</p>}

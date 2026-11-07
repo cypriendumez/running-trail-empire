@@ -96,7 +96,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 obligation (conditions d'API d'intervals.icu, art. 1.1) — mais au bout du
                 contenu, là où l'on arrive en défilant, sans prendre de place au travail. */}
             <div className="mt-8 border-t border-zinc-100 pt-2">
-              <AttributionGarmin className="px-2 py-1 text-[10px] leading-tight text-zinc-400 md:text-[11px] md:leading-relaxed" />
+              <AttributionGarmin className="px-2 py-1 text-[11px] leading-tight text-zinc-400 md:text-[11px] md:leading-relaxed" />
               <div className="hidden md:block">
                 <MedicalDisclaimer lang={langue} />
               </div>

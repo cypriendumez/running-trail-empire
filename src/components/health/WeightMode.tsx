@@ -320,10 +320,10 @@ export function WeightMode() {
         <>
           {/* ── Chiffres clés ── */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard icon={<Scale className="h-5 w-5 text-zinc-500" />} label={tr("bmi")} value={dec(plan.bmi)} hint={BAND_LABEL[plan.band]?.[lang] ?? BAND_LABEL[plan.band]?.fr ?? ""} />
-            <StatCard icon={<Flame className="h-5 w-5 text-orange-500" />} label={tr("target")} value={plan.targetKcal.toLocaleString(lang)} hint={tr("perDay")} accent="orange" />
-            <StatCard icon={<Dumbbell className="h-5 w-5 text-violet-500" />} label={tr("protein")} value={String(plan.proteinG)} hint={tr("gPerDay")} accent="violet" />
-            <StatCard icon={<TrendingDown className="h-5 w-5 text-emerald-500" />} label={tr("trend")}
+            <StatCard icon={<Scale className="h-4 w-4 text-zinc-400" strokeWidth={1.5} />} label={tr("bmi")} value={dec(plan.bmi)} hint={BAND_LABEL[plan.band]?.[lang] ?? BAND_LABEL[plan.band]?.fr ?? ""} />
+            <StatCard icon={<Flame className="h-4 w-4 text-zinc-400" strokeWidth={1.5} />} label={tr("target")} value={plan.targetKcal.toLocaleString(lang)} hint={tr("perDay")} accent="orange" />
+            <StatCard icon={<Dumbbell className="h-4 w-4 text-zinc-400" strokeWidth={1.5} />} label={tr("protein")} value={String(plan.proteinG)} hint={tr("gPerDay")} accent="violet" />
+            <StatCard icon={<TrendingDown className="h-4 w-4 text-zinc-400" strokeWidth={1.5} />} label={tr("trend")}
               value={plan.measured ? `${plan.measured.ratePerWeek > 0 ? "+" : plan.measured.ratePerWeek < 0 ? "−" : ""}${dec(Math.abs(plan.measured.ratePerWeek))}` : "—"}
               hint={plan.measured ? tr("perWeek") : tr("noTrend")} accent="emerald" />
           </div>
@@ -490,11 +490,12 @@ export function WeightMode() {
 }
 
 function StatCard({ icon, label, value, hint, accent }: { icon: React.ReactNode; label: string; value: string; hint: string; accent?: "orange" | "violet" | "emerald" }) {
-  const tone = accent === "orange" ? "text-orange-600" : accent === "violet" ? "text-violet-600" : accent === "emerald" ? "text-emerald-600" : "text-zinc-900";
+  // Une carte de chiffre n'a pas de couleur propre (passe « unslop ») : `accent` est gardé pour les appels.
+  const tone = "text-zinc-900"; void accent;
   return (
     <div className="bento-card !p-4">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{label}</span>{icon}
+        <span className="text-[13px] text-zinc-500 first-letter:uppercase">{label}</span>{icon}
       </div>
       <div className={`text-2xl font-semibold tabular-nums ${tone}`}>{value}</div>
       <div className="mt-0.5 text-xs text-zinc-500">{hint}</div>

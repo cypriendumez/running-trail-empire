@@ -533,7 +533,7 @@ export default function SyncPage() {
                         )}
                         {act.tss && (
                           <div className="text-center">
-                            <div className="font-semibold text-violet-600">{act.tss}</div>
+                            <div className="font-semibold tabular-nums text-zinc-900">{act.tss}</div>
                             <div>TSS</div>
                           </div>
                         )}
@@ -553,7 +553,7 @@ export default function SyncPage() {
                             </span>
                           )}
                           {act.ground_contact_time_ms && (
-                            <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium">
+                            <span className="px-2 py-0.5 bg-zinc-100 text-zinc-600 rounded-md text-xs font-medium">
                               {act.ground_contact_time_ms}ms GCT
                             </span>
                           )}
@@ -632,7 +632,7 @@ export default function SyncPage() {
                               ) : <span className="text-zinc-300">—</span>}
                             </td>
                             <td className="px-3 py-3 text-center">
-                              {w.body_battery ? <span className="font-semibold text-violet-600">{w.body_battery}</span> : <span className="text-zinc-300">—</span>}
+                              {w.body_battery ? <span className="font-semibold tabular-nums text-zinc-900">{w.body_battery}</span> : <span className="text-zinc-300">—</span>}
                             </td>
                             <td className="px-3 py-3 text-center">
                               {w.spo2 ? <span className="font-medium text-zinc-700">{w.spo2.toFixed(1)}%</span> : <span className="text-zinc-300">—</span>}
@@ -756,7 +756,7 @@ export default function SyncPage() {
                       {["Garmin", "COROS", "Polar"].map((b, i) => (
                         <div key={b} className={`rounded-lg border p-2 text-center text-[11px] font-semibold ${i === 0 ? "border-blue-300 bg-blue-50 text-blue-700 ring-2 ring-blue-200" : "border-zinc-200 bg-white text-zinc-500"}`}>
                           {b}
-                          {i === 0 && <div className="flex items-center justify-center gap-0.5 mt-1 text-[10px] text-blue-500 font-normal"><MousePointerClick className="w-3 h-3" /> {d["s2.click"]}</div>}
+                          {i === 0 && <div className="flex items-center justify-center gap-0.5 mt-1 text-[11px] text-blue-500 font-normal"><MousePointerClick className="w-3 h-3" /> {d["s2.click"]}</div>}
                         </div>
                       ))}
                     </div>
@@ -802,13 +802,13 @@ export default function SyncPage() {
                         <span className="w-2 h-2 rounded-full bg-amber-300" />
                         <span className="w-2 h-2 rounded-full bg-emerald-300" />
                       </div>
-                      <span className="text-[10px] text-zinc-400 ml-1 flex items-center gap-1"><Code2 className="w-3 h-3" /> intervals.icu — {d["s3.devAccess"]}</span>
+                      <span className="text-[11px] text-zinc-400 ml-1 flex items-center gap-1"><Code2 className="w-3 h-3" /> intervals.icu — {d["s3.devAccess"]}</span>
                     </div>
                     <div className="p-3">
                       {/* Une seule valeur à copier : l'Athlete ID se déduit de la clé. */}
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-emerald-50 border-2 border-emerald-300 rounded-lg px-3 py-2 animate-pulse">
-                          <p className="text-[10px] text-emerald-500 font-medium">API Key</p>
+                          <p className="text-[11px] text-emerald-500 font-medium">API Key</p>
                           <p className="font-mono text-xs font-semibold text-emerald-700 truncate">a1b2c3d4e5f6…</p>
                         </div>
                         <div className="flex items-center gap-1 text-emerald-600 w-20">

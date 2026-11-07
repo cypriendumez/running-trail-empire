@@ -160,7 +160,7 @@ export function SupportBubble() {
                       le dire évite qu'on la prenne pour une réponse bâclée, et c'est
                       honnête sur ce que l'assistant a réellement fait. */}
                   {m.source && (
-                    <span className="mt-1 pl-1 text-[10px] text-zinc-400">{t("instant")}</span>
+                    <span className="mt-1 pl-1 text-[11px] text-zinc-400">{t("instant")}</span>
                   )}
                 </div>
               ))}
@@ -180,7 +180,7 @@ export function SupportBubble() {
               {/* Suggestions : uniquement au premier écran, pour amorcer sans encombrer. */}
               {msgs.length === 0 && !busy && (
                 <div className="space-y-1.5 pt-1">
-                  <div className="px-1 pb-0.5 text-[10px] font-semibold text-zinc-400 first-letter:uppercase">{t("suggest")}</div>
+                  <div className="px-1 pb-0.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{t("suggest")}</div>
                   {/* Une ligne par question, alignée à gauche : en pastilles, une question
                       de huit mots se coupait sur deux lignes et devenait illisible. */}
                   {["s1", "s2", "s3"].map((k) => (

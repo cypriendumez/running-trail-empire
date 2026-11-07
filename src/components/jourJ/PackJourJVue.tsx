@@ -17,7 +17,7 @@ function Entete({ t, sous }: { t: TextesJourJ; sous?: string }) {
       <div className="flex items-center gap-2">
         <Flag className="h-5 w-5 text-[#059669]" />
         <h1 className="text-2xl font-semibold tracking-tight text-[#11201d]">{t.titre}</h1>
-        <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{t.premium}</span>
+        <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">{t.premium}</span>
       </div>
       {sous && <p className="mt-1 text-sm text-zinc-500">{sous}</p>}
     </div>

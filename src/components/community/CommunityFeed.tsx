@@ -28,13 +28,13 @@ const LOCALE: Record<string, string> = { fr: "fr-FR", en: "en-GB", de: "de-DE", 
 // Habillage par catégorie : un dégradé + une icône en lien avec le thème de l'article.
 const THEME: Record<Cat, { grad: string; icon: LucideIcon }> = {
   all: { grad: "from-zinc-600 to-zinc-800", icon: Newspaper },
-  running: { grad: "from-emerald-500 to-teal-600", icon: Footprints },
-  trail: { grad: "from-lime-600 via-emerald-600 to-emerald-700", icon: Mountain },
-  ultra: { grad: "from-orange-500 to-red-600", icon: Flame },
-  marathon: { grad: "from-sky-500 to-indigo-600", icon: Medal },
-  gear: { grad: "from-violet-500 to-fuchsia-600", icon: Watch },
-  nutrition: { grad: "from-amber-500 to-orange-600", icon: Apple },
-  elite: { grad: "from-yellow-500 to-amber-600", icon: Trophy },
+  running: { grad: "from-emerald-700 to-emerald-800", icon: Footprints },
+  trail: { grad: "from-emerald-800 to-emerald-900", icon: Mountain },
+  ultra: { grad: "from-orange-700 to-orange-800", icon: Flame },
+  marathon: { grad: "from-sky-700 to-sky-800", icon: Medal },
+  gear: { grad: "from-zinc-600 to-zinc-800", icon: Watch },
+  nutrition: { grad: "from-amber-700 to-amber-800", icon: Apple },
+  elite: { grad: "from-amber-800 to-amber-900", icon: Trophy },
 };
 
 // Photos d'illustration par catégorie — sources LÉGALES pour usage COMMERCIAL, sans
@@ -108,7 +108,7 @@ function Favicon({ src, name, className = "h-4 w-4" }: { src?: string; name: str
     return <img src={src} alt="" loading="lazy" onError={() => setOk(false)} className={`${className} rounded-sm object-contain`} />;
   }
   return (
-    <span className={`${className} flex items-center justify-center rounded-sm bg-zinc-200 text-[9px] font-semibold text-zinc-500`}>
+    <span className={`${className} flex items-center justify-center rounded-sm bg-zinc-200 text-[11px] font-semibold text-zinc-500`}>
       {(name || "?").charAt(0).toUpperCase()}
     </span>
   );
@@ -151,11 +151,11 @@ function Cover({ c, libelle, big = false, seed = 0, priorite = false }: { c: Cat
           depuis notre domaine et en cache. Les premières cartes sont prioritaires. */}
       <Image src={photo} alt="" fill sizes={big ? "(max-width: 640px) 100vw, 40vw" : "(max-width: 640px) 50vw, 33vw"}
         priority={priorite} loading={priorite ? undefined : "lazy"} quality={55}
-        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500" />
       {/* Voile dégradé teinté : lisibilité du badge + identité couleur de la catégorie */}
       <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${THEME[c].grad} opacity-50 mix-blend-multiply`} />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-black/10" />
-      <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[10px] font-semibold text-white ring-1 ring-white/25 backdrop-blur-sm first-letter:uppercase">
+      <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[11px] font-semibold text-white ring-1 ring-white/25 backdrop-blur-sm first-letter:uppercase">
         <Icon className="h-3 w-3" /> {libelle}
       </span>
     </div>

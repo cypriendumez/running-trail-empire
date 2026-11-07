@@ -388,7 +388,7 @@ function PostCard({ post, onChange }: { post: Post; onChange: () => void }) {
               {stats.map((s) => (
                 <div key={s.label}>
                   <div className="text-xl font-semibold leading-tight">{s.value}</div>
-                  <div className="text-[10px] text-zinc-400 first-letter:uppercase">{s.label}</div>
+                  <div className="text-[11px] text-zinc-400 first-letter:uppercase">{s.label}</div>
                 </div>
               ))}
             </div>

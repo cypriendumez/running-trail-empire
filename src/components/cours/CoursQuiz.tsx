@@ -151,7 +151,7 @@ export function CoursQuiz({ bank, ui }: { bank: QuizQuestion[]; ui: CoursUI["qui
                     }`}>
                     {state === "good" ? <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-600" />
                       : state === "bad" ? <XCircle className="h-4 w-4 flex-shrink-0 text-rose-500" />
-                      : <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border border-zinc-300 text-[10px] font-semibold text-zinc-400">{String.fromCharCode(65 + i)}</span>}
+                      : <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border border-zinc-300 text-[11px] font-semibold text-zinc-400">{String.fromCharCode(65 + i)}</span>}
                     {opt}
                   </button>
                 );

@@ -156,7 +156,7 @@ export default function BlogPage() {
           {showFeatured && (
             <div className="mb-16 grid items-center gap-10 lg:grid-cols-2">
               <Link href={lienDe(featured.key)} className="group relative block aspect-[4/3] overflow-hidden rounded-2xl">
-                <img src={featured.img} alt={B.posts[featured.key].title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                <img src={featured.img} alt={B.posts[featured.key].title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700" />
                 {!estEcrit(featured.key) && <BadgeAVenir t={B.bientot} />}
               </Link>
               <div>
@@ -198,7 +198,7 @@ export default function BlogPage() {
             {grid.map((post) => (
               <Link href={lienDe(post.key)} key={post.id} className="group">
                 <div className="relative mb-4 aspect-[4/3] overflow-hidden rounded-2xl">
-                  <img src={post.img} alt={B.posts[post.key].title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <img src={post.img} alt={B.posts[post.key].title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500" />
                   {!estEcrit(post.key) && <BadgeAVenir t={B.bientot} />}
                 </div>
                 <CatBadge code={post.cat} label={B.cats[post.cat]} />

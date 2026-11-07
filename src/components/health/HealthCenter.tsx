@@ -599,7 +599,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                   <div className="col-span-7 max-h-[430px] overflow-y-auto pr-1 space-y-2">
                     {GROUP_ORDER.map((g) => (
                       <div key={g}>
-                        <div className="text-[10px] font-semibold text-zinc-400 mb-1 first-letter:uppercase">{tr(g)}</div>
+                        <div className="text-[11px] font-semibold text-zinc-400 mb-1 first-letter:uppercase">{tr(g)}</div>
                         <div className="flex flex-wrap gap-1">
                           {Object.entries(zoneMap).filter(([, z]) => z.groupKey === g).map(([slot, z]) => (
                             <button key={slot} onClick={() => setSelectedSlot(selectedSlot === slot ? null : slot)}
@@ -626,7 +626,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                         barèmes différents pour une seule douleur se contrediraient à l'écran. */}
                     <input id={`${cid}-r0`} type="range" min={1} max={10} value={painLevel} onChange={(e) => setPainLevel(+e.target.value)}
                       className="w-full" style={{ accentColor: teinteDouleur(painLevel) }} />
-                    <div className="flex justify-between text-[10px] text-zinc-400 mt-0.5"><span>{tr("k.painLight")}</span><span>{tr("k.painHard")}</span></div>
+                    <div className="flex justify-between text-[11px] text-zinc-400 mt-0.5"><span>{tr("k.painLight")}</span><span>{tr("k.painHard")}</span></div>
                     <button onClick={askAboutZone} className="btn-brand w-full justify-center mt-3 text-sm">
                       <MessageCircle className="w-4 h-4" strokeWidth={1.5} /> {tr("k.ask")}
                     </button>
@@ -668,7 +668,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                             {z.signalements > 1 && <><span className="text-zinc-400">{z.premier}</span><span className="text-zinc-300">→</span></>}
                             <span>{z.dernier}</span><span className="text-[11px] font-medium text-zinc-400">/10</span>
                           </div>
-                          <span className={`rounded-lg px-1.5 py-0.5 text-[10px] font-semibold ring-1 ${ton[z.tendance]}`}>
+                          <span className={`rounded-lg px-1.5 py-0.5 text-[11px] font-semibold ring-1 ${ton[z.tendance]}`}>
                             {tr("trend." + z.tendance)}
                           </span>
                         </div>
@@ -873,7 +873,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                       <ul className="mt-1 space-y-1">
                         {bilan.hypotheses.map((h) => (
                           <li key={h.nom} className="flex items-center gap-2 text-[13px] text-zinc-800">
-                            <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${h.probabilite === "haute" ? "bg-emerald-600 text-white" : h.probabilite === "moyenne" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-600"}`}>
+                            <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${h.probabilite === "haute" ? "bg-emerald-600 text-white" : h.probabilite === "moyenne" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-600"}`}>
                               {tr(`bilan.proba.${h.probabilite}`)}
                             </span>
                             {h.nom}

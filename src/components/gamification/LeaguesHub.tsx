@@ -343,7 +343,7 @@ export function LeaguesHub({
                     <div key={key} className={`relative flex flex-col items-center rounded-2xl border px-1 py-2.5 text-center transition sm:p-3 ${isCurrent ? "border-transparent ring-2 ring-emerald-400 shadow-md bg-emerald-50/40" : "border-zinc-200 bg-white opacity-70"}`}>
                       <div className="mb-1.5"><MedaillePalier cle={key} taille="s" /></div>
                       <div className={`text-[11px] sm:text-sm font-semibold ${t.textColor}`}>{d[`tier.${key}`]}</div>
-                      {isCurrent && <span className="mt-1 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{d["youChip"]}</span>}
+                      {isCurrent && <span className="mt-1 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{d["youChip"]}</span>}
                     </div>
                   );
                 })}
@@ -513,7 +513,7 @@ export function LeaguesHub({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-zinc-900 text-sm truncate">{cT(c)[0]}</span>
-                            {done && <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700"><CheckCircle className="w-3 h-3" /> {d["ch.doneChip"]}</span>}
+                            {done && <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700"><CheckCircle className="w-3 h-3" /> {d["ch.doneChip"]}</span>}
                           </div>
                           <p className="text-xs text-zinc-400 mt-0.5">{cT(c)[1]}</p>
                         </div>

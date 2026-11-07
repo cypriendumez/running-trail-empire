@@ -62,7 +62,7 @@ export function SegmentList({ segments }: { segments: SegmentVue[] }) {
               <div className="flex items-center gap-2">
                 <h2 className="truncate font-semibold text-zinc-900">{s.name}</h2>
                 {s.jeSuisMaitre && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 first-letter:uppercase">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 first-letter:uppercase">
                     <Crown className="h-3 w-3" /> {s.maitreExAequo ? "Maître ex æquo" : "Maître"}
                   </span>
                 )}
@@ -79,19 +79,19 @@ export function SegmentList({ segments }: { segments: SegmentVue[] }) {
 
             <div className="flex items-center gap-6">
               <div className="text-right">
-                <div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">Record</div>
+                <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">Record</div>
                 {/* Pas de record = pas de tiret trompeur : on dit qu'il n'y en a pas. */}
                 <div className="text-xl font-semibold text-zinc-900">
                   {s.record != null ? chrono(s.record) : <span className="text-sm font-medium text-zinc-400">aucun</span>}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">{t("seg.myTime")}</div>
+                <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{t("seg.myTime")}</div>
                 <div className="text-xl font-semibold text-emerald-600">
                   {s.monTemps != null ? chrono(s.monTemps) : <span className="text-sm font-medium text-zinc-400">—</span>}
                 </div>
                 {s.monRang != null && (
-                  <div className="text-[10px] text-zinc-400">{t("seg.rank", { n: s.monRang, total: s.coureurs })}</div>
+                  <div className="text-[11px] text-zinc-400">{t("seg.rank", { n: s.monRang, total: s.coureurs })}</div>
                 )}
               </div>
             </div>

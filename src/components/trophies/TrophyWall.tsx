@@ -49,7 +49,7 @@ function Card({ t }: { t: Trophy }) {
             <span className="truncate text-xs font-semibold text-zinc-600 first-letter:uppercase">{t.label}</span>
           </div>
           {t.tier && (
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${style?.puce} first-letter:uppercase`}>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${style?.puce} first-letter:uppercase`}>
               {t.tier}
             </span>
           )}
