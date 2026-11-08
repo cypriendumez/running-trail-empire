@@ -53,12 +53,37 @@ const codeNu = (p: string) => readFileSync(p, "utf8").replace(/\/\*[\s\S]*?\*\//
  * sinon la requête des douleurs ou des séances prescrites recevrait la ligne de
  * l'objectif, et le test mesurerait un contexte que la base réelle ne produit jamais.
  */
+/**
+ * ⚠️ LES FILTRES ET LE TRI S'APPLIQUENT, COMME DANS LA VRAIE BASE (09/11/2026). Ils étaient
+ * ignorés : « le pic de FC des mêmes semaines l'an dernier » (`picsSaison`, `gte`/`lte` +
+ * `order(max_hr)` + `limit(1)`) recevait la PREMIÈRE séance venue, un footing. La FC max de
+ * saison tombait à ce footing, chaque footing devenait « trop intense », donc une qualité, et le
+ * plan n'en posait plus aucune — selon le jour de la semaine, d'où des tests qui rougissaient le
+ * lundi. Un filtre sur une colonne absente de la ligne est ignoré, comme `eq` ici.
+ */
 function fauxClient(tables: Record<string, unknown[]>, lues: string[] = []) {
   const requete = (toutes: unknown[]) => {
+    type L = Record<string, unknown>;
     const filtres: [string, unknown][] = [];
-    const lignes = () => toutes.filter((l) => filtres.every(([c, v]) => !(c in (l as object)) || (l as Record<string, unknown>)[c] === v));
+    const bornes: [string, "gte" | "lte" | "lt" | "gt", unknown][] = [];
+    let tri: { col: string; asc: boolean } | null = null;
+    let plafond: number | null = null;
+    const borne = (l: L) => bornes.every(([c, o, v]) => {
+      if (!(c in l) || l[c] == null) return !(c in l);
+      const a = l[c] as string | number, b = v as string | number;
+      return o === "gte" ? a >= b : o === "lte" ? a <= b : o === "lt" ? a < b : a > b;
+    });
+    const lignes = () => {
+      let r = (toutes as L[]).filter((l) => filtres.every(([c, v]) => !(c in l) || l[c] === v) && borne(l));
+      if (tri) { const { col, asc } = tri; r = [...r].sort((x, y) => { const a = x[col] as never, b = y[col] as never; return a === b ? 0 : (a > b ? 1 : -1) * (asc ? 1 : -1); }); }
+      if (plafond != null) r = r.slice(0, plafond);
+      return r;
+    };
     const q: Record<string, unknown> = {};
-    for (const m of ["select", "gte", "lte", "lt", "gt", "not", "in", "or", "order", "limit", "neq", "is", "ilike"]) q[m] = () => q;
+    for (const m of ["select", "not", "in", "or", "neq", "is", "ilike"]) q[m] = () => q;
+    for (const o of ["gte", "lte", "lt", "gt"] as const) q[o] = (c: string, v: unknown) => { bornes.push([c, o, v]); return q; };
+    q.order = (c: string, o?: { ascending?: boolean }) => { if (!tri) tri = { col: c, asc: o?.ascending !== false }; return q; };
+    q.limit = (n: number) => { plafond = n; return q; };
     q.eq = (c: string, v: unknown) => { filtres.push([c, v]); return q; };
     q.single = () => { const l = lignes(); return Promise.resolve({ data: l[0] ?? null, error: l[0] ? null : { code: "PGRST116" } }); };
     q.maybeSingle = () => Promise.resolve({ data: lignes()[0] ?? null, error: null });
@@ -229,12 +254,28 @@ async function main() {
     assert.equal(ctx.weekPlan.qualiteDes, 4, `reprise dans ${ctx.weekPlan.qualiteDes} jour(s) au lieu de 4`);
     // Tous les jours disponibles : la place ne manque pas, seule la reprise décide du jour.
     const plan = buildWeekPlan({ ...ctx, availability: { daysPerWeek: 6, days: [0, 1, 2, 3, 4, 5, 6] } }, new Date());
-    const qualites = plan.map((j, i) => ({ j, i })).filter(({ j }) => /VMA|Seuil|Spécifique/.test(j.type));
-    assert.equal(qualites.length, 1, `${qualites.length} séance(s) de qualité au plan : ${plan.map((j) => j.type).join(", ")}`);
-    assert.ok(qualites[0].i >= 4, `séance de qualité au jour ${qualites[0].i}, avant la reprise (jour 4)`);
-    assert.match(qualites[0].j.title, /\(reprise\)$/, `titre : ${qualites[0].j.title}`);
-    assert.match(qualites[0].j.why, /^Reprise après Marathon International de Lille/, `pourquoi : ${qualites[0].j.why}`);
-    assert.ok(!/coupe le nombre de répétitions/.test(qualites[0].j.detail), "la séance, déjà courte, est coupée une seconde fois");
+    // ⚠️ LE PLAN SE LIT PAR DATE, jamais par position : un jour peut porter deux séances
+    // (rejoué sur les 7 jours de la semaine le 09/11/2026 : le mardi, le plan a 8 lignes).
+    const jours = [...new Set(plan.map((j) => j.date))].sort();
+    const indice = (d: string) => jours.indexOf(d);
+    const qualites = plan.filter((j) => /VMA|Seuil|Spécifique/.test(j.type)).map((j) => ({ j, i: indice(j.date) }));
+    const longue = plan.find((j) => j.type === "Sortie longue");
+    const iLongue = longue ? indice(longue.date) : -1;
+    // Les jours où la reprise PEUT tomber : à partir du 15ᵉ jour (indice 4), jamais à moins de
+    // 48 h de la sortie longue. Le mardi, la reprise tombe le samedi, collée à la sortie longue
+    // du dimanche : aucun jour légal dans ces sept jours, le plan glissant la pose au suivant
+    // (« impossible sans violer la récupération… on n'insiste pas », autoPlan, étape 4).
+    const legaux = [4, 5, 6].filter((i) => i !== iLongue && (iLongue < 0 || Math.abs(i - iLongue) >= 2));
+    const lu = plan.map((j) => `${j.date} ${j.type}`).join(", ");
+    assert.ok(qualites.every((q) => q.i >= 4), `séance de qualité avant la reprise (jour 4) : ${lu}`);
+    assert.ok(qualites.length <= 1, `${qualites.length} séances de qualité la semaine de la reprise : ${lu}`);
+    assert.equal(qualites.length, legaux.length ? 1 : 0,
+      legaux.length ? `un jour légal existait (${legaux.join(", ")}) et la reprise n'y est pas : ${lu}` : `aucun jour légal, et une qualité est posée quand même : ${lu}`);
+    if (qualites.length) {
+      assert.match(qualites[0].j.title, /\(reprise\)$/, `titre : ${qualites[0].j.title}`);
+      assert.match(qualites[0].j.why, /^Reprise après Marathon International de Lille/, `pourquoi : ${qualites[0].j.why}`);
+      assert.ok(!/coupe le nombre de répétitions/.test(qualites[0].j.detail), "la séance, déjà courte, est coupée une seconde fois");
+    }
   });
 
   await test("seize jours après : la reprise est en cours, un seuil dès aujourd'hui, et le bandeau le dit", async () => {

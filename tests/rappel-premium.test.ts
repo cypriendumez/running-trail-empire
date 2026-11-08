@@ -37,6 +37,14 @@ type Ligne = Record<string, unknown>;
  * appliquées, pour qu'un second passage relise ce que le premier a écrit) et des pannes à la
  * demande : une écriture refusée, une lecture en erreur, une table qui lève.
  */
+/**
+ * ⚠️ LES FILTRES ET LE TRI S'APPLIQUENT, COMME DANS LA VRAIE BASE (09/11/2026). Ils étaient
+ * ignorés : « le pic de FC des mêmes semaines l'an dernier » (`picsSaison`, `gte`/`lte` +
+ * `order(max_hr)` + `limit(1)`) recevait la PREMIÈRE séance venue, un footing. La FC max de
+ * saison tombait à ce footing, chaque footing devenait « trop intense », donc une qualité, et le
+ * plan n'en posait plus aucune — selon le jour de la semaine, d'où des tests qui rougissaient le
+ * lundi. Un filtre sur une colonne absente de la ligne est ignoré, comme `eq` ici.
+ */
 function fausseBase(tables: Record<string, Ligne[]>) {
   const lus: { table: string; colonnes: string }[] = [];
   const ecrits: { table: string; op: string; valeur: unknown }[] = [];
@@ -44,16 +52,32 @@ function fausseBase(tables: Record<string, Ligne[]>) {
   let id = 0;
   const requete = (table: string) => {
     const filtres: [string, unknown][] = [];
+    const bornes: [string, "gte" | "lte" | "lt" | "gt", unknown][] = [];
+    let tri: { col: string; asc: boolean } | null = null;
+    let plafond: number | null = null;
     let colonnes: string[] | null = null;
     let op: "select" | "insert" | "update" | "delete" = "select";
     let valeur: unknown = null;
     const toutes = () => (tables[table] ??= []);
-    const garde = (l: Ligne) => filtres.every(([c, v]) => !(c in l) || l[c] === v);
+    const borne = (l: Ligne) => bornes.every(([c, o, v]) => {
+      if (!(c in l) || l[c] == null) return !(c in l);
+      const a = l[c] as string | number, b = v as string | number;
+      return o === "gte" ? a >= b : o === "lte" ? a <= b : o === "lt" ? a < b : a > b;
+    });
+    const garde = (l: Ligne) => filtres.every(([c, v]) => !(c in l) || l[c] === v) && borne(l);
     const projeter = (l: Ligne) => (colonnes ? Object.fromEntries(colonnes.filter((c) => c in l).map((c) => [c, l[c]])) : l);
-    const lignes = () => toutes().filter(garde).map(projeter);
+    const lignes = () => {
+      let r = toutes().filter(garde);
+      if (tri) { const { col, asc } = tri; r = [...r].sort((x, y) => { const a = x[col] as never, b = y[col] as never; return a === b ? 0 : (a > b ? 1 : -1) * (asc ? 1 : -1); }); }
+      if (plafond != null) r = r.slice(0, plafond);
+      return r.map(projeter);
+    };
     const erreurLecture = () => (pannes.lecture === table ? { message: `lecture refusée (${table})`, code: "XX000" } : null);
     const q: Record<string, unknown> = {};
-    for (const m of ["gte", "lte", "lt", "gt", "not", "in", "or", "order", "limit", "neq", "is"]) q[m] = () => q;
+    for (const m of ["not", "in", "or", "neq", "is"]) q[m] = () => q;
+    for (const o of ["gte", "lte", "lt", "gt"] as const) q[o] = (c: string, v: unknown) => { bornes.push([c, o, v]); return q; };
+    q.order = (c: string, o?: { ascending?: boolean }) => { if (!tri) tri = { col: c, asc: o?.ascending !== false }; return q; };
+    q.limit = (n: number) => { plafond = n; return q; };
     q.eq = (c: string, v: unknown) => { filtres.push([c, v]); return q; };
     q.select = (c = "*") => {
       lus.push({ table, colonnes: String(c) });
