@@ -89,7 +89,7 @@ export function ErrorReporter() {
         fetch("/api/log-error", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source, message, stack, url: location.href, meta: { ...meta, clic: clicRecent() } }),
+          body: JSON.stringify({ source, message, stack, url: location.origin + location.pathname, meta: { ...meta, clic: clicRecent() } }),
           keepalive: true,
         }).catch(() => {});
       } catch { /* ne jamais casser */ }

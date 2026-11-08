@@ -12,7 +12,10 @@ export const maxDuration = 60;
 // dans product_offers. Protégé par CRON_SECRET ou ADMIN_SECRET. Ne scrape aucun site.
 async function handle(req: Request) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (secret !== process.env.CRON_SECRET && secret !== process.env.ADMIN_SECRET) {
+  // ⚠️ UNE VARIABLE ABSENTE NE DOIT RIEN OUVRIR (08/11/2026) : `undefined !== undefined` est
+  // faux, si bien que sans `ADMIN_SECRET` une requête SANS en-tête passait.
+  const accepte = (attendu: string | undefined) => !!secret && !!attendu && secret === attendu;
+  if (!accepte(process.env.CRON_SECRET) && !accepte(process.env.ADMIN_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { searchParams } = new URL(req.url);

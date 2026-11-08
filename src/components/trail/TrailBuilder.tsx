@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { TB, fillT } from "./trailI18n";
 import { fmtNombre, fmtKm } from "@/lib/i18n/nombres";
+import { idPartage } from "@/lib/courses/veille";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface LatLng { lat: number; lng: number }
@@ -887,7 +888,9 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
 
   // ── Partage live : diffuse la position via Supabase Realtime ───────────────────
   const startShare = useCallback(() => {
-    const sid = Math.random().toString(36).slice(2, 9);
+    // ⚠️ CET IDENTIFIANT EST LE SEUL SECRET DU LIEN DE SUIVI GPS EN DIRECT (08/11/2026) :
+    // `Math.random` n'est pas fait pour ça. Même tirage que la veille de course.
+    const sid = idPartage();
     setShareId(sid);
     setSharing(true);
     setNavMode(true);

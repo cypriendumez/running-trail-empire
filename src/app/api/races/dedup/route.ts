@@ -83,7 +83,10 @@ export async function POST(req: Request) {
   });
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // ⚠️ ROUTE DE MAINTENANCE, CHAQUE MÉTHODE (08/11/2026) : seule POST était gardée.
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   const all = await fetchAllRaces();
   const groups = new Map<string, number>();
   for (const r of all) {
@@ -101,6 +104,10 @@ export async function GET() {
 
 // PATCH: update a specific race (admin only)
 export async function PATCH(req: Request) {
+  // ⚠️ ELLE ÉTAIT OUVERTE (08/11/2026) : sans garde, n'importe quelle requête anonyme
+  // renommait ou redatait une course du catalogue avec la clé de service.
+  const denied = await denyIfNotAdmin(req);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   const { id, date, name } = await req.json().catch(() => ({}));
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
   const updates: Record<string, string> = { updated_at: new Date().toISOString() };

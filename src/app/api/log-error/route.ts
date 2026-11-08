@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rapportLocal } from "@/lib/csp/rapport";
+import { urlJournalisable } from "@/lib/journal/urlJournal";
 
 const cut = (s: unknown, n: number) => (typeof s === "string" && s ? s.slice(0, n) : null);
 
@@ -72,7 +73,10 @@ export async function POST(req: Request) {
       source: cut(body.source, 24) ?? "client",
       message: cut(body.message, 2000) ?? "(no message)",
       stack: cut(body.stack, 6000),
-      url: cut(body.url, 1000),
+      // ⚠️ JAMAIS L'ADRESSE COMPLÈTE (08/11/2026) : `/suivre/<id>` est le secret du suivi GPS en
+      // direct, et une requête peut porter un code. Nettoyée ICI : la route est publique,
+      // elle ne se fie pas au navigateur.
+      url: urlJournalisable(body.url),
       user_agent: cut(req.headers.get("user-agent"), 500),
       meta,
     });
