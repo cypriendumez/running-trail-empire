@@ -68,7 +68,8 @@ export function DeuxFacteurs({ L, lang }: { L: AuthDict["deuxFacteurs"]; lang: s
     setEnrolement(null);
     toast.success(L.activee);
     // L'avis par e-mail au titulaire (`/api/auth/2fa/activee`) : si quelqu'un d'autre l'a activée
-    // avec son téléphone, le titulaire le sait. Sans attendre : l'activation est faite.
+    // depuis CET écran avec son téléphone, le titulaire le sait (une activation par appel direct à
+    // GoTrue n'en déclenche aucun : voir `avertirActivation`). Sans attendre : l'activation est faite.
     void fetch("/api/auth/2fa/activee", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang }) }).catch(() => null);
     await relire();
   }

@@ -83,8 +83,13 @@ export async function retirerDeuxFacteurs(d: {
  * L'AVIS D'ACTIVATION (relecture du 08/11/2026) : quelqu'un qui connaît le mot de passe d'un compte
  * SANS double authentification pourrait l'activer avec SON téléphone et enfermer le titulaire
  * dehors. Le lien « téléphone perdu » l'en sortirait, mais encore faut-il qu'il le sache : un
- * e-mail part donc à l'adresse du compte à chaque activation. Appelé par la carte des réglages
- * juste après la vérification du premier code — la session est alors `aal2`, la garde la laisse passer.
+ * e-mail part donc à l'adresse du compte quand l'activation passe par l'ÉCRAN DE PACEVO (la carte
+ * des réglages l'appelle juste après le premier code ; la session est alors `aal2`).
+ *
+ * ⚠️ LIMITE, À DIRE (relecture du 08/11/2026) : qui appelle GoTrue directement (`mfa.enroll` puis
+ * `verify`, avec la clé publique) active sans passer par ici, et AUCUN avis ne part. Le recours reste
+ * « J'ai perdu mon téléphone ». Pour fermer ce trou, il faudrait détecter un facteur nouveau côté
+ * serveur (à la connexion suivante, ou par un déclencheur sur `auth.mfa_factors`).
  */
 export async function avertirActivation(d: {
   utilisateur: () => Promise<Utilisateur | null>;

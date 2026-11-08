@@ -74,6 +74,10 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
 2. **Sauvegarde des données personnelles** : couverte chaque semaine sur le Mac (chiffrée), mais
    pas de copie quotidienne côté hébergeur tant que Supabase est sur l'offre gratuite. Passage à
    l'offre Pro à décider au lancement.
+3. **Chantier sécurité du 08/11** (mots de passe, CSP appliquée, CAPTCHA en sommeil, double
+   authentification facultative) : commité sur la branche `worktree-securite-mots-de-passe`, ni
+   fusionné ni déployé. Les actions de Cyprien, dans l'ordre, sont hors dépôt :
+   `~/Desktop/Pacevo/securite-2026-11-08-actions.md`. Aucun agent ne déploie cette branche avant.
 
 ## Résolues le 08/11/2026
 
