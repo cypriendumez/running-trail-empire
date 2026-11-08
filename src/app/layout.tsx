@@ -9,21 +9,33 @@ import { Visite } from "@/components/Visite";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { getPublicLang } from "@/lib/i18n/serverLang";
 import { PwaClient } from "@/components/pwa/PwaClient";
+import { SITE_URL, TITRE_ACCUEIL } from "@/lib/brand/entite";
 
 // Polices réellement chargées (avant : variables jamais définies → tout en system-ui).
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const anton = Anton({ subsets: ["latin"], weight: "400", variable: "--font-anton", display: "swap" });
 
 export const metadata: Metadata = {
+  /**
+   * ⚠️ SANS `metadataBase`, NEXT DEVINAIT LE DOMAINE — ET SE TROMPAIT. L'image de partage de
+   * chaque page partait en `https://pacevo.app/opengraph-image` (constaté le 08/11/2026 dans
+   * le HTML servi), un domaine qui ne fait que rediriger, et les canoniques relatives
+   * (`/courses`) restaient à résoudre par le moteur. Toute adresse relative des métadonnées
+   * se résout désormais sur le domaine réellement servi.
+   */
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "Pacevo",
+    // ⚠️ C'EST LE TITRE DE L'ACCUEIL (page cliente, sans `metadata` à elle). Il se résumait
+    // à « Pacevo » : rien ne disait au moteur que ce nom désigne un coach de course, et
+    // Google corrigeait la requête « pacevo » en « pancevo » (08/11/2026). Voir
+    // `lib/brand/entite`.
+    default: TITRE_ACCUEIL,
     template: "%s | Pacevo",
   },
-  // Description remaniée avec le slogan : c'est la ligne que Google affiche sous le titre.
-  // L'ancienne énumérait des fonctions (« Plans IA, analyse biomécanique… ») sans jamais
-  // dire ce que l'app FAIT concrètement pour le coureur, ni d'où vient le nom.
+  // La marque en tête : c'est la ligne que Google affiche sous le titre, et elle doit dire
+  // à la fois QUI (Pacevo) et QUOI (coach de course et de trail), puis ce que l'app FAIT.
   description:
-    "Pace Your Evolution. Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance recalculée à chaque synchronisation.",
+    "Pacevo, coach de running et de trail. Ta montre mesure déjà tout : VFC, sommeil, charge, allures. Pacevo en fait une séance recalculée à chaque synchronisation.",
   /**
    * ⚠️ LE JETON DE VÉRIFICATION SE POSE SUR L'HÉBERGEMENT, PAS DANS LE CODE. La Search
    * Console de Google exige de prouver qu'on possède le domaine ; la méthode la plus

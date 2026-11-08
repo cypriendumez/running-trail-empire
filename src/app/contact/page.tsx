@@ -8,6 +8,7 @@ import { EDITEUR, PAYS_EDITEUR } from "@/lib/brand/editeur";
 export const metadata: Metadata = {
   title: "Contact",
   description: "Une question, un bug, une suggestion ? Contacte l'équipe de Pacevo.",
+  alternates: { canonical: "/contact" },
 };
 
 const C: Record<Lang, { title: string; sla: string; intro: string; email: string; write: string; editor: string; rgpdA: string; privacy: string; rgpdB: string; legal: string; rgpdC: string }> = {

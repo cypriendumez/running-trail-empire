@@ -4,6 +4,7 @@ import { LegalContent } from "@/components/legal/LegalContent";
 export const metadata: Metadata = {
   title: "Conditions générales (CGU / CGV)",
   description: "Conditions générales d'utilisation et de vente de Pacevo.",
+  alternates: { canonical: "/terms" },
 };
 
 // Page PUBLIQUE (CGU + conditions d'abonnement). ⚠️ Adapte les montants/durées (dans legalI18n.ts) à ton offre réelle.
