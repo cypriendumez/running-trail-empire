@@ -900,7 +900,7 @@ export const ARTICLES: Article[] = [
   {
     slug: "reprendre-apres-une-blessure-progression",
     cle: "p13",
-    maj: "1er octobre 2026",
+    maj: "8 novembre 2026",
     chapo:
       "Le facteur de risque le mieux établi chez le coureur, c'est la blessure précédente : la reprise est donc le moment où se joue la suivante. Voici ce que la littérature documente sur la progression — et les règles chiffrées qu'elle ne confirme pas.",
     avertissement:
@@ -926,6 +926,7 @@ export const ARTICLES: Article[] = [
         p: [
           "L'étude prospective de Nielsen et ses collègues (2014) a suivi un an durant 874 coureurs débutants équipés d'une montre GPS ; 202 se sont blessés. Chaque semaine était classée selon la progression de distance : moins de 10 % ou une baisse, 10 à 30 %, plus de 30 %. Aucune différence significative entre les trois groupes sur l'ensemble des blessures.",
           "Le signal n'apparaît qu'en isolant sept diagnostics dits liés à la distance, dont le syndrome fémoro-patellaire, la bandelette ilio-tibiale et la périostite tibiale : rapport de risque 1,59 (IC 95 % : 0,96 à 2,66 ; P = 0,07) au-delà de 30 % sur deux semaines, comparé à moins de 10 %. Les auteurs qualifient eux-mêmes leur travail d'exploratoire.",
+          "Dès le départ, l'étude rangeait à part les blessures qu'elle supposait liées à l'allure plutôt qu'au volume : tendinopathie d'Achille, aponévrosite plantaire, fracture de fatigue du tibia, blessures des ischio-jambiers, du psoas et du mollet. Chez les 58 coureurs concernés, aucun lien avec la progression de distance n'apparaît. C'est le sens de son titre : l'association, si elle existe, dépend du type de blessure.",
           "Damsted rapporte une étude où les blessés avaient augmenté leur distance totale de 86 % de plus (IC 95 % : 12 % à 159 % ; P = 0,026) la semaine précédant la blessure. Ce n'est pas la pente douce qui est documentée : c'est le saut brutal.",
         ],
       },

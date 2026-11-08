@@ -668,6 +668,7 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
           p: [
             "The prospective study by Nielsen and colleagues (2014) followed 874 novice runners wearing a GPS watch for one year; 202 were injured. Each week was classified by distance progression: less than 10% or a decrease, 10 to 30%, more than 30%. No significant difference between the three groups across all injuries.",
             "The signal only appears when seven diagnoses described as distance-related are isolated, among them patellofemoral pain, iliotibial band syndrome and medial tibial stress syndrome: hazard ratio 1.59 (95% CI: 0.96 to 2.66; P = .07) beyond 30% over two weeks, compared with less than 10%. The authors themselves call their work exploratory.",
+            "From the outset, the study set apart the injuries it assumed to be related to pace rather than volume: Achilles tendinopathy, plantar fasciitis, tibial stress fracture, and hamstring, iliopsoas and calf injuries. Among the 58 runners concerned, no link with distance progression appears. That is the point of its title: the association, if there is one, depends on the type of injury.",
             "Damsted reports a study in which injured runners had increased their total distance by 86% more (95% CI: 12% to 159%; P = .026) in the week before the injury. It is not the gentle slope that is documented: it is the abrupt jump.",
           ],
         },
