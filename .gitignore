@@ -119,3 +119,7 @@ public/brands/polar.svg
 /ops/briefings/
 /ops/social/
 /ops/partenariats/
+
+# Sauvegarde PRIVÉE (données des coureurs, chiffrée) : jamais dans le dépôt public.
+*.pacevo-sauvegarde
+*.pacevo-sauvegarde.partiel
