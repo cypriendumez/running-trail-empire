@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { buildAthleteContext, COACH_SYSTEM } from "@/lib/ai/coachContext";
 import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 import { generateContent } from "@/lib/ai/gemini";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 import {
   SESSION_CACHE_TYPE, PROFILE_FINGERPRINT_COLUMNS, fingerprint, isCacheUsable, serverDay,
   type SessionSignals, type AiSession,
@@ -154,7 +155,11 @@ Réponds UNIQUEMENT par un objet JSON valide (aucun texte autour) :
       : await admin.from("notifications").insert({
           user_id: user.id, type: SESSION_CACHE_TYPE, title: "Séance IA du jour", body: "", read: true, data: payload,
         });
-    if (eCache) console.error("[séance IA] cache non écrit, la séance sera regénérée :", eCache.message);
+    // La réponse est `ok` : sans journal, ce coût caché (quota Gemini repayé) n'existait pour personne.
+    if (eCache) {
+      console.error("[séance IA] cache non écrit, la séance sera regénérée :", eCache.message);
+      await journaliserEchec(admin, { source: "seance-ia", userId: user.id, url: "/api/ai/session", message: `Cache de la séance IA non écrit, quota repayé au prochain affichage : ${eCache.code ?? "?"} ${eCache.message}` });
+    }
 
     return NextResponse.json({ session });
   } catch (e) {

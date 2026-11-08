@@ -81,8 +81,12 @@ export async function GET(req: Request) {
     if (data.length < 1000) break;
   }
 
-  const { data: ligne } = await sb.from("notifications").select("id,data")
+  const { data: ligne, error: eEtat } = await sb.from("notifications").select("id,data")
     .eq("user_id", proprietaire).eq("type", TYPE_ETAT).maybeSingle();
+  // ⚠️ UN ÉTAT ILLISIBLE N'EST PAS UN ÉTAT VIDE (08/11/2026) : le curseur repartait de 0 et un
+  // `insert` créait une SECONDE ligne d'état ; dès lors `maybeSingle()` échouait à chaque
+  // passage et le cron tournait sur place, voyants au vert. On n'écrit rien.
+  if (eEtat) return NextResponse.json({ ok: false, error: `État illisible : ${eEtat.message}` }, { status: 500 });
   const etat = (ligne?.data ?? {}) as { curseur?: number; corrigees?: number; vues?: number; ajoutees?: number };
 
   const ids = courses.map((c) => String(c.id));
@@ -143,12 +147,16 @@ export async function GET(req: Request) {
           const vu = typeDepuisUrl(fiche);
           const nouveau = typeCorrige(c.type, vu, Number(c.distance_km) || null);
           if (nouveau) {
-            const { error: e } = await sb.from("races")
+            const { error: e, status: statutMaj } = await sb.from("races")
               .update({ type: nouveau, updated_at: new Date().toISOString() }).eq("id", id);
             if (!e) {
               corrigees++;
               if (details.length < 20) details.push({ course: String(c.name), de: String(c.type), vers: nouveau });
             }
+            // ⚠️ La correction refusée se voit comme l'insertion refusée (08/11/2026) : `if (!e)`
+            // seul taisait un type refusé par l'énumération, et le passage se disait réussi.
+            else if (estErreurTransitoire(e, statutMaj)) { transitoires++; if (erreurs.length < 5) erreurs.push(`${c.name} (type → ${nouveau}) : HTTP ${statutMaj} ${e.message} [passager]`); }
+            else { refusees++; if (erreurs.length < 5) erreurs.push(`${c.name} (type → ${nouveau}) : ${e.message}`); }
           }
 
           // ── DISTANCES MANQUANTES ────────────────────────────────────────────────

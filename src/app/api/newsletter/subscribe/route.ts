@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       // invisible qu'un refus. Même journal, même endroit.
       await admin.from("error_logs").insert({
         user_id: userId, source: "newsletter",
-        message: `Accusé d'inscription non envoyé à ${clean} : variables manquantes (${[!CLE && "RESEND_API_KEY", !FROM && "RESEND_FROM", !BASE && "NEXT_PUBLIC_APP_URL"].filter(Boolean).join(", ")})`,
+        message: `Accusé d'inscription non envoyé : variables manquantes (${[!CLE && "RESEND_API_KEY", !FROM && "RESEND_FROM", !BASE && "NEXT_PUBLIC_APP_URL"].filter(Boolean).join(", ")})`,
         url: "/api/newsletter/subscribe",
       }).then(({ error }) => { if (error) console.error("[newsletter] journal non écrit :", error.message); });
     }

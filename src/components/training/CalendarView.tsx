@@ -266,7 +266,10 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
       if (!j.ok) { toast.error(j.error || t("cal.toast.failed")); return; }
       if (adding === "race") {
         setRaces((rs) => [...rs, { id: j.id, date: sel, name: race.name, location: race.location, distanceKm: race.distanceKm ? Number(race.distanceKm) : null, priorite: race.priorite }]);
-        toast.success(t("cal.toast.raceAdded"));
+        // La course est enregistrée, mais l'objectif qu'elle devait poser a échoué (journalisé
+        // côté serveur) : « visible dans l'onglet Courses » laisserait croire que le plan la vise.
+        if (j.objectifPose === false) toast.error(t("cal.toast.objectifRate"));
+        else toast.success(t("cal.toast.raceAdded"));
       } else {
         setNotes((ns) => [...ns, { id: j.id, date: sel, text: noteText }]);
         toast.success(t("cal.toast.noteAdded"));

@@ -73,8 +73,11 @@ export function CoursQuiz({ bank, ui }: { bank: QuizQuestion[]; ui: CoursUI["qui
       } catch { /* ignore */ }
       // 🏅 Badge « Expert du cours » : mode Complet réussi à ≥ 90 %.
       if (mode === "complet" && final / qs.length >= 0.9) {
-        setBadge(true);
-        fetch("/api/cours/badge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ score: final, total: qs.length }) }).catch(() => {});
+        // ⚠️ Annoncé SEULEMENT une fois enregistré (08/11/2026) : « badge débloqué » s'affichait
+        // avant la réponse, et le badge n'apparaissait jamais si l'écriture échouait.
+        fetch("/api/cours/badge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ score: final, total: qs.length }) })
+          .then((r) => { if (r.ok) setBadge(true); })
+          .catch(() => { /* hors ligne : pas de badge annoncé, le quiz pourra être refait */ });
       }
       setPhase("done");
       return;

@@ -25,11 +25,21 @@ import { estErreurTransitoire } from "@/lib/cron/transitoire";
 export const ROUTES_SYNCHRO = {
   webhook: "/api/webhooks/intervals",
   cron: "/api/cron/sync-all",
+  navigateur: "/api/intervals/sync",
 } as const;
 export type CanalSynchro = keyof typeof ROUTES_SYNCHRO;
 
 /** Au-delà, `meta` grossit sans rien apprendre de plus ; le total, lui, reste exact. */
 const EXEMPLES_MAX = 20;
+
+/**
+ * ⚠️ LE NAVIGATEUR SYNCHRONISE TOUTES LES 2 MINUTES (AutoSync). Un refus qui dure — une
+ * séance refusée à chaque remise à jour, un bien-être en 403 — écrirait la même ligne
+ * ~700 fois par jour et par athlète : le bruit qui fait cesser de lire le journal. Pour ce
+ * canal, une même cause ne s'écrit qu'une fois par fenêtre. Le webhook et le cron, plus
+ * rares, gardent une ligne par passage.
+ */
+export const FENETRE_NAVIGATEUR_MS = 6 * 3600 * 1000;
 
 /** Un code rendu PAR LA BASE : SQLSTATE (23502, 22P02, P0001, XX000…) ou PostgREST (PGRST204…).
  *  Pas « cinq majuscules » : `EPIPE`, une coupure réseau, en a cinq aussi. */
@@ -96,11 +106,22 @@ export async function journaliserRefus(
   if (passagers) console.warn(`[synchro/${o.canal}] ${passagers} écriture(s) en échec passager — reprises au passage suivant`);
   if (!parCause.size) return bilan;
 
+  const message = (g: { quoi: string; cause: string }) => `Écriture refusée à la synchro (${g.quoi}) : ${g.cause}`.slice(0, 2000);
   try {
+    if (o.canal === "navigateur") {
+      const depuis = new Date(Date.now() - FENETRE_NAVIGATEUR_MS).toISOString();
+      const { data: deja, error: eDeja } = await admin.from("error_logs").select("message")
+        .eq("user_id", o.userId).eq("source", "synchro").eq("url", ROUTES_SYNCHRO.navigateur).gte("created_at", depuis).limit(200);
+      // Sans réponse, rien n'est tenu pour déjà écrit : mieux vaut une ligne de trop qu'un
+      // refus que personne ne voit.
+      const vus = new Set(eDeja ? [] : ((deja ?? []) as { message?: string }[]).map((l) => l.message));
+      for (const [cle, g] of parCause) if (vus.has(message(g))) parCause.delete(cle);
+      if (!parCause.size) return bilan;
+    }
     const { error } = await admin.from("error_logs").insert([...parCause.values()].map((g) => ({
       user_id: o.userId,
       source: "synchro",
-      message: `Écriture refusée à la synchro (${g.quoi}) : ${g.cause}`.slice(0, 2000),
+      message: message(g),
       url: ROUTES_SYNCHRO[o.canal],
       meta: { canal: o.canal, total: g.lignes.length, refus: g.lignes.slice(0, EXEMPLES_MAX) },
     })));

@@ -14,7 +14,9 @@ export async function POST(req: Request) {
   const { user_id } = await req.json() as { user_id?: string };
   if (!user_id) return NextResponse.json({ error: "user_id requis" }, { status: 400 });
 
-  await createAdminClient().from("notifications").update({ read: true })
+  // L'écriture est lue (08/11/2026) : la route disait « ok » et les messages restaient non lus.
+  const { error } = await createAdminClient().from("notifications").update({ read: true })
     .eq("user_id", user_id).eq("type", "client_message").eq("read", false);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

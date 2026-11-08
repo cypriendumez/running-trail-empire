@@ -44,6 +44,9 @@ export type SyncReport = {
   refus: number;
   passagers: number;
   error?: string;
+  /** Le statut HTTP d'intervals.icu quand il y en a un : c'est lui qui dit si réessayer a un
+   *  sens (429, 503…) ou non (401, 403 : accès retiré), pas le texte. */
+  status?: number | null;
 };
 
 export type Synchro = {
@@ -154,7 +157,7 @@ export async function syncAndCoachForUser(
 ): Promise<SyncReport> {
   const s = await synchroniser(admin, { ...opts, canal: "cron" });
   if (s.error) {
-    return { fresh: 0, replanned: false, skipped: "erreur", tracks: { imported: 0, withoutGps: 0, failed: 0, remaining: 0 }, refus: 0, passagers: 0, error: s.error };
+    return { fresh: 0, replanned: false, skipped: "erreur", tracks: { imported: 0, withoutGps: 0, failed: 0, remaining: 0 }, refus: 0, passagers: 0, error: s.error, status: s.status ?? null };
   }
   const suite = await poursuivre(admin, opts, s.fresh);
   return { fresh: s.fresh, ...suite, refus: s.refus, passagers: s.passagers };

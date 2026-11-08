@@ -25,6 +25,7 @@ import { StoreBadges } from "@/components/layout/StoreBadges";
 import { OffreEtudiante } from "@/components/landing/OffreEtudiante";
 import { WaitlistSection } from "@/components/WaitlistSection";
 import { PHOTOS_PROGRAMMES } from "@/lib/brand/photosProgrammes";
+import { SITE_URL, NOM_MARQUE, jsonLdMarque } from "@/lib/brand/entite";
 
 // Données visuelles (non traduisibles). Les libellés viennent de LANDING[lang].
 // ── PHOTOS DES PROGRAMMES ────────────────────────────────────────────────────
@@ -224,6 +225,16 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans text-zinc-900 antialiased">
+      {/* ── L'ENTITÉ « PACEVO » POUR LES MOTEURS (08/11/2026) ──
+          Google corrigeait « pacevo » en « pancevo » (ville serbe) et pacevo.fr n'était pas
+          en première page. L'accueil ne portait ni canonique ni donnée structurée : voir
+          `lib/brand/entite`. La canonique est posée ICI parce que cette page est un
+          composant client (pas d'export `metadata`) et qu'une canonique dans le layout
+          racine serait HÉRITÉE par toutes les pages sans la leur : /contact, /avis ou
+          /notre-histoire se déclareraient alors des doublons de l'accueil. React 19 remonte
+          ce `<link>` dans le `<head>`, au rendu serveur compris. */}
+      <link rel="canonical" href={SITE_URL} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdMarque() }} />
 
       {/* ── NAV ── */}
       {/* La barre reste TRANSPARENTE sur le hero. Un fond en verre dépoli sombre avait été
@@ -539,6 +550,10 @@ export default function LandingPage() {
                 traite le fond. L'ombre agit là où il faut — sous les lettres — et laisse la
                 piste lumineuse partout ailleurs. */}
             <h1 className="text-[2.9rem] font-semibold leading-[1.03] tracking-tight text-white [text-shadow:0_2px_22px_rgba(0,0,0,0.72)] sm:text-6xl md:text-7xl lg:text-[5.25rem]">
+              {/* Le nom de la marque, pour les lecteurs d'écran et les moteurs : le titre
+                  visible est la ligne de marque (« Pace Your Evolution »), qui ne dit
+                  jamais « Pacevo ». Invisible à l'écran, le dessin du hero ne bouge pas. */}
+              <span className="sr-only">{NOM_MARQUE} — </span>
               {L.hero.titleA}<br />{L.hero.titleB}
               {/* Le mot accentué porte la seconde moitié du nom (« Evo ») : on lui donne
                   le vert du wordmark et une ombre portée, sans quoi l'émeraude sur une

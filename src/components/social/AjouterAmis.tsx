@@ -41,7 +41,7 @@ const T: Record<string, Record<string, string>> = {
     qrPartager: "Partager mon lien", qrScanner: "Scanner un code",
     qrScanIndispo: "Pour scanner le code d'un ami, ouvre l'appareil photo de ton téléphone et vise son code.",
     qrCamEchec: "Caméra inaccessible", qrPasPacevo: "Ce code n'est pas un code Pacevo", fermer: "Fermer",
-    suivreCarte: "Suivre {nom} ?", introuvable: "Athlète introuvable",
+    suivreCarte: "Suivre {nom} ?", introuvable: "Athlète introuvable", indispo: "Liste momentanément indisponible, réessaie dans un instant.",
   },
   en: {
     suggestions: "Suggestions", contacts: "Contacts", qr: "QR code", resultats: "Results",
@@ -57,7 +57,7 @@ const T: Record<string, Record<string, string>> = {
     qrPartager: "Share my link", qrScanner: "Scan a code",
     qrScanIndispo: "To scan a friend's code, open your phone camera and point it at their code.",
     qrCamEchec: "Camera unavailable", qrPasPacevo: "This isn't a Pacevo code", fermer: "Close",
-    suivreCarte: "Follow {nom}?", introuvable: "Athlete not found",
+    suivreCarte: "Follow {nom}?", introuvable: "Athlete not found", indispo: "List unavailable right now, try again in a moment.",
   },
   de: {
     suggestions: "Vorschläge", contacts: "Kontakte", qr: "QR-Code", resultats: "Ergebnisse",
@@ -73,7 +73,7 @@ const T: Record<string, Record<string, string>> = {
     qrPartager: "Meinen Link teilen", qrScanner: "Code scannen",
     qrScanIndispo: "Um den Code eines Freundes zu scannen, öffne die Kamera deines Telefons und richte sie auf seinen Code.",
     qrCamEchec: "Kamera nicht verfügbar", qrPasPacevo: "Das ist kein Pacevo-Code", fermer: "Schließen",
-    suivreCarte: "{nom} folgen?", introuvable: "Athlet nicht gefunden",
+    suivreCarte: "{nom} folgen?", introuvable: "Athlet nicht gefunden", indispo: "Liste gerade nicht verfügbar, versuche es gleich noch einmal.",
   },
   es: {
     suggestions: "Sugerencias", contacts: "Contactos", qr: "Código QR", resultats: "Resultados",
@@ -89,7 +89,7 @@ const T: Record<string, Record<string, string>> = {
     qrPartager: "Compartir mi enlace", qrScanner: "Escanear un código",
     qrScanIndispo: "Para escanear el código de un amigo, abre la cámara de tu teléfono y apunta a su código.",
     qrCamEchec: "Cámara no disponible", qrPasPacevo: "Este no es un código Pacevo", fermer: "Cerrar",
-    suivreCarte: "¿Seguir a {nom}?", introuvable: "Atleta no encontrado",
+    suivreCarte: "¿Seguir a {nom}?", introuvable: "Atleta no encontrado", indispo: "Lista no disponible ahora mismo, inténtalo de nuevo en un momento.",
   },
   pt: {
     suggestions: "Sugestões", contacts: "Contactos", qr: "Código QR", resultats: "Resultados",
@@ -105,7 +105,7 @@ const T: Record<string, Record<string, string>> = {
     qrPartager: "Partilhar a minha ligação", qrScanner: "Ler um código",
     qrScanIndispo: "Para ler o código de um amigo, abre a câmara do telemóvel e aponta para o código dele.",
     qrCamEchec: "Câmara indisponível", qrPasPacevo: "Este não é um código Pacevo", fermer: "Fechar",
-    suivreCarte: "Seguir {nom}?", introuvable: "Atleta não encontrado",
+    suivreCarte: "Seguir {nom}?", introuvable: "Atleta não encontrado", indispo: "Lista indisponível de momento, tenta novamente daqui a pouco.",
   },
 };
 
@@ -158,10 +158,13 @@ export function AjouterAmis({ moi, suivre, onFollowChange }: {
   const load = useCallback(async (query: string) => {
     try {
       const r = await fetch(`/api/social/follow?q=${encodeURIComponent(query)}`);
+      // ⚠️ Une panne n'est pas « personne à suggérer » (08/11/2026) : on garde la liste
+      // affichée et on le dit.
+      if (!r.ok) { toast.error(d.indispo); return; }
       const j = await r.json();
       setAthletes(j.athletes ?? []);
-    } catch { setAthletes([]); }
-  }, []);
+    } catch { toast.error(d.indispo); }
+  }, [d]);
 
   // Recherche différée : sans ce délai, chaque frappe déclenchait une requête.
   useEffect(() => {
@@ -183,7 +186,8 @@ export function AjouterAmis({ moi, suivre, onFollowChange }: {
         const j = await r.json();
         if (!vivant) return;
         if (r.ok && j.athlete) setInvite(j.athlete);
-        else toast.error(d.introuvable);
+        // 404 = vraiment introuvable ; une panne (503) n'est pas « introuvable ».
+        else toast.error(r.status === 404 ? d.introuvable : d.indispo);
       } catch { if (vivant) toast.error(d.introuvable); }
       if (suivre) router.replace("/dashboard/communaute");
     })();

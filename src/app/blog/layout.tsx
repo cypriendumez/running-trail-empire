@@ -8,7 +8,12 @@ import type { Metadata } from "next";
  * ⚠️ ET CETTE ERREUR NE SE VOIT QU'AU BUILD : `tsc` passe, la suite de tests passe.
  * C'est ce qui distingue `npm run verify` de `npm run build`.
  */
-export const metadata: Metadata = { title: "Conseils course à pied et trail", description: "Entraînement, allures, blessures, matériel : les articles de Pacevo pour progresser sans se blesser." };
+export const metadata: Metadata = {
+  title: "Conseils course à pied et trail",
+  description: "Entraînement, allures, blessures, matériel : les articles de Pacevo pour progresser sans se blesser.",
+  // Héritée par /blog/<article> SAUF que chaque article déclare la sienne (generateMetadata).
+  alternates: { canonical: "/blog" },
+};
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;

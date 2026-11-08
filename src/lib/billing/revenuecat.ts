@@ -5,6 +5,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formuleDuProduit } from "@/lib/billing/stores";
+import { sansAdresse } from "@/lib/journal/sansAdresse";
 
 const ACTIFS = new Set(["INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "UNCANCELLATION", "NON_RENEWING_PURCHASE"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -17,7 +18,7 @@ export async function traiterEvenementStore(admin: SupabaseClient, ev: Record<st
   const ok = (corps: Record<string, unknown>): ReponseStore => ({ statut: 200, corps: { ok: true, ...corps } });
   if (type === "TEST") return ok({ ignore: "test" });
   const journal = async (message: string, meta: Record<string, unknown>) => {
-    const { error } = await admin.from("error_logs").insert({ source: "revenuecat", message: message.slice(0, 2000), meta });
+    const { error } = await admin.from("error_logs").insert({ source: "revenuecat", message: sansAdresse(message).slice(0, 2000), meta: sansAdresse(meta) });
     if (error) console.error("[revenuecat] journal non écrit :", error.message);
   };
   // Un acheteur anonyme ($RCAnonymousID) ou inconnu : rien à accorder, mais on le garde en trace.

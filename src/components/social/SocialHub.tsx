@@ -22,6 +22,7 @@ import { Heart, MessageCircle, UserPlus, Trash2, Send, Users, ImagePlus, X, Load
 import { AjouterAmis } from "./AjouterAmis";
 import { timeAgo, statLine, likesLabel } from "@/lib/social/feed";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { toast } from "sonner";
 
 type Author = { id: string; full_name?: string | null; avatar_url?: string | null };
 type Workout = {
@@ -421,30 +422,38 @@ function PostCard({ post, onChange }: { post: Post; onChange: () => void }) {
 function Comments({ postId }: { postId: string }) {
   const { t } = useT();
   const [items, setItems] = useState<Comment[] | null>(null);
+  const [panne, setPanne] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const r = await fetch(`/api/social/interact?postId=${postId}`);
+    const r = await fetch(`/api/social/interact?postId=${postId}`).catch(() => null);
+    // ⚠️ Une panne n'est pas « aucun commentaire — sois le premier » (08/11/2026) : la liste
+    // déjà affichée reste, et sans liste on dit la panne à sa place.
+    if (!r?.ok) { setPanne(true); toast.error(t("club.commentIndispo")); return; }
     const j = await r.json();
+    setPanne(false);
     setItems(j.comments ?? []);
-  }, [postId]);
+  }, [postId, t]);
   useEffect(() => { void load(); }, [load]);
 
   async function send() {
     if (!text.trim()) return;
     setBusy(true);
-    await fetch("/api/social/interact", {
+    const r = await fetch("/api/social/interact", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ postId, action: "comment", body: text }),
-    });
-    setText(""); setBusy(false); void load();
+    }).catch(() => null);
+    setBusy(false);
+    // Le texte n'est effacé que s'il est parti : un refus le laissait disparaître sans un mot.
+    if (!r?.ok) { const j = await r?.json().catch(() => null); toast.error(j?.error || t("club.commentIndispo")); return; }
+    setText(""); void load();
   }
 
   return (
     <div className="border-t border-zinc-100 bg-zinc-50/60 px-4 py-3">
       {items === null ? (
-        <div className="h-8 animate-pulse rounded bg-zinc-200" />
+        panne ? <p className="mb-3 text-xs text-zinc-500">{t("club.commentIndispo")}</p> : <div className="h-8 animate-pulse rounded bg-zinc-200" />
       ) : items.length === 0 ? (
         <p className="mb-3 text-xs text-zinc-400">{t("club.noComment")}</p>
       ) : (

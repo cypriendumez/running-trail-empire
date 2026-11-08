@@ -215,7 +215,9 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
       const j = await res.json();
       if (j.ok) {
         setPlannedList(ps => [...ps, { id: String(j.id), name: r.name, location: r.city || r.department || "", distanceKm: r.distance_km, date }]);
-        toast.success(d["t.added"]);
+        // « ton coach en tiendra compte » serait faux si l'objectif n'a pas pu être posé.
+        if (j.objectifPose === false) toast.error(d["t.objectifRate"]);
+        else toast.success(d["t.added"]);
       } else toast.error(j.error || d["t.fail"]);
     } catch { toast.error(d["t.saveErr"]); }
     finally { setPlanning(false); }

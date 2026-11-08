@@ -8,7 +8,11 @@ import type { Metadata } from "next";
  * ⚠️ ET CETTE ERREUR NE SE VOIT QU'AU BUILD : `tsc` passe, la suite de tests passe.
  * C'est ce qui distingue `npm run verify` de `npm run build`.
  */
-export const metadata: Metadata = { title: "Tarifs", description: "Les formules Pacevo : essai gratuit, Starter et Premium. Prix tout compris, sans engagement." };
+export const metadata: Metadata = {
+  title: "Tarifs",
+  description: "Les formules Pacevo : essai gratuit, Starter et Premium. Prix tout compris, sans engagement.",
+  alternates: { canonical: "/pricing" },
+};
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;

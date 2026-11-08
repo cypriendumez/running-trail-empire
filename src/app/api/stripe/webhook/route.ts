@@ -9,6 +9,7 @@ import { emailEncaissement, emailAlerteCompta } from "@/lib/compta/alerte";
 import { emailEditeur } from "@/lib/admin/acces";
 import { TYPE_ETAT_ABO, type EtatAbonnement } from "@/lib/billing/etatAbonnement";
 import { envoyerEmail } from "@/lib/email/envoyer";
+import { journaliserEchec, journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 
 
 export async function POST(req: Request) {
@@ -66,14 +67,23 @@ export async function POST(req: Request) {
    * Un paiement perdu, sans la moindre erreur nulle part.
    * On retombe donc sur l'identifiant client Stripe, qui est stocké sur le profil.
    */
-  const findUser = async (sub: Stripe.Subscription): Promise<string | null> => {
+  //
+  // ⚠️ UNE LECTURE RATÉE N'EST PAS « AUCUN ATHLÈTE » (08/11/2026). L'erreur n'était pas lue :
+  // une panne de quelques secondes donnait `null`, la branche s'arrêtait sur « sans athlète
+  // identifiable » et la route répondait 200 — Stripe ne réémet jamais après un 200, le
+  // client restait facturé en `free` pour toujours. Une panne renvoie maintenant 500.
+  const findUser = async (sub: Stripe.Subscription): Promise<{ id: string | null; panne?: string }> => {
     const fromMeta = sub.metadata?.supabase_user_id;
-    if (fromMeta) return fromMeta;
+    if (fromMeta) return { id: fromMeta };
     const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
-    if (!customerId) return null;
-    const { data } = await admin.from("profiles").select("id").eq("stripe_customer_id", customerId).maybeSingle();
-    return (data as { id?: string } | null)?.id ?? null;
+    if (!customerId) return { id: null };
+    const { data, error } = await admin.from("profiles").select("id").eq("stripe_customer_id", customerId).maybeSingle();
+    if (error) return { id: null, panne: `athlète illisible pour ${sub.id} : ${error.message}` };
+    return { id: (data as { id?: string } | null)?.id ?? null };
   };
+  /** Vraiment personne : pas de réémission (elle n'y changerait rien), mais une trace lue. */
+  const orphelin = (quoi: string, id: string) =>
+    journaliserEchec(admin, { source: "stripe", url: "/api/stripe/webhook", message: `${quoi} sans athlète identifiable (${id})` });
 
   /**
    * Mémorise l'état de l'abonnement pour que l'écran puisse le DIRE.
@@ -95,6 +105,9 @@ export async function POST(req: Request) {
       : await admin.from("notifications").insert({ user_id: userId, type: TYPE_ETAT_ABO, title: "abonnement", body: "", data: etat });
     // Sans cet état, l'écran ne peut dire ni « résiliation en cours » ni « carte
     // refusée » : l'athlète perdrait son accès sans avoir jamais su pourquoi.
+    // 23503 : le profil n'existe plus (compte supprimé, relecture du 08/11/2026). Personne à
+    // prévenir : une réémission échouerait pareil pendant trois jours. Une trace, pas un 500.
+    if (error?.code === "23503") { await orphelin("État d'abonnement d'un compte supprimé", userId); return; }
     if (error) echecs.push(`état d'abonnement : ${error.message}`);
   };
 
@@ -118,8 +131,10 @@ export async function POST(req: Request) {
     case "customer.subscription.created":
     case "customer.subscription.updated": {
       const sub = event.data.object as Stripe.Subscription;
-      const userId = await findUser(sub);
-      if (!userId) { console.error("[stripe] abonnement sans athlète identifiable", sub.id); break; }
+      const lu = await findUser(sub);
+      if (lu.panne) { echecs.push(lu.panne); break; }
+      const userId = lu.id;
+      if (!userId) { await orphelin("Abonnement", sub.id); break; }
       // ⚠️ La formule se lit sur le TARIF ACHETÉ. Écrire « pro » en dur donnait l'IA à
       // quelqu'un qui avait payé Essentiel : l'écart de 5 € entre les deux formules ne
       // voulait plus rien dire, et le verrou d'accès n'avait rien à verrouiller.
@@ -149,14 +164,21 @@ export async function POST(req: Request) {
     }
     case "customer.subscription.deleted": {
       const sub = event.data.object as Stripe.Subscription;
-      const userId = await findUser(sub);
-      if (!userId) { console.error("[stripe] résiliation sans athlète identifiable", sub.id); break; }
-      const { error: eFin } = await admin.from("profiles").update({
+      const lu = await findUser(sub);
+      if (lu.panne) { echecs.push(lu.panne); break; }
+      const userId = lu.id;
+      if (!userId) { await orphelin("Résiliation", sub.id); break; }
+      const { data: touches, error: eFin } = await admin.from("profiles").update({
         subscription_tier: "free",
         stripe_subscription_id: null,
-      }).eq("id", userId);
+      }).eq("id", userId).select("id");
       // Son échec laisse un accès payant à quelqu'un qui ne paie plus.
-      if (eFin) echecs.push(`fin d'accès de ${userId} : ${eFin.message}`);
+      if (eFin) { echecs.push(`fin d'accès de ${userId} : ${eFin.message}`); break; }
+      // ⚠️ AUCUN PROFIL : LE COMPTE A ÉTÉ SUPPRIMÉ (08/11/2026). La suppression de compte résilie
+      // l'abonnement, et cet événement arrive APRÈS l'effacement du profil : mémoriser l'état
+      // échouerait (clé étrangère) et le 500 ferait réémettre Stripe pendant des jours pour
+      // rien. Il n'y a plus personne à prévenir : 200.
+      if (!(touches ?? []).length) break;
       await memoriserEtat(userId, {
         statut: "canceled", periodeFin: null, annuleALaFin: false, echecPaiement: false,
         souscritLe: null, intervalle: null,
@@ -179,11 +201,15 @@ export async function POST(req: Request) {
       const inv = event.data.object as Stripe.Invoice & { subscription?: string | { id: string } };
       const subId = typeof inv.subscription === "string" ? inv.subscription : inv.subscription?.id;
       if (!subId) break;
-      const { data } = await admin.from("profiles").select("id").eq("stripe_subscription_id", subId).maybeSingle();
+      const { data, error: eQui } = await admin.from("profiles").select("id").eq("stripe_subscription_id", subId).maybeSingle();
+      if (eQui) { echecs.push(`athlète illisible pour ${subId} : ${eQui.message}`); break; }
       const userId = (data as { id?: string } | null)?.id;
-      if (!userId) { console.error("[stripe] échec de paiement sans athlète identifiable", subId); break; }
-      const { data: ligne } = await admin.from("notifications").select("id, data")
+      if (!userId) { await orphelin("Échec de paiement", subId); break; }
+      // Sans l'état précédent, `memoriserEtat` l'écraserait par des champs vides
+      // (date de souscription, périodicité) : on ne touche à rien et Stripe réessaie.
+      const { data: ligne, error: eLigne } = await admin.from("notifications").select("id, data")
         .eq("user_id", userId).eq("type", TYPE_ETAT_ABO).maybeSingle();
+      if (eLigne) { echecs.push(`état d'abonnement illisible pour ${userId} : ${eLigne.message}`); break; }
       const precedent = (ligne?.data ?? {}) as Partial<EtatAbonnement>;
       await memoriserEtat(userId, {
         statut: typeof precedent.statut === "string" ? precedent.statut : "past_due",
@@ -199,12 +225,21 @@ export async function POST(req: Request) {
   }
 
   if (echecs.length) {
-    // Le détail va au journal du serveur, pas à Stripe : la réponse d'un webhook n'est
-    // pas un endroit où raconter l'état de sa base.
-    console.error("[stripe] écritures d'accès en échec, on demande une réémission :", echecs);
+    await signalerReemission(admin, event, echecs);
     return NextResponse.json({ error: "écriture impossible" }, { status: 500 });
   }
   return NextResponse.json({ received: true });
+}
+
+/**
+ * Le détail d'une réémission demandée va au journal, pas à Stripe : la réponse d'un
+ * webhook n'est pas un endroit où raconter l'état de sa base. Un webhook ne passe pas par
+ * le navigateur : sans le journal, ces échecs n'existaient pour personne. Une ligne par
+ * événement (Stripe le réémet pendant trois jours, on ne la répète pas).
+ */
+async function signalerReemission(admin: ReturnType<typeof createAdminClient>, event: Stripe.Event, echecs: string[]): Promise<void> {
+  console.error("[stripe] écritures d'accès en échec, on demande une réémission :", echecs);
+  await journaliserEchecUneFois(admin, { source: "stripe", url: "/api/stripe/webhook", message: `Événement ${event.id} (${event.type}) à réémettre : ${echecs.join(" ; ")}` }, 7 * 24 * 3600 * 1000);
 }
 
 /**

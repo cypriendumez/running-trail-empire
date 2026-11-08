@@ -53,9 +53,15 @@ export async function POST(req: Request) {
     // `created_at` et `subscription_tier` servent à calculer les jours d'essai RESTANTS :
     // sans eux, on ne peut pas distinguer un athlète qui vient de s'inscrire d'un autre
     // dont l'essai gratuit est terminé depuis un mois.
-    const { data: profile } = await supabase
+    const { data: profile, error: eProfil } = await supabase
       .from("profiles").select("stripe_customer_id, email, full_name, created_at, subscription_tier")
       .eq("id", user.id).single();
+    // ⚠️ AUCUNE CRÉATION CHEZ STRIPE SUR UN PROFIL ILLISIBLE (08/11/2026). Sans lui, un NOUVEAU
+    // client était créé et remplaçait l'ancien lien (l'abonnement existant devenait orphelin),
+    // et `created_at` absent valait un essai gratuit de 7 jours que personne n'avait décidé.
+    if (eProfil || !profile) {
+      return NextResponse.json({ error: "Paiement indisponible pour le moment, réessaie dans un instant." }, { status: 503 });
+    }
 
     let customerId = profile?.stripe_customer_id;
     if (!customerId) {

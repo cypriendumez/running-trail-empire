@@ -44,3 +44,36 @@ export function idExterneGpx(premierInstant: string | null | undefined): string 
   const t = Date.parse(String(premierInstant ?? ""));
   return Number.isFinite(t) ? `gpx:${new Date(t).toISOString()}` : null;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LECTURE D'UN GPX : nom, points (`<trkpt>`), altitude et heure de passage.
+//  Sortie de la route d'import le 08/11/2026 pour être testée sur de vrais fichiers.
+// ─────────────────────────────────────────────────────────────────────────────
+export function parseGPX(xml: string): { name: string; points: { lat: number; lng: number; ele?: number; time?: string }[] } {
+  const nameMatch = xml.match(/<name>(.*?)<\/name>/);
+  const name = nameMatch ? nameMatch[1].trim() : "Activité importée";
+
+  // Les attributs dans N'IMPORTE QUEL ordre, entre guillemets simples ou doubles (relecture du
+  // 08/11/2026) : `lat` puis `lon` était seul lu, et un export `lon="…" lat="…"` arrivait vide,
+  // refusé comme « sans trace ».
+  const trkptRegex = /<trkpt\b([^>]*?)(?:\/>|>([\s\S]*?)<\/trkpt>)/g;
+  const attribut = (attrs: string, nom: string) => attrs.match(new RegExp(`\\b${nom}\\s*=\\s*["']([^"']+)["']`))?.[1];
+  const points: { lat: number; lng: number; ele?: number; time?: string }[] = [];
+
+  let m;
+  while ((m = trkptRegex.exec(xml)) !== null) {
+    const lat = parseFloat(attribut(m[1], "lat") ?? "");
+    const lng = parseFloat(attribut(m[1], "lon") ?? "");
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const inner = m[2] ?? "";
+    const eleMatch = inner.match(/<ele>(.*?)<\/ele>/);
+    const timeMatch = inner.match(/<time>(.*?)<\/time>/);
+    points.push({
+      lat,
+      lng,
+      ele: eleMatch ? parseFloat(eleMatch[1]) : undefined,
+      time: timeMatch ? timeMatch[1] : undefined,
+    });
+  }
+  return { name, points };
+}

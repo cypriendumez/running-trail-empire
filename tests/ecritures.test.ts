@@ -59,7 +59,8 @@ test("un échec d'octroi d'accès fait RÉÉMETTRE l'événement Stripe", () => 
   // Les deux écritures qui donnent et retirent l'accès payé.
   assert.ok(/const\s*\{\s*error:\s*eAcces\s*\}\s*=\s*await\s+admin\s*\.from\("profiles"\)\.update/.test(src),
     "l'octroi d'accès ne lit plus son erreur");
-  assert.ok(/const\s*\{\s*error:\s*eFin\s*\}\s*=\s*await\s+admin\.from\("profiles"\)\.update/.test(src),
+  // `data` lu en plus (08/11/2026) : 0 ligne touchée = compte déjà supprimé, voir le webhook.
+  assert.ok(/const\s*\{\s*(?:data:\s*\w+\s*,\s*)?error:\s*eFin\s*\}\s*=\s*await\s+admin\.from\("profiles"\)\.update/.test(src),
     "la fin d'accès ne lit plus son erreur");
 });
 

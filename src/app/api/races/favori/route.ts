@@ -30,8 +30,12 @@ export async function POST(req: Request) {
   const on = body.on !== false;
 
   const admin = createAdminClient();
-  const { data: deja } = await admin.from("notifications").select("id")
+  const { data: deja, error: eLecture } = await admin.from("notifications").select("id")
     .eq("user_id", user.id).eq("type", TYPE_FAVORI).eq("data->>raceId", raceId).limit(1).maybeSingle();
+  // ⚠️ UNE LECTURE RATÉE N'EST PAS « PAS EN FAVORI » (08/11/2026) : le retrait répondait
+  // `favori: false` sans rien supprimer (l'étoile revenait au rechargement), l'ajout insérait
+  // un doublon. Réessayer peut réussir : 503, et l'écran revient en arrière.
+  if (eLecture) return NextResponse.json({ error: "Favoris momentanément indisponibles." }, { status: 503 });
 
   if (!on) {
     // Retrait : on supprime TOUTES les copies, pas seulement la première. Une base qui

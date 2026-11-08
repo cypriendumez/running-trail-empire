@@ -37,9 +37,14 @@ export function AutoSync() {
       if (Date.now() - last < THROTTLE_MS) return;
 
       // Vérifie une seule fois si Intervals.icu est configuré, puis met en cache.
+      // ⚠️ SEULE UNE RÉPONSE RÉUSSIE SE MET EN CACHE. Une coupure ou un 503 était gardé comme
+      // « pas de montre » pour toute la visite : plus aucune synchronisation, sans un mot.
+      // Sans réponse, on ne sait pas : on reposera la question au tick suivant.
       if (configured.current === null) {
-        try { const s = await fetch("/api/intervals/status").then(r => r.json()); configured.current = !!s.configured; }
-        catch { configured.current = false; }
+        try {
+          const r = await fetch("/api/intervals/status");
+          if (r.ok) configured.current = !!(await r.json()).configured;
+        } catch { /* sans réponse : on ne sait pas, on reposera la question */ }
       }
       if (!configured.current) return;
 

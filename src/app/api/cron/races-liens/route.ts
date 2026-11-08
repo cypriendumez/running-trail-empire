@@ -61,8 +61,11 @@ export async function GET(req: Request) {
     if (data.length < 1000) break;
   }
 
-  const { data: ligne } = await sb.from("notifications").select("id, data")
+  const { data: ligne, error: eEtat } = await sb.from("notifications").select("id, data")
     .eq("user_id", proprietaire).eq("type", TYPE_ETAT).maybeSingle();
+  // ⚠️ Un état illisible n'est pas un état vide (08/11/2026) : la liste des pages mortes
+  // accumulée était écrasée, et une seconde ligne d'état bloquait ensuite chaque passage.
+  if (eEtat) return NextResponse.json({ ok: false, error: `État illisible : ${eEtat.message}` }, { status: 500 });
   const etat: EtatLiens = { ...ETAT_VIDE, ...((ligne?.data ?? {}) as Partial<EtatLiens>) };
 
   const aujourdhui = jourLocal();

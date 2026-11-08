@@ -17,19 +17,22 @@ export function SectionHeading({
   subtitle,
   align = "center",
   className,
+  niveau: Titre = "h2",
 }: {
   eyebrow?: string;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   align?: "center" | "left";
   className?: string;
+  /** `h1` quand ce titre EST celui de la page (/pricing n'avait aucun H1, 08/11/2026). */
+  niveau?: "h1" | "h2";
 }) {
   return (
     <div className={cn(align === "center" ? "text-center mx-auto max-w-2xl" : "max-w-2xl", className)}>
       {eyebrow && (
         <p className="text-[13px] font-medium text-[#047857] first-letter:uppercase">{eyebrow}</p>
       )}
-      <h2 className="mt-3 text-3xl sm:text-4xl font-semibold tracking-tight text-zinc-900">{title}</h2>
+      <Titre className="mt-3 text-3xl sm:text-4xl font-semibold tracking-tight text-zinc-900">{title}</Titre>
       {subtitle && <p className="mt-4 text-base leading-relaxed text-zinc-500">{subtitle}</p>}
     </div>
   );

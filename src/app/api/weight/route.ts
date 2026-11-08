@@ -3,10 +3,12 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
   buildWeightPlan, weightModeEligibility, trendVerdict,
-  type WeightLog, type EnergyWorkout,
+  type WeightLog,
 } from "@/lib/weight/energy";
 import { weightTrainingRules } from "@/lib/weight/coaching";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
+import { fetchWorkouts } from "@/lib/weight/seances";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  MODE PERTE DE POIDS — lecture du plan et enregistrement des pesées.
@@ -42,11 +44,20 @@ type ProfileRow = {
  */
 async function fetchProfile(sb: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const full = await sb.from("profiles").select(`${BASE_COLS}, ${MODE_COLS}`).eq("id", userId).single();
-  if (!full.error) return { profile: full.data as unknown as ProfileRow, migrated: true };
+  if (!full.error) return { profile: full.data as unknown as ProfileRow, migrated: true, panne: false };
+  // ⚠️ SEULE UNE COLONNE ABSENTE (42703) EST « MIGRATION EN RETARD » (08/11/2026). Toute
+  // erreur relançait sans les colonnes du mode : une panne passagère affichait « migration
+  // à exécuter » et `enabled: false` à un athlète dont le mode est actif.
+  if (full.error.code === "PGRST116") return { profile: null, migrated: true, panne: false };
+  if (full.error.code !== "42703") return { profile: null, migrated: true, panne: true };
   const base = await sb.from("profiles").select(BASE_COLS).eq("id", userId).single();
-  if (base.error) return { profile: null, migrated: false };
-  return { profile: base.data as unknown as ProfileRow, migrated: false };
+  if (base.error) return { profile: null, migrated: false, panne: base.error.code !== "PGRST116" };
+  return { profile: base.data as unknown as ProfileRow, migrated: false, panne: false };
 }
+
+/** Une lecture en échec n'est ni « profil introuvable » ni « migration en retard ». */
+const illisible = (cle: "profil_illisible" | "pesees_illisibles" | "seances_illisibles") =>
+  NextResponse.json({ error: cle }, { status: 503 });
 
 /** Pesées — table absente tant que la migration 018 n'est pas passée. */
 async function fetchLogs(sb: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<WeightLog[] | null> {
@@ -56,21 +67,13 @@ async function fetchLogs(sb: Awaited<ReturnType<typeof createClient>>, userId: s
   return (r.data ?? []) as unknown as WeightLog[];
 }
 
-async function fetchWorkouts(sb: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<EnergyWorkout[]> {
-  const since = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-  const cols = "date, type, distance_km, duration_seconds, elevation_gain_m, avg_power_watts";
-  const withSport = await sb.from("workouts").select(`${cols}, sport`).eq("user_id", userId).gte("date", since);
-  if (!withSport.error) return (withSport.data ?? []) as unknown as EnergyWorkout[];
-  const plain = await sb.from("workouts").select(cols).eq("user_id", userId).gte("date", since);
-  return (plain.data ?? []) as unknown as EnergyWorkout[];
-}
-
 export async function GET() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const { profile, migrated } = await fetchProfile(sb, user.id);
+  const { profile, migrated, panne } = await fetchProfile(sb, user.id);
+  if (panne) return illisible("profil_illisible");
   if (!profile) return NextResponse.json({ error: "Profil introuvable" }, { status: 404 });
 
   const body = {
@@ -79,6 +82,12 @@ export async function GET() {
   };
   const eligibility = weightModeEligibility(body, profile.health_conditions);
   const logs = migrated ? await fetchLogs(sb, user.id) : null;
+  // ⚠️ MIGRATION PASSÉE ET PESÉES ILLISIBLES = PANNE, pas « aucune pesée enregistrée »
+  // (08/11/2026) : l'écran l'affichait, et le plan retombait sur le poids du profil.
+  if (migrated && logs == null) {
+    await journaliserEchec(null, { source: "poids", userId: user.id, url: "/api/weight", message: "Pesées illisibles : plan non calculé (mode poids)" });
+    return illisible("pesees_illisibles");
+  }
   const enabled = Boolean(profile.weight_mode_enabled);
   const goalKg = profile.weight_goal_kg != null ? Number(profile.weight_goal_kg) : null;
 
@@ -94,6 +103,15 @@ export async function GET() {
   // des garde-fous d'éligibilité.
   const applyDeficit = enabled && eligibility.ok;
   const workouts = await fetchWorkouts(sb, user.id);
+  if (workouts == null) {
+    // Journalisé : une panne qui dure doit se voir dans /admin › Bugs, pas seulement à l'écran.
+    await journaliserEchec(null, {
+      source: "poids", userId: user.id, url: "/api/weight",
+      message: "Séances illisibles : dépense non calculée (mode poids)",
+    });
+    // Réessayer peut réussir : 503, avec une clé que l'écran traduit.
+    return illisible("seances_illisibles");
+  }
   const plan = buildWeightPlan({ body, goalKg, logs: logs ?? [], workouts, applyDeficit });
   if (!plan) {
     return NextResponse.json({
@@ -129,7 +147,8 @@ export async function POST(req: Request) {
       if (enabled) {
         // Les garde-fous sont revérifiés SERVEUR : masquer un bouton dans l'interface
         // n'empêche personne d'appeler la route directement.
-        const { profile } = await fetchProfile(sb, user.id);
+        const { profile, panne } = await fetchProfile(sb, user.id);
+        if (panne) return illisible("profil_illisible");
         if (!profile) return NextResponse.json({ error: "Profil introuvable" }, { status: 404 });
         const el = weightModeEligibility(
           { weightKg: profile.weight_kg ?? null, heightCm: profile.height_cm ?? null, age: profile.age ?? null, gender: profile.gender ?? null },
@@ -149,7 +168,10 @@ export async function POST(req: Request) {
         // Sans cette symétrie, l'app refusait le mode à quelqu'un déjà mince mais acceptait
         // de projeter quelqu'un VERS cette même corpulence — et affichait une échéance pour
         // y arriver. Le garde-fou d'entrée ne servait alors à rien.
-        const { profile } = await fetchProfile(sb, user.id);
+        // ⚠️ SANS PROFIL LISIBLE, PAS DE GARDE-FOU : la taille restait inconnue, le contrôle
+        // de l'IMC 20 était SAUTÉ et l'objectif passait. Une panne refuse, elle ne laisse pas faire.
+        const { profile, panne } = await fetchProfile(sb, user.id);
+        if (panne) return illisible("profil_illisible");
         const h = profile?.height_cm ?? null;
         if (h) {
           const minKg = Math.ceil(20 * (h / 100) ** 2 * 10) / 10;
@@ -197,7 +219,12 @@ export async function POST(req: Request) {
     const { error: eProfil } = await sb.from("profiles").update({ weight_kg: weightKg }).eq("id", user.id);
     if (eProfil) {
       profilAJour = false;
-      console.error("[poids] pesée enregistrée mais profil non mis à jour :", eProfil.message);
+      // La console d'une fonction Vercel, personne ne la lit : /admin › Bugs lit `error_logs`.
+      // Le poids lui-même reste hors du message (donnée de santé).
+      await journaliserEchec(null, {
+        source: "poids", userId: user.id, url: "/api/weight",
+        message: `Pesée enregistrée mais profil non mis à jour : ${eProfil.code ?? "?"} ${eProfil.message}`,
+      });
     }
   }
 

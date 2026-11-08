@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     // Voir et commenter sont deux droits distincts. Compte public : n'importe qui.
     // Compte privé : uniquement les amis, c'est-à-dire un suivi dans les DEUX sens.
     const auteurId = String((post as { user_id: string }).user_id);
-    const [{ data: auteur }, { data: jeSuis }, { data: ilMeSuit }] = await Promise.all([
+    const [{ data: auteur, error: eAuteur }, { data: jeSuis, error: eSuis }, { data: ilMeSuit, error: eSuit }] = await Promise.all([
       // `athletes_publics` et non `profiles` : la RLS de `profiles` ne laisse lire
       // que sa propre ligne, si bien que le drapeau d'un AUTRE athlète revenait
       // toujours nul — et le repli « compte public » s'appliquait à tout le monde.
@@ -63,6 +63,13 @@ export async function POST(req: Request) {
     // Migration 021 en retard : PostgREST renvoie 42703 et `auteur` vaut null. On
     // retombe alors sur « compte public », c'est-à-dire le comportement d'avant —
     // jamais sur un refus général qui bloquerait toute la messagerie sociale.
+    // ⚠️ MAIS SEULEMENT POUR 42703 (08/11/2026). Toute autre panne retombait aussi sur « compte
+    // public » : un hoquet de la base ouvrait les commentaires d'un compte PRIVÉ à n'importe
+    // qui. Et une lecture des suivis ratée faisait refuser un ami. Dans le doute, on ne
+    // décide pas : 503, réessayable.
+    if ((eAuteur && eAuteur.code !== "42703") || eSuis || eSuit) {
+      return NextResponse.json({ error: "Commentaire momentanément impossible, réessaie dans un instant." }, { status: 503 });
+    }
     const auteurPrive = Boolean((auteur as { is_private?: boolean } | null)?.is_private);
     const autorise = canComment(
       post as Parameters<typeof canComment>[0], user.id, auteurPrive,
@@ -109,11 +116,13 @@ export async function GET(req: Request) {
   const postId = new URL(req.url).searchParams.get("postId");
   if (!postId) return NextResponse.json({ error: "Publication manquante" }, { status: 400 });
 
-  const { data } = await sb.from("post_comments")
+  const { data, error } = await sb.from("post_comments")
     // Contrainte nommée pour la même raison que dans le fil : sans elle, PostgREST
     // hésite entre plusieurs chemins vers `profiles` et répond 300.
     .select("id, body, created_at, author:profiles!post_comments_user_id_fkey(id, full_name, avatar_url)")
     .eq("post_id", postId).order("created_at", { ascending: true }).limit(100);
+  // Une panne n'est pas « aucun commentaire » (08/11/2026).
+  if (error) return NextResponse.json({ error: "Commentaires momentanément illisibles." }, { status: 503 });
 
   return NextResponse.json({ comments: data ?? [] });
 }

@@ -62,7 +62,7 @@ const W: Record<string, Record<string, string>> = {
     assumptions: "Ce qui est calculé, ce qui est supposé",
     caps: "Plafonds de sécurité appliqués",
     disclaimer: "Ces chiffres sont des estimations issues d'équations de population, pas des mesures. En cas de pathologie (diabète, thyroïde, trouble du comportement alimentaire), de traitement en cours ou de perte de poids importante visée, parles-en à un médecin ou à un diététicien avant de commencer.",
-    saved: "Pesée enregistrée", deleted: "Pesée supprimée", err: "Erreur",
+    saved: "Pesée enregistrée", deleted: "Pesée supprimée", err: "Erreur", "err.pesees": "Tes pesées sont illisibles pour l'instant : rien n'est calculé sans elles. Réessaie dans un moment.", "err.profil": "Ton profil est illisible pour l'instant : rien n'est calculé ni enregistré sans lui. Réessaie dans un moment.", "err.seances": "Tes séances sont illisibles pour l'instant : ta dépense ne peut pas être calculée, et on ne va pas la deviner. Réessaie dans un moment.", "warn.profil": "Pesée enregistrée, mais ton profil garde l'ancien poids : tes zones et tes calories de séance ne sont pas encore à jour. Réessaie dans un moment.",
     delete: "Supprimer",
   },
   en: {
@@ -94,7 +94,7 @@ const W: Record<string, Record<string, string>> = {
     assumptions: "What is computed, what is assumed",
     caps: "Safety caps applied",
     disclaimer: "These figures are estimates from population equations, not measurements. If you have a medical condition (diabetes, thyroid, eating disorder), are on medication, or are targeting significant weight loss, talk to a doctor or dietitian first.",
-    saved: "Weigh-in saved", deleted: "Weigh-in deleted", err: "Error",
+    saved: "Weigh-in saved", deleted: "Weigh-in deleted", err: "Error", "err.pesees": "Your weigh-ins can't be read right now: nothing is calculated without them. Try again in a moment.", "err.profil": "Your profile can't be read right now: nothing is calculated or saved without it. Try again in a moment.", "err.seances": "Your sessions can't be read right now: your energy expenditure can't be calculated, and we won't guess it. Try again in a moment.", "warn.profil": "Weigh-in saved, but your profile still has your previous weight: your zones and session calories aren't up to date yet. Try again in a moment.",
     delete: "Delete",
   },
   de: {
@@ -126,7 +126,7 @@ const W: Record<string, Record<string, string>> = {
     assumptions: "Was berechnet, was angenommen wird",
     caps: "Angewandte Sicherheitsgrenzen",
     disclaimer: "Diese Zahlen sind Schätzungen aus Populationsgleichungen, keine Messungen. Bei Erkrankungen (Diabetes, Schilddrüse, Essstörung), laufender Medikation oder angestrebtem starkem Gewichtsverlust sprich vorher mit Arzt oder Ernährungsberatung.",
-    saved: "Wiegen gespeichert", deleted: "Wiegen gelöscht", err: "Fehler",
+    saved: "Wiegen gespeichert", deleted: "Wiegen gelöscht", err: "Fehler", "err.pesees": "Deine Wiegungen sind gerade nicht lesbar: Ohne sie wird nichts berechnet. Versuche es gleich noch einmal.", "err.profil": "Dein Profil ist gerade nicht lesbar: Ohne es wird nichts berechnet oder gespeichert. Versuche es gleich noch einmal.", "err.seances": "Deine Einheiten sind gerade nicht lesbar: Dein Energieverbrauch lässt sich nicht berechnen, und wir raten ihn nicht. Versuche es gleich noch einmal.", "warn.profil": "Wiegen gespeichert, aber dein Profil hat noch das alte Gewicht: Deine Zonen und Kalorien pro Einheit sind noch nicht aktuell. Versuche es gleich noch einmal.",
     delete: "Löschen",
   },
   es: {
@@ -158,7 +158,7 @@ const W: Record<string, Record<string, string>> = {
     assumptions: "Lo que se calcula y lo que se supone",
     caps: "Límites de seguridad aplicados",
     disclaimer: "Estas cifras son estimaciones de ecuaciones poblacionales, no mediciones. Si tienes una patología (diabetes, tiroides, trastorno de la conducta alimentaria), sigues un tratamiento o buscas una pérdida importante, consulta antes a un médico o dietista.",
-    saved: "Pesaje guardado", deleted: "Pesaje eliminado", err: "Error",
+    saved: "Pesaje guardado", deleted: "Pesaje eliminado", err: "Error", "err.pesees": "Tus pesajes no se pueden leer ahora mismo: sin ellos no se calcula nada. Inténtalo de nuevo en un momento.", "err.profil": "Tu perfil no se puede leer ahora mismo: sin él no se calcula ni se guarda nada. Inténtalo de nuevo en un momento.", "err.seances": "Tus sesiones no se pueden leer ahora mismo: tu gasto no se puede calcular y no lo vamos a adivinar. Inténtalo de nuevo en un momento.", "warn.profil": "Pesaje guardado, pero tu perfil conserva el peso anterior: tus zonas y las calorías de tus sesiones aún no están al día. Inténtalo de nuevo en un momento.",
     delete: "Eliminar",
   },
   pt: {
@@ -190,7 +190,7 @@ const W: Record<string, Record<string, string>> = {
     assumptions: "O que é calculado e o que é suposto",
     caps: "Limites de segurança aplicados",
     disclaimer: "Estes valores são estimativas de equações populacionais, não medições. Em caso de patologia (diabetes, tiroide, perturbação alimentar), medicação em curso ou perda de peso significativa pretendida, fala primeiro com um médico ou nutricionista.",
-    saved: "Pesagem guardada", deleted: "Pesagem eliminada", err: "Erro",
+    saved: "Pesagem guardada", deleted: "Pesagem eliminada", err: "Erro", "err.pesees": "As tuas pesagens não podem ser lidas agora: sem elas nada é calculado. Tenta novamente daqui a pouco.", "err.profil": "O teu perfil não pode ser lido agora: sem ele nada é calculado nem guardado. Tenta novamente daqui a pouco.", "err.seances": "As tuas sessões não podem ser lidas agora: o teu gasto não pode ser calculado e não o vamos adivinhar. Tenta novamente daqui a pouco.", "warn.profil": "Pesagem guardada, mas o teu perfil mantém o peso anterior: as tuas zonas e as calorias das sessões ainda não estão atualizadas. Tenta novamente daqui a pouco.",
     delete: "Eliminar",
   },
 };
@@ -233,6 +233,9 @@ export function WeightMode() {
   const { lang } = useT();
   // Les clés d'habillage viennent de W, les phrases CALCULÉES de WEIGHT_EXPLAIN.
   const tr: Tr = (k, p) => fill(W[lang]?.[k] ?? WEIGHT_EXPLAIN[lang]?.[k] ?? W.fr[k] ?? WEIGHT_EXPLAIN.fr[k] ?? k, p);
+  // Les pannes de lecture de /api/weight arrivent en CLÉS : on les traduit, on ne les affiche pas.
+  const ILLISIBLE: Record<string, string> = { seances_illisibles: "err.seances", pesees_illisibles: "err.pesees", profil_illisible: "err.profil" };
+  const messageErreur = (e: unknown) => (typeof e === "string" && ILLISIBLE[e] ? tr(ILLISIBLE[e]) : typeof e === "string" && e ? e : tr("err"));
 
   // Les décimales suivent la langue affichée : « 34,1 » en français, « 34.1 » en anglais.
   // Sans ça, un écran entièrement traduit laissait passer des nombres à l'anglaise.
@@ -248,7 +251,7 @@ export function WeightMode() {
     try {
       const res = await fetch("/api/weight");
       const json = await res.json();
-      if (!res.ok) { toast.error(json.error ?? tr("err")); return; }
+      if (!res.ok) { toast.error(messageErreur(json.error)); return; }
       setState(json as ApiState);
       setGoalInput(json.goalKg != null ? String(json.goalKg) : "");
     } catch { toast.error(tr("err")); }
@@ -263,8 +266,11 @@ export function WeightMode() {
     try {
       const res = await fetch("/api/weight", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const json = await res.json();
-      if (!res.ok) { toast.error(json.error ?? tr("err")); return false; }
-      if (okMsg) toast.success(okMsg);
+      if (!res.ok) { toast.error(messageErreur(json.error)); return false; }
+      // La pesée est enregistrée mais le profil garde l'ancien poids (`profilAJour: false`,
+      // journalisé côté serveur) : « Pesée enregistrée » seul cacherait des zones fausses.
+      if (json.profilAJour === false) toast.error(tr("warn.profil"));
+      else if (okMsg) toast.success(okMsg);
       await load();
       return true;
     } catch { toast.error(tr("err")); return false; }

@@ -7,6 +7,7 @@ import { coquilleEmail, ech } from "@/lib/newsletter/gabarit";
 import { envoyerEmail } from "@/lib/email/envoyer";
 import { kmApres } from "@/lib/dashboard/ressenti";
 import { douleursDeclarees } from "@/lib/coach/painZonesI18n";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 
 // POST /api/feedback {workout_id?, date, title, rpe (0-10), pain: string[], note, chaussure_id?}
 // → enregistre le ressenti post-séance (lu par le coach, informe la perso IA), rattaché à
@@ -63,7 +64,11 @@ export async function POST(req: Request) {
   // Un échec ici ne perd pas le ressenti (déjà enregistré) : on le dit, sans échouer.
   let chaussure: { id: string; km: number } | null = null, chaussureErreur = false;
   const km = Number(seance?.distance_km);
-  if (seance && typeof chaussure_id === "string" && chaussure_id && Number.isFinite(km) && km > 0) {
+  const paireCochee = typeof chaussure_id === "string" && chaussure_id !== "";
+  // ⚠️ UNE PAIRE COCHÉE QUI NE REÇOIT RIEN SE DIT (08/11/2026). Séance introuvable, ou sans
+  // distance mesurée : le toast annonçait le succès et la jauge d'usure ne bougeait pas.
+  if (paireCochee && !(seance && Number.isFinite(km) && km > 0)) chaussureErreur = true;
+  if (seance && paireCochee && Number.isFinite(km) && km > 0) {
     const { data: c, error: ec } = await admin.from("shoes").select("id, current_km").eq("id", chaussure_id).eq("user_id", user.id).eq("is_active", true).maybeSingle();
     if (ec || !c) chaussureErreur = true;
     else {
@@ -71,7 +76,10 @@ export async function POST(req: Request) {
       const { error: eu } = await admin.from("shoes").update({ current_km: nouveau }).eq("id", chaussure_id).eq("user_id", user.id);
       if (eu) chaussureErreur = true; else chaussure = { id: chaussure_id, km: nouveau };
     }
-    if (chaussureErreur) console.error("[feedback] kilométrage de la paire non mis à jour", chaussure_id);
+    if (chaussureErreur) {
+      console.error("[feedback] kilométrage de la paire non mis à jour", chaussure_id);
+      await journaliserEchec(admin, { source: "chaussures", userId: user.id, url: "/api/feedback", message: `Kilométrage de la paire non mis à jour : ${ec ? `lecture ${ec.code ?? "?"} ${ec.message}` : !c ? "paire introuvable ou inactive" : "écriture refusée"}` });
+    }
   }
 
   // ── ALERTE AU COACH ────────────────────────────────────────────────────────

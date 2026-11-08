@@ -17,6 +17,7 @@
  * l'action qu'il accompagne (inscription, objectif, ressenti…). Ici, on ne lève jamais.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sansAdresse } from "@/lib/journal/sansAdresse";
 
 const RESEND = "https://api.resend.com/emails";
 
@@ -65,9 +66,11 @@ async function journaliser(source: string, message: string, o: Options | undefin
     const { error } = await admin.from("error_logs").insert({
       user_id: o?.userId ?? null,
       source: source.slice(0, 24),
-      message: message.slice(0, 2000),
+      // Aucune adresse dans le journal (08/11/2026) : ni le destinataire, ni celle que le corps
+      // d'erreur de Resend peut répéter. Le compte (`user_id`) suffit à retrouver qui.
+      message: sansAdresse(message).slice(0, 2000),
       url: o?.url ?? null,
-      meta: { ...(o?.meta ?? {}), from },
+      meta: sansAdresse({ ...(o?.meta ?? {}), from }),
     });
     if (error) console.error(`[email:${source}] journal non écrit :`, error.message);
   } catch (e) {

@@ -3,35 +3,11 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { aujourdhui, jourCivil, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
-import { sportDuGpx, idExterneGpx } from "@/lib/intervals/gpx";
+import { sportDuGpx, idExterneGpx, parseGPX } from "@/lib/intervals/gpx";
 
 export const runtime = "nodejs";
 
-// Minimal GPX parser — extracts name, trkpts, distance
-function parseGPX(xml: string): { name: string; points: { lat: number; lng: number; ele?: number; time?: string }[] } {
-  const nameMatch = xml.match(/<name>(.*?)<\/name>/);
-  const name = nameMatch ? nameMatch[1].trim() : "Activité importée";
-
-  const trkptRegex = /<trkpt lat="([^"]+)" lon="([^"]+)"[^>]*>([\s\S]*?)<\/trkpt>/g;
-  const points: { lat: number; lng: number; ele?: number; time?: string }[] = [];
-
-  let m;
-  while ((m = trkptRegex.exec(xml)) !== null) {
-    const lat = parseFloat(m[1]);
-    const lng = parseFloat(m[2]);
-    const inner = m[3];
-    const eleMatch = inner.match(/<ele>(.*?)<\/ele>/);
-    const timeMatch = inner.match(/<time>(.*?)<\/time>/);
-    points.push({
-      lat,
-      lng,
-      ele: eleMatch ? parseFloat(eleMatch[1]) : undefined,
-      time: timeMatch ? timeMatch[1] : undefined,
-    });
-  }
-  return { name, points };
-}
-
+// Distance entre deux points (le fichier est lu par `parseGPX`, lib/intervals/gpx).
 function haversine(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371;
   const dLat = (b.lat - a.lat) * Math.PI / 180;
@@ -57,9 +33,22 @@ export async function POST(req: Request) {
   const xml = await file.text();
   const { name, points } = parseGPX(xml);
 
-  // Accept even 0-point GPX (manual/indoor activities with no GPS track)
+  // Un fichier sans aucun point ni repère n'est pas un GPX (les séances sans trace, en salle,
+  // sont refusées juste après : sans heures de passage, ni durée ni date réelles).
   if (points.length === 0 && !xml.includes("<trkpt") && !xml.includes("<wpt")) {
     return NextResponse.json({ error: "Fichier GPX invalide ou vide" }, { status: 400 });
+  }
+
+  // ⚠️ UNE SÉANCE SANS TRACE NI HEURES DE PASSAGE N'EST PAS UNE SÉANCE (08/11/2026). Sans
+  // `<trkpt>`, `points[0]` faisait tomber la route ; sans horodatage, la durée devenait 1 s
+  // (« minimum pour la contrainte ») et la date celle du jour : une allure de 10 km en 1 s,
+  // datée d'aujourd'hui, entrait dans le volume et les records comme une mesure. Un
+  // itinéraire préparé (sans heures) n'est pas une activité : on le dit.
+  if (points.length < 2) {
+    return NextResponse.json({ error: "Ce fichier ne contient pas de trace d'activité (aucun point de passage)." }, { status: 400 });
+  }
+  if (!points[0].time || !points[points.length - 1].time) {
+    return NextResponse.json({ error: "Ce fichier n'a pas d'heures de passage : sans durée ni date réelles, la séance fausserait ton volume et tes records. Exporte l'activité enregistrée par ta montre, pas un itinéraire." }, { status: 400 });
   }
 
   // Calculate distance
@@ -68,8 +57,12 @@ export async function POST(req: Request) {
 
   // Calculate elevation gain
   let elevGain = 0;
+  // Seulement entre deux points qui ont TOUS LES DEUX une altitude : un point sans `<ele>`
+  // valait 0, et le saut de 0 à 300 m comptait 300 m de dénivelé inventé.
   for (let i = 1; i < points.length; i++) {
-    const diff = (points[i].ele ?? 0) - (points[i - 1].ele ?? 0);
+    const a = points[i - 1].ele, b = points[i].ele;
+    if (a == null || b == null) continue;
+    const diff = b - a;
     if (diff > 0) elevGain += diff;
   }
 
@@ -89,7 +82,8 @@ export async function POST(req: Request) {
   if (externalId) {
     const { data: deja, error: eDeja } = await supabase.from("workouts").select("id")
       .eq("user_id", user.id).eq("external_id", externalId).limit(1).maybeSingle();
-    if (eDeja) console.error("[import GPX] doublon non vérifié :", eDeja.message);
+    // Sans réponse, on ne sait pas si elle est déjà là : l'insérer pourrait la doubler.
+    if (eDeja) return NextResponse.json({ error: "Vérification impossible pour le moment, réessaie dans un instant." }, { status: 503 });
     if (deja) return NextResponse.json({ error: "Cette activité est déjà importée." }, { status: 409 });
   }
 

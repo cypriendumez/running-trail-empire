@@ -8,6 +8,7 @@ import { roleOf } from "@/lib/intervals/sport";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
 import { enteteIntervals } from "@/lib/intervals/auth";
 import { temperaturesAir, positionHabituelle, enInterieur } from "@/lib/weather/temperatureSeances";
+import { fusionnerMetriquesGarmin, aDesMetriques } from "@/lib/intervals/metriquesGarmin";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -30,11 +31,15 @@ export async function GET(req: Request) {
   const newest = url.searchParams.get("newest") ?? new Date().toISOString().split("T")[0];
 
   // Load credentials: user profile first, then global env vars
-  const { data: profile } = await supabase
+  const { data: profile, error: eProfil } = await supabase
     .from("profiles")
     .select("intervals_athlete_id, intervals_api_key, last_loc_at, pace_curve")
     .eq("id", user.id)
     .single();
+  // ⚠️ UNE PANNE N'EST PAS « PAS DE MONTRE » (08/11/2026) : sans cette lecture, la suite
+  // répondait `configured: false` et l'onglet Sync demandait de brancher une montre déjà
+  // branchée. Réessayer peut réussir : 503.
+  if (eProfil) return NextResponse.json({ error: "Profil momentanément illisible, réessaie dans un moment." }, { status: 503 });
 
   // ⚠️ AUCUN REPLI SUR LES VARIABLES D'ENVIRONNEMENT — voir `lib/intervals/identifiants`.
   // Le `|| process.env.INTERVALS_ICU_*` qui était ici donnait le compte de l'ÉDITEUR à
@@ -76,10 +81,13 @@ export async function GET(req: Request) {
   }
 
   const activities: IntervalsActivity[] = await activitiesRes.json();
-  const wellness: IntervalsWellness[] = wellnessRes.ok ? await wellnessRes.json() : [];
-
   let synced = { workouts: 0, hrv: 0, sleep: 0 };
   const syncErrors: string[] = [];
+  // ⚠️ UN BIEN-ÊTRE REFUSÉ N'EST PAS « AUCUNE MESURE ». Un 4xx/5xx d'intervals.icu donnait
+  // une liste vide sans un mot : ni VFC ni sommeil importés, et le coach lisait « pas de
+  // mesure ». On continue avec les séances, mais on le dit.
+  const wellness: IntervalsWellness[] = wellnessRes.ok ? await wellnessRes.json() : [];
+  if (!wellnessRes.ok) syncErrors.push(`Bien-être intervals.icu : HTTP ${wellnessRes.status}`);
   let freshWorkouts = 0;   // insertions uniquement (cf. plus bas)
 
   // ── Sync activities → workouts ──────────────────────────────
@@ -88,10 +96,16 @@ export async function GET(req: Request) {
   if (validActivities.length > 0) {
     // Repli si la migration 015 n'est pas encore appliquée : PostgREST rejette le
     // select entier pour une seule colonne inconnue (42703).
-    const existingRows = existingWorkoutsResult.error
-      ? (await supabase.from("workouts").select("id, date, title")
-          .eq("user_id", user.id).gte("date", oldest).lte("date", newest)).data ?? []
-      : existingWorkoutsResult.data ?? [];
+    // ⚠️ SANS LES SÉANCES DÉJÀ EN BASE, ON NE SAIT PAS LESQUELLES SONT NOUVELLES. Si le repli
+    // échoue aussi, `[]` faisait de chaque activité une insertion : des doublons, et un
+    // « du neuf » qui republiait le plan. On s'arrête et on le dit.
+    let existingRows: unknown[] = existingWorkoutsResult.data ?? [];
+    if (existingWorkoutsResult.error) {
+      const repli = await supabase.from("workouts").select("id, date, title")
+        .eq("user_id", user.id).gte("date", oldest).lte("date", newest);
+      if (repli.error) return NextResponse.json({ error: "Tes séances sont momentanément illisibles, réessaie dans un moment." }, { status: 503 });
+      existingRows = repli.data ?? [];
+    }
 
     // L'identifiant d'origine prime sur (date, titre) : deux sorties le même jour
     // portent le même titre automatique Garmin et se confondaient.
@@ -149,20 +163,25 @@ export async function GET(req: Request) {
       if (!error) {
         synced.workouts += toInsert.length;
       } else {
-        syncErrors.push(`Insert batch: ${error.message}`);
+        // Le lot est repris séance par séance : c'est la cause de CHAQUE refus qui compte.
         for (const p of toInsert) {
           const { error: e2 } = await supabase.from("workouts").insert(p);
           if (!e2) synced.workouts++;
-          else syncErrors.push(`${p.date} "${p.title}": ${e2.message}`);
+          else syncErrors.push(`${p.date} « ${p.title} » : ${e2.code ?? "?"} ${e2.message}`);
         }
       }
     }
 
     // Parallel updates (20 concurrent)
     for (let i = 0; i < toUpdate.length; i += 20) {
+      // ⚠️ LE REFUS D'UNE MISE À JOUR SE DIT, comme celui d'une insertion : une séance
+      // refusée n'était jamais rafraîchie, sans trace nulle part.
       await Promise.all(toUpdate.slice(i, i + 20).map(({ id, payload }) =>
         supabase.from("workouts").update(payload).eq("id", id)
-          .then(({ error }) => { if (!error) synced.workouts++; })
+          .then(({ error }) => {
+            if (!error) synced.workouts++;
+            else syncErrors.push(`${String(payload.date ?? "?")} « ${String(payload.title ?? "?")} » : ${error.code ?? "?"} ${error.message}`);
+          })
       ));
     }
   }
@@ -223,7 +242,19 @@ export async function GET(req: Request) {
     vo2maxHistory,
     updatedAt: new Date().toISOString(),
   };
-  const hasGarminMetrics = [garminMetrics.vo2max, garminMetrics.restingHR, garminMetrics.lthr, garminMetrics.ctl].some(v => v != null);
+  // Même fusion que la synchro serveur (lib/intervals/metriquesGarmin) : si l'historique
+  // d'un an n'a pas pu être lu, la fenêtre courte ne doit pas écraser la courbe connue.
+  let metriquesAEcrire: ReturnType<typeof fusionnerMetriquesGarmin> | null = null;
+  let vo2AEcrire: number | null = null;
+  if (aDesMetriques(garminMetrics)) {
+    const { data: actuel, error: eMetriques } = await supabase.from("profiles")
+      .select("garmin_vo2max, garmin_metrics").eq("id", user.id).maybeSingle();
+    if (eMetriques) syncErrors.push(`Métriques montre illisibles : ${eMetriques.code ?? "?"} ${eMetriques.message}`);
+    else {
+      metriquesAEcrire = fusionnerMetriquesGarmin((actuel as { garmin_metrics?: unknown } | null)?.garmin_metrics, garminMetrics);
+      vo2AEcrire = metriquesAEcrire.vo2max;
+    }
+  }
 
   await Promise.all([
     // ⚠️ LE RÉSULTAT EST LU. `.then(() => synced.hrv = n)` comptait le lot comme écrit
@@ -243,9 +274,16 @@ export async function GET(req: Request) {
             else synced.sleep = sleepRows.length;
           })
       : Promise.resolve(),
-    // best-effort (colonnes garmin_vo2max + garmin_metrics ajoutées via SQL) — n'empêche pas la sync.
-    latestVo2 ? supabase.from("profiles").update({ garmin_vo2max: latestVo2 }).eq("id", user.id) : Promise.resolve(),
-    hasGarminMetrics ? supabase.from("profiles").update({ garmin_metrics: garminMetrics }).eq("id", user.id) : Promise.resolve(),
+    // Colonnes ajoutées à la main, chacune dans son `update` : un refus n'empêche pas la
+    // synchro, mais il part dans `errors` au lieu de disparaître.
+    vo2AEcrire != null
+      ? supabase.from("profiles").update({ garmin_vo2max: vo2AEcrire }).eq("id", user.id)
+          .then(({ error }) => { if (error) syncErrors.push(`VO2max montre : ${error.code ?? "?"} ${error.message}`); })
+      : Promise.resolve(),
+    metriquesAEcrire
+      ? supabase.from("profiles").update({ garmin_metrics: metriquesAEcrire }).eq("id", user.id)
+          .then(({ error }) => { if (error) syncErrors.push(`Métriques montre : ${error.code ?? "?"} ${error.message}`); })
+      : Promise.resolve(),
   ]);
 
   // ── COACH INSTANTANÉ ──────────────────────────────────────────────────────
@@ -311,6 +349,13 @@ export async function GET(req: Request) {
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const { importTracksBestEffort, replanIfFresh } = await import("@/lib/intervals/syncAndCoach");
   const admin = createAdminClient();
+  // ⚠️ LES REFUS PARTENT AU JOURNAL, comme ceux du webhook et du cron. Ils n'allaient que
+  // dans `errors`, que seul l'onglet Sync affiche : AutoSync — l'appelant de loin le plus
+  // fréquent — ne les lit pas, et /admin › Bugs ne les voyait jamais.
+  if (syncErrors.length) {
+    const { journaliserRefus } = await import("@/lib/intervals/refusSynchro");
+    await journaliserRefus(admin, { userId: user.id, canal: "navigateur", failures: syncErrors });
+  }
   const tracks = await importTracksBestEffort(admin, { userId: user.id, apiKey: API_KEY });
   const { replanned, skipped } = await replanIfFresh(admin, {
     userId: user.id, athleteId: ATHLETE_ID, apiKey: API_KEY, fresh: freshWorkouts,

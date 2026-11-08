@@ -48,11 +48,17 @@ export async function GET(req: Request) {
   let query = sb.from(TABLE_ATHLETES).select(ATHLETE_COLS).eq("onboarding_completed", true).limit(30);
   if (id) query = query.eq("id", id);
   else if (q) query = query.ilike("full_name", `%${q}%`);
-  const [{ data: rows }, { data: following }, masques] = await Promise.all([
+  const [{ data: rows, error: eAthletes }, { data: following, error: eSuivis }, masques] = await Promise.all([
     query,
     sb.from("follows").select("following_id").eq("follower_id", user.id).eq("status", "accepted"),
     athletesMasques(createAdminClient()),
   ]);
+  // ⚠️ UNE PANNE N'EST PAS « PERSONNE À SUIVRE » NI « JE NE SUIS PERSONNE » (08/11/2026). La
+  // seconde était la pire : chaque bouton affichait « Suivre » pour des gens déjà suivis, et
+  // le clic (une BASCULE) retirait le suivi — dont dépend la messagerie.
+  if (eAthletes || eSuivis) {
+    return NextResponse.json({ error: "Liste momentanément indisponible, réessaie dans un instant." }, { status: 503 });
+  }
 
   const followingIds = new Set((following ?? []).map((f) => String((f as { following_id: string }).following_id)));
   const visible = ((rows ?? []) as { id: string }[]).filter((a) => !estMasque(masques, a.id) && a.id !== user.id);

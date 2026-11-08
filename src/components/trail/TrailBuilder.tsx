@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { TB, fillT } from "./trailI18n";
 import { fmtNombre, fmtKm } from "@/lib/i18n/nombres";
+import { idPartage } from "@/lib/courses/veille";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface LatLng { lat: number; lng: number }
@@ -677,13 +678,17 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
           setLoadingRoutes(false);
           return;
         }
+      } else {
+        // ⚠️ Le repli sur ce navigateur reste, mais il se DIT (08/11/2026) : en silence,
+        // l'athlète croyait avoir perdu ses parcours enregistrés en ligne.
+        toast.error(d["t.loadErr"]);
       }
-    } catch { /* ignore */ }
+    } catch { toast.error(d["t.loadErr"]); }
     // Fallback to localStorage
     const local = JSON.parse(localStorage.getItem("trail_routes") || "[]");
     setSavedRoutes(local);
     setLoadingRoutes(false);
-  }, []);
+  }, [d]);
 
   useEffect(() => { loadSavedRoutes(); }, [loadSavedRoutes]);
 
@@ -707,9 +712,21 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
 
   // ── Delete saved route ─────────────────────────────────────────────────────
   const handleDeleteRoute = useCallback(async (id: string) => {
-    try {
-      await fetch(`/api/routes?id=${id}`, { method: "DELETE" });
-    } catch {}
+    // ⚠️ LA RÉPONSE EST LUE (08/11/2026) : l'écran retirait le parcours et disait « supprimé »
+    // quoi qu'ait répondu le serveur ; il revenait au rechargement. Un refus garde tout en place.
+    //
+    // Un parcours du REPLI LOCAL (enregistrement en ligne refusé) a pour id `Date.now()` :
+    // le serveur ne l'a jamais eu, et Postgres refuse cet id dans une colonne uuid. Le
+    // demander au serveur le rendait impossible à supprimer : il se retire du navigateur seul.
+    const enLigne = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    let supprime = !enLigne;
+    if (enLigne) {
+      try {
+        const res = await fetch(`/api/routes?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+        supprime = res.ok;
+      } catch { /* hors ligne : on ne sait pas, on ne retire rien */ }
+    }
+    if (!supprime) { toast.error(d["t.delErr"]); return; }
     const local = JSON.parse(localStorage.getItem("trail_routes") || "[]");
     const updated = local.filter((r: SavedRoute) => r.id !== id);
     localStorage.setItem("trail_routes", JSON.stringify(updated));
@@ -887,7 +904,9 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
 
   // ── Partage live : diffuse la position via Supabase Realtime ───────────────────
   const startShare = useCallback(() => {
-    const sid = Math.random().toString(36).slice(2, 9);
+    // ⚠️ CET IDENTIFIANT EST LE SEUL SECRET DU LIEN DE SUIVI GPS EN DIRECT (08/11/2026) :
+    // `Math.random` n'est pas fait pour ça. Même tirage que la veille de course.
+    const sid = idPartage();
     setShareId(sid);
     setSharing(true);
     setNavMode(true);

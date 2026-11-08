@@ -21,6 +21,7 @@ import { ReglesMotDePasse, messageRefusMotDePasse } from "@/components/auth/Regl
 import { Turnstile, CLE_TURNSTILE, type TurnstileRef } from "@/components/auth/Turnstile";
 import { DeuxFacteurs } from "./DeuxFacteurs";
 import { verifierRegles } from "@/lib/auth/reglesMotDePasse";
+import { deconnexion } from "@/lib/auth/deconnexion";
 
 type Profile = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
@@ -285,7 +286,10 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
   };
   const toggleSound = () => { const v = !sound; setSound(v); try { localStorage.setItem("rte:sound", v ? "on" : "off"); } catch { /* ignore */ } toast(v ? "" : ""); };
 
-  const signOut = async () => { await sb.auth.signOut(); router.push("/login"); };
+  // ⚠️ LA MÊME DÉCONNEXION QUE PARTOUT AILLEURS (08/11/2026) : `signOut()` seul laissait sur
+  // l'appareil les séances gardées hors ligne, les tracés et les brouillons de messages,
+  // lisibles par la personne suivante. `deconnexion()` fait le ménage.
+  const signOut = async () => { await deconnexion(); router.push("/login"); };
 
   const deleteAccount = async () => {
     if (delText !== "SUPPRIMER") return;
@@ -293,7 +297,9 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
     try {
       const r = await fetch("/api/account/delete", { method: "POST" });
       const j = await r.json();
-      if (j.ok) { await sb.auth.signOut(); router.push("/login"); }
+      // Données effacées mais identifiant de connexion resté (fin à la main) : on déconnecte
+      // aussi, en le disant ; rester connecté à un compte sans profil ne mène nulle part.
+      if (j.ok || j.donneesEffacees) { if (!j.ok) toast.error(j.error); await deconnexion(); router.push("/login"); }
       else { toast.error(j.error || "Échec"); setDeleting(false); }
     } catch { toast.error("Erreur"); setDeleting(false); }
   };

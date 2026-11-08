@@ -25,6 +25,7 @@ import { emailAccuseRetractation } from "@/lib/billing/emailsAbonnement";
 import { envoyerEmail } from "@/lib/email/envoyer";
 import { emailEditeur } from "@/lib/admin/acces";
 import { EDITEUR } from "@/lib/brand/editeur";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 
 type Profil = {
   stripe_subscription_id?: string | null;
@@ -105,9 +106,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Ta demande n'a pas pu être enregistrée. Réessaie dans un instant, ou écris-nous à ${EDITEUR.email}.` }, { status: 500 });
   }
 
-  // 2. REMBOURSEMENT AU PRORATA, PUIS ARRÊT IMMÉDIAT.
+  // 2. REMBOURSEMENT AU PRORATA, PUIS ARRÊT IMMÉDIAT — DEUX ÉTAPES, DEUX ISSUES (08/11/2026).
+  //    Elles partageaient un seul `try` : un remboursement RÉUSSI suivi d'un arrêt en échec
+  //    effaçait le montant (`null`), l'accusé disait « pas encore remboursé » et l'éditeur
+  //    recevait « rembourser à la main » — un second remboursement, et le prélèvement
+  //    suivant quand même. Chaque étape garde maintenant son résultat.
   let rembourseCentimes: number | null = null;
-  let erreurStripe: string | null = null;
+  let erreurRemboursement: string | null = null;
+  let erreurArret: string | null = null;
   try {
     const factures = await stripe.invoices.list({ subscription: subId, status: "paid", limit: 1 });
     const inv = factures.data[0] as (Stripe.Invoice & { payment_intent?: string | { id: string } | null; charge?: string | { id: string } | null }) | undefined;
@@ -132,11 +138,19 @@ export async function POST(req: Request) {
       }
       rembourseCentimes = aRendre;
     }
+  } catch (e) {
+    erreurRemboursement = (e as Error).message;
+  }
+  try {
     await stripe.subscriptions.cancel(subId, { prorate: false, cancellation_details: { comment: "Rétractation (14 jours)" } });
   } catch (e) {
-    erreurStripe = (e as Error).message;
-    rembourseCentimes = null;
-    console.error("[retractation] remboursement ou arrêt à faire à la main :", erreurStripe);
+    erreurArret = (e as Error).message;
+  }
+  const erreurStripe = [erreurRemboursement && `remboursement : ${erreurRemboursement}`, erreurArret && `arrêt : ${erreurArret}`]
+    .filter(Boolean).join(" ; ") || null;
+  // Un remboursement légal à faire sous 14 jours ne se lit pas qu'à la console.
+  if (erreurStripe) {
+    await journaliserEchec(admin, { source: "retractation", userId: user.id, url: "/api/stripe/retractation", message: `Rétractation à finir à la main (${subId}) — ${erreurStripe}` });
   }
 
   // La demande est déjà enregistrée (statut « recue ») : si cette mise à jour échoue, la
@@ -145,7 +159,7 @@ export async function POST(req: Request) {
   const { error: eStatut } = await admin.from("notifications").update({
     data: { ...trace, statut: erreurStripe ? "a_traiter" : "traitee", rembourseCentimes, erreur: erreurStripe },
   }).eq("id", ligne.id);
-  if (eStatut) console.error("[retractation] statut de la demande non mis à jour :", eStatut.message);
+  if (eStatut) await journaliserEchec(admin, { source: "retractation", userId: user.id, url: "/api/stripe/retractation", message: `Statut de la demande de rétractation non mis à jour : ${eStatut.message}` });
 
   // 3. L'ACCUSÉ DE RÉCEPTION, quoi qu'il soit arrivé chez Stripe.
   const m = emailAccuseRetractation({
@@ -159,9 +173,14 @@ export async function POST(req: Request) {
 
   const dest = emailEditeur();
   if (dest) {
-    const action = erreurStripe
-      ? `⚠️ À TRAITER À LA MAIN dans les 14 jours : rembourser la part non utilisée et arrêter l'abonnement ${subId}. Erreur Stripe : ${erreurStripe}`
-      : `Remboursé automatiquement : ${((rembourseCentimes ?? 0) / 100).toFixed(2)} €. Abonnement ${subId} arrêté.`;
+    // Ce qui est FAIT et ce qui reste à faire, étape par étape : jamais « tout à refaire ».
+    const remb = erreurRemboursement
+      ? `⚠️ REMBOURSEMENT À FAIRE À LA MAIN dans les 14 jours (part non utilisée). Erreur : ${erreurRemboursement}`
+      : `Remboursé automatiquement : ${((rembourseCentimes ?? 0) / 100).toFixed(2)} € (ne PAS rembourser à nouveau).`;
+    const arret = erreurArret
+      ? `⚠️ ARRÊTER L'ABONNEMENT ${subId} À LA MAIN, sinon le prochain prélèvement aura lieu. Erreur : ${erreurArret}`
+      : `Abonnement ${subId} arrêté.`;
+    const action = `${remb}\n${arret}`;
     await envoyerEmail("retractation-editeur", {
       to: [dest], subject: `Rétractation : ${email}`,
       text: `${nom} (${email}) a renoncé à son abonnement le ${recueLe.toISOString()}.\n${action}\nAccusé de réception : ${envoi.ok ? "envoyé" : `NON ENVOYÉ (${envoi.erreur}) — à renvoyer`}.`,
