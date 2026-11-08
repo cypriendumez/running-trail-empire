@@ -23,6 +23,9 @@ export async function GET() {
     // liste VIDE — l'athlète perdrait l'accès à tous ses parcours pour une colonne.
     const repli = await supabase.from("user_routes").select("*")
       .eq("user_id", user.id).order("created_at", { ascending: false });
+    // ⚠️ Si le repli échoue aussi, ce n'est pas « aucun parcours » (08/11/2026) : l'écran
+    // basculait en silence sur la copie du navigateur, et l'athlète croyait les avoir perdus.
+    if (repli.error) return NextResponse.json({ error: "Parcours momentanément illisibles." }, { status: 503 });
     return NextResponse.json({ routes: repli.data ?? [] });
   }
   return NextResponse.json({ routes: data ?? [] });
@@ -105,6 +108,11 @@ export async function DELETE(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id requis" }, { status: 400 });
+  // Un id qui n'est pas un UUID (parcours du repli local, `Date.now()`) n'a jamais été en
+  // base : Postgres le rejetterait et la route répondait 500, comme une panne.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return NextResponse.json({ error: "Parcours inconnu" }, { status: 404 });
+  }
 
   const { error } = await supabase
     .from("user_routes")

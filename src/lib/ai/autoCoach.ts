@@ -26,7 +26,7 @@ import { programmeMarcheCourse, FENETRE_JOURS as FENETRE_MARCHE_COURSE, type Pro
 import { isRun } from "@/lib/intervals/sport";
 import { decaleJour } from "@/lib/streak/compute";
 import { reecritureLue, type SeanceEcrite } from "@/lib/coach/planNotifie";
-import { journaliserEchec } from "@/lib/journal/echecServeur";
+import { journaliserEchec, journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 
 type Admin = SupabaseClient;
 
@@ -147,7 +147,15 @@ export async function autoCoachForUser(
   //  Un compte en consultation garde tout ce qu'il a déjà : historique, courses,
   //  trophées, série, et le plan qui était en place. Il ne reçoit simplement plus de
   //  NOUVELLE prescription. On ne détruit rien, on cesse de produire.
-  const { data: profilAcces } = await admin.from("profiles").select(`${COLONNES_ACCES}, email, preferred_language`).eq("id", userId).maybeSingle();
+  const { data: profilAcces, error: eAcces } = await admin.from("profiles").select(`${COLONNES_ACCES}, email, preferred_language`).eq("id", userId).maybeSingle();
+  // ⚠️ UNE PANNE N'EST NI « COMPTE GRATUIT » NI « PAS LE FONDATEUR » (08/11/2026) : sans ce
+  // profil, la formule tombait au plus bas et la suite prescrivait le test VMA. On ne touche
+  // à rien : le plan en place reste, le passage suivant réessaie.
+  if (eAcces) {
+    // Une fois par jour et par athlète : cette fonction tourne à chaque synchro (2 min).
+    await journaliserEchecUneFois(admin, { source: "coach-auto", userId, message: `Profil illisible, plan laissé en place : ${eAcces.code ?? "?"} ${eAcces.message}` });
+    return { processed: false, reason: "profil illisible" };
+  }
   const acces = profilAcces as Parameters<typeof profilPeut>[0];
   const planComplet = profilPeut(acces, "plan");
   // ⚠️ LE PALIER GRATUIT REÇOIT SEPT JOURS, BÂTIS SUR SON OBJECTIF SEUL (Cyprien,
@@ -175,8 +183,15 @@ export async function autoCoachForUser(
   //  colonne, de la même façon (le tri par `tested_at`, comme coachContext) : aucune 5ᵉ
   //  chaîne de VMA, un seul signal partagé. Comme `vma_kmh` est NOT NULL en base, « une
   //  ligne existe » ⟺ « une VMA est mesurée ».
-  const { data: baseVma } = await admin.from("performance_baselines")
+  const { data: baseVma, error: eBase } = await admin.from("performance_baselines")
     .select("vma_kmh").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle();
+  // ⚠️ UNE LECTURE RATÉE N'EST PAS « AUCUNE VMA MESURÉE » (08/11/2026). Elle l'était : le coach
+  // SUPPRIMAIT alors tout le plan à venir et prescrivait un test VMA (montre comprise) à un
+  // coureur dont la VMA est mesurée, sur un simple hoquet de la base, en répondant « traité ».
+  if (eBase) {
+    await journaliserEchecUneFois(admin, { source: "coach-auto", userId, message: `VMA illisible, plan laissé en place : ${eBase.code ?? "?"} ${eBase.message}` });
+    return { processed: false, reason: "vma illisible" };
+  }
   const vmaMesuree = Number((baseVma as { vma_kmh?: number } | null)?.vma_kmh) > 0;
   // Le FONDATEUR (compte admin) n'est pas soumis au test : sa VMA a toujours été estimée
   // depuis sa courbe d'allure/VO2max, il pilote l'app et n'a pas à passer par le test 6 min.

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { synchroniser, poursuivre } from "@/lib/intervals/syncAndCoach";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
 import { estErreurTransitoire } from "@/lib/cron/transitoire";
+import { sansAdresse } from "@/lib/journal/sansAdresse";
 import {
   RAISONS_IGNOREES, issueDe, lireLivraison, lotsATraiter, secretAttendu, secretValide, statutHttp, type Issue,
 } from "@/lib/intervals/webhook";
@@ -19,7 +20,7 @@ const ROUTE = "/api/webhooks/intervals";
 async function journaliser(userId: string | null, message: string, meta: Record<string, unknown>): Promise<void> {
   try {
     const { error } = await createAdminClient().from("error_logs").insert({
-      user_id: userId, source: "intervals-webhook", message: message.slice(0, 2000), url: ROUTE, meta,
+      user_id: userId, source: "intervals-webhook", message: sansAdresse(message).slice(0, 2000), url: ROUTE, meta: sansAdresse(meta),
     });
     if (error) console.error("[webhook/intervals] journal non écrit :", error.message);
   } catch (e) {

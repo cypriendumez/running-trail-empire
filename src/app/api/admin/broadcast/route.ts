@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { estAdmin } from "@/lib/admin/acces";
 import { envoyerEmail } from "@/lib/email/envoyer";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 
 
 // POST /api/admin/broadcast { title, body }
@@ -23,10 +24,12 @@ export async function POST(req: Request) {
 
   // Destinataires : UNIQUEMENT les personnes ABONNÉES à la newsletter (opt-in, non désinscrites).
   // On n'envoie JAMAIS aux comptes qui ne se sont pas abonnés.
-  const { data: subs } = await admin
+  const { data: subs, error: eSubs } = await admin
     .from("newsletter_subscribers")
     .select("email, user_id")
     .eq("unsubscribed", false);
+  // ⚠️ Une panne n'est pas « 0 abonné » (08/11/2026) : la lettre semblait partie vers personne.
+  if (eSubs) return NextResponse.json({ error: `Abonnés illisibles : ${eSubs.message}` }, { status: 500 });
   const subRows = (subs ?? []) as { email?: string; user_id?: string | null }[];
   const emails = new Set<string>();
   for (const s of subRows) if (s.email) emails.add(s.email.toLowerCase());
@@ -42,6 +45,7 @@ export async function POST(req: Request) {
   if (notifRows.length) {
     const { error } = await admin.from("notifications").insert(notifRows);
     if (!error) notified = notifRows.length;
+    else await journaliserEchec(admin, { source: "newsletter", url: "/api/admin/broadcast", message: `Notifications de la lettre non écrites : ${error.message}` });
   }
 
   // 2) E-mails via Resend, en lots BCC de 45 (un seul envoi par lot, sans exposer les adresses).

@@ -4,6 +4,10 @@ export const maxDuration = 60;
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { autoCoachForUser } from "@/lib/ai/autoCoach";
+import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
+
+/** Les raisons qui décrivent un compte, pas une panne : rien à journaliser. */
+const ETATS_NORMAUX = new Set(["essai_expire"]);
 
 type AutoSummary = { userId: string; processed: boolean; days?: number; pushed?: number; reason?: string };
 
@@ -37,8 +41,16 @@ export async function GET(req: Request) {
       apiKey: p.intervals_api_key as string | null,
     }).catch((e) => ({ processed: false, reason: String((e as Error).message) }));
     results.push({ userId: p.id as string, ...r });
+    // ⚠️ LE FILET DE NUIT NE SE TAISAIT PAS SEULEMENT, IL N'ÉTAIT VU PAR PERSONNE (08/11/2026) :
+    // cron Vercel, sans workflow ni navigateur, qui répondait `ok` même si tous les plans
+    // échouaient. Un échec qui n'est pas un état normal du compte part au journal, une fois
+    // par jour et par cause.
+    if (!r.processed && r.reason && !ETATS_NORMAUX.has(r.reason)) {
+      await journaliserEchecUneFois(admin, { source: "coach-nuit", userId: p.id as string, url: "/api/cron/auto-coach", message: `Plan non republié : ${r.reason}` });
+    }
   }
 
   const updated = results.filter((r) => r.processed).length;
-  return NextResponse.json({ ok: true, athletes: results.length, updated, results });
+  const echecs = results.filter((r) => !r.processed && r.reason && !ETATS_NORMAUX.has(r.reason)).length;
+  return NextResponse.json({ ok: true, athletes: results.length, updated, echecs, results });
 }

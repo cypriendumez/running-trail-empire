@@ -22,6 +22,7 @@ import { PRIX_AFFICHES } from "@/lib/billing/prix";
 import { emailRappelReconduction } from "@/lib/billing/emailsAbonnement";
 import { envoyerEmail } from "@/lib/email/envoyer";
 import { EDITEUR } from "@/lib/brand/editeur";
+import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 
 /** Type de la ligne `notifications` qui note chaque rappel envoyé. */
 export const TYPE_RAPPEL_RECONDUCTION = "rappel_reconduction";
@@ -66,9 +67,16 @@ export async function envoyerRappelsReconduction(
       const etat = litEtatAbo(ligne.data);
       if (!doitRappelerReconduction(etat, aujourdHui) || !etat?.periodeFin) continue;
 
-      const { data: deja } = await admin.from("notifications").select("id")
+      // ⚠️ SANS RÉPONSE, ON NE SAIT PAS S'IL EST DÉJÀ PARTI (08/11/2026) : la lecture ratée
+      // valait « jamais envoyé », et le même e-mail légal repartait à chaque passage de la
+      // synchronisation (toutes les ~30 min). On n'envoie rien et on le dit.
+      const { data: deja, error: eDeja } = await admin.from("notifications").select("id")
         .eq("user_id", ligne.user_id).eq("type", TYPE_RAPPEL_RECONDUCTION)
         .eq("data->>echeance", etat.periodeFin).maybeSingle();
+      if (eDeja) {
+        await journaliserEchecUneFois(admin, { source: "reconduction", userId: ligne.user_id, url: "/api/cron/sync-all", message: `Rappel de reconduction non vérifié, rien envoyé : ${eDeja.message}` });
+        echecs++; continue;
+      }
       if (deja) continue;
 
       const { data: p } = await admin.from("profiles")
@@ -83,19 +91,27 @@ export async function envoyerRappelsReconduction(
         montantCentimes: PRIX_AFFICHES[formule].an, echeance: etat.periodeFin,
         lien: `${base}/dashboard/profile?onglet=abonnement`,
       });
+      // La trace sert de preuve de l'information ET de verrou contre un second envoi : elle
+      // est donc posée AVANT l'envoi (08/11/2026). Après, son échec renvoyait le rappel à
+      // chaque passage. Si l'envoi échoue, on la retire pour réessayer au passage suivant.
+      const { data: trace, error: eTrace } = await admin.from("notifications").insert({
+        user_id: ligne.user_id, type: TYPE_RAPPEL_RECONDUCTION, title: "rappel de reconduction", body: "",
+        // L'adresse fait partie de la preuve de l'information (rattachée au compte, effacée avec lui).
+        data: { echeance: etat.periodeFin, envoyeLe: maintenant.toISOString(), email: profil.email },
+      }).select("id").single();
+      if (eTrace || !trace) {
+        await journaliserEchecUneFois(admin, { source: "reconduction", userId: ligne.user_id, url: "/api/cron/sync-all", message: `Rappel de reconduction non envoyé : verrou non posé (${eTrace?.message ?? "aucune ligne"})` });
+        echecs++; continue;
+      }
       const r = await envoyerEmail("reconduction", {
         to: [profil.email], subject: m.objet, text: m.texte, html: m.html, reply_to: EDITEUR.email,
       }, { userId: ligne.user_id, url: "/api/cron/sync-all" });
-      if (!r.ok) { echecs++; continue; }
-
-      // La trace sert de preuve de l'information ET de verrou contre un second envoi.
-      // ⚠️ Si elle ne s'écrit pas, l'abonné risque de recevoir le rappel une seconde fois au
-      // passage suivant : c'est un moindre mal, mais il faut que le journal le dise.
-      const { error: eTrace } = await admin.from("notifications").insert({
-        user_id: ligne.user_id, type: TYPE_RAPPEL_RECONDUCTION, title: "rappel de reconduction", body: "",
-        data: { echeance: etat.periodeFin, envoyeLe: maintenant.toISOString(), email: profil.email },
-      });
-      if (eTrace) { console.error("[reconduction] rappel envoyé mais non noté :", eTrace.message); echecs++; }
+      if (!r.ok) {
+        // L'échec d'envoi est déjà journalisé par `envoyerEmail` ; on libère le verrou.
+        const { error: eRetrait } = await admin.from("notifications").delete().eq("id", (trace as { id: string }).id);
+        if (eRetrait) await journaliserEchecUneFois(admin, { source: "reconduction", userId: ligne.user_id, url: "/api/cron/sync-all", message: `Rappel non envoyé ET verrou resté posé : il ne sera pas retenté (${eRetrait.message})` });
+        echecs++; continue;
+      }
       envoyes++;
     }
   } catch (e) {

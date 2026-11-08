@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { jetonValide } from "@/lib/newsletter/token";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 
 /**
  * GET /api/newsletter/unsubscribe?e=<email>&t=<jeton>
@@ -36,35 +37,62 @@ const page = (titre: string, message: string, ok: boolean) =>
     { status: ok ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8" } },
   );
 
-export async function GET(req: Request) {
+/**
+ * La désinscription elle-même, commune au lien (GET) et au bouton des messageries (POST).
+ *
+ * ⚠️ L'ÉCRITURE EST LUE (08/11/2026). Elle ne l'était pas : un client Supabase RETOURNE son
+ * erreur, le `try/catch` ne voyait rien, et la page disait « C'est fait » à quelqu'un qui
+ * recevait encore la lettre chaque lundi — un manquement au droit d'opposition que
+ * personne n'aurait vu, la requête venant d'un lien d'e-mail et non de l'application.
+ */
+async function desinscrire(req: Request): Promise<{ ok: boolean; invalide?: boolean }> {
   const { searchParams } = new URL(req.url);
   const email = String(searchParams.get("e") ?? "").trim().toLowerCase();
   const jeton = String(searchParams.get("t") ?? "");
+  if (!email || !jetonValide(email, jeton)) return { ok: false, invalide: true };
+  const admin = createAdminClient();
+  try {
+    const { error } = await admin.from("newsletter_subscribers").update({ unsubscribed: true }).eq("email", email);
+    if (!error) return { ok: true };
+    await journaliserEchec(admin, { source: "newsletter", url: "/api/newsletter/unsubscribe", message: `Désinscription non enregistrée : ${error.code ?? "?"} ${error.message}` });
+  } catch (e) {
+    await journaliserEchec(admin, { source: "newsletter", url: "/api/newsletter/unsubscribe", message: `Désinscription non enregistrée : ${e instanceof Error ? e.message : String(e)}` });
+  }
+  return { ok: false };
+}
 
-  if (!email || !jetonValide(email, jeton)) {
+export async function GET(req: Request) {
+  const r = await desinscrire(req);
+  if (r.invalide) {
     return page(
       "Ce lien n'est plus valide",
       "Le lien de désinscription est incomplet ou a expiré. Écris-nous et nous te retirons de la liste à la main.",
       false,
     );
   }
-
-  try {
-    await createAdminClient()
-      .from("newsletter_subscribers")
-      .update({ unsubscribed: true })
-      .eq("email", email);
-  } catch {
+  if (!r.ok) {
     return page(
       "La désinscription a échoué",
       "Quelque chose n'a pas fonctionné de notre côté. Réessaie dans un instant, ou écris-nous.",
       false,
     );
   }
-
   return page(
     "C'est fait, tu es désinscrit",
     "Tu ne recevras plus le résumé hebdomadaire. Ton compte et tes données d'entraînement ne sont pas affectés.",
     true,
   );
+}
+
+/**
+ * Le bouton « Se désabonner » de Gmail et d'Apple Mail (RFC 8058) : nos e-mails portent
+ * `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, et la messagerie appelle l'adresse
+ * en POST. Sans cette méthode, elle recevait un 405 : le bouton échouait sans que personne
+ * le sache, et la personne finissait par marquer la lettre comme indésirable.
+ */
+export async function POST(req: Request) {
+  const r = await desinscrire(req);
+  if (r.invalide) return NextResponse.json({ ok: false, error: "lien invalide" }, { status: 400 });
+  if (!r.ok) return NextResponse.json({ ok: false }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }

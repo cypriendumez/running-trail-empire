@@ -678,13 +678,17 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
           setLoadingRoutes(false);
           return;
         }
+      } else {
+        // ⚠️ Le repli sur ce navigateur reste, mais il se DIT (08/11/2026) : en silence,
+        // l'athlète croyait avoir perdu ses parcours enregistrés en ligne.
+        toast.error(d["t.loadErr"]);
       }
-    } catch { /* ignore */ }
+    } catch { toast.error(d["t.loadErr"]); }
     // Fallback to localStorage
     const local = JSON.parse(localStorage.getItem("trail_routes") || "[]");
     setSavedRoutes(local);
     setLoadingRoutes(false);
-  }, []);
+  }, [d]);
 
   useEffect(() => { loadSavedRoutes(); }, [loadSavedRoutes]);
 
@@ -708,9 +712,21 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
 
   // ── Delete saved route ─────────────────────────────────────────────────────
   const handleDeleteRoute = useCallback(async (id: string) => {
-    try {
-      await fetch(`/api/routes?id=${id}`, { method: "DELETE" });
-    } catch {}
+    // ⚠️ LA RÉPONSE EST LUE (08/11/2026) : l'écran retirait le parcours et disait « supprimé »
+    // quoi qu'ait répondu le serveur ; il revenait au rechargement. Un refus garde tout en place.
+    //
+    // Un parcours du REPLI LOCAL (enregistrement en ligne refusé) a pour id `Date.now()` :
+    // le serveur ne l'a jamais eu, et Postgres refuse cet id dans une colonne uuid. Le
+    // demander au serveur le rendait impossible à supprimer : il se retire du navigateur seul.
+    const enLigne = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    let supprime = !enLigne;
+    if (enLigne) {
+      try {
+        const res = await fetch(`/api/routes?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+        supprime = res.ok;
+      } catch { /* hors ligne : on ne sait pas, on ne retire rien */ }
+    }
+    if (!supprime) { toast.error(d["t.delErr"]); return; }
     const local = JSON.parse(localStorage.getItem("trail_routes") || "[]");
     const updated = local.filter((r: SavedRoute) => r.id !== id);
     localStorage.setItem("trail_routes", JSON.stringify(updated));

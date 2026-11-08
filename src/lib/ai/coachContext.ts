@@ -2262,8 +2262,12 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // Sans elles, le plan remplissait 7 jours pour tout le monde. Un athlète qui peut
   // courir 3 fois par semaine recevait un plan inapplicable et décrochait.
   const genderLabel = p?.gender === "female" ? "femme" : p?.gender === "male" ? "homme" : p?.gender ? String(p.gender) : "?";
+  // ⚠️ LE PRÉNOM SEUL PART AU MODÈLE (08/11/2026) : le nom complet n'aide en rien le coach
+  // (le plan est déterministe, le texte ne fait que s'adresser à l'athlète) et c'est une
+  // donnée d'identité de plus envoyée à un tiers avec des données de santé.
+  const prenomSeul = String(p?.full_name ?? "").trim().split(/\s+/)[0] || "Athlète";
   const text = `PROFIL
-- ${p?.full_name ?? "Athlète"} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · mode ${p?.mode ?? "?"}
+- ${prenomSeul} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · mode ${p?.mode ?? "?"}
 - NIVEAU estimé : ${level}${vma ? ` (VMA ${vma} km/h${vmaIsEst ? " estimée" : ""})` : ""}
 - ANCIENNETÉ en course à pied : ${expLabel ?? "non renseignée (reste prudent sur la charge tant que tu ne sais pas)"}
 - TERRAINS habituels : ${terr.labels.length ? terr.labels.join(" + ") : "non renseignés"}${elev ? ` · dénivelé : ${elev.label}` : ""} · D+ réalisé cette semaine : ${elevWeek} m

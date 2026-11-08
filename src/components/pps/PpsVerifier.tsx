@@ -38,7 +38,7 @@ export function PpsVerifier({
   const [numero, setNumero] = useState(initial?.number ?? "");
   const [expiresAt, setExpiresAt] = useState(initial?.expiresAt ?? ppsExpiration(initial?.obtainedAt) ?? "");
   const [licensed, setLicensed] = useState(initial?.licensed === true);
-  const [etat, setEtat] = useState<"repos" | "envoi" | "ok">("repos");
+  const [etat, setEtat] = useState<"repos" | "envoi" | "ok" | "echec">("repos");
 
   // Le verdict se recalcule À LA SAISIE : l'athlète voit l'effet de sa date avant même
   // d'enregistrer. C'est ce qui transforme un formulaire en réponse.
@@ -55,10 +55,14 @@ export function PpsVerifier({
 
   const enregistrer = async () => {
     setEtat("envoi");
-    await fetch("/api/pps", {
+    // ⚠️ LA RÉPONSE EST LUE (08/11/2026) : « Enregistré » s'affichait puis la page se
+    // rechargeait même sur un refus ou une coupure — un coureur pouvait croire son pass
+    // enregistré le jour de sa course.
+    const res = await fetch("/api/pps", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ expiresAt: expiresAt || null, number: numero || null, licensed }),
-    }).catch(() => undefined);
+    }).catch(() => null);
+    if (!res?.ok) { setEtat("echec"); return; }
     setEtat("ok");
     setTimeout(() => window.location.reload(), 600);
   };
@@ -143,6 +147,7 @@ export function PpsVerifier({
         {etat === "envoi" ? <Loader2 className="h-4 w-4 animate-spin" /> : etat === "ok" ? <Check className="h-4 w-4" /> : null}
         {etat === "ok" ? t.enregistre : t.enregistrer}
       </button>
+      {etat === "echec" && <p role="alert" className="mt-2 text-sm text-red-600">{t.echecEnregistrement}</p>}
     </div>
   );
 }

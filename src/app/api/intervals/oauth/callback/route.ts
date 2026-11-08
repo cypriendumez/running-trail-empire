@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { secretOAuth } from "@/lib/intervals/auth";
+import { sansAdresse } from "@/lib/journal/sansAdresse";
 import {
   CHEMIN_COOKIE, COOKIE_ETAT, PAGE_RETOUR, codeManquantes, configurationOAuth, echangerCode,
   etatsEgaux, lireCookie,
@@ -74,8 +75,8 @@ export async function GET(req: NextRequest) {
 async function journaliser(userId: string, message: string, meta: Record<string, unknown>): Promise<void> {
   try {
     const { error } = await createAdminClient().from("error_logs").insert({
-      user_id: userId, source: "intervals-oauth", message: message.slice(0, 2000),
-      url: "/api/intervals/oauth/callback", meta,
+      user_id: userId, source: "intervals-oauth", message: sansAdresse(message).slice(0, 2000),
+      url: "/api/intervals/oauth/callback", meta: sansAdresse(meta),
     });
     if (error) console.error("[intervals-oauth] journal non écrit :", error.message);
   } catch (e) {

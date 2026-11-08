@@ -8,6 +8,7 @@ import { statutCompte } from "@/lib/auth/statutCompte";
 import { autoriserPartage, ipDe } from "@/lib/auth/limiteur";
 import { champsConsentement, CONSENTEMENT_EFFACE } from "@/lib/auth/consentement";
 import { randomBytes } from "node:crypto";
+import { sansAdresse } from "@/lib/journal/sansAdresse";
 
 /**
  * L'INSCRIPTION PAR E-MAIL, ET L'E-MAIL DE CONFIRMATION ENVOYÉ PAR NOUS.
@@ -216,8 +217,8 @@ async function envoyerConfirmation(
 async function journaliser(message: string, meta: Record<string, unknown>): Promise<void> {
   try {
     const { error } = await createAdminClient().from("error_logs").insert({
-      user_id: null, source: "confirmation", message: message.slice(0, 2000),
-      url: "/api/auth/confirmation", meta,
+      user_id: null, source: "confirmation", message: sansAdresse(message).slice(0, 2000),
+      url: "/api/auth/confirmation", meta: sansAdresse(meta),
     });
     if (error) console.error("[confirmation] journal non écrit :", error.message);
   } catch (e) {

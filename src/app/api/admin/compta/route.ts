@@ -92,6 +92,11 @@ export async function GET() {
   // s'affiche vide parce que la requête a échoué se lit exactement comme un journal
   // vide — et on conclut qu'on n'a rien saisi.
   if (ecr.error) return NextResponse.json({ error: `Lecture impossible : ${ecr.error.message}` }, { status: 500 });
+  // Même règle pour les réglages (taux de cotisation, ACRE, solde initial : sans eux, le
+  // résultat affiché est faux sans un mot) et pour le journal d'accès aux factures, dont un
+  // faux « personne n'a consulté » est pire que pas de réponse (08/11/2026).
+  if (reg.error) return NextResponse.json({ error: `Réglages illisibles : ${reg.error.message}` }, { status: 500 });
+  if (acc.error) return NextResponse.json({ error: `Journal d'accès illisible : ${acc.error.message}` }, { status: 500 });
 
   return NextResponse.json({
     ok: true,

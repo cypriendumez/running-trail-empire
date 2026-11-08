@@ -62,9 +62,12 @@ export async function POST(req: Request) {
   // quelqu'un qu'il n'a pas choisi.
   const destinataire = String(b.to ?? "").trim();
   if (destinataire) {
-    const { data: liens } = await admin.from("follows")
+    const { data: liens, error: eLiens } = await admin.from("follows")
       .select("follower_id,following_id")
       .or(`follower_id.eq.${user.id},following_id.eq.${user.id}`);
+    // ⚠️ Une panne n'est pas un refus de droit (08/11/2026) : elle répondait « Vous ne pouvez
+    // pas écrire à cet athlète » (403, que personne ne journalise). 503, réessayable.
+    if (eLiens) return NextResponse.json({ error: "Envoi momentanément impossible, réessaie dans un instant." }, { status: 503 });
     if (!peutEcrire(user.id, destinataire, (liens ?? []) as Lien[])) {
       // On ne dit pas si la personne existe : répondre « athlète inconnu » d'un côté et
       // « pas ami » de l'autre laisserait deviner qui est inscrit.
@@ -73,7 +76,10 @@ export async function POST(req: Request) {
     // Les deux noms en une lecture. Celui du DESTINATAIRE est recopié dans le message :
     // la conversation doit rester nommée chez l'expéditeur même le jour où ils ne se
     // suivent plus — la liste d'amis, elle, ne le connaîtra plus.
-    const { data: noms } = await admin.from("profiles").select("id, full_name").in("id", [user.id, destinataire]);
+    const { data: noms, error: eNoms } = await admin.from("profiles").select("id, full_name").in("id", [user.id, destinataire]);
+    // Sans les noms, « Un athlète » et un destinataire vide seraient FIGÉS dans le message
+    // pour toujours : on n'écrit pas un nom inventé, on attend que la base réponde.
+    if (eNoms) return NextResponse.json({ error: "Envoi momentanément impossible, réessaie dans un instant." }, { status: 503 });
     const nomDe = (id: string) => String(noms?.find((p) => p.id === id)?.full_name ?? "").trim();
     const expediteur = nomDe(user.id) || "Un athlète";
     const contenu = {

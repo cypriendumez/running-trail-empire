@@ -39,6 +39,8 @@ export type TextesPps = {
   licencieAide: string;
   enregistrer: string;
   enregistre: string;
+  /** L'enregistrement a échoué : rien n'est sauvé, il faut réessayer. */
+  echecEnregistrement: string;
   effacer: string;
 
   // ── Verdicts ───────────────────────────────────────────────────────────────
@@ -106,6 +108,7 @@ export const PPS_T: Record<Lang, TextesPps> = {
     licencieAide: "Ta licence remplace le PPS : on cesse de t'en parler.",
     enregistrer: "Enregistrer",
     enregistre: "Enregistré",
+    echecEnregistrement: "Non enregistré : réessaie dans un instant.",
     effacer: "Effacer",
 
     vInconnu: "PPS non renseigné",
@@ -163,6 +166,7 @@ export const PPS_T: Record<Lang, TextesPps> = {
     licencieAide: "Your licence replaces the PPS: we will stop bringing it up.",
     enregistrer: "Save",
     enregistre: "Saved",
+    echecEnregistrement: "Not saved: try again in a moment.",
     effacer: "Clear",
 
     vInconnu: "PPS not recorded",
@@ -220,6 +224,7 @@ export const PPS_T: Record<Lang, TextesPps> = {
     licencieAide: "Deine Lizenz ersetzt den PPS: Wir sprechen dich nicht mehr darauf an.",
     enregistrer: "Speichern",
     enregistre: "Gespeichert",
+    echecEnregistrement: "Nicht gespeichert: versuche es gleich noch einmal.",
     effacer: "Löschen",
 
     vInconnu: "PPS nicht hinterlegt",
@@ -277,6 +282,7 @@ export const PPS_T: Record<Lang, TextesPps> = {
     licencieAide: "Tu licencia sustituye al PPS: dejamos de mencionártelo.",
     enregistrer: "Guardar",
     enregistre: "Guardado",
+    echecEnregistrement: "No guardado: inténtalo de nuevo en un momento.",
     effacer: "Borrar",
 
     vInconnu: "PPS no registrado",
@@ -334,6 +340,7 @@ export const PPS_T: Record<Lang, TextesPps> = {
     licencieAide: "A tua licença substitui o PPS: deixamos de te falar nisso.",
     enregistrer: "Guardar",
     enregistre: "Guardado",
+    echecEnregistrement: "Não guardado: tenta novamente daqui a pouco.",
     effacer: "Apagar",
 
     vInconnu: "PPS não registado",

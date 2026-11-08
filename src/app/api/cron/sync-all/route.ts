@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncAndCoachForUser, shardForPass } from "@/lib/intervals/syncAndCoach";
 import { envoyerRappelsReconduction } from "@/lib/billing/reconduction";
+import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
+import { estErreurTransitoire } from "@/lib/cron/transitoire";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // 60s timeout (Vercel hobby = 10s, pro = 60s)
@@ -72,8 +74,16 @@ export async function GET(req: Request) {
       // `refus` : écritures refusées par la base, déjà journalisées dans `error_logs` par la
       // chaîne. Répétées ici pour qu'on les lise aussi dans le compte rendu de l'exécution.
       results.push({ userId: profile.id, ok: !r.error, workouts: r.fresh, coached: r.replanned, skipped: r.skipped, refus: r.refus, passagers: r.passagers, error: r.error });
+      // ⚠️ L'ÉCHEC D'UN ATHLÈTE N'ALLAIT QUE DANS LE CORPS DE LA RÉPONSE (08/11/2026), que le
+      // workflow ne lit pas : un accès intervals.icu retiré laissait son plan figé sans que
+      // personne le sache. Un refus durable (pas un incident passager) part au journal, une
+      // fois par jour et par cause.
+      if (r.error && !estErreurTransitoire(r.error, r.status ?? null)) {
+        await journaliserEchecUneFois(admin, { source: "sync-cron", userId: profile.id, url: "/api/cron/sync-all", message: `Synchronisation refusée : ${r.error}` });
+      }
     } catch (err) {
       results.push({ userId: profile.id, ok: false, error: String(err) });
+      await journaliserEchecUneFois(admin, { source: "sync-cron", userId: profile.id, url: "/api/cron/sync-all", message: `Synchronisation en exception : ${err instanceof Error ? err.message : String(err)}` });
     }
   }
 
@@ -89,7 +99,8 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ok: true, shard: shard + 1, shards, eligible: eligible.length,
-    users: results.length, total_activities: total, replanned: coached, refus, results, reconduction,
+    users: results.length, total_activities: total, replanned: coached, refus,
+    echecs: results.filter((r) => !r.ok).length, results, reconduction,
   });
 }
 

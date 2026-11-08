@@ -11,6 +11,7 @@ import { consommerAppelIA } from "@/lib/billing/aiQuota";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normaliserQuestion, empreinteKb, utilisable, type EntreeMemoire } from "@/lib/support/memoire";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ASSISTANT DE SUPPORT — répond aux questions sur l'app, dans la langue de l'athlète.
@@ -164,7 +165,16 @@ export async function POST(req: Request) {
   //  faux ET indiscret. La garantie est double : on n'ENREGISTRE que les réponses
   //  produites sans aucun constat, et on ne RESSERT que si le compte qui redemande n'en
   //  a aucun non plus. Voir `lib/support/memoire`.
-  const constats = diagnoseAccount(state);
+  // ⚠️ UN ÉTAT ILLISIBLE NE SE DIAGNOSTIQUE PAS (08/11/2026). Aucune erreur n'était lue : un
+  // profil en panne devenait « montre non connectée », « inscription non terminée », « 0
+  // séance », et l'assistant l'affirmait avec assurance à un coureur parfaitement réglé. Sans
+  // état fiable, aucun constat : la réponse vient de la base de connaissances générale.
+  const etatIllisible = [profRes, woRes, lastWoRes, csRes, stateRes, objRes, wlRes].some((r) => r.error);
+  if (etatIllisible) {
+    // Une ligne par jour et par athlète, pas une par question pendant la panne.
+    await journaliserEchecUneFois(null, { source: "support", userId: user.id, url: "/api/ai/support", message: "État du compte illisible : réponse sans constat" });
+  }
+  const constats = etatIllisible ? [] : diagnoseAccount(state);
   const compteAvecConstats = constats.length > 0;
   const cle = normaliserQuestion(message);
   const kb = empreinteKb();

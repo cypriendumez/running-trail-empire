@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sansAdresse } from "@/lib/journal/sansAdresse";
 
 export type EchecServeur = {
   /** Quelle fonction échouait (« kine », « objectif », « poids »…). 24 caractères au plus. */
@@ -33,11 +34,33 @@ export async function journaliserEchec(admin: SupabaseClient | null, e: EchecSer
     const { error } = await client.from("error_logs").insert({
       user_id: e.userId ?? null,
       source: e.source.slice(0, 24),
-      message: e.message.slice(0, 2000),
+      message: sansAdresse(e.message).slice(0, 2000),
       url: e.url ?? null,
-      meta: e.meta ?? {},
+      meta: sansAdresse(e.meta ?? {}),
     });
     if (error) console.error(`[${e.source}] journal non écrit :`, error.message, "—", e.message);
+  } catch (err) {
+    console.error(`[${e.source}] journal non écrit :`, err instanceof Error ? err.message : String(err), "—", e.message);
+  }
+}
+
+/**
+ * Comme `journaliserEchec`, mais une seule ligne par compte, source et message sur la
+ * fenêtre (24 h par défaut). Pour les tâches qui repassent souvent (synchronisation toutes
+ * les 30 min, coach de nuit) : un refus durable — accès intervals.icu retiré — écrirait
+ * sinon la même ligne quarante-huit fois par jour, et un journal qui crie cesse d'être lu.
+ * Sans réponse sur l'existant, on écrit : une ligne de trop vaut mieux qu'un échec tu.
+ */
+export async function journaliserEchecUneFois(admin: SupabaseClient | null, e: EchecServeur, fenetreMs = 24 * 3600 * 1000): Promise<void> {
+  try {
+    const client = admin ?? createAdminClient();
+    const message = sansAdresse(e.message).slice(0, 2000);
+    let q = client.from("error_logs").select("id").eq("source", e.source.slice(0, 24)).eq("message", message)
+      .gte("created_at", new Date(Date.now() - fenetreMs).toISOString()).limit(1);
+    q = e.userId ? q.eq("user_id", e.userId) : q.is("user_id", null);
+    const { data, error } = await q;
+    if (!error && (data ?? []).length) return;
+    await journaliserEchec(client, e);
   } catch (err) {
     console.error(`[${e.source}] journal non écrit :`, err instanceof Error ? err.message : String(err), "—", e.message);
   }

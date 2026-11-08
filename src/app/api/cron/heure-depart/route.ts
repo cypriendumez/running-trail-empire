@@ -95,8 +95,35 @@ export async function GET(req: Request) {
     // le passage suivant refait exactement le même travail — deux appels Gemini par
     // objectif, tous les jours, pour un résultat déjà obtenu. Le cron paraîtrait
     // fonctionner tout en n'avançant jamais.
+    //
+    // ⚠️ RELIRE AVANT D'ÉCRIRE (08/11/2026). `majBase` part de la copie lue au DÉBUT du
+    // passage, plusieurs minutes et deux appels au modèle plus tôt : un objectif modifié
+    // entre-temps par l'athlète (course, date, chrono, priorité) était écrasé par l'ancien,
+    // sans un mot. On relit la ligne, on n'y ajoute QUE ce que ce passage a établi, et si la
+    // course a changé, l'heure trouvée pour l'ancienne n'est pas posée sur la nouvelle.
+    const { data: actuelle, error: eRelue } = await sb.from("notifications").select("data").eq("id", l.id).maybeSingle();
+    if (eRelue || !actuelle) {
+      details.push({ race: o.race, verdict: eRelue ? "relecture impossible, rien écrit" : "objectif supprimé entre-temps" });
+      continue;
+    }
+    const now = ((actuelle as { data?: Obj }).data ?? {}) as Obj;
+    const memeCourse = now.race === o.race && now.raceDate === o.raceDate;
+    if (!memeCourse) {
+      // La recherche portait sur l'ANCIENNE course : rien n'est écrit, pas même « cherchée
+      // aujourd'hui », pour que la nouvelle soit cherchée au prochain passage.
+      if (majBase.heureDepart) trouvees--;
+      details.push({ race: o.race, verdict: "objectif modifié pendant la recherche, heure non posée" });
+      continue;
+    }
+    const ajout: Obj = { heureCherchéeLe: aujourdhui };
+    if (!now.heureDepart && majBase.heureDepart) {
+      ajout.heureDepart = majBase.heureDepart;
+      ajout.heureSource = majBase.heureSource;
+    } else if (majBase.heureDepart) {
+      trouvees--; // une heure a été saisie entre-temps : la sienne prime, la nôtre n'est pas posée
+    }
     const { error: eMarqueur } = await sb.from("notifications")
-      .update({ data: majBase as unknown as Record<string, unknown> }).eq("id", l.id);
+      .update({ data: { ...now, ...ajout } as unknown as Record<string, unknown> }).eq("id", l.id);
     if (eMarqueur) {
       console.error("[heure-depart] marqueur non écrit, la recherche sera refaite :", eMarqueur.message);
       details.push({ race: o.race, verdict: "marqueur non enregistré" });

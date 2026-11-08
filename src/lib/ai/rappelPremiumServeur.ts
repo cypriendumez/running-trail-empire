@@ -23,6 +23,7 @@ import { buildWeekPlan, type PlanDay } from "@/lib/ai/autoPlan";
 import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { ecartPremium, textesRappel, TYPE_RAPPEL_PREMIUM, VERSION_RAPPEL, type DonneesRappel } from "@/lib/coach/rappelPremium";
+import { sansAdresse } from "@/lib/journal/sansAdresse";
 
 export type IssueRappel = "inchange" | "ecrit" | "echec";
 
@@ -41,7 +42,7 @@ export function empreinteRappel(o: {
 async function journaliser(admin: SupabaseClient, userId: string, message: string): Promise<void> {
   try {
     const { error } = await admin.from("error_logs").insert({
-      user_id: userId, source: "rappel-premium", url: "/dashboard/calendrier", message: message.slice(0, 2000),
+      user_id: userId, source: "rappel-premium", url: "/dashboard/calendrier", message: sansAdresse(message).slice(0, 2000),
     });
     if (error) console.error("[rappel premium]", message, "— journal non écrit :", error.message);
   } catch {

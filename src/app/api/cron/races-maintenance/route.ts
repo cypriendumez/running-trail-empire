@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dateApresBascule, DATE_INCONNUE } from "@/lib/races/publique";
+import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 
 /**
  * BASCULEMENT QUOTIDIEN DES COURSES PASSÉES.
@@ -104,7 +105,10 @@ export async function GET(req: Request) {
   const limiteVisites = new Date(Date.now() - 13 * 30.5 * 864e5).toISOString().slice(0, 10);
   const { error: eVisites, count: visitesPurgees } = await sb.from("visites")
     .delete({ count: "exact" }).lt("jour", limiteVisites);
-  if (eVisites) console.error("[maintenance] purge des visites impossible :", eVisites.message);
+  // ⚠️ DIT, MAIS À QUI ? Le workflow ne lit que le code HTTP (08/11/2026) : la console seule
+  // laissait les visites de plus de 13 mois s'accumuler des mois durant. Au journal, une
+  // fois par jour.
+  if (eVisites) await journaliserEchecUneFois(sb, { source: "maintenance", url: "/api/cron/races-maintenance", message: `Purge des visites de plus de 13 mois impossible : ${eVisites.message}` });
 
   return NextResponse.json({
     ok: true,
