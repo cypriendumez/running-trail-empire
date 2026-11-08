@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -80,16 +81,14 @@ export async function DELETE() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // Lus avant l'effacement : il faut le jeton pour le rendre à intervals.icu.
-  const { data: profile } = await supabase
+  // Illisible, le jeton serait perdu à l'effacement : Pacevo resterait autorisé chez
+  // intervals.icu sans plus personne pour le rendre. On s'arrête avant (audit du 08/11/2026).
+  const { data: profile, error: eLecture } = await supabase
     .from("profiles")
     .select("intervals_athlete_id, intervals_api_key")
     .eq("id", user.id)
     .single();
-
-  // OAuth : on révoque l'autorisation, ce qui coupe aussi les alertes de l'application.
-  if (estJetonOAuth(profile?.intervals_api_key)) {
-    await revoquer(jetonDe(String(profile!.intervals_api_key)));
-  }
+  if (eLecture && eLecture.code !== "PGRST116") return NextResponse.json({ error: "Déconnexion impossible pour le moment : rien n'a été modifié, réessaie dans un instant." }, { status: 503 });
 
   /**
    * ⚠️ ENREGISTRER VÉRIFIAIT SON ERREUR (plus haut, 500 si elle échoue) ; EFFACER NON.
@@ -104,6 +103,15 @@ export async function DELETE() {
     .update({ intervals_athlete_id: null, intervals_api_key: null })
     .eq("id", user.id);
   if (error) return NextResponse.json({ error: "Déconnexion impossible, tes identifiants sont toujours enregistrés" }, { status: 500 });
+
+  // OAuth : on révoque l'autorisation, ce qui coupe aussi les alertes de l'application.
+  // ⚠️ APRÈS l'effacement, plus avant (audit du 08/11/2026) : révoqué d'abord, un effacement
+  // en échec laissait en base un jeton déjà mort, et toutes les synchros échouaient ensuite.
+  // Une révocation refusée laisse Pacevo autorisé chez intervals.icu, jeton déjà effacé : à
+  // retirer à la main depuis le compte intervals.icu de l'athlète, donc écrit au journal.
+  if (estJetonOAuth(profile?.intervals_api_key) && !(await revoquer(jetonDe(String(profile!.intervals_api_key))))) {
+    await journaliserEchec(null, { source: "intervals-oauth", userId: user.id, url: "/api/intervals/credentials", message: "Autorisation intervals.icu non révoquée à la déconnexion de la montre (jeton déjà effacé)" });
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
 import { enteteIntervals } from "@/lib/intervals/auth";
 
@@ -17,7 +17,7 @@ type SeriesPoint = { km: Num; min: Num; pace: Num; hr: Num; power: Num; cad: Num
 export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user || !estAdmin(user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || !estAdmin(user?.email) || await appareilRefuse(user.id)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { user_id, date, distance_km } = await req.json() as { user_id: string; date: string; distance_km?: number };
   if (!user_id || !date) return NextResponse.json({ error: "user_id et date requis" }, { status: 400 });

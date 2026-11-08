@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
 import { envoyerEmail } from "@/lib/email/envoyer";
 import { journaliserEchec } from "@/lib/journal/echecServeur";
 
@@ -13,7 +13,7 @@ import { journaliserEchec } from "@/lib/journal/echecServeur";
 export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user || !estAdmin(user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || !estAdmin(user?.email) || await appareilRefuse(user.id)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { title, body } = (await req.json()) as { title?: string; body?: string };
   const t = String(title ?? "").trim();

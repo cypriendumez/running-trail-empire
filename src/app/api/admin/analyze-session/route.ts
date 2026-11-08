@@ -6,7 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { buildAthleteContext, classifyRun, type AthleteContext } from "@/lib/ai/coachContext";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
 import { COLONNES_VFC, precisionMetrique, serieVfc } from "@/lib/health/vfc";
 import { enteteIntervals } from "@/lib/intervals/auth";
@@ -60,7 +61,7 @@ async function gem(model: string, parts: string[], cfg: Record<string, unknown>)
 export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user || !estAdmin(user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || !estAdmin(user?.email) || await appareilRefuse(user.id)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { user_id, date, distance_km } = await req.json() as { user_id: string; date: string; distance_km?: number };
   if (!user_id || !date) return NextResponse.json({ error: "user_id et date requis" }, { status: 400 });
@@ -103,9 +104,18 @@ export async function POST(req: Request) {
       admin.from("workouts").select("date,title,type,distance_km,duration_seconds,tss,avg_hr,max_hr").eq("user_id", user_id).order("date", { ascending: false }).limit(20),
       admin.from("hrv_data").select(COLONNES_VFC).eq("user_id", user_id).order("date", { ascending: false }).limit(14),
       admin.from("sleep_data").select("sleep_score,total_sleep_min").eq("user_id", user_id).order("date", { ascending: false }).limit(1).single(),
-      admin.from("training_plans").select("goal:name, race_date").eq("user_id", user_id).eq("is_active", true).single(),
-      admin.from("notifications").select("data").eq("user_id", user_id).eq("type", "race_objective").maybeSingle(),
+      admin.from("training_plans").select("goal:name, race_date").eq("user_id", user_id).eq("is_active", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      admin.from("notifications").select("data").eq("user_id", user_id).eq("type", "race_objective").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
+    // ⚠️ UNE LECTURE EN PANNE N'EST PAS UNE DONNÉE ABSENTE (audit du 08/11/2026). Elle devenait
+    // « aucun historique », une FC max inconnue, « aucune course visée → progression globale »,
+    // et l'analyse s'écrivait sur ce faux portrait. `.single()` sans ligne (PGRST116) est, lui,
+    // une vraie absence.
+    const lectures: [string, { error: { code?: string } | null }][] = [
+      ["repères", baseRes], ["séances", recentRes], ["VFC", hrvRes], ["sommeil", sleepRes], ["plan", planRes], ["objectif", objRes],
+    ];
+    const enPanne = lectures.filter(([, r]) => r.error && r.error.code !== "PGRST116").map(([n]) => n);
+    if (enPanne.length) return NextResponse.json({ error: `Données illisibles (${enPanne.join(", ")}) : analyse non écrite, réessaie dans un instant.` }, { status: 503 });
     const a: Record<string, unknown> = fullRes && fullRes.ok ? await fullRes.json() : act;
     const baseline = baseRes.data;
     // La dernière VFC dans LA mesure de l'athlète, état face à SA base (lib/health/vfc).
@@ -286,7 +296,7 @@ Le plan "week" couvre 7 jours (la séance d'AUJOURD'HUI = nextSession est le 1er
       user_id, type: "session_ai_analysis", title: `Analyse séance ${day}`,
       body: analysis.slice(0, 300), data: { date: day, summary, analysis, nextSession, week },
     });
-    if (eAnalyse) console.error("[analyse séance] non conservée :", eAnalyse.message);
+    if (eAnalyse) await journaliserEchec(admin, { source: "analyse-coach", userId: user_id, url: "/api/admin/analyze-session", message: `Analyse non conservée : ${eAnalyse.code ?? "?"} ${eAnalyse.message}` });
 
     return NextResponse.json({ analysis, nextSession, week, macroPlan: ctx?.macroPlan ?? [], objective: objective ? { ...objective, daysToRace: objDays } : null, rest: { daysSinceLast, restDays7 }, readiness: ctx?.readiness ?? null });
   } catch (e) {

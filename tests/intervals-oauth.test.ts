@@ -286,7 +286,8 @@ await testA("la déconnexion révoque l'autorisation chez intervals.icu", async 
   assert.equal(await revoquer("x", faux(() => new Response(null, { status: 500 })).f), false);
   assert.equal(await revoquer("x", faux(() => new Error("panne")).f), false, "une panne ne doit pas lever d'exception");
   const code = codeSeul(CREDENTIALS);
-  assert.ok(/estJetonOAuth\([^)]*\)\)\s*\{\s*await revoquer\(/.test(code), "DELETE ne révoque pas un jeton OAuth");
+  // `&& !(await revoquer(…))` (08/11/2026) : le refus est journalisé, la révocation reste faite.
+  assert.ok(/estJetonOAuth\([^)]*\)(\)\s*\{\s*await revoquer\(| && !\(await revoquer\()/.test(code), "DELETE ne révoque pas un jeton OAuth");
 });
 
 // Audit du 24/10/2026 : supprimer son compte effaçait le jeton sans le rendre à intervals.icu.
@@ -297,7 +298,7 @@ test("supprimer son compte révoque aussi l'autorisation intervals.icu", () => {
   const code = codeSeul(SUPPRESSION_COMPTE);
   const lu = code.search(/\.select\("intervals_api_key"\)/);
   const efface = code.indexOf('.from("profiles").delete()');
-  const rendu = code.search(/estJetonOAuth\([^)]*\)\)\s*await revoquer\(jetonDe\(/);
+  const rendu = code.search(/estJetonOAuth\([^)]*\)(\)\s*| && !\()await revoquer\(jetonDe\(/);
   const compte = code.indexOf("deleteUser(");
   assert.ok(lu >= 0, "le jeton n'est pas lu avant l'effacement du profil");
   assert.ok(rendu >= 0, "la suppression du compte ne révoque pas un jeton OAuth");

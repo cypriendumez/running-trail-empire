@@ -11,11 +11,12 @@
  * l'adresse complète des pages, y compris le lien secret du suivi GPS en direct.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { urlJournalisable } from "../src/lib/journal/urlJournal";
 import { sansAdresse, MASQUE } from "../src/lib/journal/sansAdresse";
 import { parseGPX } from "../src/lib/intervals/gpx";
+import { coursesExistantes } from "../src/lib/races/existantes";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -103,6 +104,44 @@ test("chaque méthode des routes de maintenance du catalogue est gardée", () =>
     }
   }
   assert.ok(vues >= 11, `seulement ${vues} méthodes trouvées : le découpage ne voit plus les routes`);
+});
+
+test("chaque route d'administration exige aussi l'appareil de confiance", () => {
+  // Audit du 08/11/2026 : 14 routes ne vérifiaient que l'adresse du compte, et 5 autres
+  // s'ouvraient au seul secret partagé `x-admin-secret`. Le panneau exige l'appareil scellé :
+  // ses routes s'appellent directement, elles doivent l'exiger aussi. Seule exception, la
+  // route qui SCELLE l'appareil (elle ne peut pas exiger ce qu'elle délivre).
+  const fichiers = (readdirSync("src/app/api/admin", { recursive: true }) as string[])
+    .filter((f) => f.endsWith("route.ts")).map((f) => `src/app/api/admin/${f}`)
+    .filter((f) => f !== "src/app/api/admin/appareil/route.ts");
+  let vues = 0;
+  const sansAppareil: string[] = [];
+  for (const f of fichiers) {
+    // La compta passe par une aide locale (`admin()`, `editeur()`) qui commence par `gardeAdmin`.
+    const src = codeNu(f);
+    const aideGardee = (nom: string) => new RegExp(`async function ${nom}\\(\\)[^\\n]*\\{\\s*if \\(!\\(await gardeAdmin\\(\\)\\)\\) return null;`).test(src);
+    for (const [meth, corps] of Object.entries(handlers(f))) {
+      vues++;
+      const tete = corps.slice(0, 1600);
+      const direct = /await (verdictAdmin|gardeAdmin)\(\)|!estAdmin\(user\?\.email\) \|\| await appareilRefuse\(user\.id\)/.test(tete);
+      const parAide = ["admin", "editeur"].some((n) => new RegExp(`await ${n}\\(\\)`).test(tete) && aideGardee(n));
+      if (!direct && !parAide) sansAppareil.push(`${f} ${meth}`);
+    }
+  }
+  assert.deepEqual(sansAppareil, [], `route(s) d'administration sans appareil de confiance : ${sansAppareil.join(", ")}`);
+  assert.ok(vues >= 29, `seulement ${vues} méthodes vues (29 le 08/11/2026) : le parcours des routes est cassé`);
+  // Le secret partagé n'ouvre plus aucune route du panneau.
+  for (const f of fichiers) assert.ok(!/headers\.get\("x-admin-secret"\)/.test(codeNu(f)), `${f} s'ouvre de nouveau au secret partagé`);
+  // La garde des routes de maintenance exige l'appareil pour une session, et la garde
+  // complète passe par le même contrôle.
+  const garde = codeNu("src/lib/api/adminGuard.ts");
+  assert.match(garde, /if \(user && estAdmin\(user\.email\) && !\(await appareilRefuse\(user\.id\)\)\) return null;/, "une session administrateur sans appareil rouvre les routes de maintenance");
+  // Le secret partagé ouvrait aussi ces routes (dont `races/dedup`, qui supprime) SANS second
+  // facteur, et plus aucun script ne l'envoyait (2e relecture du 08/11/2026).
+  assert.ok(!/x-admin-secret|ADMIN_SECRET/.test(garde), "le secret partagé rouvre les routes de maintenance sans appareil");
+  const acces = codeNu("src/lib/admin/acces.ts");
+  assert.match(acces, /if \(await appareilRefuse\(user!\.id\)\) return \{ ok: false, motif: "refus" \};/, "verdictAdmin ne vérifie plus l'appareil");
+  assert.match(acces, /if \(!appareilExige\(\)\) return false;\s*return !verifierAppareil\(/, "le contrôle d'appareil ne refuse plus un jeton invalide");
 });
 
 test("un secret absent n'ouvre pas l'import du flux de la boutique", () => {
@@ -500,6 +539,135 @@ test("le cron de l'heure de départ ne marque pas « cherchée » une course qu'
   assert.match(src, /if \(!memeCourse\) \{[\s\S]{0,300}continue;\s*\}/, "une course modifiée pendant la recherche est marquée « cherchée aujourd'hui »");
   assert.match(src, /if \(majBase\.heureDepart\) trouvees--;/, "une heure non posée est comptée « trouvée »");
   assert.match(src, /\} else if \(majBase\.heureDepart\) \{\s*trouvees--;/, "une heure saisie entre-temps (la nôtre non posée) est comptée « trouvée »");
+});
+
+// ── Lot 3 (08/11/2026, soir) ────────────────────────────────────────────────────
+test("lot 3 : un cache d'IA illisible ne paie pas le modèle et ne crée pas de doublon", () => {
+  for (const [f, source] of [["src/app/api/ai/ajustement/route.ts", "ia-ajustement"], ["src/app/api/ai/bilan/route.ts", "ia-bilan"]] as const) {
+    const src = codeNu(f);
+    const lu = src.search(/const \{ data: memos, error: eCache \} = await admin/);
+    // La ligne la plus récente, jamais `maybeSingle` : un doublon ferait une erreur à vie.
+    assert.match(src, /\.order\("created_at", \{ ascending: false \}\)\.limit\(1\);\s*const memo = memos\?\.\[0\] \?\? null;/, `${f} : le cache est de nouveau lu par maybeSingle (un doublon = « indisponible » pour toujours)`);
+    const arret = src.search(/if \(eCache\) \{[\s\S]{0,400}status: 503/);
+    const modele = src.search(/generateContent\(/);
+    assert.ok(lu > 0 && arret > lu, `${f} : un cache illisible passe de nouveau pour une absence`);
+    assert.ok(modele > arret, `${f} : le modèle est appelé avant de savoir si le cache est lisible`);
+    assert.match(src, new RegExp(`if \\(eMemo\\) await journaliserEchecUneFois\\(admin, \\{ source: "${source}"`), `${f} : une mémorisation ratée ne va de nouveau qu'à la console`);
+  }
+});
+
+test("lot 3 : l'import des traces dit une panne au lieu de « terminé » ou « montre non connectée »", () => {
+  const src = codeNu("src/app/api/tracks/import/route.ts");
+  assert.match(src, /if \(eProfil\) return NextResponse\.json\([\s\S]{0,120}status: 503/, "une panne du profil se lit « connecte d'abord ta montre »");
+  assert.match(src, /if \(eSeances\) return NextResponse\.json\([\s\S]{0,120}status: 503/, "des séances illisibles se lisent « import terminé »");
+  assert.match(src, /if \(eTraces\) return NextResponse\.json\([\s\S]{0,120}status: 503/, "des traces illisibles relancent tout le lot chez intervals.icu");
+  assert.match(src, /\.order\("workout_id"\)\.range\(page \* 1000, page \* 1000 \+ 999\)/, "les traces faites ne sont plus lues par pages : au-delà de 1 000, elles repartent");
+});
+
+testAsync("lot 3 : le catalogue existant se lit EN ENTIER, par pages, et une panne n'est pas « vide »", async () => {
+  const faux = (pages: (number | "panne")[]) => {
+    const vues: { ordre?: string; de?: number }[] = [];
+    let k = 0;
+    const client = {
+      from: () => ({ select: () => ({ order: (col: string) => ({ range: async (de: number) => {
+        vues.push({ ordre: col, de });
+        const p = pages[k++];
+        if (p === "panne") return { data: null, error: { message: "délai dépassé", code: "57014" } };
+        return { data: Array.from({ length: p ?? 0 }, (_, i) => ({ name: `c${de + i}`, date: "2026-05-01" })), error: null };
+      } }) }) }),
+    };
+    return { client: client as unknown as SupabaseClient, vues };
+  };
+  const plein = faux([1000, 1000, 1000, 412]);
+  const r = await coursesExistantes(plein.client);
+  assert.ok("courses" in r, "un catalogue lisible est rendu comme une erreur");
+  assert.equal((r as { courses: unknown[] }).courses.length, 3412, "des pages manquent : leurs courses seraient réinsérées");
+  assert.deepEqual(plein.vues.map((v) => v.de), [0, 1000, 2000, 3000]);
+  assert.ok(plein.vues.every((v) => v.ordre === "id"), "l'ordre n'est plus total (`id`) : des lignes sautent d'une page à l'autre");
+  const panne = await coursesExistantes(faux([1000, "panne"]).client);
+  assert.ok("erreur" in panne, "une page illisible donne de nouveau un catalogue raccourci");
+  for (const f of ["src/app/api/races/seed/route.ts", "src/app/api/races/seed-full/route.ts"]) {
+    const src = codeNu(f);
+    assert.match(src, /const lues = await coursesExistantes\(createAdminClient\(\)\);\s*if \("erreur" in lues\) return NextResponse\.json\([\s\S]{0,140}status: 500/, `${f} : l'existant n'est plus lu en entier, ou une panne n'arrête plus l'import`);
+    assert.ok(!/select\("name,date"\);/.test(src), `${f} : la lecture plafonnée à 1 000 lignes est revenue`);
+  }
+});
+
+test("lot 3 : la synchro du catalogue n'invente ni distance ni région, et ne double pas l'existant", () => {
+  const src = codeNu("src/app/api/races/sync/route.ts");
+  assert.ok(!/\|\| "ile-de-france"/.test(src), "une course sans département connu est de nouveau rangée en Île-de-France");
+  assert.ok(!/getDefaultDistance|\|\| 10;/.test(src), "une distance par défaut est de nouveau écrite comme la distance réelle");
+  // `road_10k` est aussi le type PAR DÉFAUT d'une course sans distance lue : il ne donne rien.
+  assert.match(src, /const DISTANCE_DU_TYPE: Record<string, number> = \{ semi: 21\.097, marathon: 42\.195 \};/, "un type sans distance définie (trail, ultra, 10 km par défaut) donne de nouveau une distance");
+  assert.match(src, /const demi = \/semi\|demi\|1\\\/2\|half\/\.test\(text\);/, "« demi-marathon » ou « 1/2 marathon » n'est plus reconnu comme un semi");
+  assert.match(src, /if \(maxKm >= 42 \|\| \(text\.includes\("marathon"\) && !demi && !\/relais\|ekiden\/\.test\(text\)\)\) return "marathon";/, "un semi ou un relais sans distance écrite redevient un marathon (42,195 km inventés)");
+  assert.match(src, /if \(maxKm >= 20 \|\| demi\) return "semi";/, "un demi-marathon n'est plus classé semi");
+  assert.match(src, /distancesText: contentText\.match\(\/\\d\+\(\?:\[\.,\]\\d\+\)\?\\s\*km\/gi\)/, "« 21,1 km » est de nouveau lu « 1 km »");
+  assert.ok(!/"provence-alpes-cote-azur"/.test(src), "la synchro écrit de nouveau l'ancienne variante de la région PACA");
+  assert.match(src, /const deptNum = departementDuCodePostal\(postal\)\?\.code \?\?/, "la Corse et l'outre-mer retombent en « région inconnue »");
+  assert.match(src, /if \(!r\.region\) \{ sansRegion\+\+; continue; \}/, "une course sans région est de nouveau importée");
+  assert.match(src, /if \(d == null\) \{ sansDistance\+\+; continue; \}/, "une course sans distance est de nouveau importée");
+  assert.match(src, /\.select\("name,date"\)\s*\.order\("id"\)/, "la pagination de l'existant n'a plus d'ordre total : des doublons repartent");
+  assert.match(src, /if \(eExistantes\) \{[\s\S]{0,400}status: 500/, "une page illisible arrête de nouveau la lecture comme une fin de table");
+  const seed = codeNu("src/app/api/races/seed/route.ts");
+  assert.match(seed, /name: "Diagonale des Fous \(Grand Raid\)", type: "ultra", region: "la-reunion"/, "la Diagonale des Fous est de nouveau rangée hors de La Réunion");
+  assert.match(seed, /\.\.\.r,\s*time_limits: \[\],/, "des barrières horaires saisies à la main repartent au catalogue");
+});
+
+test("lot 3 : un parcours partagé n'affiche ni mesure inventée ni identité complète", () => {
+  const src = codeNu("src/app/api/community/routes/route.ts");
+  assert.ok(!/\|\| 0\)/.test(src), "`|| 0` écrit de nouveau une mesure absente comme une mesure");
+  assert.match(src, /if \(!fini\(distance_km\) \|\| distance_km <= 0 \|\| !fini\(duration_min\) \|\| !fini\(elevation_gain_m\)\) \{\s*return NextResponse\.json\([\s\S]{0,200}status: 400/, "un parcours sans mesures est de nouveau publié");
+  assert.ok(!/\.select\("\*"\)/.test(src), "la liste publique renvoie de nouveau toutes les colonnes, identifiant des comptes compris");
+  assert.ok(!/user_id, author_name/.test(src.slice(0, src.indexOf("export async function POST"))), "la liste publique renvoie de nouveau l'identifiant des comptes");
+  assert.match(src, /author = String\(prof\.full_name\)\.trim\(\)\.split\(\/\\s\+\/\)\[0\]/, "le nom complet de l'auteur est de nouveau publié");
+  assert.match(src, /if \(error\.code === "42P01"\) return NextResponse\.json\(\{ routes: \[\] \}\);\s*return NextResponse\.json\([\s\S]{0,80}status: 503/, "une panne se lit de nouveau « aucun parcours partagé »");
+});
+
+test("lot 3 : l'appariement des segments ne date plus un passage au hasard et lit ses erreurs", () => {
+  const src = codeNu("src/app/api/segments/match/route.ts");
+  assert.ok(!/\?\? new Date\(\)\.toISOString\(\)/.test(src), "un passage sans séance connue est de nouveau daté du jour");
+  assert.match(src, /if \(!date\) \{ sansDate\+\+; continue; \}/, "un passage sans date est de nouveau enregistré");
+  for (const e of ["eTraces", "eSegments", "eSeances"]) assert.match(src, new RegExp(`if \\(${e}\\) return NextResponse\\.json\\([\\s\\S]{0,80}status: 503`), `${e} : une panne se lit de nouveau comme une absence`);
+  assert.match(src, /\.in\("id", \(tracks as/, "toutes les séances du compte sont de nouveau lues (plafond de 1 000)");
+});
+
+test("lot 3 : modération, déconnexion de la montre, lettre, alertes et analyse coach disent leurs pannes", () => {
+  const avis = codeNu("src/app/api/admin/avis/route.ts");
+  assert.match(avis, /if \(eLigne\) return NextResponse\.json\([\s\S]{0,100}status: 503/, "une panne se lit « avis introuvable »");
+  assert.match(avis, /if \(error\) return NextResponse\.json\(\{ ok: false, error: "Avis momentanément illisibles/, "une panne se lit « aucun avis à modérer »");
+  const cred = codeNu("src/app/api/intervals/credentials/route.ts");
+  const del = cred.slice(cred.indexOf("export async function DELETE"));
+  assert.match(del, /if \(eLecture && eLecture\.code !== "PGRST116"\) return NextResponse\.json\([\s\S]{0,140}status: 503/, "un profil illisible laisse de nouveau effacer le jeton sans pouvoir le rendre");
+  assert.match(del, /!\(await revoquer\(jetonDe\(String\(profile!\.intervals_api_key\)\)\)\)\) \{\s*await journaliserEchec\(/, "une révocation refusée chez intervals.icu repasse sous silence");
+  assert.match(codeNu("src/app/api/account/delete/route.ts"), /!\(await revoquer\(jetonDe\(String\(jeton\)\)\)\)\) \{\s*\/?\/?[^\n]*\n?\s*await journaliserEchec\(admin,/, "une révocation refusée à la suppression du compte repasse sous silence");
+  assert.ok(del.search(/if \(error\) return NextResponse\.json\(\{ error: "Déconnexion impossible/) < del.search(/await revoquer\(/), "le jeton est de nouveau révoqué AVANT l'effacement : un échec laisse un jeton mort en base");
+  assert.match(codeNu("src/app/api/newsletter/subscribe/route.ts"), /\} catch \(e\) \{\s*await journaliserEchec\(null, \{ source: "newsletter"/, "la cause d'une inscription ratée est de nouveau avalée");
+  assert.match(codeNu("src/app/api/webhooks/intervals/route.ts"), /await journaliser\(x\.userId \?\? null, `Suite d'une alerte en échec/, "la suite d'une alerte (traces, replanification, montre) rate de nouveau sans trace");
+  const an = codeNu("src/app/api/admin/analyze-session/route.ts");
+  assert.match(an, /const enPanne = lectures\.filter\(\(\[, r\]\) => r\.error && r\.error\.code !== "PGRST116"\)/, "une lecture en panne passe de nouveau pour une donnée absente");
+  const arretPanne = an.search(/if \(enPanne\.length\) return/);
+  assert.ok(arretPanne > 0 && arretPanne < an.search(/gem\("gemini-2\.5-flash", \[analysisSystem/), "l'analyse est demandée au modèle avant de savoir si ses données sont lisibles");
+  assert.match(an, /if \(eAnalyse\) await journaliserEchec\(admin,/, "une analyse non conservée ne va de nouveau qu'à la console");
+  // Deux plans actifs avec `.single()` = PGRST116, toléré comme « absent » : l'analyse partait
+  // sans objectif. Le plus récent, et zéro ligne n'est pas une erreur (relecture du 08/11/2026).
+  assert.match(an, /from\("training_plans"\)[^\n]*\.eq\("is_active", true\)\.order\("created_at", \{ ascending: false \}\)\.limit\(1\)\.maybeSingle\(\)/, "deux plans actifs font de nouveau analyser sans objectif");
+  assert.match(an, /\.eq\("type", "race_objective"\)\.order\("created_at", \{ ascending: false \}\)\.limit\(1\)\.maybeSingle\(\)/, "deux objectifs font de nouveau analyser sans objectif");
+});
+
+test("lot 3 : les pièces jointes d'un athlète ne s'ouvrent au coach que depuis l'appareil de confiance", () => {
+  // 3e relecture du 08/11/2026 : `estCoach = estAdmin(…)` ouvrait les pièces privées de tous les
+  // comptes (photos au Kiné) à une session admin ouverte sur n'importe quel appareil.
+  assert.match(codeNu("src/app/api/messages/piece/route.ts"), /const estCoach = estAdmin\(user\.email\) && !\(await appareilRefuse\(user\.id\)\);/, "le coach ouvre de nouveau les pièces des athlètes sans appareil de confiance");
+});
+
+test("lot 3 : le dépôt public ne porte plus les lieux de séances réelles", () => {
+  // Une liste BLANCHE de noms génériques : une liste noire recopierait elle-même les lieux
+  // dans le dépôt public (relecture du 08/11/2026).
+  const noms = (JSON.parse(readFileSync("tests/fixtures/activities.json", "utf8")) as { name: string }[]).map((a) => a.name);
+  const generiques = new Set(["Randonnée", "Randonnée en vallée", "Randonnée en montagne", "Course à pied"]);
+  assert.deepEqual(noms.filter((n) => !generiques.has(n)), [], "le fichier de test publie de nouveau le nom réel d'une séance (souvent un lieu)");
+  assert.ok(!/cypriendumez@outlook\.fr/.test(readFileSync("docs/intervals-icu-dependance.md", "utf8")), "la documentation publie de nouveau l'adresse personnelle");
 });
 
 enAttente.then(() => {

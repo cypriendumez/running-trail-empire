@@ -8,21 +8,24 @@
 //  à déclencher un dédoublonnage, une réécriture complète, ou à épuiser le quota de
 //  géocodage.
 //
-//  Deux clés acceptées : le secret d'administration (appel machine ou manuel) ou le
-//  compte administrateur connecté (appel depuis l'interface).
+//  Une seule clé : le compte administrateur connecté ET son appareil de confiance,
+//  comme le panneau. ⚠️ Le secret partagé `x-admin-secret` ouvrait aussi ces routes,
+//  SANS second facteur — dont `races/dedup`, qui supprime des lignes. Aucun script,
+//  workflow ni écran ne l'envoyait plus : retiré le 08/11/2026. La synchro planifiée
+//  du catalogue (`races/sync`) garde son propre `CRON_SECRET`.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createClient } from "@/lib/supabase/server";
-import { estAdmin } from "@/lib/admin/acces";
-
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
 
 /** `null` si l'appel est autorisé, sinon le motif du refus. */
-export async function denyIfNotAdmin(req: Request): Promise<string | null> {
-  if (ADMIN_SECRET && req.headers.get("x-admin-secret") === ADMIN_SECRET) return null;
+// `req` reste dans la signature : les routes l'appellent ainsi, et un futur contrôle
+// (origine, en-tête) se lira là.
+export async function denyIfNotAdmin(_req: Request): Promise<string | null> {
   try {
     const sb = await createClient();
     const { data: { user } } = await sb.auth.getUser();
-    if (estAdmin(user?.email)) return null;
+    // Le compte administrateur ET son appareil de confiance, comme le panneau (08/11/2026).
+    if (user && estAdmin(user.email) && !(await appareilRefuse(user.id))) return null;
   } catch { /* pas de session exploitable : refus */ }
   return "Forbidden";
 }

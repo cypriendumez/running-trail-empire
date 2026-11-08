@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
 import { serieVfc } from "@/lib/health/vfc";
 import { enteteIntervals } from "@/lib/intervals/auth";
 
@@ -20,7 +20,7 @@ function icuAuth(apiKey: string) {
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !estAdmin(user?.email)) {
+  if (!user || !estAdmin(user?.email) || await appareilRefuse(user.id)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

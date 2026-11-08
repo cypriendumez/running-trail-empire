@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import * as cheerio from "cheerio";
 import { denyIfNotAdmin } from "@/lib/api/adminGuard";
+import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
+import { departementDuCodePostal } from "@/lib/races/departements";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -40,9 +42,9 @@ const DEPT_REGION: Record<string, string> = {
   "48":"occitanie","65":"occitanie","66":"occitanie","81":"occitanie","82":"occitanie",
   "44":"pays-de-la-loire","49":"pays-de-la-loire","53":"pays-de-la-loire",
   "72":"pays-de-la-loire","85":"pays-de-la-loire",
-  "04":"provence-alpes-cote-azur","05":"provence-alpes-cote-azur",
-  "06":"provence-alpes-cote-azur","13":"provence-alpes-cote-azur",
-  "83":"provence-alpes-cote-azur","84":"provence-alpes-cote-azur",
+  "04":"provence-alpes-cote-d-azur","05":"provence-alpes-cote-d-azur",
+  "06":"provence-alpes-cote-d-azur","13":"provence-alpes-cote-d-azur",
+  "83":"provence-alpes-cote-d-azur","84":"provence-alpes-cote-d-azur",
   "971":"guadeloupe","972":"martinique","973":"guyane","974":"la-reunion","976":"mayotte",
 };
 
@@ -89,8 +91,13 @@ function inferRaceType(distancesText: string, isTrail: boolean): string {
     if (maxKm >= 25) return "trail_m";
     return "trail_s";
   }
-  if (maxKm >= 42 || text.includes("marathon")) return "marathon";
-  if (maxKm >= 20 || text.includes("semi")) return "semi";
+  // « semi-marathon » contient « marathon » : sans distance écrite, il passait pour un marathon
+  // (42,195 km) — relecture du 08/11/2026.
+  // « demi-marathon », « 1/2 marathon », « half » aussi ; un marathon en RELAIS n'est la
+  // distance d'aucun coureur (relecture du 08/11/2026).
+  const demi = /semi|demi|1\/2|half/.test(text);
+  if (maxKm >= 42 || (text.includes("marathon") && !demi && !/relais|ekiden/.test(text))) return "marathon";
+  if (maxKm >= 20 || demi) return "semi";
   if (maxKm >= 10 || text.includes("10 km") || text.includes("10km")) return "road_10k";
   if (maxKm >= 5) return "road_5k";
   return "road_10k";
@@ -191,7 +198,7 @@ function parseJoggingPlusHtml(html: string, isTrail: boolean): RaceEntry[] {
 
     if (!dateStr) return;
 
-    const region = DEPT_REGION[deptNum] || DEPT_REGION[deptNum.padStart(2, "0")] || "ile-de-france";
+    const region = DEPT_REGION[deptNum] || DEPT_REGION[deptNum.padStart(2, "0")] || "";
     const type = inferRaceType(distText || contextText, isTrail);
 
     races.push({
@@ -301,7 +308,7 @@ function parseCalendarTable(html: string, isTrail: boolean, pageUrl = ""): RaceE
     const city = cityDeptMatch?.[1]?.trim() || cityDeptRaw.split("\n")[0].trim();
     const deptNum = cityDeptMatch?.[2]?.replace(/^0/, "") || "";
     const deptName = cityDeptMatch?.[3]?.trim() || "";
-    const region = DEPT_REGION[deptNum] || DEPT_REGION[deptNum.padStart(2, "0")] || "ile-de-france";
+    const region = DEPT_REGION[deptNum] || DEPT_REGION[deptNum.padStart(2, "0")] || "";
 
     const type = inferRaceType(distText, isTrail);
 
@@ -399,7 +406,7 @@ async function scrapeFfaCalendar(): Promise<RaceEntry[]> {
       const cityDeptMatch = cityDept.match(/^(.+?)\s*\((\d{2,3}[AB]?)\)/);
       const city = cityDeptMatch?.[1]?.trim() || cityDept;
       const deptNum = cityDeptMatch?.[2] || "";
-      const region = DEPT_REGION[deptNum] || DEPT_REGION[deptNum.padStart(2,"0")] || "ile-de-france";
+      const region = DEPT_REGION[deptNum] || DEPT_REGION[deptNum.padStart(2,"0")] || "";
 
       // Type from columns 3-4 if available
       const typeText = cells.length > 3 ? $(cells[3]).text().trim().toLowerCase() : "";
@@ -487,8 +494,10 @@ async function fetchWordPressAPI(maxPages = 5, startPage = 1): Promise<RaceEntry
         const addr = loc?.address || {};
         const city = addr.addressLocality || loc?.name || "";
         const postal = addr.postalCode || "";
-        const deptNum = postal ? postal.slice(0, 2) : "";
-        const region = DEPT_REGION[deptNum] || "ile-de-france";
+        // Le code postal ENTIER : « 20… » (Corse) et « 97… » (outre-mer) n'ont pas de département
+        // à deux chiffres ; ces courses tombaient en « région inconnue » (relecture du 08/11/2026).
+        const deptNum = departementDuCodePostal(postal)?.code ?? (postal ? postal.slice(0, 2) : "");
+        const region = DEPT_REGION[deptNum] || "";
 
         const geo = loc?.geo || {};
         const lat = geo.latitude ? parseFloat(geo.latitude) : null;
@@ -507,7 +516,8 @@ async function fetchWordPressAPI(maxPages = 5, startPage = 1): Promise<RaceEntry
           city,
           department: addr.addressRegion || deptNum,
           region,
-          distancesText: contentText.match(/\d+\s*km/gi)?.join(" / ") || "",
+          // Les décimales aussi : « 21,1 km » était lu « 1 km » (relecture du 08/11/2026).
+          distancesText: contentText.match(/\d+(?:[.,]\d+)?\s*km/gi)?.join(" / ") || "",
           type,
           source_url: jsonLd.url || post.link || "",
           terrain: isTrail ? ["single_track"] : ["asphalt"],
@@ -563,17 +573,20 @@ function dedup(races: RaceEntry[]): RaceEntry[] {
 }
 
 // ─── Map to Supabase schema ──────────────────────────────────────────────────
-function getDefaultDistance(type: string): number {
-  const m: Record<string, number> = {
-    road_5k:5, road_10k:10, semi:21.097, marathon:42.195,
-    trail_s:15, trail_m:35, trail_l:65, trail_xl:90, ultra:120,
-  };
-  return m[type] || 10;
+// ⚠️ SEULES LES DISTANCES QUE LE NOM DÉFINIT se déduisent (audit du 08/11/2026). Un semi et un
+// marathon ont une distance par définition ; « trail M » ou « ultra » n'en ont pas : 35 ou 120 km
+// étaient écrits comme la distance réelle de la course. Et `road_10k` est AUSSI le type par défaut
+// d'une course sans aucune distance lue (`inferRaceType`) : en déduire 10 km l'inventait encore.
+// La colonne est NOT NULL : une course sans distance connue n'est pas importée, et comptée.
+const DISTANCE_DU_TYPE: Record<string, number> = { semi: 21.097, marathon: 42.195 };
+
+function distanceConnue(r: RaceEntry): number | null {
+  const kmMatch = r.distancesText?.match(/(\d+(?:[.,]\d+)?)\s*km/i);
+  const lue = kmMatch ? parseFloat(kmMatch[1].replace(",", ".")) : DISTANCE_DU_TYPE[r.type];
+  return typeof lue === "number" && Number.isFinite(lue) && lue > 0 ? lue : null;
 }
 
-function toSupabaseRace(r: RaceEntry) {
-  const kmMatch = r.distancesText?.match(/(\d+(?:[.,]\d+)?)\s*km/i);
-  const distKm = kmMatch ? parseFloat(kmMatch[1].replace(",",".")) : getDefaultDistance(r.type);
+function toSupabaseRace(r: RaceEntry, distKm: number) {
   return {
     name: r.name,
     type: r.type,
@@ -726,30 +739,47 @@ export async function POST(req: Request) {
   // 5. No GPS enrichment during sync (use /api/races/geocode separately)
 
   // 6. Check existing to avoid duplicates (paginate to bypass 1000-row PostgREST cap)
+  //
+  // ⚠️ ORDRE TOTAL ET ERREUR LUE (audit du 08/11/2026). `order("name")` n'est pas total
+  // (plusieurs éditions portent le même nom) : des pages sautaient des lignes, et ces courses
+  // étaient réinsérées en double. Une page illisible arrêtait la lecture comme une fin de table :
+  // tout le reste passait pour nouveau. Désormais : par `id`, et une panne n'insère RIEN.
   const existingKeys = new Set<string>();
   let exPage = 0;
   const EX_PAGE = 1000;
   while (true) {
-    const { data: exData } = await createAdminClient()
+    const { data: exData, error: eExistantes } = await createAdminClient()
       .from("races")
       .select("name,date")
-      .order("name")
+      .order("id")
       .range(exPage, exPage + EX_PAGE - 1);
+    if (eExistantes) {
+      await journaliserEchecUneFois(null, { source: "races-sync", url: "/api/races/sync", message: `Courses existantes illisibles, rien inséré : ${eExistantes.code ?? "?"} ${eExistantes.message}` });
+      return NextResponse.json({ error: "Catalogue illisible : rien n'a été inséré (des doublons seraient partis)." }, { status: 500 });
+    }
     if (!exData?.length) break;
     for (const r of exData) existingKeys.add(`${r.name.toLowerCase().trim()}::${r.date}`);
     if (exData.length < EX_PAGE) break;
     exPage += EX_PAGE;
   }
-  const toInsert = races
-    .filter(r => !existingKeys.has(`${r.name.toLowerCase().trim()}::${r.date}`))
-    .map(toSupabaseRace);
+  // Région ou distance inconnue : la course n'est pas importée (les deux colonnes sont NOT NULL,
+  // et une valeur inventée s'afficherait comme une mesure). Le nombre est rendu, pas tu.
+  let sansRegion = 0, sansDistance = 0;
+  const toInsert: ReturnType<typeof toSupabaseRace>[] = [];
+  for (const r of races) {
+    if (existingKeys.has(`${r.name.toLowerCase().trim()}::${r.date}`)) continue;
+    if (!r.region) { sansRegion++; continue; }
+    const d = distanceConnue(r);
+    if (d == null) { sansDistance++; continue; }
+    toInsert.push(toSupabaseRace(r, d));
+  }
 
   // 7. Batch insert
   const BATCH = 50;
   let inserted = 0, errors = 0;
   for (let i = 0; i < toInsert.length; i += BATCH) {
     const { error } = await createAdminClient().from("races").insert(toInsert.slice(i, i + BATCH));
-    if (error) { console.error(error.message); errors++; }
+    if (error) { console.error(error.message); errors++; await journaliserEchecUneFois(null, { source: "races-sync", url: "/api/races/sync", message: `Lot de courses refusé : ${error.code ?? "?"} ${error.message}` }); }
     else inserted += Math.min(BATCH, toInsert.length - i);
   }
 
@@ -759,6 +789,7 @@ export async function POST(req: Request) {
     scraped: races.length,
     inserted,
     errors,
+    ecartees: { sansRegion, sansDistance },
     total_in_db: count || 0,
     with_gps: races.filter(r => r.latitude).length,
     sources: {

@@ -1,7 +1,7 @@
 [
   {
     "id": "i173402633",
-    "name": "Maishofen Randonnée",
+    "name": "Randonnée en vallée",
     "type": "Hike",
     "start_date_local": "2026-08-07T13:12:41",
     "moving_time": 6618,
@@ -34,7 +34,7 @@
   },
   {
     "id": "i173333836",
-    "name": "Maishofen Course à pied",
+    "name": "Course à pied",
     "type": "Run",
     "start_date_local": "2026-08-07T09:03:43",
     "moving_time": 7608,
@@ -67,7 +67,7 @@
   },
   {
     "id": "i173077860",
-    "name": "Kaprun Randonnée",
+    "name": "Randonnée en montagne",
     "type": "Hike",
     "start_date_local": "2026-08-06T11:40:02",
     "moving_time": 8257,
@@ -100,7 +100,7 @@
   },
   {
     "id": "i172792723",
-    "name": "Rauris Randonnée",
+    "name": "Randonnée",
     "type": "Hike",
     "start_date_local": "2026-08-05T10:08:13",
     "moving_time": 13199,

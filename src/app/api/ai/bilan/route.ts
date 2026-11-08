@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { exigeAcces } from "@/lib/billing/guard";
 import { generateContent, budget } from "@/lib/ai/gemini";
 import { lignesDuBilan, inviteBilan, empreinteBilan } from "@/lib/ai/bilanSemaine";
@@ -43,7 +44,16 @@ export async function POST() {
 
   // ── 2. Déjà écrit pour ces faits ? ─────────────────────────────────────────
   const admin = createAdminClient();
-  const { data: memo } = await admin.from("notifications").select("id, data").eq("user_id", user.id).eq("type", TYPE_BILAN).maybeSingle();
+  // La ligne la plus RÉCENTE, pas `maybeSingle` : un doublon d'avant ferait une erreur à
+  // chaque lecture, et le bilan ne s'afficherait plus jamais (relecture du 08/11/2026).
+  const { data: memos, error: eCache } = await admin.from("notifications").select("id, data").eq("user_id", user.id).eq("type", TYPE_BILAN).order("created_at", { ascending: false }).limit(1);
+  const memo = memos?.[0] ?? null;
+  // Cache illisible ≠ pas de cache (audit du 08/11/2026) : sinon le modèle est payé, puis une
+  // seconde ligne est insérée et plus aucune lecture ne passe (`maybeSingle`).
+  if (eCache) {
+    await journaliserEchecUneFois(admin, { source: "ia-bilan", userId: user.id, url: "/api/ai/bilan", message: `Cache illisible, modèle non appelé : ${eCache.code ?? "?"} ${eCache.message}` });
+    return NextResponse.json({ ok: false, error: "indisponible" }, { status: 503 });
+  }
   const prec = memo?.data as { empreinte?: string; texte?: string } | null;
   if (prec?.empreinte === empreinte && prec.texte) return NextResponse.json({ ok: true, texte: prec.texte, memorise: true });
 
@@ -69,7 +79,7 @@ export async function POST() {
   const { error: eMemo } = memo?.id
     ? await admin.from("notifications").update({ data: donnees }).eq("id", memo.id)
     : await admin.from("notifications").insert({ user_id: user.id, type: TYPE_BILAN, title: "bilan", body: "", read: true, data: donnees });
-  if (eMemo) console.error("[bilan] non mémorisé, il sera repayé :", eMemo.message);
+  if (eMemo) await journaliserEchecUneFois(admin, { source: "ia-bilan", userId: user.id, url: "/api/ai/bilan", message: `Bilan non mémorisé, il sera repayé : ${eMemo.code ?? "?"} ${eMemo.message}` });
 
   return NextResponse.json({ ok: true, texte, memorise: false });
 }

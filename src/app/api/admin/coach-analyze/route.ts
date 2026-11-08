@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
 import { COLONNES_VFC, precisionMetrique, serieVfc } from "@/lib/health/vfc";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -12,7 +12,7 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemi
 export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user || !estAdmin(user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || !estAdmin(user?.email) || await appareilRefuse(user.id)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { user_id } = await req.json() as { user_id: string };
   if (!user_id) return NextResponse.json({ error: "user_id requis" }, { status: 400 });

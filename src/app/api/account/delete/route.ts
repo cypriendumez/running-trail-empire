@@ -131,7 +131,10 @@ export async function POST() {
   }
   // Au mieux : `revoquer` ne lève jamais, et un refus d'intervals.icu ne retient pas la suppression.
   const jeton = montre?.intervals_api_key;
-  if (estJetonOAuth(jeton)) await revoquer(jetonDe(String(jeton)));
+  if (estJetonOAuth(jeton) && !(await revoquer(jetonDe(String(jeton))))) {
+    // Pacevo reste autorisé chez intervals.icu pour un compte effacé : écrit, pour finir à la main.
+    await journaliserEchec(admin, { source: "compte", userId: user.id, url: "/api/account/delete", message: "Autorisation intervals.icu non révoquée à la suppression du compte" });
+  }
 
   const { error } = await admin.auth.admin.deleteUser(user.id);
   // Les données sont parties, l'identifiant de connexion reste : à finir à la main, et DIT

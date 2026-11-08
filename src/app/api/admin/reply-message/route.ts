@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
 import { nettoyerPieces } from "@/lib/messages/piecesJointes";
 
 
@@ -10,7 +10,7 @@ import { nettoyerPieces } from "@/lib/messages/piecesJointes";
 export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user || !estAdmin(user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || !estAdmin(user?.email) || await appareilRefuse(user.id)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { user_id, body, attachments } = await req.json() as { user_id?: string; body?: string; attachments?: { url: string; name: string; type: string }[] };
   // Mêmes règles que la messagerie des athlètes : seules nos pièces jointes privées.

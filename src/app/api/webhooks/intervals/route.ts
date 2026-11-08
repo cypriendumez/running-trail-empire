@@ -128,7 +128,11 @@ export async function POST(req: Request) {
           const r = await poursuivre(admin, x, x.fresh);
           console.log(`[webhook/intervals] suite ${x.athleteId} · ${r.tracks.imported} trace(s) · replanifié : ${r.replanned ? "oui" : `non (${r.skipped})`}`);
         } catch (e) {
-          console.error(`[webhook/intervals] suite ${x.athleteId} en échec :`, e instanceof Error ? e.message : String(e));
+          // Après la réponse, plus personne ne lit la console : la suite (traces, replanification,
+          // envoi à la montre) ratait sans trace dans /admin › Bugs (audit du 08/11/2026).
+          const cause = e instanceof Error ? e.message : String(e);
+          console.error(`[webhook/intervals] suite ${x.athleteId} en échec :`, cause);
+          await journaliser(x.userId ?? null, `Suite d'une alerte en échec (traces, replanification, montre) : ${cause}`, { athlete: x.athleteId });
         }
       }
     });

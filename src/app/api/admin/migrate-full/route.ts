@@ -5,12 +5,12 @@ export const dynamic = "force-dynamic";
  * Call once from the admin panel.
  */
 import { NextResponse } from "next/server";
+import { verdictAdmin } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
 const MIGRATIONS: { name: string; sql: string }[] = [
   // ── workouts ─────────────────────────────────────────────────────────────────
@@ -300,10 +300,10 @@ const MIGRATIONS: { name: string; sql: string }[] = [
 ];
 
 export async function POST(req: Request) {
-  const authHeader = req.headers.get("x-admin-secret");
-  if (authHeader !== ADMIN_SECRET) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  // Session administrateur ET appareil de confiance, comme le panneau (audit du 08/11/2026) :
+  // le secret partagé `x-admin-secret` ouvrait ces routes sans le second facteur.
+  const acces = await verdictAdmin();
+  if (!acces.ok) return NextResponse.json({ error: "Forbidden" }, { status: acces.motif === "indisponible" ? 503 : 403 });
 
   const results: { name: string; status: "ok" | "error"; message?: string }[] = [];
 

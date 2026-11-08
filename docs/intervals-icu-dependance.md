@@ -86,7 +86,7 @@ Ce que ça règle, point par point :
 >
 > Best regards,
 > Cyprien Dumez — Pacevo
-> cypriendumez@outlook.fr
+> contact@pacevo.fr
 
 ## Le risque résiduel, dit franchement
 

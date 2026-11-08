@@ -1,16 +1,16 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
+import { verdictAdmin } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
 // GET /api/admin/athletes  — list all athletes for admin panel
 export async function GET(req: Request) {
-  const authHeader = req.headers.get("x-admin-secret");
-  if (authHeader !== ADMIN_SECRET) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  // Session administrateur ET appareil de confiance, comme le panneau (audit du 08/11/2026) :
+  // le secret partagé `x-admin-secret` ouvrait ces routes sans le second facteur.
+  const acces = await verdictAdmin();
+  if (!acces.ok) return NextResponse.json({ error: "Forbidden" }, { status: acces.motif === "indisponible" ? 503 : 403 });
 
   const supabase = await createClient();
 

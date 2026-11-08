@@ -6,7 +6,7 @@ import { pushIntervalsWorkout, buildWorkoutDescription, fcMaxMontre, ensureRunTh
 import { avecFcMaxMontre } from "@/lib/coach/fcCible";
 import { ciblesFcPour } from "@/lib/coach/ciblesFcServeur";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
@@ -16,7 +16,7 @@ import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 export async function POST(req: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !estAdmin(user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || !estAdmin(user?.email) || await appareilRefuse(user.id)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { user_id, title, subtitle, tags, why } = await req.json() as {
     user_id: string; title: string; subtitle?: string; tags?: string[]; why?: string;

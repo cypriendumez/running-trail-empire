@@ -8,9 +8,11 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const sport = searchParams.get("sport");
 
+  // Colonnes NOMMÉES (audit du 08/11/2026) : `*` publiait l'identifiant du compte de chaque
+  // auteur à quiconque, connecté ou non.
   let query = supabase
     .from("community_routes")
-    .select("*")
+    .select("id, author_name, name, sport, coordinates, distance_km, elevation_gain_m, duration_min, difficulty, region, city, lat, lng, description, created_at")
     .eq("is_public", true)
     .order("created_at", { ascending: false })
     .limit(500);
@@ -18,8 +20,10 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) {
-    // Table absente (migration non appliquée) — on renvoie une liste vide.
-    return NextResponse.json({ routes: [] });
+    // Table absente (migration non appliquée) : vraiment rien à montrer. Toute autre erreur est
+    // une panne, pas « aucun parcours partagé ».
+    if (error.code === "42P01") return NextResponse.json({ routes: [] });
+    return NextResponse.json({ error: "Parcours momentanément illisibles." }, { status: 503 });
   }
   return NextResponse.json({ routes: data ?? [] });
 }
@@ -43,6 +47,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Sport invalide" }, { status: 400 });
   }
 
+  // ⚠️ AUCUNE MESURE INVENTÉE (audit du 08/11/2026) : `|| 0` publiait « D+ 0 m » ou « 0 min »
+  // comme une mesure. Les colonnes sont NOT NULL : un parcours sans ces données n'est pas publié.
+  const fini = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
+  if (!fini(distance_km) || distance_km <= 0 || !fini(duration_min) || !fini(elevation_gain_m)) {
+    return NextResponse.json({ error: "Distance, durée et dénivelé requis : un parcours sans ces mesures ne peut pas être partagé." }, { status: 400 });
+  }
+
   // Point de départ représentatif (milieu du tracé) pour la vignette / le centrage
   const mid = coordinates[Math.floor(coordinates.length / 2)] as [number, number];
   const lat = typeof body.lat === "number" ? body.lat : mid[1];
@@ -51,7 +62,8 @@ export async function POST(req: NextRequest) {
   // Nom d'auteur depuis le profil
   let author = "Coureur";
   const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
-  if (prof?.full_name) author = prof.full_name as string;
+  // Le prénom seul, comme le Club : le parcours est PUBLIC (audit du 08/11/2026).
+  if (prof?.full_name) author = String(prof.full_name).trim().split(/\s+/)[0] || author;
 
   const { data, error } = await supabase
     .from("community_routes")
@@ -61,9 +73,9 @@ export async function POST(req: NextRequest) {
       name: String(name).slice(0, 120),
       sport,
       coordinates,
-      distance_km: Math.round((distance_km || 0) * 100) / 100,
-      elevation_gain_m: Math.round(elevation_gain_m || 0),
-      duration_min: Math.round(duration_min || 0),
+      distance_km: Math.round(distance_km * 100) / 100,
+      elevation_gain_m: Math.round(elevation_gain_m),
+      duration_min: Math.round(duration_min),
       difficulty: ["green", "blue", "red", "black"].includes(difficulty) ? difficulty : "green",
       region: (region || "").slice(0, 80),
       city: (city || "").slice(0, 80),

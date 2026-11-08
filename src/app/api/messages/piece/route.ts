@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
 import { SEAU_PJ, cheminValide, peutOuvrir, urlPiece } from "@/lib/messages/piecesJointes";
 
 /**
@@ -25,7 +25,10 @@ export async function GET(req: Request) {
   if (!cheminValide(chemin)) return introuvable();
 
   const admin = createAdminClient();
-  const estCoach = estAdmin(user.email);
+  // Le passe-droit du coach (ouvrir la pièce d'un autre compte : photos au Kiné, santé) exige
+  // l'appareil de confiance, comme le panneau. Une session admin ouverte ailleurs ne lit plus
+  // que ses propres pièces (relecture du 08/11/2026).
+  const estCoach = estAdmin(user.email) && !(await appareilRefuse(user.id));
   let recu = false;
   if (!chemin.startsWith(`${user.id}/`) && !estCoach) {
     // ⚠️ Filtré par `user_id` : seule SA boîte compte. La présence de l'adresse dans le

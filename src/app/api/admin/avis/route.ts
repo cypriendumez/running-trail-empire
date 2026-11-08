@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TYPE_AVIS, litAvis, refusReponse, REPONSE_MAX } from "@/lib/avis/store";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
 
 
 /**
@@ -21,7 +21,7 @@ import { estAdmin } from "@/lib/admin/acces";
 export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user || !estAdmin(user?.email)) {
+  if (!user || !estAdmin(user?.email) || await appareilRefuse(user.id)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -37,8 +37,10 @@ export async function POST(req: Request) {
   }
 
   const admin = createAdminClient();
-  const { data: ligne } = await admin
+  const { data: ligne, error: eLigne } = await admin
     .from("notifications").select("data").eq("id", id).eq("type", TYPE_AVIS).maybeSingle();
+  // Une panne n'est pas « avis introuvable » (audit du 08/11/2026).
+  if (eLigne) return NextResponse.json({ ok: false, error: "Avis momentanément illisible, réessaie." }, { status: 503 });
   const avis = litAvis(ligne?.data ?? null);
   if (!avis) return NextResponse.json({ ok: false, error: "Avis introuvable" }, { status: 404 });
 
@@ -65,12 +67,15 @@ export async function POST(req: Request) {
 export async function GET() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user || !estAdmin(user?.email)) {
+  if (!user || !estAdmin(user?.email) || await appareilRefuse(user.id)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const { data } = await createAdminClient()
+  const { data, error } = await createAdminClient()
     .from("notifications").select("id, data, created_at")
     .eq("type", TYPE_AVIS).order("created_at", { ascending: false });
+  // ⚠️ Une panne n'est pas « aucun avis à modérer » : un avis insultant resterait en ligne
+  // sans que personne le sache (audit du 08/11/2026).
+  if (error) return NextResponse.json({ ok: false, error: "Avis momentanément illisibles, réessaie." }, { status: 503 });
 
   const avis = (data ?? []).map((r) => ({ id: String(r.id), ...litAvis(r.data) })).filter((a) => a.note);
   return NextResponse.json({ ok: true, avis });

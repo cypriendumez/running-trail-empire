@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { denyIfNotAdmin } from "@/lib/api/adminGuard";
+import { coursesExistantes } from "@/lib/races/existantes";
 
 export const runtime = "nodejs";
 
@@ -480,8 +481,10 @@ export async function POST(req: Request) {
   const today = new Date().toISOString().slice(0, 10);
 
   // Get existing races to avoid duplicates
-  const { data: existing } = await createAdminClient().from("races").select("name,date");
-  const existingKeys = new Set((existing || []).map((r: { name: string; date: string }) =>
+  // Toutes les courses, par pages : une seule lecture n'en voyait que 1 000 (08/11/2026).
+  const lues = await coursesExistantes(createAdminClient());
+  if ("erreur" in lues) return NextResponse.json({ error: `Catalogue illisible, rien inséré : ${lues.erreur}` }, { status: 500 });
+  const existingKeys = new Set(lues.courses.map((r) =>
     `${r.name.toLowerCase().trim()}::${r.date}`
   ));
 
@@ -519,14 +522,16 @@ export async function POST(req: Request) {
 
   const BATCH = 50;
   let inserted = 0;
+  const refus: string[] = [];
   for (let i = 0; i < toInsert.length; i += BATCH) {
     const { error } = await createAdminClient().from("races").insert(toInsert.slice(i, i + BATCH));
-    if (error) console.error("Batch error:", error.message);
+    // Un lot refusé est DIT dans la réponse, pas seulement à la console (08/11/2026).
+    if (error) { console.error("Batch error:", error.message); refus.push(`lot ${i / BATCH + 1} : ${error.message}`); }
     else inserted += Math.min(BATCH, toInsert.length - i);
   }
 
   const { count } = await createAdminClient().from("races").select("*", { count: "exact", head: true });
-  return NextResponse.json({ inserted, total: count, message: `${inserted} courses ajoutées` });
+  return NextResponse.json({ inserted, refus, total: count, message: `${inserted} courses ajoutées${refus.length ? `, ${refus.length} lot(s) refusé(s)` : ""}` }, { status: refus.length && !inserted ? 500 : 200 });
 }
 
 export async function GET(req: Request) {

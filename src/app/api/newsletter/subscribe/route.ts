@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { lienDesinscription } from "@/lib/newsletter/token";
 import { emailConfirmation } from "@/lib/newsletter/confirmation";
 import { envoyerEmail } from "@/lib/email/envoyer";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -55,7 +56,9 @@ export async function POST(req: Request) {
       );
       if (sansLangue.error) throw new Error(sansLangue.error.message);
     }
-  } catch {
+  } catch (e) {
+    // La cause au journal, sans l'adresse (`journaliserEchec` la masque de toute façon).
+    await journaliserEchec(null, { source: "newsletter", url: "/api/newsletter/subscribe", message: `Inscription non enregistrée : ${e instanceof Error ? e.message : String(e)}` });
     return NextResponse.json({ ok: false, error: "Inscription impossible pour le moment" }, { status: 500 });
   }
 

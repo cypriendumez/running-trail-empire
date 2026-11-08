@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { exigeAcces } from "@/lib/billing/guard";
 import { generateContent } from "@/lib/ai/gemini";
 import {
@@ -64,9 +65,20 @@ export async function POST(req: Request) {
   const empreinte = empreintePlan(week, qBudget);
 
   // ── 1. Déjà répondu pour CE plan ? ─────────────────────────────────────────
-  const { data: memo } = await admin
+  // La ligne la plus RÉCENTE, pas `maybeSingle` : deux lignes (un doublon d'avant) feraient
+  // une erreur à chaque lecture, et le coureur n'aurait plus jamais d'avis (relecture du 08/11).
+  const { data: memos, error: eCache } = await admin
     .from("notifications").select("id, data")
-    .eq("user_id", user.id).eq("type", TYPE_CACHE).maybeSingle();
+    .eq("user_id", user.id).eq("type", TYPE_CACHE)
+    .order("created_at", { ascending: false }).limit(1);
+  const memo = memos?.[0] ?? null;
+  // ⚠️ CACHE ILLISIBLE ≠ PAS DE CACHE (audit du 08/11/2026). Le prendre pour une absence
+  // payait un appel Gemini sur le plafond du jour, puis INSÉRAIT une seconde ligne : dès lors
+  // `maybeSingle` échouait à chaque lecture, et chaque ouverture repayait le modèle.
+  if (eCache) {
+    await journaliserEchecUneFois(admin, { source: "ia-ajustement", userId: user.id, url: "/api/ai/ajustement", message: `Cache illisible, modèle non appelé : ${eCache.code ?? "?"} ${eCache.message}` });
+    return NextResponse.json({ ok: false, error: "indisponible" }, { status: 503 });
+  }
   const cache = memo?.data as { empreinte?: string; ajustement?: Ajustement } | null;
   if (cache?.empreinte === empreinte && cache.ajustement) {
     return NextResponse.json({ ok: true, ajustement: cache.ajustement, memorise: true });
@@ -135,7 +147,7 @@ export async function POST(req: Request) {
   const { error: eMemo } = memo?.id
     ? await admin.from("notifications").update({ data: donnees }).eq("id", memo.id)
     : await admin.from("notifications").insert({ user_id: user.id, type: TYPE_CACHE, title: "ajustement", body: "", data: donnees });
-  if (eMemo) console.error("[ajustement] mémorisation impossible, il sera recalculé :", eMemo.message);
+  if (eMemo) await journaliserEchecUneFois(admin, { source: "ia-ajustement", userId: user.id, url: "/api/ai/ajustement", message: `Ajustement non mémorisé, il sera repayé : ${eMemo.code ?? "?"} ${eMemo.message}` });
 
   return NextResponse.json({ ok: true, ajustement: v.ajustement, memorise: false });
 }

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
 
 /**
  * LA CONVERSATION D'UN SEUL ATHLÈTE.
@@ -19,7 +19,7 @@ import { estAdmin } from "@/lib/admin/acces";
 export async function GET(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
-  if (!estAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user || !estAdmin(user?.email) || await appareilRefuse(user.id)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const userId = new URL(req.url).searchParams.get("user_id");
   if (!userId) return NextResponse.json({ ok: false, error: "user_id attendu" }, { status: 400 });

@@ -6,7 +6,7 @@ import { pushIntervalsWorkout, buildWorkoutDescription, fcMaxMontre, ensureRunTh
 import { avecFcMaxMontre } from "@/lib/coach/fcCible";
 import { ciblesFcPour } from "@/lib/coach/ciblesFcServeur";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
@@ -22,7 +22,7 @@ type SessionIn = { date: string; type?: string; title?: string; detail?: string;
 export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user || !estAdmin(user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || !estAdmin(user?.email) || await appareilRefuse(user.id)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { user_id, sessions, auto } = await req.json() as { user_id: string; sessions: SessionIn[]; auto?: boolean };
   if (!user_id || !Array.isArray(sessions) || sessions.length === 0) return NextResponse.json({ error: "user_id et sessions requis" }, { status: 400 });

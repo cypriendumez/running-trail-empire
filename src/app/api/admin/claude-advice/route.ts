@@ -5,9 +5,9 @@ export const dynamic = "force-dynamic";
  * a personalized, human-voiced coaching message ready to publish.
  */
 import { NextResponse } from "next/server";
+import { verdictAdmin } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 interface GeminiAnalysis {
@@ -30,10 +30,10 @@ interface GeminiAnalysis {
 }
 
 export async function POST(req: Request) {
-  const authHeader = req.headers.get("x-admin-secret");
-  if (authHeader !== ADMIN_SECRET) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  // Session administrateur ET appareil de confiance, comme le panneau (audit du 08/11/2026) :
+  // le secret partagé `x-admin-secret` ouvrait ces routes sans le second facteur.
+  const acces = await verdictAdmin();
+  if (!acces.ok) return NextResponse.json({ error: "Forbidden" }, { status: acces.motif === "indisponible" ? 503 : 403 });
 
   if (!ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });

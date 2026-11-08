@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { denyIfNotAdmin } from "@/lib/api/adminGuard";
+import { coursesExistantes } from "@/lib/races/existantes";
 
 
 const SEED_RACES = [
@@ -37,7 +38,7 @@ const SEED_RACES = [
     max_participants: 54000,
   },
   {
-    name: "Diagonale des Fous (Grand Raid)", type: "ultra", region: "provence-alpes-cote-azur",
+    name: "Diagonale des Fous (Grand Raid)", type: "ultra", region: "la-reunion",
     department: "La Réunion", city: "Saint-Pierre",
     date: "2026-10-15", distance_km: 165, elevation_gain_m: 9978,
     difficulty: "black", terrain: ["volcanic", "single_track", "technical"],
@@ -122,13 +123,18 @@ export async function GET(req: Request) {
   const denied = await denyIfNotAdmin(req);
   if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   // Check what's already in DB to avoid duplicates
-  const { data: existing } = await createAdminClient().from("races").select("name,date");
-  const existingKeys = new Set((existing || []).map(r => `${r.name}::${r.date}`));
+  // Toutes les courses, par pages : une seule lecture n'en voyait que 1 000 (08/11/2026).
+  const lues = await coursesExistantes(createAdminClient());
+  if ("erreur" in lues) return NextResponse.json({ error: `Catalogue illisible, rien inséré : ${lues.erreur}` }, { status: 500 });
+  const existingKeys = new Set(lues.courses.map(r => `${r.name}::${r.date}`));
 
   const toInsert = SEED_RACES
     .filter(r => !existingKeys.has(`${r.name}::${r.date}`))
     .map(r => ({
       ...r,
+      // Pas de barrières horaires saisies à la main : seule la source officielle fait foi
+      // (même règle que `seed-full` et `sync`, audit du 08/11/2026).
+      time_limits: [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }));

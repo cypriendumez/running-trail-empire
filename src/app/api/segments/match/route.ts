@@ -27,19 +27,28 @@ export async function POST(req: Request) {
     .select("workout_id, points, min_lat, max_lat, min_lon, max_lon")
     .eq("user_id", user.id).eq("has_gps", true);
   if (workoutId) q = q.eq("workout_id", workoutId);
-  const { data: tracks } = await q.limit(50);
+  // Chaque lecture est lue (audit du 08/11/2026) : une panne n'est ni « aucune trace », ni
+  // « aucun segment », ni une séance sans date.
+  const { data: tracks, error: eTraces } = await q.limit(50);
+  if (eTraces) return NextResponse.json({ error: "Traces momentanément illisibles." }, { status: 503 });
   if (!tracks?.length) return NextResponse.json({ efforts: 0, message: "Aucune trace à analyser." });
 
-  const { data: segments } = await sb.from("segments")
+  const { data: segments, error: eSegments } = await sb.from("segments")
     .select("id, distance_m, start_lat, start_lon, end_lat, end_lon, min_lat, max_lat, min_lon, max_lon")
     .limit(500);
+  if (eSegments) return NextResponse.json({ error: "Segments momentanément illisibles." }, { status: 503 });
   if (!segments?.length) return NextResponse.json({ efforts: 0, message: "Aucun segment au catalogue." });
 
-  const { data: workouts } = await admin.from("workouts")
-    .select("id, date").eq("user_id", user.id);
+  // Les seules séances de ces traces (50 au plus) : toutes celles du compte dépassaient les
+  // 1 000 lignes que rend PostgREST, et les plus anciennes perdaient leur date.
+  const { data: workouts, error: eSeances } = await admin.from("workouts")
+    .select("id, date").eq("user_id", user.id)
+    .in("id", (tracks as { workout_id: string }[]).map((t) => String(t.workout_id)));
+  if (eSeances) return NextResponse.json({ error: "Séances momentanément illisibles." }, { status: 503 });
   const dateDe = new Map((workouts ?? []).map((w) => [String((w as { id: string }).id), String((w as { date: string }).date)]));
 
   const aInserer: Record<string, unknown>[] = [];
+  let sansDate = 0;
 
   for (const t of tracks as Record<string, unknown>[]) {
     const raw = (t.points ?? []) as [number, number, number][];
@@ -62,17 +71,22 @@ export async function POST(req: Request) {
         start_lat: Number(s.start_lat), start_lon: Number(s.start_lon),
         end_lat: Number(s.end_lat), end_lon: Number(s.end_lon),
       };
+      // ⚠️ PAS DE DATE INVENTÉE (audit du 08/11/2026) : `?? new Date()` datait du jour un passage
+      // dont la séance était inconnue, et le classement « du mois » le comptait. Sans date, pas
+      // d'enregistrement (la colonne est NOT NULL) : il est compté, pas tu.
+      const date = dateDe.get(String(t.workout_id));
       for (const e of findEfforts(points, def)) {
+        if (!date) { sansDate++; continue; }
         aInserer.push({
           segment_id: def.id, user_id: user.id, workout_id: String(t.workout_id),
           elapsed_seconds: e.elapsed_seconds,
-          started_at: dateDe.get(String(t.workout_id)) ?? new Date().toISOString(),
+          started_at: date,
         });
       }
     }
   }
 
-  if (!aInserer.length) return NextResponse.json({ efforts: 0, message: "Aucun segment reconnu sur ces traces." });
+  if (!aInserer.length) return NextResponse.json({ efforts: 0, sansDate, message: sansDate ? "Passages reconnus, mais séance sans date : rien enregistré." : "Aucun segment reconnu sur ces traces." });
 
   // `ignoreDuplicates` s'appuie sur la contrainte unique (segment, séance) : un
   // ré-appariement ne peut donc pas gonfler les classements ni le titre de Maître.
@@ -80,5 +94,5 @@ export async function POST(req: Request) {
     .upsert(aInserer, { onConflict: "segment_id,workout_id", ignoreDuplicates: true });
   if (error) return NextResponse.json({ error: "Enregistrement impossible" }, { status: 500 });
 
-  return NextResponse.json({ efforts: aInserer.length });
+  return NextResponse.json({ efforts: aInserer.length, sansDate });
 }

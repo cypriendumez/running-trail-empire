@@ -1,17 +1,17 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
+import { verdictAdmin } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
 // POST /api/admin/advice  { user_id, week_start, coach_advice, publish }
 // Saves Claude Pro expert advice and optionally publishes it to the athlete
 export async function POST(req: Request) {
-  const authHeader = req.headers.get("x-admin-secret");
-  if (authHeader !== ADMIN_SECRET) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  // Session administrateur ET appareil de confiance, comme le panneau (audit du 08/11/2026) :
+  // le secret partagé `x-admin-secret` ouvrait ces routes sans le second facteur.
+  const acces = await verdictAdmin();
+  if (!acces.ok) return NextResponse.json({ error: "Forbidden" }, { status: acces.motif === "indisponible" ? 503 : 403 });
 
   const supabase = await createClient();
   const { user_id, week_start, coach_advice, publish } = await req.json() as {
@@ -55,10 +55,10 @@ export async function POST(req: Request) {
 
 // GET /api/admin/advice?user_id=xxx
 export async function GET(req: Request) {
-  const authHeader = req.headers.get("x-admin-secret");
-  if (authHeader !== ADMIN_SECRET) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  // Session administrateur ET appareil de confiance, comme le panneau (audit du 08/11/2026) :
+  // le secret partagé `x-admin-secret` ouvrait ces routes sans le second facteur.
+  const acces = await verdictAdmin();
+  if (!acces.ok) return NextResponse.json({ error: "Forbidden" }, { status: acces.motif === "indisponible" ? 503 : 403 });
 
   const supabase = await createClient();
   const url = new URL(req.url);

@@ -26,8 +26,10 @@ export async function POST() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const { data: profile } = await sb.from("profiles")
+  const { data: profile, error: eProfil } = await sb.from("profiles")
     .select("intervals_api_key, intervals_athlete_id").eq("id", user.id).maybeSingle();
+  // Une panne n'est pas « montre non connectée » (audit du 08/11/2026).
+  if (eProfil) return NextResponse.json({ error: "Profil momentanément illisible, réessaie dans un instant." }, { status: 503 });
   const apiKey = (profile as { intervals_api_key?: string } | null)?.intervals_api_key;
   // La clé ne quitte JAMAIS le serveur : elle sert ici et n'apparaît dans aucune réponse.
   if (!apiKey) {
@@ -39,14 +41,25 @@ export async function POST() {
   // Séances déjà traitées — succès comme absence de trace. Sans mémoriser les
   // secondes, on rappellerait indéfiniment intervals.icu pour des séances de tapis
   // qui n'auront jamais de coordonnées.
-  const [{ data: workouts }, { data: done }] = await Promise.all([
-    sb.from("workouts").select("id, external_id, date")
-      .eq("user_id", user.id).not("external_id", "is", null)
-      .order("date", { ascending: false }).limit(1000),
-    admin.from("activity_tracks").select("workout_id").eq("user_id", user.id),
-  ]);
+  //
+  // ⚠️ LES DEUX LECTURES SONT LUES (audit du 08/11/2026). Séances illisibles : la réponse
+  // disait « 0 restante », import terminé. Traces illisibles : tout le lot repartait chez
+  // intervals.icu, dont le débit est limité. Et PostgREST rend 1 000 lignes au plus : au-delà,
+  // des traces faites passaient pour à faire ; elles sont lues par pages, dans un ordre total.
+  const { data: workouts, error: eSeances } = await sb.from("workouts").select("id, external_id, date")
+    .eq("user_id", user.id).not("external_id", "is", null)
+    .order("date", { ascending: false }).limit(1000);
+  if (eSeances) return NextResponse.json({ error: "Séances momentanément illisibles, réessaie dans un instant." }, { status: 503 });
+  const done: { workout_id: string }[] = [];
+  for (let page = 0; page < 50; page++) {
+    const { data: lot, error: eTraces } = await admin.from("activity_tracks").select("workout_id")
+      .eq("user_id", user.id).order("workout_id").range(page * 1000, page * 1000 + 999);
+    if (eTraces) return NextResponse.json({ error: "Traces momentanément illisibles, réessaie dans un instant." }, { status: 503 });
+    done.push(...((lot ?? []) as { workout_id: string }[]));
+    if ((lot ?? []).length < 1000) break;
+  }
 
-  const traitees = new Set((done ?? []).map((t) => String((t as { workout_id: string }).workout_id)));
+  const traitees = new Set(done.map((t) => String(t.workout_id)));
   const restantes = (workouts ?? []).filter((w) => !traitees.has(String((w as { id: string }).id)));
   const lot = restantes.slice(0, LOT);
 

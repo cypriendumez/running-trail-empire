@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { estAdmin } from "@/lib/admin/acces";
+import { estAdmin, appareilRefuse } from "@/lib/admin/acces";
 import { envoyerEmail } from "@/lib/email/envoyer";
 
 
@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   // Auth check — only admin can call this
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !estAdmin(user?.email)) {
+  if (!user || !estAdmin(user?.email) || await appareilRefuse(user.id)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

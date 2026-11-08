@@ -114,8 +114,6 @@ export type VerdictAdmin =
  */
 export async function verdictAdmin(): Promise<VerdictAdmin> {
   const { createClient } = await import("@/lib/supabase/server");
-  const { cookies } = await import("next/headers");
-  const { COOKIE_APPAREIL, appareilExige, verifierAppareil } = await import("@/lib/admin/appareil");
   const sb = await createClient();
   const { data: { user }, error } = await sb.auth.getUser();
   if (!user && error) {
@@ -125,13 +123,25 @@ export async function verdictAdmin(): Promise<VerdictAdmin> {
     if (!status || status >= 500) return { ok: false, motif: "indisponible", detail: error.message };
   }
   if (!estAdmin(user?.email)) return { ok: false, motif: "refus" };
-  if (appareilExige()) {
-    const v = verifierAppareil({
-      secret: String(process.env.ADMIN_DEVICE_SECRET),
-      userId: user!.id,
-      jeton: (await cookies()).get(COOKIE_APPAREIL)?.value,
-    });
-    if (!v.ok) return { ok: false, motif: "refus" };
-  }
+  if (await appareilRefuse(user!.id)) return { ok: false, motif: "refus" };
   return { ok: true, id: user!.id, email: String(user!.email) };
+}
+
+/**
+ * L'APPAREIL DE CONFIANCE, pour une route qui a déjà lu sa session et vérifié l'adresse.
+ *
+ * ⚠️ AUDIT DU 08/11/2026 : 14 routes d'administration (fiches des athlètes, envoi d'e-mails,
+ * lettre, messagerie, publication de plans…) ne vérifiaient QUE l'adresse du compte. Une
+ * session restée ouverte ailleurs les ouvrait sans jamais croiser l'écran qui réclame le code
+ * — exactement ce que `gardeAdmin` devait empêcher. `true` = refuser.
+ */
+export async function appareilRefuse(userId: string): Promise<boolean> {
+  const { cookies } = await import("next/headers");
+  const { COOKIE_APPAREIL, appareilExige, verifierAppareil } = await import("@/lib/admin/appareil");
+  if (!appareilExige()) return false;
+  return !verifierAppareil({
+    secret: String(process.env.ADMIN_DEVICE_SECRET),
+    userId,
+    jeton: (await cookies()).get(COOKIE_APPAREIL)?.value,
+  }).ok;
 }

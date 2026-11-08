@@ -1,20 +1,20 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
+import { verdictAdmin } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
 // POST /api/admin/report  { user_id, week_start }
 // Generates a Gemini Flash technical synthesis for a given athlete + week
 export async function POST(req: Request) {
-  const authHeader = req.headers.get("x-admin-secret");
-  if (authHeader !== ADMIN_SECRET) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  // Session administrateur ET appareil de confiance, comme le panneau (audit du 08/11/2026) :
+  // le secret partagé `x-admin-secret` ouvrait ces routes sans le second facteur.
+  const acces = await verdictAdmin();
+  if (!acces.ok) return NextResponse.json({ error: "Forbidden" }, { status: acces.motif === "indisponible" ? 503 : 403 });
 
   const supabase = await createClient();
   const { user_id, week_start } = await req.json() as { user_id: string; week_start: string };
