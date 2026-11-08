@@ -95,7 +95,14 @@ const AV: Record<Lang, Bloc> = {
 };
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Avis" };
+// ⚠️ SANS DESCRIPTION NI CANONIQUE, la page reprenait celles de l'accueil (constaté le
+// 08/11/2026 dans le HTML servi) : deux pages avec la même description, c'est une de trop
+// pour un moteur qui cherche encore à quoi correspond le nom « Pacevo ».
+export const metadata = {
+  title: "Avis",
+  description: "Les avis laissés par les coureurs qui utilisent Pacevo, coach de running et de trail.",
+  alternates: { canonical: "/avis" },
+};
 
 export default async function AvisPage() {
   const lang = await getPublicLang();

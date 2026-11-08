@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ARTICLES, articleParSlug } from "../articles";
 import { BLOG } from "../blogI18n";
 import { VueArticle } from "./VueArticle";
+import { donneesStructureesArticle, serialiserJsonLd } from "@/lib/brand/entite";
 
 /**
  * LA PAGE D'ARTICLE — elle n'existait pas.
@@ -60,5 +61,13 @@ export default async function PageArticle({
   const { slug } = await params;
   const a = articleParSlug(slug);
   if (!a) notFound();
-  return <VueArticle slug={slug} />;
+  // Données structurées de l'article, publié par Pacevo (voir `lib/brand/entite`). Le
+  // titre est le français, comme les métadonnées : c'est la langue du texte.
+  const ld = donneesStructureesArticle({ slug: a.slug, titre: BLOG.fr.posts[a.cle].title, chapo: a.chapo, maj: a.maj, sources: a.sources });
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serialiserJsonLd(ld) }} />
+      <VueArticle slug={slug} />
+    </>
+  );
 }

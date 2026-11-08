@@ -20,7 +20,7 @@ const CREDIT_PHOTO = "Photo © François Pix";
 
 export async function generateMetadata(): Promise<Metadata> {
   const H = HISTOIRE[await getPublicLang()] ?? HISTOIRE.fr;
-  return { title: H.metaTitle, description: H.metaDesc };
+  return { title: H.metaTitle, description: H.metaDesc, alternates: { canonical: "/notre-histoire" } };
 }
 
 /**

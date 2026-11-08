@@ -4,6 +4,7 @@ import { LegalContent } from "@/components/legal/LegalContent";
 export const metadata: Metadata = {
   title: "Politique de confidentialité",
   description: "Comment Pacevo collecte, utilise et protège tes données personnelles (RGPD).",
+  alternates: { canonical: "/confidentialite" },
 };
 
 // Page PUBLIQUE (URL à fournir à Apple App Store / Google Play).

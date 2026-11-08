@@ -4,6 +4,7 @@ import { LegalContent } from "@/components/legal/LegalContent";
 export const metadata: Metadata = {
   title: "Mentions légales",
   description: "Mentions légales de Pacevo (éditeur, hébergeur, contact).",
+  alternates: { canonical: "/mentions-legales" },
 };
 
 // Page PUBLIQUE. ⚠️ Remplace les [À RENSEIGNER] (dans legalI18n.ts) par tes informations réelles avant publication.

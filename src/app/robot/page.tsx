@@ -9,6 +9,7 @@ import { TEXTES_ROBOT, ROBOTS_TXT_REFUS } from "./textes";
 export const metadata: Metadata = {
   title: "Robot d'exploration",
   description: "Ce que lit le robot de Pacevo, comment il respecte robots.txt et comment s'y opposer.",
+  alternates: { canonical: "/robot" },
 };
 
 /**

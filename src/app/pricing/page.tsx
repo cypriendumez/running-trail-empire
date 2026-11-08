@@ -146,7 +146,7 @@ export default function PricingPage() {
 
       <Section>
         <Container>
-          <SectionHeading eyebrow={P.eyebrow} title={P.title} subtitle={P.subtitle} />
+          <SectionHeading niveau="h1" eyebrow={P.eyebrow} title={P.title} subtitle={P.subtitle} />
 
           <div className="mt-10 flex justify-center">
             <div className="inline-flex items-center rounded-full border border-zinc-200 bg-white p-1">
