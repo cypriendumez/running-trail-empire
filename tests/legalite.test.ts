@@ -163,7 +163,9 @@ const LANGUES = ["fr", "en", "de", "es", "pt"] as const;
       assert.match(sec(6), /Resend, Microsoft/, `${l} §6 : transferts hors UE incomplets`);
       assert.match(sec(7), /13/, `${l} §7 : durée de conservation de l'audience absente`);
     }
-    assert.match(lire("src/app/confidentialite/page.tsx"), /date="01\/10\/2026"/);
+    // La date suit le DERNIER changement du texte : 01/10/2026 (ce bloc), puis 08/11/2026
+    // (Have I Been Pwned nommé, sécurité des mots de passe). Texte modifié → date avancée ici.
+    assert.match(lire("src/app/confidentialite/page.tsx"), /date="08\/11\/2026"/);
   });
 
   // ── 5. LE REFUS DE LA MESURE D'AUDIENCE EXISTE ──────────────────────────────
