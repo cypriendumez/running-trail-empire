@@ -62,8 +62,12 @@ test("Score de forme : même total que computeForme avec les mêmes entrées", (
   const totaux = new Set<number>();
   for (const cible of cibles) {
     const d = donnees(cible == null ? { objectif: null } : { objectif: { ...donnees().objectif!, targetSeconds: cible } });
-    const disc = computeDiscipline(d.seances, d.vfc.slice(0, 14) as never, { sleep_score: 82 }, "optimal");
-    const f = computeForme(d.seances, d.vma.vma, disc.recovery, disc.consistency, d.objectif ? { distanceKm: 42.195, targetSeconds: d.objectif.targetSeconds } : null);
+    // ⚠️ LE JOUR DE LA PAGE, passé aux deux calculs comme le fait la fiche (09/11/2026, 0 h 03) :
+    // sans lui, ils comptaient depuis aujourd'hui à PARIS, la page depuis `AUJ` (UTC). Entre
+    // minuit à Paris et minuit UTC, les deux fenêtres différaient d'un jour : 85 contre 86, et le
+    // test rougissait chaque nuit à cette heure, sans qu'une ligne du produit ait changé.
+    const disc = computeDiscipline(d.seances, d.vfc.slice(0, 14) as never, { sleep_score: 82 }, "optimal", { aujourdhui: d.aujourdhui });
+    const f = computeForme(d.seances, d.vma.vma, disc.recovery, disc.consistency, d.objectif ? { distanceKm: 42.195, targetSeconds: d.objectif.targetSeconds } : null, d.aujourdhui);
     assert.equal(ficheIndicateur("forme", d).valeur, String(f.total), `cible ${cible}`);
     assert.equal(ficheIndicateur("discipline", d).valeur, String(disc.total));
     assert.ok(f.speed < 100 || cible !== cibles[1], "le profil ambitieux doit laisser l'axe vitesse sous 100");
