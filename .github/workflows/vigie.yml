@@ -1,0 +1,87 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  @VIGIE — pacevo.fr répond-il ? Deux fois par heure (GitHub en lance moins).
+#
+#  POURQUOI (08/11/2026) : rien ne surveillait la disponibilité du site. La routine
+#  « Bugs » lit le journal d'erreurs à 6 h et 23 h ; si pacevo.fr tombait à 9 h,
+#  personne ne le voyait avant le soir — et une panne totale n'écrit même rien au
+#  journal. Cette sonde ne coûte rien : pas d'IA, pas de quota Claude, pas de secret.
+#
+#  CE QUI EST VÉRIFIÉ : l'accueil, la connexion, le blog et `version.json` (qui doit
+#  contenir un commit) répondent 200. Chaque page a TROIS essais espacés de 30 s :
+#  un hoquet du réseau de GitHub ne doit pas réveiller Cyprien — une fausse alerte
+#  apprend à ignorer les vraies.
+#
+#  EN CAS DE PANNE : un ticket « [Vigie] » est ouvert (un seul, jamais en double) et
+#  le passage échoue. GitHub envoie un e-mail pour le ticket ET pour l'échec. Au
+#  passage suivant qui réussit, le ticket est commenté « rétabli » puis fermé.
+#  Le dépôt est public : le ticket ne contient que des adresses publiques et des
+#  codes HTTP, jamais de secret ni de donnée d'athlète.
+# ──────────────────────────────────────────────────────────────────────────────
+name: Vigie — disponibilité de pacevo.fr
+
+on:
+  schedule:
+    - cron: "23,53 * * * *"
+  workflow_dispatch:
+
+# Deux sondes simultanées ouvriraient deux tickets.
+concurrency:
+  group: vigie
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  vigie:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Interroger le site (trois essais par page)
+        id: sonde
+        run: |
+          set -u
+          echec=""
+          for url in https://pacevo.fr/ https://pacevo.fr/login https://pacevo.fr/blog https://pacevo.fr/version.json; do
+            ok=0
+            code=000
+            for essai in 1 2 3; do
+              code=$(curl -s -o /tmp/corps -w '%{http_code}' --max-time 20 "$url" || true)
+              if [ "$code" = "200" ]; then ok=1; break; fi
+              sleep 30
+            done
+            if [ "$ok" -eq 0 ]; then echec="$echec $url (HTTP $code) ;"; fi
+          done
+          # version.json doit dire QUELLE version est servie, sinon le déploiement est cassé.
+          if ! curl -s --max-time 20 https://pacevo.fr/version.json | grep -q '"commit"'; then
+            echec="$echec version.json ne contient pas de commit ;"
+          fi
+          echo "Résultat :${echec:- tout répond.}"
+          echo "echec=$echec" >> "$GITHUB_OUTPUT"
+
+      - name: Ouvrir ou fermer le ticket de panne
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ECHEC: ${{ steps.sonde.outputs.echec }}
+        run: |
+          set -u
+          ouvert=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "Vigie in:title" \
+            --json number,title --jq '[.[] | select(.title | startswith("[Vigie]"))][0].number // empty')
+          maintenant=$(TZ=Europe/Paris date '+%d/%m/%Y %H:%M')
+          if [ -n "$ECHEC" ]; then
+            if [ -z "$ouvert" ]; then
+              gh issue create -R "$GITHUB_REPOSITORY" \
+                --title "[Vigie] pacevo.fr ne répond plus ($maintenant)" \
+                --body "@cypriendumez — la sonde de disponibilité a échoué le $maintenant (heure de Paris), après trois essais par page.
+
+          Ce qui ne répond pas :$ECHEC
+
+          À vérifier : https://pacevo.fr puis le tableau de bord Vercel (déploiements et journaux). Ce ticket se ferme seul au premier passage qui réussit."
+            fi
+            exit 1
+          fi
+          if [ -n "$ouvert" ]; then
+            gh issue comment "$ouvert" -R "$GITHUB_REPOSITORY" --body "Rétabli : toutes les pages répondent à nouveau ($maintenant, heure de Paris)."
+            gh issue close "$ouvert" -R "$GITHUB_REPOSITORY"
+          fi

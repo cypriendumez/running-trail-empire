@@ -45,6 +45,7 @@ export const TACHES: Tache[] = [
   { fichier: "courses-rafraichissement", cadence: "1×/semaine (mardi)", parJour: 1 / 7, role: "Relit les courses : dates, dénivelés, liens d'inscription et classements" },
   { fichier: "sites-officiels-gratuits", cadence: "1×/semaine (mercredi)", parJour: 1 / 7, role: "Trouve le site officiel des courses jogging-plus, sans IA" },
   { fichier: "sites-officiels", cadence: "1×/jour (fin de quota)", parJour: 2, role: "Recherche web des sites officiels, avec le reste du quota IA du jour" },
+  { fichier: "vigie", cadence: "2×/heure", parJour: 48, role: "Vérifie que pacevo.fr répond ; en cas de panne, ouvre un ticket GitHub (e-mail à Cyprien)" },
 ];
 
 export type Execution = { created_at: string; conclusion: string | null; html_url?: string };

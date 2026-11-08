@@ -261,6 +261,26 @@ test("races-types s'arrête AVANT le plafond Hobby (60 s), sinon Vercel la tue s
   assert.ok(timeouts.length > 0 && timeouts.every((t) => t <= 10_000), `un fetch le-sportif a un timeout trop long : ${timeouts.join(", ")} ms`);
 });
 
+test("@Vigie : une panne du site alerte Cyprien, un hoquet du réseau non", () => {
+  // ⚠️ CRÉÉE LE 08/11/2026 : rien ne surveillait la disponibilité de pacevo.fr ; une panne
+  // totale n'écrit même rien au journal d'erreurs. La sonde doit (1) réessayer avant de
+  // crier — une fausse alerte apprend à ignorer les vraies —, (2) ÉCHOUER en cas de panne,
+  // car c'est l'échec qui déclenche l'e-mail de GitHub, (3) n'ouvrir qu'UN ticket et le
+  // fermer au retour, (4) ne lire aucune donnée extérieure dans ses commandes.
+  const src = readFileSync(".github/workflows/vigie.yml", "utf8")
+    .split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+  assert.match(src, /for essai in 1 2 3/, "plus de nouvel essai : un hoquet réseau deviendrait une alerte");
+  assert.match(src, /if \[ "\$ok" -eq 0 \]; then echec=/, "une page qui ne répond pas n'est plus relevée");
+  assert.match(src, /https:\/\/pacevo\.fr\/version\.json/, "la version servie n'est plus contrôlée");
+  assert.match(src, /grep -q '"commit"'/, "un version.json vide passerait pour un site sain");
+  const panne = src.slice(src.indexOf('if [ -n "$ECHEC" ]'));
+  assert.match(panne, /^\s*exit 1\s*$/m, "une panne ne fait plus échouer le passage : aucun e-mail ne partirait");
+  assert.match(panne, /if \[ -z "\$ouvert" \]; then\s*\n\s*gh issue create/, "un ticket serait ouvert à chaque passage");
+  assert.match(src, /gh issue close "\$ouvert"/, "le ticket ne se ferme plus au retour du site");
+  assert.match(src, /issues: write/, "sans ce droit, le ticket ne peut pas être ouvert");
+  assert.doesNotMatch(src, /\$\{\{\s*github\.event\./, "une donnée d'événement injectée dans une commande");
+});
+
 test("le plan de la semaine : un skip PAR ATHLÈTE ne fait pas rougir le cron", () => {
   // ⚠️ 14/09/2026 : le workflow grepait \"skipped\" sur toute la réponse pour détecter un
   // refus GLOBAL (« pas lundi »). Or chaque athlète aux notifs coach coupées est
