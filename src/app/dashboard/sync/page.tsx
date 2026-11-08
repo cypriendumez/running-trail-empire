@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { Watch, RefreshCw, CheckCircle2, Activity, Zap, Heart, Moon, Battery, AlertCircle, ChevronRight, Upload, Info, WifiOff, Clock, Key, Eye, EyeOff, Trash2, ExternalLink, ArrowDown, MousePointerClick, Settings2, Link2, Code2, Footprints, Mountain, Bike, Waves, XCircle, ArrowRight, AlertTriangle, HeartPulse, Droplet, BarChart3, Trophy, type LucideIcon, Smartphone } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -116,12 +116,31 @@ export default function SyncPage() {
   const [voirCleManuelle, setVoirCleManuelle] = useState(false);
   const [retourOAuth, setRetourOAuth] = useState<RetourOAuth | null>(null);
 
+  // ⚠️ UNE PANNE N'EST PAS « NON CONFIGURÉ » (08/11/2026). Une réponse ratée affichait
+  // « Non configuré » à un athlète dont la montre est branchée : elle affiche maintenant
+  // « Statut illisible, réessaie plus tard ». PAS DE RÉESSAI AUTOMATIQUE : trois relectures
+  // indépendantes ont trouvé, à chaque version, un minuteur qui survivait (démontage, deux
+  // appels en vol, Strict Mode). Seul reste un JETON DE GÉNÉRATION : chaque appel, et le
+  // démontage, invalide les réponses précédentes — une vieille réponse arrivée en retard
+  // n'écrase plus la nouvelle, et rien ne touche l'état d'une page quittée.
+  const generationStatut = useRef(0);
+  const [statutIllisible, setStatutIllisible] = useState(false);
   function checkStatus() {
+    const g = ++generationStatut.current;
+    setStatutIllisible(false);
     fetch("/api/intervals/status")
-      .then(r => r.json())
-      .then(d => { setConfigured(d.configured ?? false); setOauth(d.oauth === true); })
-      .catch(() => setConfigured(false));
+      .then(async r => {
+        if (!r.ok) throw new Error(String(r.status));
+        const d = await r.json();
+        if (g !== generationStatut.current) return;
+        setConfigured(d.configured ?? false); setOauth(d.oauth === true);
+      })
+      .catch(() => {
+        if (g !== generationStatut.current) return;
+        setConfigured(null); setStatutIllisible(true);
+      });
   }
+  useEffect(() => () => { generationStatut.current++; }, []);
 
   // Check if Intervals.icu is configured
   useEffect(() => {
@@ -303,14 +322,14 @@ export default function SyncPage() {
             configured ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
             "border-red-200 bg-red-50 text-red-700"
           }`}>
-            {configured === null ? <RefreshCw className="h-4 w-4 animate-spin" /> :
+            {configured === null ? (statutIllisible ? <AlertCircle className="h-4 w-4" /> : <RefreshCw className="h-4 w-4 animate-spin" />) :
              configured ? (
                <span className="relative flex h-2.5 w-2.5">
                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
                </span>
              ) : <WifiOff className="h-4 w-4" />}
-            {configured === null ? d["st.checking"] :
+            {configured === null ? (statutIllisible ? d["st.illisible"] : d["st.checking"]) :
              configured ? d["st.connected"] :
              d["st.notConfigured"]}
           </div>

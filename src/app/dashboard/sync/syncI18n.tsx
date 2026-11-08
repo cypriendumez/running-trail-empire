@@ -8,7 +8,7 @@ export function fillY(s: string, p?: Record<string, string | number>): string {
 export const SY: Record<string, Record<string, string>> = {
   fr: {
     "title": "Sync Montre",
-    "st.checking": "Vérification…", "st.connected": "Intervals.icu connecté", "st.notConfigured": "Non configuré",
+    "st.checking": "Vérification…", "st.illisible": "Statut illisible, réessaie plus tard", "st.connected": "Intervals.icu connecté", "st.notConfigured": "Non configuré",
     "period": "Période :", "p.2y": "2 ans", "p.1y": "1 an", "p.3m": "3 mois", "p.dayN": "{d}j",
     "syncing": "Synchronisation…", "syncNow": "Synchroniser maintenant",
     "r.saved": "activités sauvegardées", "r.hrv": "VFC", "r.nights": "nuits",
@@ -72,7 +72,7 @@ export const SY: Record<string, Record<string, string>> = {
   },
   en: {
     "title": "Watch Sync",
-    "st.checking": "Checking…", "st.connected": "Intervals.icu connected", "st.notConfigured": "Not configured",
+    "st.checking": "Checking…", "st.illisible": "Status unreadable, try again later", "st.connected": "Intervals.icu connected", "st.notConfigured": "Not configured",
     "period": "Period:", "p.2y": "2 years", "p.1y": "1 year", "p.3m": "3 months", "p.dayN": "{d}d",
     "syncing": "Syncing…", "syncNow": "Sync now",
     "r.saved": "activities saved", "r.hrv": "HRV", "r.nights": "nights",
@@ -136,7 +136,7 @@ export const SY: Record<string, Record<string, string>> = {
   },
   de: {
     "title": "Uhr-Sync",
-    "st.checking": "Prüfung…", "st.connected": "Intervals.icu verbunden", "st.notConfigured": "Nicht konfiguriert",
+    "st.checking": "Prüfung…", "st.illisible": "Status nicht lesbar, versuche es später", "st.connected": "Intervals.icu verbunden", "st.notConfigured": "Nicht konfiguriert",
     "period": "Zeitraum:", "p.2y": "2 Jahre", "p.1y": "1 Jahr", "p.3m": "3 Monate", "p.dayN": "{d}Tg.",
     "syncing": "Synchronisierung…", "syncNow": "Jetzt synchronisieren",
     "r.saved": "Aktivitäten gespeichert", "r.hrv": "HRV", "r.nights": "Nächte",
@@ -200,7 +200,7 @@ export const SY: Record<string, Record<string, string>> = {
   },
   es: {
     "title": "Sync Reloj",
-    "st.checking": "Verificando…", "st.connected": "Intervals.icu conectado", "st.notConfigured": "Sin configurar",
+    "st.checking": "Verificando…", "st.illisible": "Estado ilegible, inténtalo más tarde", "st.connected": "Intervals.icu conectado", "st.notConfigured": "Sin configurar",
     "period": "Periodo:", "p.2y": "2 años", "p.1y": "1 año", "p.3m": "3 meses", "p.dayN": "{d}d",
     "syncing": "Sincronizando…", "syncNow": "Sincronizar ahora",
     "r.saved": "actividades guardadas", "r.hrv": "VFC", "r.nights": "noches",
@@ -264,7 +264,7 @@ export const SY: Record<string, Record<string, string>> = {
   },
   pt: {
     "title": "Sync Relógio",
-    "st.checking": "A verificar…", "st.connected": "Intervals.icu ligado", "st.notConfigured": "Não configurado",
+    "st.checking": "A verificar…", "st.illisible": "Estado ilegível, tenta mais tarde", "st.connected": "Intervals.icu ligado", "st.notConfigured": "Não configurado",
     "period": "Período:", "p.2y": "2 anos", "p.1y": "1 ano", "p.3m": "3 meses", "p.dayN": "{d}d",
     "syncing": "A sincronizar…", "syncNow": "Sincronizar agora",
     "r.saved": "atividades guardadas", "r.hrv": "VFC", "r.nights": "noites",

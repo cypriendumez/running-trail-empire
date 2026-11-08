@@ -26,6 +26,7 @@ import { programmeMarcheCourse, FENETRE_JOURS as FENETRE_MARCHE_COURSE, type Pro
 import { isRun } from "@/lib/intervals/sport";
 import { decaleJour } from "@/lib/streak/compute";
 import { reecritureLue, type SeanceEcrite } from "@/lib/coach/planNotifie";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 
 type Admin = SupabaseClient;
 
@@ -270,6 +271,7 @@ export async function autoCoachForUser(
     .eq("user_id", userId).eq("type", "coach_session").gte("data->>date", from);
   if (ePurge) {
     console.error("[coach-auto] plan à venir non purgé, republication abandonnée :", ePurge.message);
+    await journaliserEchec(admin, { source: "coach-auto", userId, message: `Plan à venir non purgé, republication abandonnée : ${ePurge.code ?? "?"} ${ePurge.message}` });
     return { processed: false, days: 0, pushed: 0, emailed: false, emailSkipped: "purge impossible" };
   }
 
@@ -314,7 +316,24 @@ export async function autoCoachForUser(
     },
   }));
   const { error } = await admin.from("notifications").insert(rows);
-  if (error) return { processed: false, reason: error.message };
+  if (error) {
+    // ⚠️ LA PURGE EST DÉJÀ FAITE (08/11/2026). Rendre `processed: false` laissait l'athlète
+    // avec un calendrier VIDE jusqu'au cron de la nuit — et ses appelants (VMA, test de
+    // lactate, priorité d'une course) ignorent ce résultat. On remet le plan précédent,
+    // relu juste avant la purge, et on journalise.
+    let restaure = false;
+    if (lignesAvant?.length) {
+      const { error: eRetour } = await admin.from("notifications").insert(lignesAvant.map((l) => ({
+        user_id: userId, type: "coach_session", title: l.title, body: l.body, read: l.read, data: l.data,
+      })));
+      restaure = !eRetour;
+    }
+    await journaliserEchec(admin, {
+      source: "coach-auto", userId,
+      message: `Nouveau plan refusé (${error.code ?? "?"} ${error.message}) : ${restaure ? "plan précédent remis" : planAvant == null ? "plan précédent illisible, calendrier vide" : lignesAvant?.length ? "plan précédent NON remis, calendrier vide" : "aucun plan précédent"}`,
+    });
+    return { processed: false, reason: error.message };
+  }
 
   // 3) Montre : SEULEMENT les jours confirmés. Pousser du prévisionnel encombrerait
   //    Garmin de séances qui vont changer avant d'être courues.

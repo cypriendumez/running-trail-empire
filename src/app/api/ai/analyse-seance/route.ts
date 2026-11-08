@@ -13,6 +13,7 @@ import { decaleJour } from "@/lib/streak/compute";
 import { intervallesDeSeance, fluxDeSeance } from "@/lib/intervals/performance";
 import { identifiantsDe, type ProfilIdentifiants } from "@/lib/intervals/identifiants";
 import { getAccountLang } from "@/lib/i18n/serverLang";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 
 /**
  * L'ANALYSE D'UNE SÉANCE — passée ou tout juste arrivée.
@@ -56,11 +57,18 @@ export async function POST(req: Request) {
 
   // ── 1. La réponse mémorisée d'abord : elle évite l'appel ET le verrou n'a pas à
   //       repayer un texte déjà produit pour cet athlète.
-  const [{ data: cache }, { data: profilAcces }] = await Promise.all([
+  const [{ data: cache, error: eCache }, { data: profilAcces, error: eAcces }] = await Promise.all([
     supabase.from("notifications").select("id,body,data")
       .eq("user_id", user.id).eq("type", TYPE_ANALYSE).eq("data->>workout_id", workoutId).limit(1),
     supabase.from("profiles").select(COLONNES_ACCES).eq("id", user.id).maybeSingle(),
   ]);
+  // ⚠️ UNE LECTURE RATÉE N'EST NI « PAS D'ANALYSE EN MÉMOIRE » NI « PAS PREMIUM » (08/11/2026) :
+  // la première refaisait payer une analyse déjà écrite, la seconde servait l'analyse
+  // essentielle à un abonné Premium. Réessayer peut réussir : 503.
+  if (eCache || eAcces) {
+    console.error("[analyse-seance] mémoire ou accès illisible :", (eCache ?? eAcces)!.message);
+    return NextResponse.json({ error: "Analyse momentanément indisponible, réessaie dans un moment." }, { status: 503 });
+  }
   const complet = profilPeut(profilAcces as Parameters<typeof profilPeut>[0], "analyse_complete");
   const memo = cache?.[0] as { id?: string; body?: string | null; data?: { complete?: boolean; longue?: boolean } | null } | undefined;
   // ⚠️ UNE ANALYSE ESSENTIELLE NE SE RESSERT PAS À PREMIUM. Qui passe à Premium et rouvre
@@ -100,6 +108,15 @@ export async function POST(req: Request) {
       .eq("type", "coach_session").eq("data->>date", String(s.date).slice(0, 10)).limit(1),
   ]);
 
+  // ⚠️ DES REPÈRES ILLISIBLES NE SONT PAS DES REPÈRES ABSENTS (08/11/2026). Sans la FC max de
+  // référence ni les comparables, `fcMax` devenait le pic de CETTE seule sortie (dès 150 bpm)
+  // et le verdict d'intensité partait faux, sans signe de dégradation ; sans le prescrit,
+  // la séance était jugée comme si rien n'était prévu. On n'analyse pas à l'aveugle : 503.
+  const eRepere = profilRes.error ?? baseRes.error ?? compRes.error ?? prescritRes.error;
+  if (eRepere) {
+    console.error("[analyse-seance] repères illisibles :", eRepere.message);
+    return NextResponse.json({ error: "Analyse momentanément indisponible, réessaie dans un moment." }, { status: 503 });
+  }
   const comparables = (compRes.data ?? []) as unknown as SeanceBrute[];
   // ⚠️ MÊME SOURCE DE FC MAX QUE LE COACH : mesure de référence, sinon le maximum
   // réellement observé, sinon la formule d'âge. Deux sources divergentes donneraient deux
@@ -195,7 +212,11 @@ export async function POST(req: Request) {
   const { error: eIns } = memo?.id
     ? await admin.from("notifications").update(ligne).eq("id", memo.id).eq("user_id", user.id)
     : await admin.from("notifications").insert({ user_id: user.id, type: TYPE_ANALYSE, ...ligne });
-  if (eIns) console.error("[analyse-seance] analyse non mémorisée, elle sera repayée :", eIns.message);
+  // La réponse est `ok` : sans journal, ce coût caché (quota Gemini repayé) n'existait pour personne.
+  if (eIns) {
+    console.error("[analyse-seance] analyse non mémorisée, elle sera repayée :", eIns.message);
+    await journaliserEchec(null, { source: "analyse-seance", userId: user.id, url: "/api/ai/analyse-seance", message: `Analyse non mémorisée, quota repayé à la réouverture : ${eIns.code ?? "?"} ${eIns.message}` });
+  }
 
   return NextResponse.json({ ok: true, texte, memorise: false, tronquee: r.tronquee === true, complete: complet });
 }

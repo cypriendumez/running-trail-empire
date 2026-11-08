@@ -8,6 +8,7 @@ import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { prioriteDe } from "@/lib/coach/saison";
 import { objectifEnCours } from "@/lib/coach/prochaineCourse";
 import { autoCoachForUser } from "@/lib/ai/autoCoach";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 
 // POST /api/calendar-entry — le client ajoute une note ou une course planifiée à un jour.
 //   {date, kind:"note", text}  OU  {date, kind:"race", name, location?, distanceKm?}
@@ -53,24 +54,40 @@ export async function POST(req: Request) {
   // ⚠️ ET PLUS DE VMA INVENTÉE : sans VMA connue, le chrono visé était prédit avec 14 km/h et
   // servait d'allure spécifique au plan. Sans VMA, pas d'objectif déclaré : la course A
   // reste dans la saison, sans chrono, et le coach la vise quand même (lib/coach/saison).
+  //
+  // ⚠️ AU MIEUX, MAIS PLUS MUET (08/11/2026). La course est déjà ajoutée : un objectif raté
+  // ne l'annule pas. Mais le `catch` vide avalait tout — `setRaceObjective` LÈVE quand la
+  // lecture ou l'écriture de l'objectif échoue — et la route répondait `ok` : l'athlète
+  // voyait « ton coach en tiendra compte » et le plan ne visait pas sa course, sans trace.
+  // `objectifPose` : true = posé, null = rien à poser (objectif déjà à venir, pas de VMA,
+  // course sans distance), false = ÉCHEC, journalisé et dit à l'écran.
+  let objectifPose: boolean | null = null;
   if (b.kind === "race" && prioriteDe(b.priorite) === "A") {
     const distanceKm = b.distanceKm != null && b.distanceKm !== "" ? Number(b.distanceKm) : null;
     const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date) && !date.startsWith("2099") && date >= aujourdhui(FUSEAU_DEFAUT);
     if (distanceKm != null && isFinite(distanceKm) && distanceKm > 0 && dateOk) {
+      const echec = async (cause: string) => {
+        objectifPose = false;
+        await journaliserEchec(admin, { source: "objectif", userId: user.id, url: "/api/calendar-entry", message: `Objectif de course non posé : ${cause}` });
+      };
       try {
         // Une lecture en échec ne dit PAS « aucun objectif » : sans réponse, on ne touche à rien.
         const { data: objRow, error: eObjectif } = await admin.from("notifications").select("data")
           .eq("user_id", user.id).eq("type", "race_objective").maybeSingle();
+        if (eObjectif) await echec(`lecture ${eObjectif.code ?? "?"} ${eObjectif.message}`);
         const objectifAVenir = objectifEnCours((objRow as { data?: { raceDate?: unknown } } | null)?.data ?? null, aujourdhui(FUSEAU_DEFAUT));
         const vma = await getEffectiveVma(sb, user.id);
         if (!eObjectif && !objectifAVenir && vma != null) {
           await setRaceObjective(admin, user.id, { race: String(b.name).slice(0, 80), distanceKm, raceDate: date, targetSeconds: predictTargetSeconds(distanceKm, vma) });
+          objectifPose = true;
         }
-      } catch { /* best-effort : la course est déjà ajoutée */ }
+      } catch (e) {
+        await echec(e instanceof Error ? e.message : String(e));
+      }
     }
   }
 
-  return NextResponse.json({ ok: true, id: data?.id });
+  return NextResponse.json({ ok: true, id: data?.id, objectifPose });
 }
 
 // PATCH /api/calendar-entry  {id, priorite} — change la priorité d'une course du calendrier

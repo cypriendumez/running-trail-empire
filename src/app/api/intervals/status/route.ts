@@ -31,11 +31,16 @@ export async function GET() {
   // visiteur anonyme.
   if (!user) return NextResponse.json({ configured: false, source: null });
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from("profiles")
     .select("intervals_athlete_id, intervals_api_key")
     .eq("id", user.id)
     .single();
+  // ⚠️ UNE PANNE N'EST PAS « NON CONFIGURÉ » (08/11/2026). L'erreur n'était pas lue : une
+  // lecture ratée répondait `configured: false`, qu'AutoSync garde en cache pour toute la
+  // visite (plus aucune synchronisation) et que l'onglet Sync affichait « Non configuré »
+  // à un athlète dont la montre est branchée. Réessayer peut réussir : 503.
+  if (error) return NextResponse.json({ error: "statut_illisible" }, { status: 503 });
 
   const configured = !!identifiantsDe(profile);
   // `oauth` : le bouton « Autoriser Pacevo sur intervals.icu » peut-il être proposé ? Seulement

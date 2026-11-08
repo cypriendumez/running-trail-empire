@@ -131,7 +131,8 @@ test("le kiné réclame le bilan, avec assez de jetons pour l'écrire", () => {
   const route = codeNu("src/app/api/ai/physio/route.ts");
   assert.match(route, /BILAN STRUCTURÉ \(OBLIGATOIRE/, "l'invite ne demande plus de bilan structuré");
   assert.match(route, /extraireBilan\(out\.text\)/, "la réponse n'est plus découpée");
-  assert.match(route, /NextResponse\.json\(\{ reply, bilan \}\)/, "le bilan n'est plus renvoyé au navigateur");
+  // La réponse porte aussi `douleurNotee` depuis le 08/11/2026 (tests/echecs-muets.test.ts).
+  assert.match(route, /NextResponse\.json\(\{ reply, bilan(, douleurNotee)? \}\)/, "le bilan n'est plus renvoyé au navigateur");
   // ⚠️ Le bilan vient EN DERNIER : mesuré le 22/09/2026, 1900 jetons de réponse le
   // coupaient en plein JSON. Le budget de réponse doit rester large.
   const m = route.match(/budget\((\d+), (\d+)\)/);

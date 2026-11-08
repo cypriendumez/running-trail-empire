@@ -11,6 +11,8 @@ import { prochaineCourse } from "@/lib/coach/prochaineCourse";
 import { courseDatee, dateLongue } from "@/lib/ai/reperesTemps";
 import { actives, libellesActifs, type Douleur } from "@/lib/health/douleurs";
 import { extraireBilan } from "@/lib/health/bilan";
+import { enregistrerDouleurDeclaree } from "@/lib/health/douleurDeclaree";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 import { COLONNES_VFC, precisionMetrique, serieVfc } from "@/lib/health/vfc";
 
 type Msg = { role: "user" | "model"; text: string };
@@ -277,34 +279,16 @@ STYLE : experte, humaine, structurée (titres courts / puces), CONCISE (pas de p
   //
   // Une seule déclaration conservée par zone et par jour : le chat envoie la zone à
   // CHAQUE message, ce qui créerait sinon une entrée par phrase échangée.
+  //
+  // ⚠️ LE KINÉ RÉPOND MÊME SI L'ENREGISTREMENT ÉCHOUE, MAIS L'ÉCRAN LE DIT. Jusqu'au
+  // 08/11/2026 l'échec ne partait que dans la console : la douleur était perdue, le coach
+  // continuait de prescrire de l'intensité, et l'athlète croyait l'avoir signalée.
+  // `douleurNotee` : null = rien à enregistrer, true = notée, false = PERDUE (et journalisée).
+  let douleurNotee: boolean | null = null;
   if (zone && typeof painLevel === "number" && painLevel >= 4) {
-    try {
-      const today = aujourdhui(FUSEAU_DEFAUT);
-      const { data: existing } = await supabase.from("notifications")
-        .select("id, data").eq("user_id", user.id).eq("type", "pain_report")
-        .gte("created_at", `${today}T00:00:00Z`).limit(20);
-      // Le dédoublonnage suit la CLÉ, pas le libellé : sinon changer de langue en cours
-      // de journée rouvrirait une seconde déclaration pour la même zone.
-      const cle = zoneKey || zone;
-      const already = (existing ?? []).some((n) => {
-        const d = n.data as { zone?: string; slot?: string } | null;
-        return (d?.slot || d?.zone) === cle;
-      });
-      if (!already) {
-        // ⚠️ L'INTENTION DU `catch` EST JUSTE — le kiné doit répondre même si
-        // l'enregistrement échoue — MAIS IL NE VOYAIT RIEN : un client Supabase
-        // RETOURNE ses erreurs, il ne les lève pas. Une déclaration de douleur perdue,
-        // c'est une donnée de santé que l'athlète a saisie et que le kiné ne retrouvera
-        // jamais à la séance suivante, alors que c'est toute l'utilité de sa mémoire.
-        const { error } = await supabase.from("notifications").insert({
-          user_id: user.id, type: "pain_report",
-          title: `Douleur signalée : ${zone}`,
-          body: `Intensité ${painLevel}/10 — déclarée depuis l'espace Santé.`,
-          data: { zone, slot: zoneKey ?? null, level: painLevel, date: today },
-        });
-        if (error) console.error("[kiné] douleur déclarée non enregistrée :", error.message);
-      }
-    } catch { /* best-effort : le kiné répond même si l'enregistrement échoue */ }
+    douleurNotee = await enregistrerDouleurDeclaree(supabase, {
+      userId: user.id, zone, zoneKey: zoneKey ?? null, painLevel, today: aujourdhui(FUSEAU_DEFAUT),
+    });
   }
 
   // ⚠️ UNE RÉPONSE COUPÉE NE DOIT PAS PASSER POUR UNE CONCLUSION. On garde le texte —
@@ -326,13 +310,22 @@ STYLE : experte, humaine, structurée (titres courts / puces), CONCISE (pas de p
     const fil = [...(history ?? []).slice(-38).map((m) => ({ role: m.role, text: String(m.text).slice(0, 1500) })),
       { role: "user" as const, text: (message || "").slice(0, 1500) }, { role: "model" as const, text: reply.slice(0, 4000) }].slice(-40);
     const { data: existant, error: eLecture } = await supabase.from("notifications").select("id").eq("user_id", user.id).eq("type", "kine_chat").limit(1).maybeSingle();
-    if (eLecture) console.error("[kiné] mémoire illisible :", eLecture.message);
-    const contenu = { user_id: user.id, type: "kine_chat", title: "Consultation kiné IA", body: null, data: { messages: fil, maj: new Date().toISOString() } };
-    const { error } = existant
-      ? await supabase.from("notifications").update({ data: contenu.data }).eq("id", existant.id)
-      : await supabase.from("notifications").insert(contenu);
-    if (error) console.error("[kiné] consultation non mémorisée :", error.message);
+    if (eLecture) {
+      // ⚠️ UNE LECTURE RATÉE NE DIT PAS « PAS ENCORE DE MÉMOIRE » (08/11/2026). `existant`
+      // restait indéfini et on INSÉRAIT une seconde ligne `kine_chat` : la relecture de
+      // l'onglet en prend une au hasard, le fil pouvait revenir ancien. On n'écrit rien.
+      await journaliserEchec(null, { source: "kine", userId: user.id, url: "/api/ai/physio", message: `Mémoire de consultation illisible, fil non réécrit : ${eLecture.code ?? "?"} ${eLecture.message}` });
+    } else {
+      const contenu = { user_id: user.id, type: "kine_chat", title: "Consultation kiné IA", body: null, data: { messages: fil, maj: new Date().toISOString() } };
+      const { error } = existant
+        ? await supabase.from("notifications").update({ data: contenu.data }).eq("id", existant.id)
+        : await supabase.from("notifications").insert(contenu);
+      if (error) {
+        console.error("[kiné] consultation non mémorisée :", error.message);
+        await journaliserEchec(null, { source: "kine", userId: user.id, url: "/api/ai/physio", message: `Consultation non mémorisée : ${error.code ?? "?"} ${error.message}` });
+      }
+    }
   } catch (e) { console.error("[kiné] consultation non mémorisée :", e instanceof Error ? e.message : String(e)); }
 
-  return NextResponse.json({ reply, bilan });
+  return NextResponse.json({ reply, bilan, douleurNotee });
 }

@@ -32,7 +32,7 @@ const H: Record<string, Record<string, string>> = {
     "chat.seed": "Bonjour, je suis votre kiné du sport. Décrivez-moi ce que vous ressentez — zone, depuis quand, à l'effort ou au repos — ou cliquez une zone sur le schéma, et je vous aide.",
     "chat.thinking": "Le kiné réfléchit…", "chat.placeholder": "Ex : douleur au genou après mes sorties longues…", "chat.photoAdd": "Ajouter une photo", "chat.photoRemove": "Retirer la photo", "chat.photoReady": "Photo prête. Elle est analysée puis oubliée : rien n'est enregistré. Cadre serré sur la zone, en pleine lumière.", "chat.photoBadType": "Image illisible. Formats acceptés : JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Peux-tu regarder cette photo ?",
     "chat.disclaimer": "Conseils informatifs — ne remplacent pas un avis médical. Douleur forte / persistante → consultez.",
-    "chat.errNoReply": "Je n'ai pas pu répondre, réessayez.", "chat.errConn": "Connexion impossible au kiné IA. Réessayez.",
+    "chat.errNoReply": "Je n'ai pas pu répondre, réessayez.", "chat.errConn": "Connexion impossible au kiné IA. Réessayez.", "chat.painNotSaved": "Ta douleur n'a pas pu être enregistrée : ton coach ne la connaît pas encore. Signale-la de nouveau dans un moment.",
     "chat.verrou": "Le kiné IA fait partie des formules Starter et Premium.", "chat.verrouCta": "Voir les formules", "chat.quota": "Tu as utilisé tes échanges avec l'IA pour aujourd'hui : ils reviennent demain.",
     "k.askPrompt": "J'ai une douleur au niveau : {zone} (intensité {n}/10). Qu'est-ce que ça peut être, et que dois-je faire concrètement ?",
     "k.annuler": "Annuler", "k.etatQ": "{z} — où en es-tu ?", "k.mieux": "Ça va mieux", "k.pire": "Ça empire", "k.passe": "C'est passé", "k.etatOk": "C'est noté — ton coach en tient compte.", "k.etatPasse": "Noté : cette douleur ne bride plus ton plan.", "k.etatErr": "Mise à jour impossible. Réessaie.",
@@ -67,7 +67,7 @@ const H: Record<string, Record<string, string>> = {
     "chat.seed": "Hello, I'm your sports physio. Tell me what you feel — area, since when, on exertion or at rest — or click a zone on the diagram, and I'll help.",
     "chat.thinking": "The physio is thinking…", "chat.placeholder": "E.g. knee pain after my long runs…", "chat.photoAdd": "Add a photo", "chat.photoRemove": "Remove photo", "chat.photoReady": "Photo ready. It is analysed then forgotten: nothing is stored. Frame the area closely, in good light.", "chat.photoBadType": "Unreadable image. Accepted: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Could you look at this photo?",
     "chat.disclaimer": "Informational advice — not a substitute for medical care. Severe / persistent pain → see a doctor.",
-    "chat.errNoReply": "I couldn't reply, please try again.", "chat.errConn": "Couldn't connect to the AI physio. Try again.",
+    "chat.errNoReply": "I couldn't reply, please try again.", "chat.errConn": "Couldn't connect to the AI physio. Try again.", "chat.painNotSaved": "Your pain couldn't be saved: your coach doesn't know about it yet. Report it again in a moment.",
     "chat.verrou": "The AI physio is part of the Starter and Premium plans.", "chat.verrouCta": "See the plans", "chat.quota": "You've used today's AI exchanges: they come back tomorrow.",
     "k.askPrompt": "I have pain in: {zone} (intensity {n}/10). What could it be, and what should I concretely do?",
     "k.annuler": "Undo", "k.etatQ": "{z} — how is it now?", "k.mieux": "Getting better", "k.pire": "Getting worse", "k.passe": "It's gone", "k.etatOk": "Noted — your coach takes it into account.", "k.etatPasse": "Noted: this pain no longer holds your plan back.", "k.etatErr": "Couldn't update. Try again.",
@@ -102,7 +102,7 @@ const H: Record<string, Record<string, string>> = {
     "chat.seed": "Hallo, ich bin dein Sportphysio. Beschreibe mir, was du spürst — Bereich, seit wann, bei Belastung oder in Ruhe — oder klicke eine Zone im Schema an, und ich helfe dir.",
     "chat.thinking": "Der Physio überlegt…", "chat.placeholder": "Z. B. Knieschmerzen nach langen Läufen…", "chat.photoAdd": "Foto hinzufügen", "chat.photoRemove": "Foto entfernen", "chat.photoReady": "Foto bereit. Es wird analysiert und dann verworfen: nichts wird gespeichert. Bereich nah und gut ausgeleuchtet aufnehmen.", "chat.photoBadType": "Bild nicht lesbar. Erlaubt: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Kannst du dir dieses Foto ansehen?",
     "chat.disclaimer": "Informative Hinweise — kein Ersatz für ärztlichen Rat. Starke / anhaltende Schmerzen → zum Arzt.",
-    "chat.errNoReply": "Ich konnte nicht antworten, bitte erneut versuchen.", "chat.errConn": "Keine Verbindung zum KI-Physio. Versuche es erneut.",
+    "chat.errNoReply": "Ich konnte nicht antworten, bitte erneut versuchen.", "chat.errConn": "Keine Verbindung zum KI-Physio. Versuche es erneut.", "chat.painNotSaved": "Dein Schmerz konnte nicht gespeichert werden: Dein Coach weiß noch nichts davon. Melde ihn gleich noch einmal.",
     "chat.verrou": "Die KI-Physio ist Teil der Tarife Starter und Premium.", "chat.verrouCta": "Tarife ansehen", "chat.quota": "Deine KI-Dialoge für heute sind aufgebraucht: morgen gibt es neue.",
     "k.askPrompt": "Ich habe Schmerzen im Bereich: {zone} (Intensität {n}/10). Was könnte es sein, und was soll ich konkret tun?",
     "k.annuler": "Rückgängig", "k.etatQ": "{z} — wie ist es jetzt?", "k.mieux": "Wird besser", "k.pire": "Wird schlimmer", "k.passe": "Ist weg", "k.etatOk": "Notiert — dein Coach berücksichtigt es.", "k.etatPasse": "Notiert: dieser Schmerz bremst deinen Plan nicht mehr.", "k.etatErr": "Aktualisierung nicht möglich. Versuch es nochmal.",
@@ -137,7 +137,7 @@ const H: Record<string, Record<string, string>> = {
     "chat.seed": "Hola, soy tu fisio del deporte. Cuéntame qué sientes — zona, desde cuándo, en esfuerzo o en reposo — o haz clic en una zona del esquema, y te ayudo.",
     "chat.thinking": "El fisio está pensando…", "chat.placeholder": "Ej.: dolor de rodilla tras mis tiradas largas…", "chat.photoAdd": "Añadir una foto", "chat.photoRemove": "Quitar la foto", "chat.photoReady": "Foto lista. Se analiza y se descarta: no se guarda nada. Encuadra la zona de cerca y con buena luz.", "chat.photoBadType": "Imagen ilegible. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "¿Puedes mirar esta foto?",
     "chat.disclaimer": "Consejos informativos — no sustituyen un consejo médico. Dolor fuerte / persistente → consulta.",
-    "chat.errNoReply": "No he podido responder, inténtalo de nuevo.", "chat.errConn": "No se pudo conectar con el fisio IA. Inténtalo de nuevo.",
+    "chat.errNoReply": "No he podido responder, inténtalo de nuevo.", "chat.errConn": "No se pudo conectar con el fisio IA. Inténtalo de nuevo.", "chat.painNotSaved": "No se pudo guardar tu dolor: tu coach aún no lo conoce. Vuelve a indicarlo en un momento.",
     "chat.verrou": "El fisio IA forma parte de los planes Starter y Premium.", "chat.verrouCta": "Ver los planes", "chat.quota": "Has usado tus intercambios con la IA de hoy: vuelven mañana.",
     "k.askPrompt": "Tengo dolor en: {zone} (intensidad {n}/10). ¿Qué puede ser y qué debo hacer concretamente?",
     "k.annuler": "Deshacer", "k.etatQ": "{z}: ¿cómo va?", "k.mieux": "Va mejor", "k.pire": "Va peor", "k.passe": "Ya pasó", "k.etatOk": "Anotado: tu entrenador lo tiene en cuenta.", "k.etatPasse": "Anotado: este dolor ya no frena tu plan.", "k.etatErr": "No se pudo actualizar. Reinténtalo.",
@@ -172,7 +172,7 @@ const H: Record<string, Record<string, string>> = {
     "chat.seed": "Olá, sou o teu fisio do desporto. Conta-me o que sentes — zona, desde quando, em esforço ou em repouso — ou clica numa zona no esquema, e eu ajudo.",
     "chat.thinking": "O fisio está a pensar…", "chat.placeholder": "Ex.: dor no joelho após os meus treinos longos…", "chat.photoAdd": "Adicionar uma foto", "chat.photoRemove": "Remover a foto", "chat.photoReady": "Foto pronta. É analisada e depois descartada: nada é guardado. Enquadra a zona de perto e com boa luz.", "chat.photoBadType": "Imagem ilegível. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Podes olhar para esta foto?",
     "chat.disclaimer": "Conselhos informativos — não substituem aconselhamento médico. Dor forte / persistente → consulta.",
-    "chat.errNoReply": "Não consegui responder, tenta novamente.", "chat.errConn": "Não foi possível ligar ao fisio IA. Tenta novamente.",
+    "chat.errNoReply": "Não consegui responder, tenta novamente.", "chat.errConn": "Não foi possível ligar ao fisio IA. Tenta novamente.", "chat.painNotSaved": "Não foi possível guardar a tua dor: o teu coach ainda não a conhece. Volta a indicá-la daqui a pouco.",
     "chat.verrou": "O fisio IA faz parte dos planos Starter e Premium.", "chat.verrouCta": "Ver os planos", "chat.quota": "Usaste as tuas trocas com a IA de hoje: voltam amanhã.",
     "k.askPrompt": "Tenho dor em: {zone} (intensidade {n}/10). O que pode ser e o que devo fazer concretamente?",
     "k.annuler": "Anular", "k.etatQ": "{z} — como está agora?", "k.mieux": "Está melhor", "k.pire": "Está pior", "k.passe": "Já passou", "k.etatOk": "Registado — o teu treinador tem isso em conta.", "k.etatPasse": "Registado: esta dor já não trava o teu plano.", "k.etatErr": "Não foi possível atualizar. Tenta de novo.",
@@ -446,6 +446,9 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
         : json.error === "quota_indisponible" ? tr("chat.errNoReply")
         : json.error || tr("chat.errNoReply");
       if (json.reply) { setMessages((m) => [...m, { role: "model", text: json.reply }]); setBilan(json.bilan ?? null); }
+      // La douleur déclarée n'a pas atteint le coach (`douleurNotee: false`, journalisé côté
+      // serveur) : le kiné a répondu, mais l'athlète doit savoir que rien n'est noté.
+      if (json.douleurNotee === false) toast.error(tr("chat.painNotSaved"));
       else setMessages((m) => [...m, { role: "model", text: "" + erreur }]);
     } catch {
       setMessages((m) => [...m, { role: "model", text: "" + tr("chat.errConn") }]);

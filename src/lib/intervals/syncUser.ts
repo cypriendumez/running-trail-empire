@@ -9,6 +9,7 @@ import { ligneSommeil, ligneVfc, type IcuWellness } from "./wellnessRow";
 import { roleOf } from "./sport";
 import { enteteIntervals } from "@/lib/intervals/auth";
 import { temperaturesAir, positionHabituelle, enInterieur } from "@/lib/weather/temperatureSeances";
+import { fusionnerMetriquesGarmin, aDesMetriques } from "./metriquesGarmin";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -59,6 +60,10 @@ export async function syncIntervalsForUser(
 
   let synced = 0;
   const failures: string[] = [];
+  // ⚠️ UN BIEN-ÊTRE REFUSÉ N'EST PAS « AUCUNE MESURE » (08/11/2026) : un 4xx/5xx donnait une
+  // liste vide sans un mot, et le coach lisait « pas de VFC ». Un 502/503/504 est compté
+  // comme passager par `journaliserRefus` ; un 401/403 (accès retiré) part au journal.
+  if (!wellnessRes.ok) failures.push(`Bien-être intervals.icu : HTTP ${wellnessRes.status}`);
 
   // ── ÉCRITURE DES SÉANCES ────────────────────────────────────────────────────
   // On n'utilise PLUS `upsert(..., { onConflict: "user_id,date,title" })` : cette
@@ -179,8 +184,28 @@ export async function syncIntervalsForUser(
       .map(w => ({ date: w.id, v: Math.round((w.vo2max as number) * 10) / 10 })).reverse().slice(-120),
     updatedAt: new Date().toISOString(),
   };
-  if (latestVo2 != null || gm.restingHR != null || gm.ctl != null) {
-    await admin.from("profiles").update({ garmin_vo2max: latestVo2, garmin_metrics: gm }).eq("id", profile.id).then(() => {}, () => {});
+  // ⚠️ FUSIONNER, PAS ÉCRASER (lib/intervals/metriquesGarmin). La fenêtre du cron est d'un
+  // jour : sans fusion, `garmin_vo2max: null` effaçait la VO2max mesurée et l'historique
+  // d'un an devenait un seul point. Et plus d'erreur avalée : la lecture et les deux
+  // écritures (colonnes ajoutées à la main, chacune dans son `update`) vont dans `failures`.
+  if (aDesMetriques(gm)) {
+    const { data: actuel, error: eLecture } = await admin.from("profiles")
+      .select("garmin_vo2max, garmin_metrics").eq("id", profile.id).maybeSingle();
+    if (eLecture) {
+      // Sans l'existant, écrire reviendrait à écraser : on n'écrit rien.
+      failures.push(`métriques montre illisibles : ${eLecture.code ?? "?"} ${eLecture.message}`);
+    } else {
+      const fusion = fusionnerMetriquesGarmin((actuel as { garmin_metrics?: unknown } | null)?.garmin_metrics, gm);
+      // Une VO2max connue de la seule colonne (profil d'avant `garmin_metrics`) reste la
+      // même des deux côtés : la colonne et les métriques ne doivent pas diverger.
+      fusion.vo2max ??= (actuel as { garmin_vo2max?: number | null } | null)?.garmin_vo2max ?? null;
+      if (fusion.vo2max != null) {
+        const { error: eVo2 } = await admin.from("profiles").update({ garmin_vo2max: fusion.vo2max }).eq("id", profile.id);
+        if (eVo2) failures.push(`VO2max montre : ${eVo2.code ?? "?"} ${eVo2.message}`);
+      }
+      const { error: eMetriques } = await admin.from("profiles").update({ garmin_metrics: fusion }).eq("id", profile.id);
+      if (eMetriques) failures.push(`métriques montre : ${eMetriques.code ?? "?"} ${eMetriques.message}`);
+    }
   }
 
   // ── ANALYSES MESURÉES ───────────────────────────────────────────────────────

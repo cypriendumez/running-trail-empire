@@ -2538,6 +2538,12 @@ export async function getEffectiveVma(sb: SupabaseClient, userId: string): Promi
     fetchWorkouts(sb, userId),
     sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
   ]);
+  // ⚠️ UNE PANNE N'EST PAS « VMA INCONNUE » (08/11/2026). Aucune des trois erreurs n'était
+  // lue : une lecture ratée rendait `null`, que les appelants lisent comme « pas de VMA »
+  // (objectif de course posé sans chrono sans le dire, Ghost Runner sans allures). On
+  // LÈVE : l'appelant décide (journal et `objectifPose: false`, page « réessayer »).
+  const ePanne = baseRes.error ?? woRes.error ?? profRes.error;
+  if (ePanne) throw new Error(`VMA illisible : ${ePanne.code ?? "?"} ${ePanne.message}`);
   const prof = profRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null;
   // Course à pied uniquement : une sortie vélo produirait une VMA fantaisiste.
   const wks = ((woRes.data ?? []) as Wk[]).filter(w => isRun(w.sport));

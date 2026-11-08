@@ -260,7 +260,7 @@ export const T: Record<Lang, Dict> = {
     "cal.add": "Ajouter", "cal.cancel": "Annuler", "cal.plan": "Planifier",
     "cal.race.namePh": "Nom de la course (ex : Marathon de Paris)", "cal.race.locPh": "Lieu (optionnel)", "cal.race.kmPh": "km",
     "cal.race.prio": "Priorité dans ta saison", "cal.race.prioA": "A · à préparer", "cal.race.prioB": "B · de préparation", "cal.race.prioC": "C · d'entraînement", "cal.race.prioHint": "A : le coach la prépare et l'affûte. B : deux jours calmes avant, la récupération après. C : elle remplace une séance de qualité.", "cal.toast.prioOk": "Priorité enregistrée : ton plan est recalculé.",
-    "cal.toast.raceAdded": "Course planifiée — visible dans l'onglet Courses", "cal.toast.noteAdded": "Note ajoutée", "cal.toast.failed": "Échec", "cal.toast.saveFailed": "Impossible d'enregistrer", "cal.toast.delFailed": "Suppression impossible",
+    "cal.toast.raceAdded": "Course planifiée — visible dans l'onglet Courses", "cal.toast.objectifRate": "Course ajoutée, mais ton objectif n'a pas pu être enregistré : ton plan ne la vise pas encore. Retire-la et ajoute-la de nouveau dans un moment.", "cal.toast.noteAdded": "Note ajoutée", "cal.toast.failed": "Échec", "cal.toast.saveFailed": "Impossible d'enregistrer", "cal.toast.delFailed": "Suppression impossible",
     // Renforcement (RenfoGuide)
     "renfo.banner.title": "Séance de renforcement.", "renfo.banner.body": "Choisis selon ton matériel du jour — échauffe-toi 5-10 min, puis enchaîne les blocs (20-30 min, 1-2×/sem). Qualité > quantité : mouvements lents et contrôlés.", "renfo.demo": "Voir la démo vidéo",
     "renfo.prog.none.label": "Sans matériel", "renfo.prog.none.intro": "Au poids du corps — à la maison, en voyage, au parc. Aucun équipement, zéro excuse.",
@@ -558,7 +558,7 @@ export const T: Record<Lang, Dict> = {
     "cal.add": "Add", "cal.cancel": "Cancel", "cal.plan": "Plan",
     "cal.race.namePh": "Race name (e.g. Paris Marathon)", "cal.race.locPh": "Location (optional)", "cal.race.kmPh": "km",
     "cal.race.prio": "Priority in your season", "cal.race.prioA": "A · to peak for", "cal.race.prioB": "B · tune-up", "cal.race.prioC": "C · training race", "cal.race.prioHint": "A: the coach builds up to it and tapers. B: two easy days before, recovery after. C: it replaces a quality session.", "cal.toast.prioOk": "Priority saved: your plan is being recalculated.",
-    "cal.toast.raceAdded": "Race planned — visible in the Races tab", "cal.toast.noteAdded": "Note added", "cal.toast.failed": "Failed", "cal.toast.saveFailed": "Couldn't save", "cal.toast.delFailed": "Couldn't delete",
+    "cal.toast.raceAdded": "Race planned — visible in the Races tab", "cal.toast.objectifRate": "Race added, but your goal couldn't be saved: your plan isn't targeting it yet. Remove it and add it again in a moment.", "cal.toast.noteAdded": "Note added", "cal.toast.failed": "Failed", "cal.toast.saveFailed": "Couldn't save", "cal.toast.delFailed": "Couldn't delete",
     // Strength training (RenfoGuide)
     "renfo.banner.title": "Strength session.", "renfo.banner.body": "Pick based on the gear you have today — warm up 5-10 min, then run through the blocks (20-30 min, 1-2×/week). Quality > quantity: slow, controlled movements.", "renfo.demo": "Watch the video demo",
     "renfo.prog.none.label": "No equipment", "renfo.prog.none.intro": "Bodyweight only — at home, travelling, in the park. No gear, no excuses.",
@@ -856,7 +856,7 @@ export const T: Record<Lang, Dict> = {
     "cal.add": "Hinzufügen", "cal.cancel": "Abbrechen", "cal.plan": "Planen",
     "cal.race.namePh": "Rennname (z. B. Berlin-Marathon)", "cal.race.locPh": "Ort (optional)", "cal.race.kmPh": "km",
     "cal.race.prio": "Priorität in deiner Saison", "cal.race.prioA": "A · Saisonhöhepunkt", "cal.race.prioB": "B · Vorbereitung", "cal.race.prioC": "C · Trainingsrennen", "cal.race.prioHint": "A: Der Coach bereitet es vor und plant das Tapering. B: zwei ruhige Tage davor, danach Erholung. C: Es ersetzt eine Qualitätseinheit.", "cal.toast.prioOk": "Priorität gespeichert: Dein Plan wird neu berechnet.",
-    "cal.toast.raceAdded": "Rennen geplant — sichtbar im Tab Rennen", "cal.toast.noteAdded": "Notiz hinzugefügt", "cal.toast.failed": "Fehlgeschlagen", "cal.toast.saveFailed": "Speichern nicht möglich", "cal.toast.delFailed": "Löschen nicht möglich",
+    "cal.toast.raceAdded": "Rennen geplant — sichtbar im Tab Rennen", "cal.toast.objectifRate": "Rennen hinzugefügt, aber dein Ziel konnte nicht gespeichert werden: Dein Plan zielt noch nicht darauf. Entferne es und füge es gleich noch einmal hinzu.", "cal.toast.noteAdded": "Notiz hinzugefügt", "cal.toast.failed": "Fehlgeschlagen", "cal.toast.saveFailed": "Speichern nicht möglich", "cal.toast.delFailed": "Löschen nicht möglich",
     // Krafttraining (RenfoGuide)
     "renfo.banner.title": "Krafteinheit.", "renfo.banner.body": "Wähle je nach heutiger Ausrüstung — 5-10 Min. aufwärmen, dann die Blöcke durchziehen (20-30 Min., 1-2×/Woche). Qualität > Quantität: langsame, kontrollierte Bewegungen.", "renfo.demo": "Video-Demo ansehen",
     "renfo.prog.none.label": "Ohne Geräte", "renfo.prog.none.intro": "Nur mit dem eigenen Körpergewicht — zu Hause, unterwegs, im Park. Keine Ausrüstung, keine Ausreden.",
@@ -1154,7 +1154,7 @@ export const T: Record<Lang, Dict> = {
     "cal.add": "Añadir", "cal.cancel": "Cancelar", "cal.plan": "Planificar",
     "cal.race.namePh": "Nombre de la carrera (ej.: Maratón de Madrid)", "cal.race.locPh": "Lugar (opcional)", "cal.race.kmPh": "km",
     "cal.race.prio": "Prioridad en tu temporada", "cal.race.prioA": "A · a preparar", "cal.race.prioB": "B · de preparación", "cal.race.prioC": "C · de entrenamiento", "cal.race.prioHint": "A: el entrenador la prepara y hace la puesta a punto. B: dos días tranquilos antes y la recuperación después. C: sustituye una sesión de calidad.", "cal.toast.prioOk": "Prioridad guardada: tu plan se está recalculando.",
-    "cal.toast.raceAdded": "Carrera planificada — visible en la pestaña Carreras", "cal.toast.noteAdded": "Nota añadida", "cal.toast.failed": "Error", "cal.toast.saveFailed": "No se pudo guardar", "cal.toast.delFailed": "No se pudo eliminar",
+    "cal.toast.raceAdded": "Carrera planificada — visible en la pestaña Carreras", "cal.toast.objectifRate": "Carrera añadida, pero no se pudo guardar tu objetivo: tu plan aún no la tiene en cuenta. Quítala y vuelve a añadirla en un momento.", "cal.toast.noteAdded": "Nota añadida", "cal.toast.failed": "Error", "cal.toast.saveFailed": "No se pudo guardar", "cal.toast.delFailed": "No se pudo eliminar",
     // Entrenamiento de fuerza (RenfoGuide)
     "renfo.banner.title": "Sesión de fuerza.", "renfo.banner.body": "Elige según el material que tengas hoy — calienta 5-10 min, luego encadena los bloques (20-30 min, 1-2×/sem). Calidad > cantidad: movimientos lentos y controlados.", "renfo.demo": "Ver el vídeo de demostración",
     "renfo.prog.none.label": "Sin material", "renfo.prog.none.intro": "Con el peso del cuerpo — en casa, de viaje, en el parque. Sin equipo, sin excusas.",
@@ -1452,7 +1452,7 @@ export const T: Record<Lang, Dict> = {
     "cal.add": "Adicionar", "cal.cancel": "Cancelar", "cal.plan": "Planear",
     "cal.race.namePh": "Nome da prova (ex.: Maratona de Lisboa)", "cal.race.locPh": "Local (opcional)", "cal.race.kmPh": "km",
     "cal.race.prio": "Prioridade na tua época", "cal.race.prioA": "A · a preparar", "cal.race.prioB": "B · de preparação", "cal.race.prioC": "C · de treino", "cal.race.prioHint": "A: o treinador prepara-a e faz o afinamento. B: dois dias calmos antes e a recuperação depois. C: substitui uma sessão de qualidade.", "cal.toast.prioOk": "Prioridade guardada: o teu plano está a ser recalculado.",
-    "cal.toast.raceAdded": "Prova planeada — visível no separador Provas", "cal.toast.noteAdded": "Nota adicionada", "cal.toast.failed": "Falhou", "cal.toast.saveFailed": "Não foi possível guardar", "cal.toast.delFailed": "Não foi possível eliminar",
+    "cal.toast.raceAdded": "Prova planeada — visível no separador Provas", "cal.toast.objectifRate": "Prova adicionada, mas não foi possível guardar o teu objetivo: o teu plano ainda não a tem em conta. Retira-a e volta a adicioná-la daqui a pouco.", "cal.toast.noteAdded": "Nota adicionada", "cal.toast.failed": "Falhou", "cal.toast.saveFailed": "Não foi possível guardar", "cal.toast.delFailed": "Não foi possível eliminar",
     // Treino de força (RenfoGuide)
     "renfo.banner.title": "Sessão de força.", "renfo.banner.body": "Escolhe consoante o material que tens hoje — aquece 5-10 min, depois encadeia os blocos (20-30 min, 1-2×/sem). Qualidade > quantidade: movimentos lentos e controlados.", "renfo.demo": "Ver o vídeo de demonstração",
     "renfo.prog.none.label": "Sem material", "renfo.prog.none.intro": "Com o peso do corpo — em casa, em viagem, no parque. Sem equipamento, sem desculpas.",
