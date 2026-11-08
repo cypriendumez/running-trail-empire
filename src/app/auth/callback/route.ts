@@ -15,10 +15,14 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
       const { data: { user } } = await supabase.auth.getUser();
+      // ⚠️ DOUBLE AUTHENTIFICATION : un compte protégé par un code sort de Google en `aal1`, et
+      // `getUser()` répond alors « personne » (lib/supabase/server). Il donne d'abord son code ;
+      // le consentement et l'onboarding suivent, par les gardes des pages. (Avant, `user!.id`.)
+      if (!user) return NextResponse.redirect(`${origin}/verification-2fa?next=${encodeURIComponent(next)}`);
       const { data: profile } = await supabase
         .from("profiles")
         .select("onboarding_completed")
-        .eq("id", user!.id)
+        .eq("id", user.id)
         .single();
       const destination = profile?.onboarding_completed ? next : "/onboarding";
 

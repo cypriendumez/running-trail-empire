@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState , useId } from "react";
+import { useEffect, useRef, useState , useId } from "react";
+import { Turnstile, CLE_TURNSTILE, type TurnstileRef } from "@/components/auth/Turnstile";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, MailCheck } from "lucide-react";
@@ -23,6 +24,10 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [aide, setAide] = useState<Situation | null>(null);
   const D = AUTH[lang] ?? AUTH.fr;
+  // CAPTCHA (en sommeil sans clé) : vérifié par `/api/auth/reset`, que GoTrue dispense (clé d'administration).
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaHs, setCaptchaHs] = useState(false); // widget Cloudflare qui ne se charge pas
+  const widget = useRef<TurnstileRef>(null);
 
   // L'adresse tapée sur la connexion suit la personne ici.
   useEffect(() => {
@@ -32,6 +37,7 @@ export default function ForgotPasswordPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (CLE_TURNSTILE && !captcha) { toast.error(captchaHs ? D.captcha.indisponible : D.captcha.attente, { duration: 8000 }); return; }
     setLoading(true);
     setAide(null);
     // ⚠️ PAR NOTRE ROUTE, PAS `supabase.auth.resetPasswordForEmail()`. Ce dernier envoie le
@@ -42,12 +48,15 @@ export default function ForgotPasswordPage() {
     // compte ») : avant, l'écran « envoyé » s'affichait quand même et on attendait en vain.
     const r = await fetch("/api/auth/reset", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.trim(), lang }),
+      body: JSON.stringify({ email: email.trim(), lang, captcha }),
     }).catch(() => null);
     const j = r ? await r.json().catch(() => null) : null;
     setLoading(false);
+    widget.current?.reinitialiser(); // un jeton ne sert qu'une fois
     if (j?.error === "aucun_compte") { setAide({ cas: "aucun_compte" }); return; }
-    if (!r?.ok || !j?.ok) { toast.error(r?.status === 429 ? D.login.errRate : D.aide.envoiImpossible); return; }
+    // `trop_de_liens` : plusieurs liens viennent de partir vers CETTE adresse — le dernier est sans
+    // doute déjà dans la boîte ; on le dit, plutôt qu'un « trop de tentatives » qui accuse le réseau.
+    if (!r?.ok || !j?.ok) { toast.error(j?.error === "captcha_refuse" ? D.captcha.refuse : j?.error === "trop_de_liens" ? D.aide.tropDeLiens : r?.status === 429 ? D.login.errRate : D.aide.envoiImpossible, { duration: 8000 }); return; }
     setSent(true);
   }
 
@@ -86,6 +95,7 @@ export default function ForgotPasswordPage() {
               />
               {aide && <AideCompte situation={aide} email={email} lang={lang} />}
             </div>
+            <Turnstile ref={widget} onJeton={(j) => { setCaptcha(j); if (j) setCaptchaHs(false); }} onErreur={() => setCaptchaHs(true)} langue={lang} />
             <button type="submit" disabled={loading} className="btn-brand w-full justify-center py-3">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               {L.submit}

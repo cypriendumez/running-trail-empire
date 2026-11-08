@@ -16,6 +16,11 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import type { Lang } from "@/lib/i18n/translations";
 import { activerPush } from "@/lib/push/client";
 import { PWA_I18N } from "@/components/pwa/pwaI18n";
+import { AUTH } from "@/components/auth/authI18n";
+import { ReglesMotDePasse, messageRefusMotDePasse } from "@/components/auth/ReglesMotDePasse";
+import { Turnstile, CLE_TURNSTILE, type TurnstileRef } from "@/components/auth/Turnstile";
+import { DeuxFacteurs } from "./DeuxFacteurs";
+import { verifierRegles } from "@/lib/auth/reglesMotDePasse";
 
 type Profile = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
@@ -167,6 +172,19 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
 
   // ── Sécurité ──
   const [pwd, setPwd] = useState(""); const [pwd2, setPwd2] = useState(""); const [savingPwd, setSavingPwd] = useState(false);
+  const [pwdActuel, setPwdActuel] = useState("");
+  // Le compte a-t-il déjà un mot de passe ? (identité « email » : inscription par e-mail, ou
+  // mot de passe ajouté à un compte Google). Inconnu tant que la session n'est pas lue.
+  const [aUnMdp, setAUnMdp] = useState<boolean | null>(null);
+  const AUTH_L = AUTH[lang] ?? AUTH.fr;
+  const M = AUTH_L.mdp;
+  const [captchaMdp, setCaptchaMdp] = useState<string | null>(null);
+  const [captchaHs, setCaptchaHs] = useState(false); // widget Cloudflare qui ne se charge pas
+  const widgetMdp = useRef<TurnstileRef>(null);
+  useEffect(() => {
+    sb.auth.getUser().then(({ data }) => setAUnMdp((data.user?.identities ?? []).some((i) => i.provider === "email")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [newEmail, setNewEmail] = useState(""); const [savingEmail, setSavingEmail] = useState(false);
 
   // ── Notifications ──
@@ -213,13 +231,31 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
     if (error) toast.error(error.message); else { toast.success(t("toast.profileOk")); router.refresh(); }
   };
 
+  // ⚠️ PAR NOTRE ROUTE, PLUS PAR `sb.auth.updateUser()` (08/11/2026) : le serveur applique les
+  // règles communes, refuse un mot de passe déjà fuité, et EXIGE le mot de passe actuel — sans
+  // lui, une session laissée ouverte suffisait à changer le mot de passe et garder le compte.
+  // Un compte ouvert avec Google n'en a pas : rien à demander (`aUnMdp` faux).
   const savePassword = async () => {
-    if (pwd.length < 8) return toast.error(t("toast.pwdMin"));
+    if (verifierRegles(pwd, email).length) return toast.error(M.faible);
     if (pwd !== pwd2) return toast.error(t("toast.pwdMismatch"));
+    if (aUnMdp && !pwdActuel) return toast.error(M.actuelRequis);
+    // CAPTCHA (en sommeil sans clé) : la vérification du mot de passe actuel est une connexion
+    // GoTrue, qui exige un jeton dès que la protection est activée chez Supabase.
+    if (aUnMdp && CLE_TURNSTILE && !captchaMdp) return toast.error(captchaHs ? AUTH_L.captcha.indisponible : AUTH_L.captcha.attente, { duration: 8000 });
     setSavingPwd(true);
-    const { error } = await sb.auth.updateUser({ password: pwd });
+    const rep = await fetch("/api/auth/mot-de-passe", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pwd, ...(pwdActuel ? { actuel: pwdActuel } : {}), ...(captchaMdp ? { captcha: captchaMdp } : {}) }),
+    }).catch(() => null);
+    const j = rep ? await rep.json().catch(() => null) : null;
     setSavingPwd(false);
-    if (error) toast.error(error.message); else { toast.success(t("toast.pwdOk")); setPwd(""); setPwd2(""); }
+    widgetMdp.current?.reinitialiser(); // un jeton ne sert qu'une fois
+    if (!rep?.ok || !j?.ok) {
+      if (j?.error === "actuel_requis") setAUnMdp(true);
+      if (j?.error === "captcha_refuse") return toast.error(AUTH_L.captcha.refuse, { duration: 8000 });
+      return toast.error(messageRefusMotDePasse(j?.error, M) ?? M.echec, { duration: 8000 });
+    }
+    toast.success(t("toast.pwdOk")); setPwd(""); setPwd2(""); setPwdActuel("");
   };
 
   const saveEmail = async () => {
@@ -341,10 +377,21 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
             <>
               <Card title={t("set.pwd.title")} desc={t("set.pwd.desc")}>
                 <div className="max-w-sm space-y-4">
-                  <Field label={t("set.pwd.new")}><div className="relative"><Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-300" /><input type="password" value={pwd} onChange={(e) => setPwd(e.target.value)} className={inputCls + " pl-9"} placeholder="••••••••" autoComplete="new-password" /></div></Field>
+                  {aUnMdp && (
+                    <Field label={M.actuel}><div className="relative"><Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-300" /><input type="password" value={pwdActuel} onChange={(e) => setPwdActuel(e.target.value)} className={inputCls + " pl-9"} placeholder="••••••••" autoComplete="current-password" /></div></Field>
+                  )}
+                  <div>
+                    <Field label={t("set.pwd.new")}><div className="relative"><Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-300" /><input type="password" value={pwd} onChange={(e) => setPwd(e.target.value)} className={inputCls + " pl-9"} placeholder="••••••••" autoComplete="new-password" aria-describedby="reglages-regles-mdp" /></div></Field>
+                    <ReglesMotDePasse mdp={pwd} email={email} L={M} id="reglages-regles-mdp" />
+                  </div>
+                  {aUnMdp && <Turnstile ref={widgetMdp} onJeton={(j) => { setCaptchaMdp(j); if (j) setCaptchaHs(false); }} onErreur={() => setCaptchaHs(true)} langue={lang} />}
                   <Field label={t("set.pwd.confirm")}><div className="relative"><Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-300" /><input type="password" value={pwd2} onChange={(e) => setPwd2(e.target.value)} className={inputCls + " pl-9"} placeholder="••••••••" autoComplete="new-password" /></div></Field>
                   <button onClick={savePassword} disabled={savingPwd || !pwd || !pwd2} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50">{savingPwd ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />} {t("set.pwd.update")}</button>
                 </div>
+              </Card>
+
+              <Card title={AUTH_L.deuxFacteurs.titre} desc={AUTH_L.deuxFacteurs.desc}>
+                <DeuxFacteurs L={AUTH_L.deuxFacteurs} lang={lang} />
               </Card>
 
               <Card title={t("set.email.title")} desc={t("set.email.desc")}>

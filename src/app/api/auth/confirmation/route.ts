@@ -5,9 +5,12 @@ import { emailInscription } from "@/lib/auth/emailConfirmation";
 import { envoyerEmail } from "@/lib/email/envoyer";
 import { domaineRecoitDuCourrier, suggestionDomaine } from "@/lib/auth/domaineCourrier";
 import { statutCompte } from "@/lib/auth/statutCompte";
-import { autoriserPartage, ipDe } from "@/lib/auth/limiteur";
+import { autoriserPartage, cleParAdresse, ipDe } from "@/lib/auth/limiteur";
 import { champsConsentement, CONSENTEMENT_EFFACE } from "@/lib/auth/consentement";
 import { randomBytes } from "node:crypto";
+import { verifierRegles } from "@/lib/auth/reglesMotDePasse";
+import { controlerNouveauMotDePasse } from "@/lib/auth/motDePasseFuite";
+import { controlerCaptcha } from "@/lib/auth/turnstile";
 
 /**
  * L'INSCRIPTION PAR E-MAIL, ET L'E-MAIL DE CONFIRMATION ENVOYÉ PAR NOUS.
@@ -51,7 +54,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "trop_de_requetes" }, { status: 429 });
   }
   const debut = Date.now();
-  const { email, password, fullName, lang, domaineConfirme, renvoi, motDePasseConnu, accord } = (await req.json().catch(() => ({}))) as { email?: string; password?: string; fullName?: string; lang?: string; domaineConfirme?: boolean; renvoi?: boolean; motDePasseConnu?: boolean; accord?: boolean };
+  const { email, password, fullName, lang, domaineConfirme, renvoi, motDePasseConnu, accord, captcha } = (await req.json().catch(() => ({}))) as { email?: string; password?: string; fullName?: string; lang?: string; domaineConfirme?: boolean; renvoi?: boolean; motDePasseConnu?: boolean; accord?: boolean; captcha?: unknown };
   const adresse = String(email ?? "").trim().toLowerCase();
   const langue = String(lang ?? "fr");
   if (!adresse || !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(adresse)) {
@@ -79,13 +82,23 @@ export async function POST(req: Request) {
     return envoyerConfirmation(adresse, null, null, langue, BASE, FROM, statut.methodes, motDePasseConnu === false ? "conteste" : "renvoi", debut);
   }
 
-  // ⚠️ LE MOT DE PASSE trop court : refusé avant tout, sans réseau.
-  if (mdp.length < 8) {
-    return NextResponse.json({ ok: false, error: "mot_de_passe_trop_court", min: 8 }, { status: 400 });
+  // ⚠️ LES RÈGLES DU MOT DE PASSE : refusé avant tout, sans réseau (`lib/auth/reglesMotDePasse`).
+  // C'est le SEUL contrôle de l'inscription : `generateLink` ne passe par aucune règle de GoTrue
+  // (v2.197), quel que soit le réglage « longueur minimale » du tableau de bord Supabase.
+  const raisons = verifierRegles(mdp, adresse);
+  if (raisons.length) {
+    return NextResponse.json({ ok: false, error: "mot_de_passe_faible", raisons }, { status: 400 });
   }
   // La case d'accord (CGU + données de santé) : exigée ICI aussi, pas seulement par le HTML.
   if (accord !== true) {
     return NextResponse.json({ ok: false, error: "accord_requis" }, { status: 400 });
+  }
+  // ⚠️ CAPTCHA (en sommeil sans `TURNSTILE_SECRET_KEY`). Vérifié ICI parce que GoTrue dispense de
+  // CAPTCHA les appels faits avec la clé d'administration (`generateLink`) : activer la protection
+  // chez Supabase ne protège PAS cette inscription. Avant le DNS et Have I Been Pwned : un robot
+  // s'arrête avant tout appel réseau coûteux.
+  if ((await controlerCaptcha(captcha, ipDe(req), "/api/auth/confirmation")) === "refuse") {
+    return NextResponse.json({ ok: false, error: "captcha_refuse" }, { status: 400 });
   }
 
   // ⚠️ LE DOMAINE, LUI AUSSI, DONNE UNE VRAIE ERREUR. Une adresse bien formée mais dont le
@@ -107,6 +120,13 @@ export async function POST(req: Request) {
   }
   if ((await domaineRecoitDuCourrier(domaine)) === "non") {
     return NextResponse.json({ ok: false, error: "domaine_sans_courrier", domaine, suggestion }, { status: 400 });
+  }
+
+  // ⚠️ UN MOT DE PASSE DÉJÀ FUITÉ est refusé (Have I Been Pwned, k-anonymat : seuls 5 caractères
+  // de son empreinte sortent d'ici). Service injoignable : accepté, et noté au journal.
+  const controle = await controlerNouveauMotDePasse(mdp, adresse, "/api/auth/confirmation");
+  if (!controle.ok) {
+    return NextResponse.json({ ok: false, error: controle.error, ...(controle.error === "mot_de_passe_faible" ? { raisons: controle.raisons } : {}) }, { status: 400 });
   }
 
   // ── ADRESSE DÉJÀ INSCRITE (et confirmée) : on le DIT, avec la façon d'y entrer ─────────
@@ -138,6 +158,14 @@ async function envoyerConfirmation(
   adresse: string, mdp: string | null, nom: string | null, lang: string, BASE: string, FROM: string,
   methodes: string[] | undefined, mode: "nouveau" | "conteste" | "renvoi", debut: number,
 ): Promise<NextResponse> {
+  // ⚠️ 3 E-MAILS PAR TRANCHE DE 10 MINUTES AU PLUS POUR UNE MÊME ADRESSE, quelle que soit l'IP :
+  // compté ici, au seul endroit qui envoie, pour qu'un refus (mot de passe faible, domaine douteux)
+  // ne consomme rien. Sans lui, un script changeant d'IP inondait une boîte de liens. Fenêtre
+  // courte exprès (voir `api/auth/reset`) : un tiers qui épuise le compteur ne bloque la personne
+  // que 10 minutes, et l'écran lui dit d'aller voir sa boîte (`trop_de_liens`).
+  if (!(await autoriserPartage(createAdminClient(), cleParAdresse("confirmation-adresse", adresse), 3, 10 * 60_000))) {
+    return NextResponse.json({ ok: false, error: "trop_de_liens" }, { status: 429 });
+  }
   try {
     const admin = createAdminClient();
     const generer = () => admin.auth.admin.generateLink({

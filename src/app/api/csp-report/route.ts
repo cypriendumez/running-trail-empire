@@ -4,7 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { lireRapportCsp, rapportLocal, rapportEtranger } from "@/lib/csp/rapport";
 
 /**
- * COLLECTE DES VIOLATIONS CSP (report-only) — cible de `report-uri` (voir next.config.ts, M4).
+ * COLLECTE DES VIOLATIONS CSP — cible de `report-uri` (voir next.config.ts). La politique est
+ * APPLIQUÉE depuis le 08/11/2026 : chaque rapport est une ressource réellement BLOQUÉE chez un
+ * visiteur (une carte grise, une image vide), à regarder dans /admin → Bugs.
  *
  * Publique et sans authentification : une violation survient dans le navigateur, souvent avant
  * toute connexion, et le navigateur l'envoie tout seul. Comme /api/log-error et /api/visite,
@@ -39,7 +41,8 @@ export async function POST(req: Request) {
     const { error } = await admin.from("error_logs").insert({
       user_id: null,
       source: "csp",
-      message: `CSP report-only — ${directive} ← ${bloque}`.slice(0, 2000),
+      // « CSP bloquée » : depuis le 08/11/2026 la politique est APPLIQUÉE, la ressource n'a pas chargé.
+      message: `CSP bloquée — ${directive} ← ${bloque}`.slice(0, 2000),
       url: page || null,
       user_agent: (req.headers.get("user-agent") ?? "").slice(0, 500) || null,
       meta: { extrait: brut.slice(0, 2000) },

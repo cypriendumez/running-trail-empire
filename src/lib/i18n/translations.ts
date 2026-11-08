@@ -104,7 +104,7 @@ export const T: Record<Lang, Dict> = {
     "set.identity": "Identité", "set.fullname": "Nom complet", "set.email": "Adresse e-mail",
     "set.emailHint": "Pour modifier l'e-mail, va dans l'onglet Sécurité.", "set.save": "Enregistrer",
     "set.fullProfile": "Profil sportif complet (VMA, objectifs…)",
-    "set.pwd.title": "Changer le mot de passe", "set.pwd.desc": "Au moins 8 caractères. Tu resteras connecté sur cet appareil.",
+    "set.pwd.title": "Changer le mot de passe", "set.pwd.desc": "Au moins 12 caractères. Tu resteras connecté sur cet appareil.",
     "set.pwd.new": "Nouveau mot de passe", "set.pwd.confirm": "Confirmer le mot de passe", "set.pwd.update": "Mettre à jour",
     "set.email.title": "Changer l'adresse e-mail", "set.email.desc": "Un lien de confirmation sera envoyé à la nouvelle adresse.",
     "set.email.new": "Nouvelle adresse e-mail", "set.email.send": "Envoyer le lien",
@@ -125,7 +125,7 @@ export const T: Record<Lang, Dict> = {
     "set.danger.delete": "Supprimer mon compte", "set.danger.confirm": "pour confirmer. Irréversible.", "set.danger.cta": "Supprimer définitivement",
     "toast.saved": "Enregistré", "toast.color": "Couleur enregistrée", "toast.units": "Unités enregistrées",
     "toast.lang": "Langue mise à jour", "toast.photoOk": "Photo mise à jour", "toast.profileOk": "Profil enregistré",
-    "toast.pwdMin": "8 caractères minimum", "toast.pwdMismatch": "Les deux mots de passe diffèrent", "toast.pwdOk": "Mot de passe modifié",
+    "toast.pwdMin": "12 caractères minimum", "toast.pwdMismatch": "Les deux mots de passe diffèrent", "toast.pwdOk": "Mot de passe modifié",
     "toast.emailInvalid": "E-mail invalide", "toast.emailSent": "E-mail de confirmation envoyé",
     // Tableau de bord
     // ── La série (boucle quotidienne alignée sur le plan) ──
@@ -403,7 +403,7 @@ export const T: Record<Lang, Dict> = {
     "set.identity": "Identity", "set.fullname": "Full name", "set.email": "Email address",
     "set.emailHint": "To change your email, go to the Security tab.", "set.save": "Save",
     "set.fullProfile": "Full sports profile (VMA, goals…)",
-    "set.pwd.title": "Change password", "set.pwd.desc": "At least 8 characters. You'll stay signed in on this device.",
+    "set.pwd.title": "Change password", "set.pwd.desc": "At least 12 characters. You'll stay signed in on this device.",
     "set.pwd.new": "New password", "set.pwd.confirm": "Confirm password", "set.pwd.update": "Update",
     "set.email.title": "Change email address", "set.email.desc": "A confirmation link will be sent to the new address.",
     "set.email.new": "New email address", "set.email.send": "Send link",
@@ -424,7 +424,7 @@ export const T: Record<Lang, Dict> = {
     "set.danger.delete": "Delete my account", "set.danger.confirm": "to confirm. Irreversible.", "set.danger.cta": "Delete permanently",
     "toast.saved": "Saved", "toast.color": "Color saved", "toast.units": "Units saved",
     "toast.lang": "Language updated", "toast.photoOk": "Photo updated", "toast.profileOk": "Profile saved",
-    "toast.pwdMin": "8 characters minimum", "toast.pwdMismatch": "The two passwords differ", "toast.pwdOk": "Password changed",
+    "toast.pwdMin": "12 characters minimum", "toast.pwdMismatch": "The two passwords differ", "toast.pwdOk": "Password changed",
     "toast.emailInvalid": "Invalid email", "toast.emailSent": "Confirmation email sent",
     // Dashboard
     // ── The streak (daily loop, aligned with the plan) ──
@@ -701,7 +701,7 @@ export const T: Record<Lang, Dict> = {
     "set.identity": "Identität", "set.fullname": "Vollständiger Name", "set.email": "E-Mail-Adresse",
     "set.emailHint": "Um die E-Mail zu ändern, gehe zum Tab Sicherheit.", "set.save": "Speichern",
     "set.fullProfile": "Vollständiges Sportprofil (VMA, Ziele…)",
-    "set.pwd.title": "Passwort ändern", "set.pwd.desc": "Mindestens 8 Zeichen. Du bleibst auf diesem Gerät angemeldet.",
+    "set.pwd.title": "Passwort ändern", "set.pwd.desc": "Mindestens 12 Zeichen. Du bleibst auf diesem Gerät angemeldet.",
     "set.pwd.new": "Neues Passwort", "set.pwd.confirm": "Passwort bestätigen", "set.pwd.update": "Aktualisieren",
     "set.email.title": "E-Mail-Adresse ändern", "set.email.desc": "Ein Bestätigungslink wird an die neue Adresse gesendet.",
     "set.email.new": "Neue E-Mail-Adresse", "set.email.send": "Link senden",
@@ -722,7 +722,7 @@ export const T: Record<Lang, Dict> = {
     "set.danger.delete": "Konto löschen", "set.danger.confirm": "zur Bestätigung. Unwiderruflich.", "set.danger.cta": "Endgültig löschen",
     "toast.saved": "Gespeichert", "toast.color": "Farbe gespeichert", "toast.units": "Einheiten gespeichert",
     "toast.lang": "Sprache aktualisiert", "toast.photoOk": "Bild aktualisiert", "toast.profileOk": "Profil gespeichert",
-    "toast.pwdMin": "Mindestens 8 Zeichen", "toast.pwdMismatch": "Die Passwörter stimmen nicht überein", "toast.pwdOk": "Passwort geändert",
+    "toast.pwdMin": "Mindestens 12 Zeichen", "toast.pwdMismatch": "Die Passwörter stimmen nicht überein", "toast.pwdOk": "Passwort geändert",
     "toast.emailInvalid": "Ungültige E-Mail", "toast.emailSent": "Bestätigungs-E-Mail gesendet",
     // Dashboard
     // ── Die Serie (Tagesschleife, am Plan ausgerichtet) ──
@@ -999,7 +999,7 @@ export const T: Record<Lang, Dict> = {
     "set.identity": "Identidad", "set.fullname": "Nombre completo", "set.email": "Correo electrónico",
     "set.emailHint": "Para cambiar el correo, ve a la pestaña Seguridad.", "set.save": "Guardar",
     "set.fullProfile": "Perfil deportivo completo (VMA, objetivos…)",
-    "set.pwd.title": "Cambiar contraseña", "set.pwd.desc": "Al menos 8 caracteres. Seguirás conectado en este dispositivo.",
+    "set.pwd.title": "Cambiar contraseña", "set.pwd.desc": "Al menos 12 caracteres. Seguirás conectado en este dispositivo.",
     "set.pwd.new": "Nueva contraseña", "set.pwd.confirm": "Confirmar contraseña", "set.pwd.update": "Actualizar",
     "set.email.title": "Cambiar correo electrónico", "set.email.desc": "Se enviará un enlace de confirmación a la nueva dirección.",
     "set.email.new": "Nuevo correo electrónico", "set.email.send": "Enviar enlace",
@@ -1020,7 +1020,7 @@ export const T: Record<Lang, Dict> = {
     "set.danger.delete": "Eliminar mi cuenta", "set.danger.confirm": "para confirmar. Irreversible.", "set.danger.cta": "Eliminar definitivamente",
     "toast.saved": "Guardado", "toast.color": "Color guardado", "toast.units": "Unidades guardadas",
     "toast.lang": "Idioma actualizado", "toast.photoOk": "Foto actualizada", "toast.profileOk": "Perfil guardado",
-    "toast.pwdMin": "8 caracteres mínimo", "toast.pwdMismatch": "Las dos contraseñas no coinciden", "toast.pwdOk": "Contraseña cambiada",
+    "toast.pwdMin": "12 caracteres mínimo", "toast.pwdMismatch": "Las dos contraseñas no coinciden", "toast.pwdOk": "Contraseña cambiada",
     "toast.emailInvalid": "Correo no válido", "toast.emailSent": "Correo de confirmación enviado",
     // Panel
     // ── La racha (bucle diario, alineado con el plan) ──
@@ -1297,7 +1297,7 @@ export const T: Record<Lang, Dict> = {
     "set.identity": "Identidade", "set.fullname": "Nome completo", "set.email": "Endereço de e-mail",
     "set.emailHint": "Para mudar o e-mail, vai ao separador Segurança.", "set.save": "Guardar",
     "set.fullProfile": "Perfil desportivo completo (VMA, objetivos…)",
-    "set.pwd.title": "Mudar palavra-passe", "set.pwd.desc": "Pelo menos 8 caracteres. Permaneces ligado neste dispositivo.",
+    "set.pwd.title": "Mudar palavra-passe", "set.pwd.desc": "Pelo menos 12 caracteres. Permaneces ligado neste dispositivo.",
     "set.pwd.new": "Nova palavra-passe", "set.pwd.confirm": "Confirmar palavra-passe", "set.pwd.update": "Atualizar",
     "set.email.title": "Mudar endereço de e-mail", "set.email.desc": "Será enviado um link de confirmação para o novo endereço.",
     "set.email.new": "Novo endereço de e-mail", "set.email.send": "Enviar link",
@@ -1318,7 +1318,7 @@ export const T: Record<Lang, Dict> = {
     "set.danger.delete": "Eliminar a minha conta", "set.danger.confirm": "para confirmar. Irreversível.", "set.danger.cta": "Eliminar definitivamente",
     "toast.saved": "Guardado", "toast.color": "Cor guardada", "toast.units": "Unidades guardadas",
     "toast.lang": "Idioma atualizado", "toast.photoOk": "Foto atualizada", "toast.profileOk": "Perfil guardado",
-    "toast.pwdMin": "Mínimo 8 caracteres", "toast.pwdMismatch": "As duas palavras-passe diferem", "toast.pwdOk": "Palavra-passe alterada",
+    "toast.pwdMin": "Mínimo 12 caracteres", "toast.pwdMismatch": "As duas palavras-passe diferem", "toast.pwdOk": "Palavra-passe alterada",
     "toast.emailInvalid": "E-mail inválido", "toast.emailSent": "E-mail de confirmação enviado",
     // Painel
     // ── A série (ciclo diário, alinhado com o plano) ──

@@ -222,3 +222,166 @@ export function emailReinitialisation(
   const nom = premier === "apple" ? "Apple" : "Google";
   return rendreEmailLien({ ...t, p1: t.p1.replaceAll("{fournisseur}", nom) }, base, lien);
 }
+
+/**
+ * DOUBLE AUTHENTIFICATION — « J'ai perdu mon téléphone » (08/11/2026, choix de Cyprien : la
+ * récupération passe par un lien e-mail). Le lien ouvre une session `recovery` et mène à
+ * `/verification-2fa/retrait`, où un clic retire le second facteur.
+ */
+const D: Record<string, Bloc> = {
+  fr: {
+    objet: "Retirer la double authentification — Pacevo",
+    titre: "Téléphone perdu ?",
+    p1: "Si tu n'as rien demandé, ne clique pas : quelqu'un connaît ton mot de passe, change-le. Si c'est bien toi (« J'ai perdu mon téléphone »), clique ci-dessous pour retirer la double authentification : tu te connecteras ensuite avec ton seul mot de passe, et tu pourras la réactiver dans Réglages → Sécurité.",
+    bouton: "Retirer la double authentification",
+    p2: "Ce lien expire dans une heure et ne sert qu'une fois.",
+    secours: "Si le bouton ne fonctionne pas, copie cette adresse dans ton navigateur :",
+    pied: "Tu reçois ce message parce qu'un retrait de la double authentification a été demandé depuis une session ouverte avec ton mot de passe. Si ce n'est pas toi, ignore-le et change ton mot de passe : quelqu'un le connaît.",
+  },
+  en: {
+    objet: "Remove two-factor authentication — Pacevo",
+    titre: "Lost your phone?",
+    p1: "If you didn't ask for this, don't click: someone knows your password, change it. If it was you (“I lost my phone”), click below to remove two-factor authentication: you'll then log in with your password alone, and you can turn it back on in Settings → Security.",
+    bouton: "Remove two-factor authentication",
+    p2: "This link expires in one hour and works once.",
+    secours: "If the button doesn't work, copy this address into your browser:",
+    pied: "You're getting this because removing two-factor authentication was requested from a session opened with your password. If it wasn't you, ignore it and change your password: someone knows it.",
+  },
+  de: {
+    objet: "Zwei-Faktor-Authentifizierung entfernen — Pacevo",
+    titre: "Handy verloren?",
+    p1: "Hast du nichts angefordert, klicke nicht: Jemand kennt dein Passwort, ändere es. Warst du es („Ich habe mein Handy verloren“), klicke unten, um die Zwei-Faktor-Authentifizierung zu entfernen: Danach meldest du dich nur mit deinem Passwort an und kannst sie unter Einstellungen → Sicherheit wieder einschalten.",
+    bouton: "Zwei-Faktor-Authentifizierung entfernen",
+    p2: "Dieser Link läuft in einer Stunde ab und funktioniert einmal.",
+    secours: "Wenn der Button nicht funktioniert, kopiere diese Adresse in deinen Browser:",
+    pied: "Du erhältst diese Nachricht, weil das Entfernen der Zwei-Faktor-Authentifizierung aus einer mit deinem Passwort geöffneten Sitzung angefordert wurde. Warst du das nicht, ignoriere sie und ändere dein Passwort: Jemand kennt es.",
+  },
+  es: {
+    objet: "Quitar la verificación en dos pasos — Pacevo",
+    titre: "¿Has perdido el teléfono?",
+    p1: "Si no has pedido nada, no hagas clic: alguien conoce tu contraseña, cámbiala. Si has sido tú («He perdido el teléfono»), haz clic abajo para quitar la verificación en dos pasos: después entrarás solo con tu contraseña y podrás volver a activarla en Ajustes → Seguridad.",
+    bouton: "Quitar la verificación en dos pasos",
+    p2: "Este enlace caduca en una hora y sirve una sola vez.",
+    secours: "Si el botón no funciona, copia esta dirección en tu navegador:",
+    pied: "Recibes este mensaje porque se pidió quitar la verificación en dos pasos desde una sesión abierta con tu contraseña. Si no has sido tú, ignóralo y cambia tu contraseña: alguien la conoce.",
+  },
+  pt: {
+    objet: "Remover a verificação em dois passos — Pacevo",
+    titre: "Perdeste o telemóvel?",
+    p1: "Se não pediste nada, não cliques: alguém conhece a tua palavra-passe, muda-a. Se foste tu («Perdi o telemóvel»), clica abaixo para remover a verificação em dois passos: depois entras só com a tua palavra-passe e podes voltar a ativá-la em Definições → Segurança.",
+    bouton: "Remover a verificação em dois passos",
+    p2: "Esta ligação expira numa hora e serve uma única vez.",
+    secours: "Se o botão não funcionar, copia este endereço para o teu navegador:",
+    pied: "Recebes esta mensagem porque foi pedida a remoção da verificação em dois passos a partir de uma sessão aberta com a tua palavra-passe. Se não foste tu, ignora-a e muda a tua palavra-passe: alguém a conhece.",
+  },
+};
+
+/** L'avis envoyé APRÈS chaque retrait : si ce n'était pas le titulaire, il le sait tout de suite. */
+const N: Record<string, Bloc> = {
+  fr: {
+    objet: "Double authentification retirée — Pacevo",
+    titre: "Double authentification retirée",
+    p1: "La double authentification de ton compte Pacevo vient d'être retirée, après un clic sur le lien envoyé à cette adresse. Ton compte s'ouvre désormais avec ton seul mot de passe.",
+    bouton: "La réactiver dans mes réglages",
+    p2: "Si ce n'est pas toi, change tout de suite ton mot de passe et réactive la double authentification.",
+    secours: "Si le bouton ne fonctionne pas, copie cette adresse dans ton navigateur :",
+    pied: "Message de sécurité envoyé à chaque retrait de la double authentification.",
+  },
+  en: {
+    objet: "Two-factor authentication removed — Pacevo",
+    titre: "Two-factor authentication removed",
+    p1: "Two-factor authentication was just removed from your Pacevo account, after a click on the link sent to this address. Your account now opens with your password alone.",
+    bouton: "Turn it back on in my settings",
+    p2: "If it wasn't you, change your password right away and turn two-factor authentication back on.",
+    secours: "If the button doesn't work, copy this address into your browser:",
+    pied: "Security message sent every time two-factor authentication is removed.",
+  },
+  de: {
+    objet: "Zwei-Faktor-Authentifizierung entfernt — Pacevo",
+    titre: "Zwei-Faktor-Authentifizierung entfernt",
+    p1: "Die Zwei-Faktor-Authentifizierung deines Pacevo-Kontos wurde gerade entfernt, nach einem Klick auf den an diese Adresse gesendeten Link. Dein Konto öffnet sich jetzt nur mit deinem Passwort.",
+    bouton: "In meinen Einstellungen wieder einschalten",
+    p2: "Warst du das nicht, ändere sofort dein Passwort und schalte die Zwei-Faktor-Authentifizierung wieder ein.",
+    secours: "Wenn der Button nicht funktioniert, kopiere diese Adresse in deinen Browser:",
+    pied: "Sicherheitsnachricht, die bei jedem Entfernen der Zwei-Faktor-Authentifizierung gesendet wird.",
+  },
+  es: {
+    objet: "Verificación en dos pasos quitada — Pacevo",
+    titre: "Verificación en dos pasos quitada",
+    p1: "Se acaba de quitar la verificación en dos pasos de tu cuenta Pacevo, tras un clic en el enlace enviado a esta dirección. Tu cuenta se abre ahora solo con tu contraseña.",
+    bouton: "Volver a activarla en mis ajustes",
+    p2: "Si no has sido tú, cambia tu contraseña enseguida y vuelve a activar la verificación en dos pasos.",
+    secours: "Si el botón no funciona, copia esta dirección en tu navegador:",
+    pied: "Mensaje de seguridad enviado cada vez que se quita la verificación en dos pasos.",
+  },
+  pt: {
+    objet: "Verificação em dois passos removida — Pacevo",
+    titre: "Verificação em dois passos removida",
+    p1: "A verificação em dois passos da tua conta Pacevo acabou de ser removida, após um clique na ligação enviada para este endereço. A tua conta abre-se agora só com a tua palavra-passe.",
+    bouton: "Voltar a ativá-la nas minhas definições",
+    p2: "Se não foste tu, muda já a tua palavra-passe e volta a ativar a verificação em dois passos.",
+    secours: "Se o botão não funcionar, copia este endereço para o teu navegador:",
+    pied: "Mensagem de segurança enviada sempre que a verificação em dois passos é removida.",
+  },
+};
+
+/** L'avis envoyé à CHAQUE activation : si quelqu'un l'active avec son téléphone, le titulaire le sait. */
+const A: Record<string, Bloc> = {
+  fr: {
+    objet: "Double authentification activée — Pacevo",
+    titre: "Double authentification activée",
+    p1: "La double authentification vient d'être activée sur ton compte Pacevo : à chaque connexion, un code à 6 chiffres te sera demandé en plus de ton mot de passe.",
+    bouton: "Voir mes réglages de sécurité",
+    p2: "Si ce n'est pas toi, quelqu'un connaît ton mot de passe : sur l'écran du code, choisis « J'ai perdu mon téléphone » pour la retirer, puis change ton mot de passe.",
+    secours: "Si le bouton ne fonctionne pas, copie cette adresse dans ton navigateur :",
+    pied: "Message de sécurité envoyé à chaque activation de la double authentification.",
+  },
+  en: {
+    objet: "Two-factor authentication turned on — Pacevo",
+    titre: "Two-factor authentication turned on",
+    p1: "Two-factor authentication was just turned on for your Pacevo account: each time you log in, you'll be asked for a 6-digit code on top of your password.",
+    bouton: "See my security settings",
+    p2: "If it wasn't you, someone knows your password: on the code screen, choose “I lost my phone” to remove it, then change your password.",
+    secours: "If the button doesn't work, copy this address into your browser:",
+    pied: "Security message sent every time two-factor authentication is turned on.",
+  },
+  de: {
+    objet: "Zwei-Faktor-Authentifizierung eingeschaltet — Pacevo",
+    titre: "Zwei-Faktor-Authentifizierung eingeschaltet",
+    p1: "Für dein Pacevo-Konto wurde gerade die Zwei-Faktor-Authentifizierung eingeschaltet: Bei jeder Anmeldung wird zusätzlich zu deinem Passwort ein 6-stelliger Code abgefragt.",
+    bouton: "Meine Sicherheitseinstellungen ansehen",
+    p2: "Warst du das nicht, kennt jemand dein Passwort: Wähle auf dem Code-Bildschirm „Ich habe mein Handy verloren“, um sie zu entfernen, und ändere dann dein Passwort.",
+    secours: "Wenn der Button nicht funktioniert, kopiere diese Adresse in deinen Browser:",
+    pied: "Sicherheitsnachricht, die bei jedem Einschalten der Zwei-Faktor-Authentifizierung gesendet wird.",
+  },
+  es: {
+    objet: "Verificación en dos pasos activada — Pacevo",
+    titre: "Verificación en dos pasos activada",
+    p1: "Se acaba de activar la verificación en dos pasos en tu cuenta Pacevo: en cada inicio de sesión se te pedirá un código de 6 cifras además de tu contraseña.",
+    bouton: "Ver mis ajustes de seguridad",
+    p2: "Si no has sido tú, alguien conoce tu contraseña: en la pantalla del código, elige «He perdido el teléfono» para quitarla y después cambia tu contraseña.",
+    secours: "Si el botón no funciona, copia esta dirección en tu navegador:",
+    pied: "Mensaje de seguridad enviado cada vez que se activa la verificación en dos pasos.",
+  },
+  pt: {
+    objet: "Verificação em dois passos ativada — Pacevo",
+    titre: "Verificação em dois passos ativada",
+    p1: "A verificação em dois passos acabou de ser ativada na tua conta Pacevo: em cada início de sessão, ser-te-á pedido um código de 6 algarismos além da tua palavra-passe.",
+    bouton: "Ver as minhas definições de segurança",
+    p2: "Se não foste tu, alguém conhece a tua palavra-passe: no ecrã do código, escolhe «Perdi o telemóvel» para a remover e depois muda a tua palavra-passe.",
+    secours: "Se o botão não funcionar, copia este endereço para o teu navegador:",
+    pied: "Mensagem de segurança enviada sempre que a verificação em dois passos é ativada.",
+  },
+};
+
+export function emailDeuxFacteursActivee(lang: string, base: string): { objet: string; html: string; texte: string } {
+  return rendreEmailLien(A[lang] ?? A.fr, base, `${base}/dashboard/settings`);
+}
+
+export function emailRetraitDeuxFacteurs(lang: string, base: string, lien: string): { objet: string; html: string; texte: string } {
+  return rendreEmailLien(D[lang] ?? D.fr, base, lien);
+}
+
+export function emailDeuxFacteursRetiree(lang: string, base: string): { objet: string; html: string; texte: string } {
+  return rendreEmailLien(N[lang] ?? N.fr, base, `${base}/dashboard/settings`);
+}

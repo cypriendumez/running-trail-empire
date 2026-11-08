@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState , useId} from "react";
+import { useEffect, useRef, useState , useId} from "react";
+import { Turnstile, CLE_TURNSTILE, type TurnstileRef } from "@/components/auth/Turnstile";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2, Check } from "lucide-react";
@@ -15,6 +16,8 @@ import type { Methode, StatutCompte } from "@/lib/auth/statut";
 import { memoriserEmail, reprendreEmail } from "@/lib/auth/emailMemorise";
 import { COOKIE_ACCORD } from "@/lib/auth/consentement";
 import { JOURS_ESSAI } from "@/lib/billing/access";
+import { ReglesMotDePasse, messageRefusMotDePasse } from "@/components/auth/ReglesMotDePasse";
+import { verifierRegles, MDP_MIN } from "@/lib/auth/reglesMotDePasse";
 
 export default function SignupPage() {
   /**
@@ -33,6 +36,12 @@ export default function SignupPage() {
   const cid = useId();
   const { lang } = useT();
   const L = (AUTH[lang] ?? AUTH.fr).signup;
+  const M = (AUTH[lang] ?? AUTH.fr).mdp;
+  const C = (AUTH[lang] ?? AUTH.fr).captcha;
+  // CAPTCHA (en sommeil sans clé) : vérifié par NOTRE route, que GoTrue dispense (clé d'administration).
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaHs, setCaptchaHs] = useState(false); // widget Cloudflare qui ne se charge pas
+  const widget = useRef<TurnstileRef>(null);
   const [step, setStep] = useState<"account" | "verify">("account");
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ fullName: "", email: "", password: "", confirmPassword: "" });
@@ -93,7 +102,8 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent, domaineConfirme = false) {
     e.preventDefault();
     if (form.password !== form.confirmPassword) { toast.error(L.pwMismatch); return; }
-    if (form.password.length < 8) { toast.error(L.pwShort); return; }
+    if (verifierRegles(form.password, form.email).length) { toast.error(M.faible); return; }
+    if (CLE_TURNSTILE && !captcha) { toast.error(captchaHs ? C.indisponible : C.attente, { duration: 8000 }); return; }
     setLoading(true);
     // ⚠️ ON N'APPELLE PLUS `supabase.auth.signUp()` DIRECTEMENT, et ce n'est pas un
     // détail : cet appel déclenche l'e-mail par DÉFAUT de Supabase — « Confirm your
@@ -106,10 +116,12 @@ export default function SignupPage() {
     // arriver DEUX e-mails de confirmation.
     const rep = await fetch("/api/auth/confirmation", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: form.email, password: form.password, fullName: form.fullName, lang, domaineConfirme, accord }),
+      body: JSON.stringify({ captcha, email: form.email, password: form.password, fullName: form.fullName, lang, domaineConfirme, accord }),
     }).catch(() => null);
     const j = rep ? await rep.json().catch(() => null) : null;
     setLoading(false);
+    // Un jeton ne sert qu'une fois : un second envoi (domaine confirmé, mot de passe corrigé) en demande un neuf.
+    widget.current?.reinitialiser();
     // ⚠️ CHAQUE REFUS EST DIT, AVEC SA CAUSE (décision du 11/10/2026) : adresse déjà
     // inscrite, mot de passe trop court, domaine sans courrier, trop d'essais, envoi raté.
     // Avant, « adresse déjà prise » répondait « c'est envoyé » (anti-annuaire) et la
@@ -126,7 +138,8 @@ export default function SignupPage() {
       return;
     }
     if (!rep?.ok || !j?.ok) {
-      toast.error(j?.error === "mot_de_passe_trop_court" ? L.pwShort : j?.error === "accord_requis" ? A.consentement : rep?.status === 429 ? Lc.errRate : A.envoiImpossible);
+      // Mot de passe refusé (règles, ou déjà fuité selon Have I Been Pwned) : la cause exacte.
+      toast.error(messageRefusMotDePasse(j?.error, M) ?? (j?.error === "captcha_refuse" ? C.refuse : j?.error === "trop_de_liens" ? A.tropDeLiens : j?.error === "accord_requis" ? A.consentement : rep?.status === 429 ? Lc.errRate : A.envoiImpossible), { duration: 8000 });
       return;
     }
     setStep("verify");
@@ -151,8 +164,9 @@ export default function SignupPage() {
       // à la confirmation (protection contre la pré-inscription, voir la route).
       body: JSON.stringify({ email: form.email, lang, renvoi: true, motDePasseConnu: true }),
     }).catch(() => null);
+    const j = rep ? await rep.json().catch(() => null) : null;
     setLoading(false);
-    if (!rep?.ok) { toast.error(rep?.status === 429 ? Lc.errRate : A.envoiImpossible); return; }
+    if (!rep?.ok) { toast.error(j?.error === "trop_de_liens" ? A.tropDeLiens : rep?.status === 429 ? Lc.errRate : A.envoiImpossible, { duration: 8000 }); return; }
     toast.success(L.resent);
   }
 
@@ -191,7 +205,6 @@ export default function SignupPage() {
     );
   }
 
-  const passwordStrength = getPasswordStrength(form.password);
   const inputCls = "w-full px-4 py-3 rounded-xl border border-zinc-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent placeholder:text-zinc-400";
 
   return (
@@ -255,21 +268,8 @@ export default function SignupPage() {
           </div>
           <div>
             <label htmlFor={`${cid}-mdp`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.password}</label>
-            <input id={`${cid}-mdp`} type="password" value={form.password} onChange={(e) => update("password", e.target.value)} placeholder={L.passwordPh} required className={inputCls} />
-            {form.password && (
-              <div className="mt-2 flex gap-1">
-                {[1, 2, 3, 4].map((i) => (
-                  <div
-                    key={i}
-                    className={`h-1 flex-1 rounded-full transition-colors ${
-                      i <= passwordStrength
-                        ? passwordStrength <= 1 ? "bg-red-400" : passwordStrength <= 2 ? "bg-orange-400" : passwordStrength <= 3 ? "bg-yellow-400" : "bg-emerald-500"
-                        : "bg-zinc-200"
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
+            <input id={`${cid}-mdp`} type="password" value={form.password} onChange={(e) => update("password", e.target.value)} placeholder={L.passwordPh} required minLength={MDP_MIN} autoComplete="new-password" aria-describedby={`${cid}-regles`} className={inputCls} />
+            <ReglesMotDePasse mdp={form.password} email={form.email} L={M} id={`${cid}-regles`} />
           </div>
           <div>
             <label htmlFor={`${cid}-confirm`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.confirm}</label>
@@ -289,6 +289,7 @@ export default function SignupPage() {
             </span>
           </label>
 
+          <Turnstile ref={widget} onJeton={(j) => { setCaptcha(j); if (j) setCaptchaHs(false); }} onErreur={() => setCaptchaHs(true)} langue={lang} />
           <button type="submit" disabled={loading} className="btn-brand w-full justify-center py-3">
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {L.submit}
@@ -310,14 +311,4 @@ export default function SignupPage() {
         </p>
     </AuthShell>
   );
-}
-
-function getPasswordStrength(password: string): number {
-  if (!password) return 0;
-  let score = 0;
-  if (password.length >= 8) score++;
-  if (/[A-Z]/.test(password)) score++;
-  if (/[0-9]/.test(password)) score++;
-  if (/[^A-Za-z0-9]/.test(password)) score++;
-  return score;
 }

@@ -5,6 +5,7 @@ import { emailEditeur } from "@/lib/admin/acces";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailNouvelInscrit } from "@/lib/notify/nouvelInscrit";
 import { envoyerEmail } from "@/lib/email/envoyer";
+import { cheminSur } from "@/lib/social/amisLiens";
 
 /**
  * Confirmation d'email (et autres OTP par lien) — flux `token_hash` recommandé
@@ -18,7 +19,10 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/dashboard";
+  // ⚠️ FILTRÉ PAR `cheminSur` (relecture du 08/11/2026) : `${origin}${next}` avec `next=@site-tiers.fr`
+  // donnait `https://pacevo.fr@site-tiers.fr`, c'est-à-dire une redirection vers un autre site
+  // depuis un lien qui porte notre adresse. Seul un chemin SUR le site passe.
+  const next = cheminSur(searchParams.get("next"));
 
   if (token_hash && type) {
     const supabase = await createClient();

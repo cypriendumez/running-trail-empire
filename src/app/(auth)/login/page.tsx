@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState , useId} from "react";
+import { useEffect, useRef, useState , useId} from "react";
+import { Turnstile, CLE_TURNSTILE, type TurnstileRef } from "@/components/auth/Turnstile";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -17,6 +18,7 @@ import { AideCompte, type Situation } from "@/components/auth/AideCompte";
 import { messageErreurConnexion } from "@/lib/auth/messageErreur";
 import { sansMotDePasse, type StatutCompte } from "@/lib/auth/statut";
 import { memoriserEmail, reprendreEmail } from "@/lib/auth/emailMemorise";
+import { secondFacteurAttendu } from "@/lib/auth/mfaNavigateur";
 
 export default function LoginPage() {
   /**
@@ -36,6 +38,9 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaHs, setCaptchaHs] = useState(false); // widget Cloudflare qui ne se charge pas
+  const widget = useRef<TurnstileRef>(null);
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   // Pourquoi la connexion a échoué, et quoi faire — affiché jusqu'à la prochaine saisie.
@@ -44,6 +49,7 @@ export default function LoginPage() {
   const { t, lang } = useT();
   const L = (AUTH[lang] ?? AUTH.fr).login;
   const A = (AUTH[lang] ?? AUTH.fr).aide;
+  const C = (AUTH[lang] ?? AUTH.fr).captcha;
 
   // Surface une erreur renvoyée par /auth/callback ou /auth/confirm
   useEffect(() => {
@@ -57,6 +63,19 @@ export default function LoginPage() {
   useEffect(() => {
     const e = reprendreEmail();
     if (e) setEmail(e);
+  }, []);
+
+  // ⚠️ DOUBLE AUTHENTIFICATION : une session qui doit encore donner son code est « déconnectée »
+  // pour le serveur (lib/supabase/server) — les pages renvoient donc ici. Sans ce renvoi vers
+  // l'écran du code, la personne retaperait son mot de passe en boucle.
+  useEffect(() => {
+    void (async () => {
+      if (await secondFacteurAttendu(createClient())) {
+        const next = cheminSur(new URLSearchParams(window.location.search).get("next"));
+        router.replace(`/verification-2fa?next=${encodeURIComponent(next)}`);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -87,10 +106,20 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // CAPTCHA (en sommeil sans clé, voir `components/auth/Turnstile`) : GoTrue vérifie lui-même le
+    // jeton quand la protection est activée chez Supabase. Sans jeton, il refuserait la connexion.
+    if (CLE_TURNSTILE && !captcha) { toast.error(captchaHs ? C.indisponible : C.attente, { duration: 8000 }); return; }
     setLoading(true);
     setAide(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password, ...(CLE_TURNSTILE ? { options: { captchaToken: captcha ?? undefined } } : {}) });
+    // Un jeton ne sert qu'une fois : on en redemande un pour l'essai suivant, réussi ou non.
+    widget.current?.reinitialiser();
+    if (error && (error as { code?: string }).code === "captcha_failed") {
+      setAide({ cas: "message", texte: C.refuse });
+      setLoading(false);
+      return;
+    }
     if (error) {
       // ⚠️ PAS `error.message` : Supabase répond en anglais (« Invalid login credentials »).
       setRenvoi({ enCours: false, fait: false });
@@ -100,7 +129,10 @@ export default function LoginPage() {
     }
     // `?next=` : un chemin SUR le site (jamais une adresse externe) où revenir — la page
     // d'invitation /amis/<id> s'en sert pour que le suivi se fasse juste après.
-    router.push(cheminSur(new URLSearchParams(window.location.search).get("next")));
+    const next = new URLSearchParams(window.location.search).get("next");
+    // DOUBLE AUTHENTIFICATION : le mot de passe ne suffit pas, le code d'abord.
+    if (await secondFacteurAttendu(supabase)) { router.push(`/verification-2fa?next=${encodeURIComponent(cheminSur(next))}`); return; }
+    router.push(cheminSur(next));
     router.refresh();
   }
 
@@ -114,7 +146,7 @@ export default function LoginPage() {
     const j = r ? await r.json().catch(() => null) : null;
     if (r?.ok && j?.ok) { setRenvoi({ enCours: false, fait: true }); return; }
     setRenvoi({ enCours: false, fait: false });
-    toast.error(r?.status === 429 ? L.errRate : A.envoiImpossible);
+    toast.error(j?.error === "trop_de_liens" ? A.tropDeLiens : r?.status === 429 ? L.errRate : A.envoiImpossible, { duration: 8000 });
   }
 
   function saisir(maj: () => void) {
@@ -185,6 +217,7 @@ export default function LoginPage() {
             <AideCompte situation={aide} email={email} lang={lang}
               onRenvoyer={renvoyerConfirmation} renvoiEnCours={renvoi.enCours} renvoiFait={renvoi.fait} />
           )}
+          <Turnstile ref={widget} onJeton={(j) => { setCaptcha(j); if (j) setCaptchaHs(false); }} onErreur={() => setCaptchaHs(true)} langue={lang} />
           <button
             type="submit"
             disabled={loading}

@@ -90,27 +90,80 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     /**
-     * ⚠️ CSP EN REPORT-ONLY (constat d'audit M4). Elle n'APPLIQUE rien : elle SIGNALE les
-     * violations (`report-uri` → `/api/csp-report`, journalisées dans `error_logs`). Une CSP
-     * APPLIQUÉE casserait les scripts en ligne que Next génère lui-même (il faudrait des nonces,
-     * donc un middleware, et une vérification écran par écran) ; report-only mesure sans rien
-     * casser, avant de durcir. Les directives à forte valeur — `connect-src`, `img-src`,
-     * `object-src 'none'`, `frame-ancestors 'none'` — bornent déjà l'exfiltration par une
-     * éventuelle XSS. Hôtes relevés dans le code client : tuiles (maptiler, OSM, opentopomap,
-     * waymarkedtrails, IGN geopf), images (unsplash, cdnjs pour les marqueurs Leaflet, Supabase),
-     * cartes/altitude/itinéraire (maptiler, open-meteo, OSRM, geopf), Supabase REST + realtime.
+     * ⚠️ CSP APPLIQUÉE depuis le 08/11/2026 (elle était en report-only depuis l'audit M4, 16/10).
+     *
+     * POURQUOI : le jeton de session Supabase vit dans un cookie LISIBLE par JavaScript, par
+     * conception (`@supabase/ssr` : le client navigateur en a besoin ; le passer en httpOnly
+     * casserait tous les appels Supabase du navigateur). La parade contre son vol, c'est
+     * d'empêcher un script HÉBERGÉ AILLEURS de s'exécuter (`script-src 'self'`) et de borner les
+     * destinations de tout script (`connect-src`, `img-src`, `form-action` : seulement nos
+     * services). En report-only, rien de tout cela ne protégeait : le navigateur signalait et
+     * laissait faire.
+     *
+     * ⚠️ CE QU'ELLE NE FAIT PAS, à dire honnêtement : à cause de `'unsafe-inline'`, un script
+     * injecté EN LIGNE (faille XSS dans notre code) s'exécute quand même ; il ne peut alors
+     * envoyer le jeton qu'aux services listés ici — d'où l'hôte Supabase EXACT, pas le joker —
+     * mais rien n'empêche une simple navigation vers un autre site (`location = …`), que la CSP
+     * ne sait pas bloquer. La première défense contre le XSS reste React, qui échappe le texte.
+     *
+     * ⚠️ `'unsafe-inline'` RESTE dans script-src : Next écrit ses propres scripts en ligne
+     * (hydratation, flux RSC). Les nonces les remplaceraient, mais imposent un rendu dynamique de
+     * CHAQUE page (doc Next, « Content Security Policy ») : les 17 000 fiches de course et les pages
+     * publiques perdraient leur rendu statique. Choix fait : pas de nonces ; `eval` reste interdit.
+     * `'unsafe-eval'` n'est ajouté qu'en développement (Turbopack s'en sert, rapports du 17/10).
+     *
+     * Avant d'appliquer, les 185 rapports reçus du 17/10 au 06/11 ont été classés : extensions des
+     * visiteurs (Joko, Firebase, scite, polices Google injectées), poste de développement, et
+     * BigDataCloud bloqué par un bloqueur de publicité qui redirige la requête (vérifié : sous
+     * cette même politique appliquée, l'appel passe dans un navigateur sans bloqueur).
+     *
+     * ⚠️ TOUTE NOUVELLE SOURCE EXTERNE doit entrer ici, sinon elle est BLOQUÉE sans erreur visible
+     * (carte grise, image vide). `tests/entetes.test.ts` relève les couches de carte et les appels
+     * `fetch("https://…")` du code et refuse un hôte absent de la politique.
      */
+    // Fonds de carte : Leaflet les charge en <img> (img-src), MapLibre (Relief 3D) par fetch
+    // (connect-src) — d'où leur présence dans les DEUX listes. Relevés dans `lib/trail/couches.ts`,
+    // `lib/courses/fondsCarte.ts`, `components/trail`, `components/races`, `components/segments`.
+    const tuiles = [
+      "https://api.maptiler.com",
+      "https://*.mapbox.com",
+      "https://tile.openstreetmap.org",
+      "https://*.tile.openstreetmap.org",
+      "https://*.tile.opentopomap.org",
+      "https://*.tile-cyclosm.openstreetmap.fr",
+      "https://tile.waymarkedtrails.org",
+      "https://data.geopf.fr",
+      "https://wmts.geo.admin.ch",
+      "https://www.ign.es",
+      "https://sgx.geodatenzentrum.de",
+      "https://server.arcgisonline.com",
+      "https://basemap.nationalmap.gov",
+    ].join(" ");
+    const dev = process.env.NODE_ENV !== "production";
+    // ⚠️ L'HÔTE EXACT DU PROJET SUPABASE, PAS `*.supabase.co` (relecture du 08/11/2026). Le joker
+    // couvrait les projets de TOUT LE MONDE : un script injecté pouvait envoyer le jeton de session
+    // vers le projet Supabase d'un attaquant, et la CSP le laissait passer. Sans l'adresse (poste
+    // sans `.env`), on retombe sur le joker pour ne pas casser le développement.
+    const supabase = (() => {
+      try { const h = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").host; if (h) return { https: `https://${h}`, wss: `wss://${h}` }; } catch { /* adresse absente ou illisible */ }
+      return { https: "https://*.supabase.co", wss: "wss://*.supabase.co" };
+    })();
+    // CAPTCHA Cloudflare Turnstile (`components/auth/Turnstile`) : son script et son cadre ne sont
+    // autorisés QUE si la clé est posée — sans elle, aucune porte n'est ouverte pour rien.
+    // Directives exigées par Cloudflare (doc « Turnstile — Content Security Policy », lue le 08/11/2026).
+    const turnstile = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? " https://challenges.cloudflare.com" : "";
     const csp = [
       "default-src 'self'",
       "base-uri 'self'",
       "object-src 'none'",
       "frame-ancestors 'none'",
       "form-action 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}${turnstile}`,
+      ...(turnstile ? [`frame-src${turnstile}`] : []),
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
-      "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://images.pexels.com https://*.mapbox.com https://api.maptiler.com https://*.tile.openstreetmap.org https://*.tile.opentopomap.org https://tile.waymarkedtrails.org https://data.geopf.fr https://cdnjs.cloudflare.com https://icons.duckduckgo.com",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.maptiler.com https://*.mapbox.com https://*.open-meteo.com https://api.bigdatacloud.net https://router.project-osrm.org https://data.geopf.fr",
+      `img-src 'self' data: blob: ${supabase.https} https://images.unsplash.com https://images.pexels.com https://cdnjs.cloudflare.com https://icons.duckduckgo.com ${tuiles}`,
+      `connect-src 'self' ${supabase.https} ${supabase.wss} https://*.open-meteo.com https://api.bigdatacloud.net https://router.project-osrm.org ${tuiles}`,
       "worker-src 'self' blob:",
       "manifest-src 'self'",
       "report-uri /api/csp-report",
@@ -136,9 +189,15 @@ const nextConfig: NextConfig = {
            * fonctionnalité en silence : le navigateur refuserait sans message d'erreur
            * exploitable. Ce qu'on ferme, c'est ce que le produit n'utilise PAS.
            */
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), payment=(), usb=(), geolocation=(self)" },
-          // Report-only : on observe (voir le commentaire et `csp` ci-dessus) avant d'appliquer.
-          { key: "Content-Security-Policy-Report-Only", value: csp },
+          /**
+           * ⚠️ `camera=(self)` ET PLUS `()` (08/11/2026) : « Ajouter des amis » scanne le QR code
+           * d'un ami avec la caméra (`getUserMedia` dans `components/social/AjouterAmis.tsx`).
+           * `camera=()` faisait refuser la caméra par le navigateur, en silence — la panne même
+           * que le commentaire de la géolocalisation ci-dessus voulait éviter.
+           */
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(), payment=(), usb=(), geolocation=(self)" },
+          // Appliquée : voir le commentaire de `csp` ci-dessus.
+          { key: "Content-Security-Policy", value: csp },
         ],
       },
     ];

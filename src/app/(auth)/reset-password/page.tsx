@@ -11,6 +11,9 @@ import { Logo } from "@/components/brand/Logo";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { AUTH } from "@/components/auth/authI18n";
+import { ReglesMotDePasse, messageRefusMotDePasse } from "@/components/auth/ReglesMotDePasse";
+import { verifierRegles, MDP_MIN } from "@/lib/auth/reglesMotDePasse";
+import { secondFacteurAttendu } from "@/lib/auth/mfaNavigateur";
 
 export default function ResetPasswordPage() {
   // Chaque libellé est relié à son champ : sans cela, un lecteur d'écran annonce
@@ -28,24 +31,40 @@ export default function ResetPasswordPage() {
   // confirmée) : on dit pourquoi on demande un mot de passe. Voir /auth/confirm.
   const [apresInscription, setApresInscription] = useState(false);
 
-  // Après le clic sur le lien de l'email → /auth/callback a posé la session → on doit avoir un user.
+  const M = (AUTH[lang] ?? AUTH.fr).mdp;
+  const [email, setEmail] = useState<string | null>(null); // pour la règle « pas ton adresse »
+
+  // Après le clic sur le lien de l'email → /auth/confirm a posé la session → on doit avoir un user.
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setReady(!!data.user));
+    // DOUBLE AUTHENTIFICATION : le lien e-mail ne vaut pas le code. Un compte protégé le donne
+    // d'abord, puis revient ici (sinon le serveur refuserait le changement : session en attente).
+    void secondFacteurAttendu(supabase).then((attendu) => { if (attendu) router.replace("/verification-2fa?next=/reset-password"); });
+    supabase.auth.getUser().then(({ data }) => { setReady(!!data.user); setEmail(data.user?.email ?? null); });
     setApresInscription(new URLSearchParams(window.location.search).get("apres") === "inscription");
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 8) { toast.error(L.pwShort); return; }
+    if (verifierRegles(password, email).length) { toast.error(M.faible); return; }
     if (password !== confirm) { toast.error(L.pwMismatch); return; }
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
+    // ⚠️ PAR NOTRE ROUTE, PLUS PAR `supabase.auth.updateUser()` : le serveur applique les mêmes
+    // règles ET refuse les mots de passe déjà fuités (Have I Been Pwned), ce que le navigateur
+    // ne peut pas faire sans exposer le mot de passe. Et l'erreur arrive traduite, pas en anglais.
+    const rep = await fetch("/api/auth/mot-de-passe", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
+    }).catch(() => null);
+    const j = rep ? await rep.json().catch(() => null) : null;
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (!rep?.ok || !j?.ok) {
+      // Plus d'une heure après le clic, le serveur réclame l'ancien mot de passe, que cette page
+      // n'a pas : c'est un lien expiré, et la personne doit en redemander un.
+      toast.error(messageRefusMotDePasse(j?.error === "actuel_requis" ? "non_connecte" : j?.error, M) ?? M.echec, { duration: 8000 });
+      return;
+    }
     toast.success(L.updated, { duration: 6000 });
-    await supabase.auth.signOut();
+    await createClient().auth.signOut();
     router.push("/login");
   }
 
@@ -73,15 +92,17 @@ export default function ResetPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-zinc-700 block mb-1.5">{L.newPw}</label>
+              <label htmlFor={`${cid}-n0`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.newPw}</label>
               <div className="relative">
-                <input
+                <input id={`${cid}-n0`}
                   type={showPwd ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  minLength={8}
+                  minLength={MDP_MIN}
+                  autoComplete="new-password"
+                  aria-describedby={`${cid}-regles`}
                   className={pwInput}
                 />
                 <button
@@ -92,6 +113,7 @@ export default function ResetPasswordPage() {
                   {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <ReglesMotDePasse mdp={password} email={email} L={M} id={`${cid}-regles`} />
             </div>
             <div>
               <label htmlFor={`${cid}-c0`} className="text-sm font-medium text-zinc-700 block mb-1.5">{L.confirmPw}</label>
@@ -101,7 +123,8 @@ export default function ResetPasswordPage() {
                 onChange={(e) => setConfirm(e.target.value)}
                 placeholder="••••••••"
                 required
-                minLength={8}
+                minLength={MDP_MIN}
+                autoComplete="new-password"
                 className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent placeholder:text-zinc-400 transition-shadow"
               />
             </div>

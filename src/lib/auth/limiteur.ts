@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 
 /**
  * LIMITEUR DE DÉBIT — le prix de « cette adresse a déjà un compte ».
@@ -30,6 +31,16 @@ export function autoriser(cle: string, max: number, fenetreMs: number, maintenan
     for (const k of [...APPELS.keys()].slice(0, APPELS.size - CLES_MAX)) APPELS.delete(k);
   }
   return true;
+}
+
+/**
+ * La clé d'un compteur PAR ADRESSE E-MAIL (08/11/2026). Le compteur par IP ne suffit pas pour
+ * les routes qui ENVOIENT un e-mail : un script qui change d'adresse IP pouvait remplir la boîte
+ * d'une même personne de liens « mot de passe oublié ». L'adresse n'est pas stockée en clair
+ * dans `rate_limits` : seule son empreinte SHA-256 (tronquée) y entre.
+ */
+export function cleParAdresse(prefixe: string, adresse: string): string {
+  return `${prefixe}:${createHash("sha256").update(adresse.trim().toLowerCase(), "utf8").digest("hex").slice(0, 32)}`;
 }
 
 /** L'adresse IP du visiteur (première de `x-forwarded-for`, posée par Vercel). */
