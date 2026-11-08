@@ -741,7 +741,10 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     // pendant l'affûtage (où elle coûte de la fraîcheur sans plus rien apporter).
     detail: (l) => {
       const phase = ctx.cycle.taper ? "affûtage" : ctx.macroPlan[0]?.phase ?? "Développement";
-      const sets = blockWeekRenfo === 3 ? 2 : 3 + Math.min(1, blockWeekRenfo);
+      // La veille de l'affûtage n'est pas une semaine d'assimilation (`cycle.veilleAffutage`,
+      // même règle que la feuille de route) : la charge du renfo y est tenue, pas réduite.
+      const assimilation = blockWeekRenfo === 3 && !ctx.cycle.veilleAffutage;
+      const sets = assimilation ? 2 : 3 + Math.min(1, blockWeekRenfo);
       // ── AXE PERSONNEL, choisi sur une MESURE ────────────────────────────────
       // La séance ignorait tout de la foulée de l'athlète : deux coureurs aux
       // fragilités opposées recevaient le même gainage. On ajoute UN axe (deux au

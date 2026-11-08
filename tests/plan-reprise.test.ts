@@ -24,7 +24,7 @@ import { readFileSync } from "node:fs";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
 import { repriseApresArret, partApresArret } from "../src/lib/coach/repriseArret";
-import { semainesAffutage, partAffutage, phaseDeSemaine } from "../src/lib/coach/phase";
+import { semainesAffutage, partAffutage, phaseDeSemaine, allegementDuBloc } from "../src/lib/coach/phase";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
 let passed = 0; const fails: string[] = [];
@@ -241,6 +241,112 @@ async function main() {
     assert.ok(v[v.length - 1] < v[v.length - 2], `semaine de course non allégée : ${v.join(", ")}`);
   });
 
+  // ── PAS DE SEMAINE ALLÉGÉE LA VEILLE DE L'AFFÛTAGE (09/11/2026) ──────────────────
+  // Une semaine sur quatre, l'allègement du bloc tombait juste avant l'affûtage : 66 → 56 → 43 km
+  // pour un 5 km dans trois semaines (ce test-ci rougissait toute la semaine ISO 46).
+  await test("la règle : l'allègement du bloc saute la veille de l'affûtage, pour chaque distance", () => {
+    for (const d of [5, 10, 21.1, 42.2]) {
+      const n = semainesAffutage(d);
+      assert.equal(allegementDuBloc(3, n, d), false, `${d} km : la veille de l'affûtage (J−${n} sem.) est de nouveau allégée`);
+      assert.equal(allegementDuBloc(3, n + 1, d), true, `${d} km : une semaine allégée loin de l'affûtage a disparu`);
+      assert.equal(allegementDuBloc(7, n + 5, d), true, `${d} km : la position 7 du bloc n'est plus la quatrième`);
+      for (const p of [0, 1, 2]) assert.equal(allegementDuBloc(p, n + 2, d), false, `${d} km : position ${p} allégée`);
+      // Pendant l'affûtage et après la course, la position 3 reste une semaine d'assimilation :
+      // sinon la dose des qualités remontait en pleine semaine de course (relecture du 09/11/2026).
+      for (const w of [n - 1, 0, -1]) assert.equal(allegementDuBloc(3, w, d), true, `${d} km, ${w} semaine(s) : la dose des qualités remonte pendant l'affûtage`);
+    }
+    assert.equal(allegementDuBloc(3, null), true, "sans objectif, la semaine allégée du bloc a disparu");
+  });
+
+  await test("la feuille de route ne coupe jamais la veille de l'affûtage, quelle que soit la semaine du bloc", async () => {
+    // La course est placée à quatre échéances successives : la veille de l'affûtage tombe ainsi
+    // sur chacune des quatre positions du bloc, CHAQUE jour, sans dépendre du calendrier.
+    const positions = new Set<number>();
+    // La semaine du bloc d'aujourd'hui, calculée comme le coach (semaine ISO).
+    const blocDuJour = (() => {
+      const d = new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
+      d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+      return Math.ceil(((d.getTime() - Date.UTC(d.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7) % 4;
+    })();
+    for (const d of [5, 10, 21.1, 42.2]) {
+      const n = semainesAffutage(d);
+      for (let k = 0; k < 4; k++) {
+        const course = { race: `Course de ${d} km`, raceDate: ilYa(-(7 * (n + 1 + k) + 3)), distanceKm: d, targetTime: "1h00", targetSeconds: 3600, targetPace: "5'00/km" };
+        const ctx = await contexte({ seances: reguliere(1, 70), notifications: [objectif(course)] });
+        const phases = ctx.macroPlan.map((w) => w.phase);
+        const v = ctx.macroPlan.map((w) => w.volumeKm);
+        const iv = phases.indexOf("Affûtage") - 1;
+        assert.ok(iv >= 1, `${d} km, k=${k} : pas de veille d'affûtage lisible (${phases.join(", ")})`);
+        positions.add((blocDuJour + iv) % 4);
+        assert.ok(v[iv] >= v[iv - 1] * 0.97, `${d} km, k=${k} : volume coupé la veille de l'affûtage : ${v.join(", ")}`);
+      }
+    }
+    assert.ok(positions.has(3), `la veille de l'affûtage n'est jamais tombée sur la 4e semaine du bloc (${[...positions].join(", ")}) : le test ne prouve rien`);
+  });
+
+  /** Un lundi (AAAA-MM-JJ) en 4e semaine du bloc ISO, dans les cinq semaines qui viennent. */
+  const lundiPosition3 = (() => {
+    for (let j = 0; j < 35; j++) {
+      const t = new Date(`${ilYa(-j)}T12:00:00`);
+      if (t.getDay() !== 1) continue;
+      const d = new Date(Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()));
+      d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+      if (Math.ceil(((d.getTime() - Date.UTC(d.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7) % 4 === 3) return ilYa(-j);
+    }
+    return null;
+  })();
+  /** Exécute `fn` comme si l'horloge marquait `jour` à 10 h (le coach lit `new Date()`). */
+  async function aLaDate<T>(jour: string, fn: () => Promise<T>): Promise<T> {
+    const Vrai = Date;
+    const delta = new Vrai(`${jour}T10:00:00`).getTime() - Vrai.now();
+    class Faux extends Vrai {
+      constructor(...a: unknown[]) { if (a.length === 0) super(Vrai.now() + delta); else super(...(a as [number])); }
+      static now() { return Vrai.now() + delta; }
+    }
+    (globalThis as { Date: DateConstructor }).Date = Faux as DateConstructor;
+    try { return await fn(); } finally { (globalThis as { Date: DateConstructor }).Date = Vrai; }
+  }
+  const plusJours = (jour: string, n: number) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+  await test("la semaine en cours, 4e semaine du bloc : allégée loin de la course, PAS la veille de l'affûtage", async () => {
+    // L'horloge est posée sur un lundi en position 3 : le test rougit chaque jour, pas une
+    // semaine sur quatre (relecture du 09/11/2026).
+    assert.ok(lundiPosition3, "aucun lundi en 4e semaine du bloc dans les cinq semaines à venir");
+    for (const d of [5, 21.1, 42.2]) {
+      const n = semainesAffutage(d);
+      // Les séances sont datées par rapport au lundi visé : sinon le coureur paraîtrait arrêté
+      // (reprise), et la semaine allégée serait suspendue pour une autre raison.
+      const decalage = Math.round((Date.parse(`${lundiPosition3}T12:00:00Z`) - Date.parse(`${ilYa(0)}T12:00:00Z`)) / 86400000);
+      const seances = reguliere(1, 70).map((w) => ({ ...w, date: plusJours(String(w.date), decalage) }));
+      const lecture = (semaines: number): Promise<AthleteContext> => aLaDate(lundiPosition3!, () => contexte({ seances, notifications: [objectif({
+        race: `Course de ${d} km`, raceDate: plusJours(lundiPosition3!, 7 * semaines + 3), distanceKm: d, targetTime: "1h00", targetSeconds: 3600, targetPace: "5'00/km" })] }));
+      const loin = await lecture(n + 6), veille = await lecture(n);
+      assert.equal(loin.cycle.deload, true, `${d} km : précondition, la 4e semaine du bloc loin de la course n'est plus allégée`);
+      assert.equal(veille.cycle.veilleAffutage, true, `${d} km à ${n} semaine(s) : la veille de l'affûtage n'est pas reconnue`);
+      assert.equal(veille.cycle.deload, false, `${d} km : la veille de l'affûtage est de nouveau allégée`);
+      assert.ok(/SEMAINE ALLÉGÉE/.test(loin.text) && !/SEMAINE ALLÉGÉE/.test(veille.text), `${d} km : le texte annonce une semaine allégée la veille de l'affûtage, ou plus du tout loin de la course`);
+      assert.ok(veille.volume.targetKm > loin.volume.targetKm * 0.9, `${d} km : volume de la veille (${veille.volume.targetKm}) coupé comme une semaine allégée (${loin.volume.targetKm})`);
+    }
+  });
+
+  await test("le renforcement de la veille de l'affûtage garde sa charge (plan bâti sur une 4e semaine du bloc)", async () => {
+    // `autoPlan` calcule sa propre semaine du bloc depuis la date du plan : on lui donne un lundi
+    // en position 3, et l'on compare la même semaine, veille de l'affûtage ou non.
+    const lundi = lundiPosition3 ? new Date(`${lundiPosition3}T12:00:00`) : null;
+    assert.ok(lundi, "aucun lundi en 4e semaine du bloc dans les cinq semaines à venir");
+    const ctx = await contexte({ seances: reguliere(1, 70) });
+    const series = (veille: boolean) => {
+      // Quatre sorties sur sept jours disponibles : il reste des jours libres pour le renfo.
+      const plan = buildWeekPlan({ ...ctx, availability: { daysPerWeek: 4, days: [0, 1, 2, 3, 4, 5, 6] }, cycle: { ...ctx.cycle, taper: false, veilleAffutage: veille } } as AthleteContext, lundi!);
+      const renfo = plan.find((j) => j.type === "Renfo");
+      const m = renfo?.detail.match(/(\d)×45 s/);
+      return m ? Number(m[1]) : null;
+    };
+    const normale = series(false), veille = series(true);
+    assert.equal(normale, 2, `précondition : la 4e semaine du bloc n'allège plus le renfo (${normale} séries)`);
+    assert.equal(veille, 4, `la veille de l'affûtage, le renfo est encore allégé (${veille} séries au lieu de 4)`);
+  });
+
   console.log("\nLA SORTIE LONGUE D'UN 5 KM SUIT LE VOLUME");
 
   await test("à 60 km par semaine, la sortie longue d'un 5 km dépasse les 12 km du pic de la course", async () => {
@@ -271,7 +377,12 @@ async function main() {
     }
     assert.equal(ctx.cycle.deload, semaineDuBloc === 3, "le texte « semaine allégée » ne suit pas la même horloge");
     // L'horloge se lit aussi dans le source : la date du jour ne l'exerce qu'une semaine sur quatre.
-    assert.match(codeNu("src/lib/ai/coachContext.ts"), /const deload = !taper && blockWeek === 3/, "la semaine allégée a quitté l'horloge du bloc");
+    // `semaineAllegeeDuBloc` = `allegementDuBloc(blockWeek, …)` (09/11/2026) : la même horloge.
+    assert.match(codeNu("src/lib/ai/coachContext.ts"), /const deload = !taper && semaineAllegeeDuBloc && /, "la semaine allégée a quitté l'horloge du bloc (ou ignore de nouveau la veille de l'affûtage)");
+    // La dose des qualités suit la même règle, et ne fait pas de pic la veille de l'affûtage.
+    assert.match(codeNu("src/lib/ai/coachContext.ts"), /const doseReduite = semaineAllegeeDuBloc \|\| repriseCetteSemaine;/, "la dose des qualités a quitté la règle de la semaine allégée");
+    assert.match(codeNu("src/lib/ai/coachContext.ts"), /const blocDose = veilleAffutage \? Math\.min\(blockWeek, 2\) : blockWeek;[\s\S]*base \+ blocDose \* 2/, "la veille de l'affûtage fait de nouveau un pic de qualité");
+    assert.match(codeNu("src/lib/ai/coachContext.ts"), /const semaineAllegeeDuBloc = allegementDuBloc\(blockWeek, weeksToRace, objective\?\.distanceKm\);/, "la semaine allégée a quitté l'horloge du bloc");
     assert.equal(ctx.volume.targetKm, ctx.macroPlan[0].volumeKm, "le plan de la semaine ne vise pas la feuille de route");
   });
 

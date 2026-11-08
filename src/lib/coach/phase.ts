@@ -41,6 +41,22 @@ export function partAffutage(semainesRestantes: number, distanceKm?: number | nu
   return parts[Math.max(0, Math.floor(semainesRestantes))];
 }
 
+/**
+ * LA SEMAINE ALLÉGÉE DU BLOC DE QUATRE (position 3), SAUF LA VEILLE DE L'AFFÛTAGE (09/11/2026).
+ * Une semaine sur quatre, l'allègement tombait sur la semaine qui précède l'affûtage : deux
+ * semaines réduites d'affilée avant la course (66 → 56 → 43 km pour un 5 km dans trois
+ * semaines). L'affûtage EST la récupération ; la semaine d'avant reste une semaine de travail.
+ * `semainesRestantes` : semaines pleines avant la semaine de course (`null` sans objectif).
+ * ⚠️ SEULE LA VEILLE EST EXCLUE (relecture du 09/11/2026) : pendant l'affûtage et après la course,
+ * la position 3 reste une semaine d'assimilation (dose des qualités réduite) — « vrai » ici.
+ * L'exclure aussi faisait remonter la dose en pleine semaine de course.
+ */
+export function allegementDuBloc(position: number, semainesRestantes: number | null | undefined, distanceKm?: number | null): boolean {
+  if (((Math.trunc(position) % 4) + 4) % 4 !== 3) return false;
+  if (semainesRestantes == null || !Number.isFinite(semainesRestantes)) return true;
+  return semainesRestantes !== semainesAffutage(distanceKm);
+}
+
 /** La phase d'une semaine selon le nombre de semaines restant avant la course (et sa distance). */
 export function phaseDeSemaine(semainesRestantes: number, distanceKm?: number | null): Phase {
   return semainesRestantes <= semainesAffutage(distanceKm) - 1 ? "Affûtage"

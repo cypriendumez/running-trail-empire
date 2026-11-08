@@ -51,7 +51,7 @@ import { decaleJour } from "@/lib/streak/compute";
 import { niveauDeVma } from "@/lib/running/niveau";
 import { libellesActifs, type Douleur } from "@/lib/health/douleurs";
 import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
-import { phaseDeSemaine, specifiqueEnTete, semainesAffutage, partAffutage } from "@/lib/coach/phase";
+import { phaseDeSemaine, specifiqueEnTete, semainesAffutage, partAffutage, allegementDuBloc } from "@/lib/coach/phase";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
 
@@ -279,7 +279,7 @@ export type AthleteContext = {
    *  pour que la séance puisse l'expliquer au lieu d'afficher un chiffre inexpliqué. */
   volume: { weekKm: number; avg4wkKm: number; targetKm: number; longRunKm: number; longRunPlanned: number; longRunEased: boolean };
   /** Où l'on se situe dans le cycle : semaine allégée, affûtage, ou montée en charge. */
-  cycle: { deload: boolean; taper: boolean; label: string };
+  cycle: { deload: boolean; taper: boolean; label: string; /** Semaine qui précède l'affûtage : pas d'allègement du bloc (09/11/2026). */ veilleAffutage?: boolean };
   /** Jours de la semaine (0 = dimanche) systématiquement prescrits ET jamais réalisés. */
   skippedWeekdays: number[];
   /** Aucune séance de course connue : on ne prescrit rien qui suppose un passé. */
@@ -1658,6 +1658,13 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
    * vers des séances interminables.
    */
   const blockWeek = isoWeek % 4;                    // 0,1,2 = montée · 3 = assimilation
+  // ⚠️ PAS DE SEMAINE ALLÉGÉE LA VEILLE DE L'AFFÛTAGE (09/11/2026, `allegementDuBloc`) : la même
+  // règle pour la feuille de route, la semaine en cours, la dose des qualités et le renforcement
+  // (`cycle.veilleAffutage`, lu par autoPlan). La veille, la qualité reste au niveau de la
+  // semaine 3 du bloc : une semaine de travail, pas un pic juste avant l'affûtage.
+  const veilleAffutage = weeksToRace != null && weeksToRace === semainesAffutage(objective?.distanceKm);
+  const semaineAllegeeDuBloc = allegementDuBloc(blockWeek, weeksToRace, objective?.distanceKm);
+  const blocDose = veilleAffutage ? Math.min(blockWeek, 2) : blockWeek;
 
   /**
    * PLAFONDS DE VOLUME INTENSE — règles de Jack Daniels (Daniels' Running Formula).
@@ -1685,7 +1692,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // REPRISE APRÈS UNE COURSE : la séance est écrite COURTE — le dosage de la semaine
   // d'assimilation —, pas « coupe un tiers » ajouté au texte : la montre lit le texte de
   // la séance, elle recevrait sinon la version complète.
-  const doseReduite = blockWeek === 3 || repriseCetteSemaine;
+  const doseReduite = semaineAllegeeDuBloc || repriseCetteSemaine;
   /** Nombre de répétitions, plafonné par la règle des 8 % sur la distance travaillée. */
   const prog = (base: number, repMeters?: number): number => {
     const n = doseReduite ? Math.max(2, Math.round(base * 0.7)) : base + Math.min(2, blockWeek);
@@ -1694,7 +1701,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   };
   /** Durée d'un bloc au seuil, plafonnée par la règle des 10 % convertie en minutes. */
   const progMin = (base: number, blocks = 1): number => {
-    const m = doseReduite ? Math.max(5, Math.round(base * 0.75)) : base + blockWeek * 2;
+    const m = doseReduite ? Math.max(5, Math.round(base * 0.75)) : base + blocDose * 2;
     if (!thrSecPerKm || !(weeklyRef > 0)) return m;
     const maxMinTotal = (capThresholdKm * thrSecPerKm) / 60;
     return Math.max(5, Math.min(m, Math.floor(maxMinTotal / blocks)));
@@ -1933,7 +1940,8 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         // où la dose des qualités baisse déjà (`blockWeek === 3`). L'ancien `(i + 1) % 4` partait
         // d'aujourd'hui : la feuille de route reportait l'allègement à dans trois semaines, chaque
         // jour, et la semaine en cours ne l'était jamais — sous un texte « volume −20 % ».
-        if ((blockWeek + i) % 4 === 3 && !semaineBornee) factor *= 0.8;
+        // Et jamais la veille de l'affûtage (`allegementDuBloc`) : la semaine suivante l'est déjà.
+        if (allegementDuBloc(blockWeek + i, wkUntil, objective?.distanceKm) && !semaineBornee) factor *= 0.8;
       }
       // Après une course courue, chaque semaine de la récupération porte sa part du volume
       // (lib/coach/apresCourse) : la feuille de route dit ce que le plan fera.
@@ -2160,7 +2168,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   const taper = weeksToRace != null && weeksToRace >= 0 && weeksToRace <= semainesAffutage(objective?.distanceKm) - 1;
   // La même horloge que la feuille de route et la dose des qualités (semaine 4 du bloc), et
   // jamais par-dessus une récupération ou une reprise, déjà réduites.
-  const deload = !taper && blockWeek === 3 && !recup && !repriseArret;
+  const deload = !taper && semaineAllegeeDuBloc && !recup && !repriseArret;
   const baseKm = targetFrom(15);
   // Progression plafonnée à +10 %/semaine (+5 % si passif court ou antécédent de fracture).
   // Le mode perte de poids resserre encore ce plafond : l'impact au sol vaut 2,5 à 3 fois
@@ -2495,7 +2503,7 @@ ${catalog}`;
     lastHardDaysAgo,
     qualiteRecente,
     volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm, longRunPlanned, longRunEased },
-    cycle: { deload, taper, label: cycleLabel },
+    cycle: { deload, taper, label: cycleLabel, veilleAffutage },
     skippedWeekdays,
     noHistory,
     // Médianes, pas moyennes : une seule séance en côtes ne doit pas décider d'un axe
