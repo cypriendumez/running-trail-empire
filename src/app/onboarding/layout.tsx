@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { aConsenti } from "@/lib/auth/consentement";
 
 /**
  * ⚠️ LE TITRE VIT ICI PARCE QUE LA PAGE EST UN COMPOSANT CLIENT. Next interdit
@@ -10,6 +13,12 @@ import type { Metadata } from "next";
  */
 export const metadata: Metadata = { title: "Premiers pas" };
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default async function Layout({ children }: { children: React.ReactNode }) {
+  // L'onboarding demande des données de santé (VMA, FC, douleurs) : pas sans accord
+  // enregistré. Un compte neuf ouvert avec Google depuis la CONNEXION arrive ici sans
+  // avoir vu la case de l'inscription. Voir `lib/auth/consentement`.
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user && !aConsenti(user.app_metadata)) redirect("/consentement?next=/onboarding");
   return <>{children}</>;
 }

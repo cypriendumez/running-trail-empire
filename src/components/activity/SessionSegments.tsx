@@ -41,7 +41,7 @@ export function SessionSegments({ efforts }: { efforts: EffortVue[] }) {
   if (!efforts.length) return null;
   return (
     <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-      <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-bold text-zinc-900">
+      <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-900">
         Segments · {efforts.length}
       </h2>
       <div className="divide-y divide-zinc-50">
@@ -60,7 +60,7 @@ export function SessionSegments({ efforts }: { efforts: EffortVue[] }) {
                 {e.rang != null && ` · ${t("seg.rank", { n: e.rang, total: e.total })}`}
               </div>
             </div>
-            <span className="shrink-0 text-lg font-black tabular-nums text-zinc-900">{chrono(e.elapsed_seconds)}</span>
+            <span className="shrink-0 text-lg font-semibold tabular-nums text-zinc-900">{chrono(e.elapsed_seconds)}</span>
           </div>
         ))}
       </div>

@@ -60,8 +60,8 @@ export default async function FichePublique({ params }: { params: Promise<{ slug
       </nav>
 
       <header className="border-b border-zinc-200 pb-6 dark:border-zinc-800">
-        <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">{m.marque}</p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+        <p className="text-xs font-semibold text-emerald-700 first-letter:uppercase">{m.marque}</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           {m.nom}{m.annee ? <span className="ml-2 text-xl font-normal text-zinc-400">{m.annee}</span> : null}
         </h1>
         <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
@@ -71,7 +71,7 @@ export default async function FichePublique({ params }: { params: Promise<{ slug
       </header>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">{t("fiche.specs")}</h2>
+        <h2 className="mb-3 text-sm font-semibold text-zinc-500 first-letter:uppercase">{t("fiche.specs")}</h2>
         <dl className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {specs.map((c) => (
             <div key={c.cle} className="flex items-baseline justify-between gap-4 px-4 py-3">
@@ -88,7 +88,7 @@ export default async function FichePublique({ params }: { params: Promise<{ slug
 
       {m.sources?.length ? (
         <section className="mt-8">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">{t("fiche.sources")}</h2>
+          <h2 className="mb-3 text-sm font-semibold text-zinc-500 first-letter:uppercase">{t("fiche.sources")}</h2>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             {t("fiche.releves", { liste: m.sources.join(", ") })}
             {m.sourceFabricant ? t("fiche.fabricant") : ""}
@@ -98,7 +98,7 @@ export default async function FichePublique({ params }: { params: Promise<{ slug
 
       {/* ── LA PORTE. Ce que la page publique ne fait pas, et qui demande un compte. ── */}
       <section className="mt-10 rounded-xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900 dark:bg-emerald-950/40">
-        <h2 className="text-base font-bold text-emerald-900 dark:text-emerald-200">{t("porte.titre")}</h2>
+        <h2 className="text-base font-semibold text-emerald-900 dark:text-emerald-200">{t("porte.titre")}</h2>
         <p className="mt-2 text-sm text-emerald-900/80 dark:text-emerald-100/70">
           {t("porte.texte")}
         </p>
@@ -109,7 +109,7 @@ export default async function FichePublique({ params }: { params: Promise<{ slug
 
       {proches.length ? (
         <section className="mt-10">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">{t("fiche.proches")}</h2>
+          <h2 className="mb-3 text-sm font-semibold text-zinc-500 first-letter:uppercase">{t("fiche.proches")}</h2>
           <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {proches.map((v) => (
               <li key={v.slug}>

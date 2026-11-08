@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
+import { configurationOAuth } from "@/lib/intervals/oauth";
 
 /**
  * GET /api/intervals/status
@@ -37,5 +38,8 @@ export async function GET() {
     .single();
 
   const configured = !!identifiantsDe(profile);
-  return NextResponse.json({ configured, source: configured ? "profile" : null });
+  // `oauth` : le bouton « Autoriser Pacevo sur intervals.icu » peut-il être proposé ? Seulement
+  // quand l'identifiant ET le secret de l'application sont dans l'environnement — sinon il
+  // mènerait à une erreur. Un booléen : rien de l'application ne sort.
+  return NextResponse.json({ configured, source: configured ? "profile" : null, oauth: !!configurationOAuth() });
 }

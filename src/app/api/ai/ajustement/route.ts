@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { exigeAcces } from "@/lib/billing/guard";
 import { generateContent } from "@/lib/ai/gemini";
 import {
-  contraintesDe, validerAjustement, empreintePlan, CONSIGNE_AJUSTEMENT,
+  contraintesDe, validerAjustement, empreintePlan, CONSIGNE_AJUSTEMENT, TYPE_PROPOSITION,
   type JourPlan, type Ajustement,
 } from "@/lib/ai/ajustement";
 
@@ -32,18 +32,25 @@ import {
  *
  * Et le plafond par palier (0 / 10 / 30 par jour) s'applique via `exigeAcces` : le
  * plafond de dépense par athlète existe déjà, il n'est pas réinventé ici.
+ *
+ * ⚠️ RÉSERVÉE À PREMIUM (ET À L'ESSAI) DEPUIS LE 23/10/2026. L'avis sur la semaine
+ * rejoint le coach avancé (`plan_ia`) : ce qui fait relire le PLAN par un modèle est
+ * Premium ; l'analyse de chaque séance et le kiné restent dans les deux formules. C'est
+ * l'exclusivité réelle qui manquait à la carte Premium — une fonction qui existe, verrouillée
+ * ici, et non une ligne inventée pour remplir la carte.
  */
 
-const TYPE_CACHE = "ai_ajustement";
+const TYPE_CACHE = TYPE_PROPOSITION;
 
 export async function POST(req: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Cette route fait PARLER un modèle : c'est la capacité facturée. Masquer le bouton
-  // ne suffirait pas, la route resterait appelable — et c'est l'appel qui coûte.
-  const refus = await exigeAcces(supabase, user.id, "ia");
+  // ── 0. LA FORMULE ─────────────────────────────────────────────────────────
+  // Masquer le bouton ne suffirait pas, la route resterait appelable. Ce premier verrou
+  // ne CONSOMME rien : il dit seulement si la formule couvre la fonction (402 sinon).
+  const refus = await exigeAcces(supabase, user.id, "plan_ia");
   if (refus) return refus.reponse;
 
   const { week, qBudget, raisons, lang } = (await req.json().catch(() => ({}))) as {
@@ -65,7 +72,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, ajustement: cache.ajustement, memorise: true });
   }
 
-  // ── 2. Demander ────────────────────────────────────────────────────────────
+  // ── 2. Le plafond du jour, décompté SEULEMENT si le modèle est vraiment appelé ──
+  // ⚠️ IL L'ÉTAIT AVANT LA MÉMOIRE : rouvrir son calendrier, qui ressert pourtant la
+  // réponse mémorisée sans rien dépenser, retirait un échange au plafond quotidien. Une
+  // réponse resservie ne coûte rien — elle ne se décompte plus.
+  const plafond = await exigeAcces(supabase, user.id, "ia");
+  if (plafond) return plafond.reponse;
+
+  // ── 3. Demander ────────────────────────────────────────────────────────────
   const c = contraintesDe(week, qBudget, Array.isArray(raisons) ? raisons : []);
   const contexte = [
     `Langue de la réponse : ${lang ?? "fr"}`,
@@ -80,6 +94,12 @@ export async function POST(req: Request) {
     {
       temperature: 0.3,
       maxOutputTokens: 700,
+      // Sortie structurée (15/10/2026) : la réponse est un objet JSON de trois champs. Le mode
+      // JSON de Gemini garantit sa syntaxe — plus de phrase autour, plus d'objet mal fermé que
+      // l'extraction plus bas devait deviner. Les huit autres routes qui attendent du JSON le
+      // demandaient déjà ; celle-ci était la seule à s'en remettre au hasard. `validerAjustement`
+      // reste la vraie garde : un JSON valide n'est pas une proposition acceptable.
+      responseMimeType: "application/json",
       // ⚠️ RAISONNEMENT DÉSACTIVÉ, et c'est ce qui rend cette route rentable. Gemini 2.5
       // « pense » avant d'écrire, et ces jetons de réflexion sont FACTURÉS comme de la
       // sortie — laquelle coûte huit fois l'entrée. Mesuré le 22/08/2026 sur le vrai
@@ -101,14 +121,14 @@ export async function POST(req: Request) {
     brut = j ? JSON.parse(j[0]) : null;
   } catch { brut = null; }
 
-  // ── 3. VALIDER contre les mêmes bornes que le plan ─────────────────────────
+  // ── 4. VALIDER contre les mêmes bornes que le plan ─────────────────────────
   // ⚠️ C'est ici que l'ajout reste sûr. Une proposition qui rouvrirait l'intensité sur
   // un budget nul est REFUSÉE avant tout affichage : on ne rend pas par la fenêtre ce
   // que le plan déterministe ferme par la porte.
   const v = validerAjustement(brut, c);
   if (!v.ok) return NextResponse.json({ ok: false, error: "Proposition écartée", motif: v.motif }, { status: 422 });
 
-  // ── 4. Mémoriser pour ce plan ──────────────────────────────────────────────
+  // ── 5. Mémoriser pour ce plan ──────────────────────────────────────────────
   const donnees = { empreinte, ajustement: v.ajustement, at: new Date().toISOString() };
   // Un cache qui ne s'écrit pas se paie en appels Gemini : la même question repartira
   // au modèle au prochain affichage.

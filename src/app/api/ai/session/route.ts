@@ -2,9 +2,10 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { exigeAcces } from "@/lib/billing/guard";
-import { COLONNES_ACCES, profilPeut } from "@/lib/billing/access";
+import { COLONNES_ACCES, profilPeut, lectureDuCoach } from "@/lib/billing/access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildAthleteContext, COACH_SYSTEM } from "@/lib/ai/coachContext";
+import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 import { generateContent } from "@/lib/ai/gemini";
 import {
   SESSION_CACHE_TYPE, PROFILE_FINGERPRINT_COLUMNS, fingerprint, isCacheUsable, serverDay,
@@ -42,7 +43,9 @@ export async function POST() {
     // moins. Une simple RETOUCHE d'une séance déjà là (même date, même compte) ne périme
     // rien — c'est assumé : elle ne change pas la charge sur laquelle se cale le conseil.
     supabase.from("workouts").select("date", { count: "exact" }).eq("user_id", user.id).order("date", { ascending: false }).limit(1),
-    supabase.from("hrv_data").select("date,hrv_ms").eq("user_id", user.id).order("date", { ascending: false }).limit(1).maybeSingle(),
+    // 14 lignes et non une : la DERNIÈRE mesure n'a de sens que dans LA mesure de l'athlète
+    // (rMSSD, ou SDNN d'Apple Watch) — celle que lira le coach (lib/health/vfc).
+    supabase.from("hrv_data").select(COLONNES_VFC).eq("user_id", user.id).order("date", { ascending: false }).limit(14),
     supabase.from("sleep_data").select("date,sleep_score").eq("user_id", user.id).order("date", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
     supabase.from("performance_baselines").select("tested_at").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
@@ -59,12 +62,13 @@ export async function POST() {
   const acces = accesRow.data as Parameters<typeof profilPeut>[0];
   const cached = (cacheRow.data?.[0] ?? null) as { id?: string; data?: unknown } | null;
 
+  const derniereVfc = serieVfc((hrvRow.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]).lignes[0] ?? null;
   const signals: SessionSignals = {
     day,
     lastWorkoutDate: (workoutRow.data?.[0] as { date?: string } | undefined)?.date ?? null,
     workoutCount: workoutRow.count ?? 0,
-    lastHrvDate: (hrvRow.data as { date?: string } | null)?.date ?? null,
-    lastHrvMs: (hrvRow.data as { hrv_ms?: number } | null)?.hrv_ms ?? null,
+    lastHrvDate: derniereVfc?.date ?? null,
+    lastHrvMs: derniereVfc?.hrv_ms ?? null,
     lastSleepDate: (sleepRow.data as { date?: string } | null)?.date ?? null,
     lastSleepScore: (sleepRow.data as { sleep_score?: number } | null)?.sleep_score ?? null,
     objective: (objectiveRow.data as { data?: unknown } | null)?.data ?? null,
@@ -79,7 +83,10 @@ export async function POST() {
   }
 
   // ── 2. Rien de mémorisé d'utilisable : on paie l'appel ────────────────────────
-  const ctx = await buildAthleteContext(supabase, user.id);
+  // La MÊME lecture que le plan (`lectureDuCoach`) : Starter ne lit ni la VFC, ni la dérive
+  // cardiaque, ni la foulée — une séance du jour tirée de signaux que son plan ignore le
+  // contredirait.
+  const ctx = await buildAthleteContext(supabase, user.id, lectureDuCoach(acces));
   const jour = new Date().toLocaleDateString("fr-FR", { weekday: "long" });
 
   const prompt = `${COACH_SYSTEM}
@@ -94,7 +101,7 @@ MISSION : recommande LA séance-clé à faire AUJOURD'HUI (${jour}), parfaitemen
 - Dose le volume sur le volume hebdomadaire réel et reste prudent si une douleur est signalée.
 
 Réponds UNIQUEMENT par un objet JSON valide (aucun texte autour) :
-{"title":"nom court de la séance","subtitle":"description concrète : structure, allure/zone, durée/distance","tags":["2 à 3 tags très courts ex Z2, 10 km, VMA, Allure marathon"],"why":"1 phrase de justification personnalisée citant une donnée clé (VFC, sommeil, charge ou objectif)"}`;
+{"title":"nom court de la séance","subtitle":"description concrète : structure, allure/zone, durée/distance","tags":["2 à 3 tags très courts ex Z2, 10 km, VMA, Allure marathon"],"why":"1 phrase de justification personnalisée citant une donnée clé FOURNIE ci-dessus (sommeil, charge, objectif, ou VFC si elle y figure) — jamais une donnée absente"}`;
 
   try {
     // Passe par la chaîne de repli commune : la route appelait `gemini-2.5-flash` en dur,
@@ -109,7 +116,7 @@ Réponds UNIQUEMENT par un objet JSON valide (aucun texte autour) :
         // recevaient exactement la même analyse. C'est ici que la promesse devient vraie.
         // La longueur du texte est le seul levier honnête — on ne dégrade pas la
         // PERTINENCE d'une analyse selon ce qu'on paie, on en donne plus ou moins.
-        maxOutputTokens: profilPeut(acces, "analyse_longue") ? 600 : 380,
+        maxOutputTokens: profilPeut(acces, "analyse_complete") ? 600 : 380,
         responseMimeType: "application/json",
         thinkingConfig: { thinkingBudget: 0 },
       },

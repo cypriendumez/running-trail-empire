@@ -38,17 +38,60 @@ export const BORNES_SECONDES: Record<CleDistance, readonly [number, number]> = {
   marathon: [7100, 32400],  // 1 h 58 – 9 h  (RM 2:00:35)
 };
 
-/** « 1:15:32 », « 1h15m32 », « 75:32 » → secondes ; `null` si illisible. */
-export function lireTemps(brut: unknown): number | null {
-  const t = String(brut ?? "").trim().toLowerCase().replace(/\s+/g, "");
-  const m = t.match(/^(?:(\d{1,2})[:h])?(\d{1,3})[:m'](\d{1,2})(?:s|")?$/);
-  if (!m) return null;
-  const h = Number(m[1] ?? 0), min = Number(m[2]), sec = Number(m[3]);
-  if (sec >= 60 || (m[1] != null && min >= 60)) return null;
-  return h * 3600 + min * 60 + sec;
+/**
+ * Un temps tapé par un coureur → secondes ; `null` si illisible.
+ *   « 1:15:32 », « 1.15.32 », « 75:32 », « 1h15m32 », « 1 h 15 min 32 s », « 16'07 »,
+ *   « 16'07'' », « 75min », et SANS SECONDES : « 1h15 », « 1h15min », « 2h ».
+ *
+ * ⚠️ « 1h15 » ÉTAIT REFUSÉ (06/11/2026) : le motif exigeait des secondes, et l'athlète qui
+ * déclarait son semi en 1 h 15 lisait « Temps ou date invalide » — c'est pourtant la façon
+ * dont tout le monde écrit un chrono de semi.
+ *
+ * `bornes` lève l'ambiguïté de « 1:15 » : 1 min 15 s ou 1 h 15 ? Si la lecture minutes:
+ * secondes sort des bornes de la distance et que heures:minutes y entre, c'est la seconde.
+ */
+export function lireTemps(brut: unknown, bornes?: readonly [number, number]): number | null {
+  const t = String(brut ?? "").trim().toLowerCase().replace(/\s+/g, "")
+    .replace(/[’′]/g, "'").replace(/''|″/g, '"').replace(/,/g, ".");
+  // 1. Séparateurs « : » ou « . » — h:mm:ss, ou mm:ss / h:mm sur deux parties.
+  let m = t.match(/^(\d{1,3})[:.](\d{1,2})(?:[:.](\d{1,2}))?$/);
+  if (m) {
+    const a = Number(m[1]), b = Number(m[2]);
+    if (b >= 60) return null;
+    if (m[3] != null) {
+      const c = Number(m[3]);
+      return c >= 60 ? null : a * 3600 + b * 60 + c;
+    }
+    const ms = a * 60 + b, hm = a * 3600 + b * 60;
+    const dedans = (v: number) => !!bornes && v >= bornes[0] && v <= bornes[1];
+    return bornes && !dedans(ms) && dedans(hm) ? hm : ms;
+  }
+  // 2. Avec des heures : « 2h », « 1h15 », « 1h15min », « 1h15m32 », « 1h15'32" ».
+  m = t.match(/^(\d{1,2})h(?:(\d{1,2})(?:min|mn|m|')?(?:(\d{1,2})(?:sec|s|")?)?)?$/);
+  if (m) {
+    const min = Number(m[2] ?? 0), sec = Number(m[3] ?? 0);
+    if (min >= 60 || sec >= 60) return null;
+    return Number(m[1]) * 3600 + min * 60 + sec;
+  }
+  // 3. Sans heures : « 75min », « 16'07 », « 16min07s », « 75m32 ».
+  m = t.match(/^(\d{1,3})(?:min|mn|m|')(?:(\d{1,2})(?:sec|s|")?)?$/);
+  if (m) {
+    const sec = Number(m[2] ?? 0);
+    return sec >= 60 ? null : Number(m[1]) * 60 + sec;
+  }
+  return null;
 }
 
 const CLES: readonly CleDistance[] = ["5k", "10k", "semi", "marathon"];
+
+/** Le nom des quatre distances, par langue : « Semi » s'affichait dans toutes les langues. */
+export const NOMS_DISTANCE: Record<string, Record<CleDistance, string>> = {
+  fr: { "5k": "5 km", "10k": "10 km", semi: "Semi", marathon: "Marathon" },
+  en: { "5k": "5 km", "10k": "10 km", semi: "Half", marathon: "Marathon" },
+  de: { "5k": "5 km", "10k": "10 km", semi: "Halbmarathon", marathon: "Marathon" },
+  es: { "5k": "5 km", "10k": "10 km", semi: "Media", marathon: "Maratón" },
+  pt: { "5k": "5 km", "10k": "10 km", semi: "Meia", marathon: "Maratona" },
+};
 
 /**
  * Un record reçu du navigateur, validé — ou `null`. `aujourdhui` est FOURNI (jour de
@@ -58,9 +101,9 @@ export function validerRecordDeclare(brut: unknown, aujourdhui: string): RecordD
   const b = (brut ?? {}) as Record<string, unknown>;
   const distance = String(b.distance ?? "") as CleDistance;
   if (!CLES.includes(distance)) return null;
-  const secondes = typeof b.secondes === "number" ? Math.round(b.secondes) : lireTemps(b.temps);
-  if (secondes == null || !Number.isFinite(secondes)) return null;
   const [min, max] = BORNES_SECONDES[distance];
+  const secondes = typeof b.secondes === "number" ? Math.round(b.secondes) : lireTemps(b.temps, BORNES_SECONDES[distance]);
+  if (secondes == null || !Number.isFinite(secondes)) return null;
   if (secondes < min || secondes > max) return null;
   const date = String(b.date ?? "").slice(0, 10);
   // ⚠️ ALLER-RETOUR, pas `Date.parse` seul : « 2024-02-30 » s'y lit comme le 1er mars.
@@ -80,13 +123,17 @@ export function computeDistancePRs(
   lang: string,
   declares: readonly RecordDeclare[] = [],
 ): LigneRecord[] {
+  const nom = NOMS_DISTANCE[lang] ?? NOMS_DISTANCE.fr;
   const targets: { cle: CleDistance; l: string; lo: number; hi: number }[] = [
-    { cle: "5k", l: "5 km", lo: 4.7, hi: 5.4 },
-    { cle: "10k", l: "10 km", lo: 9.4, hi: 10.6 },
-    { cle: "semi", l: "Semi", lo: 20, hi: 22 },
-    { cle: "marathon", l: "Marathon", lo: 40.5, hi: 43.5 },
+    { cle: "5k", l: nom["5k"], lo: 4.7, hi: 5.4 },
+    { cle: "10k", l: nom["10k"], lo: 9.4, hi: 10.6 },
+    { cle: "semi", l: nom.semi, lo: 20, hi: 22 },
+    { cle: "marathon", l: nom.marathon, lo: 40.5, hi: 43.5 },
   ];
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" });
+  // ⚠️ À MIDI UTC, PAS À MINUIT (06/11/2026). `new Date("2025-10-25")` se lit minuit UTC :
+  // à l'ouest de Greenwich la carte affichait la VEILLE, et le rendu serveur et le navigateur
+  // n'étaient pas d'accord (erreur React #418). Midi reste le même jour sur tous les fuseaux.
+  const fmtDate = (d: string) => new Date(`${String(d).slice(0, 10)}T12:00:00Z`).toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" });
   const out: LigneRecord[] = [];
   for (const tgt of targets) {
     const cands = workouts.filter((w) => (w.distance_km ?? 0) >= tgt.lo && (w.distance_km ?? 0) <= tgt.hi && (w.duration_seconds ?? 0) > 0);
@@ -94,7 +141,7 @@ export function computeDistancePRs(
     const decl = declares.filter((r) => r.distance === tgt.cle).sort((a, b) => a.secondes - b.secondes)[0] ?? null;
     // Le déclaré ne l'emporte que s'il est STRICTEMENT meilleur : à égalité, la mesure gagne.
     if (decl && (!best || decl.secondes < (best.duration_seconds as number))) {
-      out.push({ cle: tgt.cle, label: tgt.l, time: fmtTime(decl.secondes), date: fmtDate(`${decl.date}T12:00:00Z`), source: "declare", course: decl.course ?? null });
+      out.push({ cle: tgt.cle, label: tgt.l, time: fmtTime(decl.secondes), date: fmtDate(decl.date), source: "declare", course: decl.course ?? null });
     } else if (best) {
       out.push({ cle: tgt.cle, label: tgt.l, time: fmtTime(best.duration_seconds as number), date: fmtDate(best.date), source: "mesure" });
     }

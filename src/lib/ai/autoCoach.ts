@@ -11,14 +11,21 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
-import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
-import { profilPeut, COLONNES_ACCES, JOURS_APERCU } from "@/lib/billing/access";
+import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, fcMaxMontre, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
+import { avecFcMaxMontre } from "@/lib/coach/fcCible";
+import { profilPeut, lectureDuCoach, rappelPremiumPour, COLONNES_ACCES } from "@/lib/billing/access";
+import { actualiserRappelPremium, type IssueRappel } from "@/lib/ai/rappelPremiumServeur";
 import { identifiantsDePaire } from "@/lib/intervals/identifiants";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { estAdmin } from "@/lib/admin/acces";
 import { normLang } from "@/lib/i18n/base";
 import { relireSemaine } from "@/lib/ai/relectureServeur";
+import { appliquerAjustements, TYPE_AJUSTEMENTS, type AjustementApplique } from "@/lib/coach/ajustementApplique";
 import { appliquerConseils } from "@/lib/ai/relectureSemaine";
+import { programmeMarcheCourse, FENETRE_JOURS as FENETRE_MARCHE_COURSE, type ProgrammeMarcheCourse } from "@/lib/coach/marcheCourse";
+import { isRun } from "@/lib/intervals/sport";
+import { decaleJour } from "@/lib/streak/compute";
+import { reecritureLue, type SeanceEcrite } from "@/lib/coach/planNotifie";
 
 type Admin = SupabaseClient;
 
@@ -37,6 +44,25 @@ const TEST_VMA = {
 } as const;
 
 /**
+ * Le programme marche-course de l'athlète, lu avant le verrou du test VMA : la réponse
+ * « pas encore » à « Peux-tu courir 30 min sans t'arrêter ? » et ses sorties récentes, avec
+ * la même règle que le contexte du coach. Colonne absente ou illisible : aucun programme
+ * (on ne déduit pas un débutant d'une panne). Sorties illisibles : la première étape —
+ * la réponse suffit à écarter un effort maximal.
+ */
+async function marcheCourseDe(admin: Admin, userId: string): Promise<ProgrammeMarcheCourse | null> {
+  const { data: profil, error } = await admin.from("profiles").select("peut_courir_30min").eq("id", userId).maybeSingle();
+  if (error || (profil as { peut_courir_30min?: boolean | null } | null)?.peut_courir_30min !== false) return null;
+  const jour = aujourdhui(FUSEAU_DEFAUT);
+  const { data: seances, error: eSeances } = await admin.from("workouts").select("date, sport").eq("user_id", userId)
+    .gte("date", decaleJour(jour, -FENETRE_MARCHE_COURSE)).order("date", { ascending: false }).limit(200);
+  if (eSeances) console.error("[coach] sorties illisibles pour la marche-course :", eSeances.message);
+  const joursCourus = ((seances ?? []) as { date: string; sport?: string | null }[])
+    .filter((w) => isRun(w.sport)).map((w) => String(w.date).slice(0, 10));
+  return programmeMarcheCourse({ peutCourir30: false, joursCourus, aujourdhui: jour });
+}
+
+/**
  * Prescrit UNIQUEMENT le test VMA : purge le plan à venir, pose la séance test du jour,
  * la pousse sur la montre (séance libre, sans allure cible — c'est un effort maximal).
  */
@@ -48,12 +74,19 @@ async function prescrireTestVma(admin: Admin, opts: { userId: string; athleteId?
   // Le test se pose AUJOURD'HUI et remplace tout le plan à venir : tant que la VMA n'est
   // pas mesurée, il ne doit exister aucune autre séance. Même règle que la purge du plan
   // normal — si elle échoue en silence, la séance test s'empilerait sur d'anciennes.
+  // La même séance test, reposée chaque jour à la date du jour, ne réannonce rien : on
+  // la compare à la DERNIÈRE séance écrite, quelle que soit sa date (comparer jour à jour
+  // verrait un plan « nouveau » chaque matin). Déjà annoncée et lue → réécrite lue.
+  const { data: derniere, error: eAvant } = await admin.from("notifications").select("title, body, read, data")
+    .eq("user_id", userId).eq("type", "coach_session").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const lue = !eAvant && derniere != null && (derniere.data as { testVma?: boolean } | null)?.testVma === true
+    && derniere.read === true && derniere.title === T.title.slice(0, 80) && derniere.body === T.subtitle.slice(0, 200);
   const { error: ePurge } = await admin.from("notifications").delete()
     .eq("user_id", userId).eq("type", "coach_session").gte("data->>date", today);
   if (ePurge) return { processed: false, reason: `purge test vma: ${ePurge.message}` };
 
   const { error } = await admin.from("notifications").insert({
-    user_id: userId, type: "coach_session", title: T.title.slice(0, 80), body: T.subtitle.slice(0, 200),
+    user_id: userId, type: "coach_session", title: T.title.slice(0, 80), body: T.subtitle.slice(0, 200), read: lue,
     data: {
       from: "coach-auto", date: today, sessionType: "Test", subtitle: T.subtitle.slice(0, 500),
       why: T.why.slice(0, 400), feel: "", tags: [...T.tags], confirmed: true, testVma: true,
@@ -66,9 +99,9 @@ async function prescrireTestVma(admin: Admin, opts: { userId: string; athleteId?
   if (error) return { processed: false, reason: error.message };
 
   let pushed = 0;
-  // Montre : seulement pour un accès complet. Un compte en aperçu gratuit voit le test
-  // dans l'app et le fait au téléphone (« Enregistrer ») — même règle que le plan normal,
-  // qui ne pousse rien sur la montre d'un compte gratuit.
+  // Montre : seulement pour un accès complet. Un compte gratuit voit le test dans l'app et
+  // le fait au téléphone (« Enregistrer ») — même règle que son plan bâti sur l'objectif,
+  // qui ne pousse rien sur la montre.
   const ids = opts.pushToWatch ? identifiantsDePaire(opts.athleteId, opts.apiKey) : null;
   if (ids?.athleteId && ids.apiKey) {
     try {
@@ -86,6 +119,8 @@ export type AutoResult = {
   processed: boolean; days?: number; pushed?: number; reason?: string;
   /** E-mail « ton plan est à jour » : envoyé, ou motif de non-envoi. Jamais silencieux. */
   emailed?: boolean; emailSkipped?: string;
+  /** Rappel « Premium aurait changé ton plan » (Starter seulement) : recalculé, inchangé ou en échec. */
+  rappelPremium?: IssueRappel;
 };
 
 export async function autoCoachForUser(
@@ -114,13 +149,15 @@ export async function autoCoachForUser(
   const { data: profilAcces } = await admin.from("profiles").select(`${COLONNES_ACCES}, email, preferred_language`).eq("id", userId).maybeSingle();
   const acces = profilAcces as Parameters<typeof profilPeut>[0];
   const planComplet = profilPeut(acces, "plan");
-  // ⚠️ LE GRATUIT NE RECEVAIT RIEN — impasse commerciale : un compte qui ne voit jamais
-  // le produit ne peut pas décider de le payer. Il reçoit désormais un APERÇU de deux
-  // jours. Ce n'est PAS un plan générique : il sort des mêmes données que le plan
-  // complet, parce qu'un « plan standard » qui ignore la VFC prescrirait de la VMA à
-  // quelqu'un d'épuisé — l'exact contraire de ce que ce produit défend.
-  const apercu = !planComplet && profilPeut(acces, "apercu");
-  if (!planComplet && !apercu) {
+  // ⚠️ LE PALIER GRATUIT REÇOIT SEPT JOURS, BÂTIS SUR SON OBJECTIF SEUL (Cyprien,
+  // 22/10/2026). Avant, il recevait un aperçu de deux jours tiré de TOUTES ses mesures —
+  // exactement l'inverse de ce qui se vend : le gratuit profitait de l'analyse du sommeil
+  // et de la VFC, et n'avait pas de quoi organiser une semaine. Désormais le contexte ne
+  // lit, pour lui, que l'objectif, le déclaré et le volume couru (`objectifSeul`) ; rien
+  // ne part sur la montre et aucun modèle ne relit le plan. Starter lit l'essentiel
+  // (`essentielle`, 30/10/2026) : ni VFC, ni dérive cardiaque, ni foulée — Premium lit tout.
+  const { objectifSeul, essentielle } = lectureDuCoach(acces);
+  if (!planComplet && !objectifSeul) {
     return { processed: false, reason: "essai_expire" };
   }
 
@@ -145,18 +182,22 @@ export async function autoCoachForUser(
   // `estAdmin` lit ADMIN_EMAILS côté serveur (repli : le propriétaire historique).
   const estFondateur = estAdmin((profilAcces as { email?: string } | null)?.email);
   if (!vmaMesuree && !estFondateur) {
-    return prescrireTestVma(admin, { userId, athleteId: opts.athleteId, apiKey: opts.apiKey, pushToWatch: planComplet });
+    // ⚠️ SAUF EN MARCHE-COURSE. « Cours 6 minutes À FOND » était le premier effort de
+    // coureur d'une personne qui ne court pas encore 30 minutes d'affilée (Cyprien,
+    // 05/11/2026). Son programme ne dépend d'aucune allure : il démarre sans test, et le
+    // test revient à la dernière étape franchie (`lib/coach/marcheCourse`).
+    if (!(await marcheCourseDe(admin, userId))) {
+      return prescrireTestVma(admin, { userId, athleteId: opts.athleteId, apiKey: opts.apiKey, pushToWatch: planComplet });
+    }
   }
 
-  const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId).catch(() => null);
+  const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId, { objectifSeul, essentielle }).catch(() => null);
   if (!ctx) return { processed: false, reason: "ctx_failed" };
 
-  // ⚠️ Tronqué APRÈS construction, jamais pendant : le squelette de semaine tient compte
-  // de l'enchaînement qualité → récupération. Le raccourcir en amont donnerait deux
-  // séances qui n'ont plus de sens l'une par rapport à l'autre.
-  const semaineComplete = buildWeekPlan(ctx);
-  const week = apercu ? semaineComplete.slice(0, JOURS_APERCU) : semaineComplete;
-  const today = week[0].date;
+  // L'instant est retenu : le rappel Premium bâtit le plan complet pour le MÊME jour.
+  const maintenant = new Date();
+  const semaineMoteur = buildWeekPlan(ctx, maintenant);
+  const today = semaineMoteur[0].date;
 
   // ── LA SÉANCE DÉJÀ COURUE NE SE RÉÉCRIT PAS ─────────────────────────────────
   // L'effacement portait sur « date >= aujourd'hui ». Tant que le plan n'était
@@ -173,14 +214,36 @@ export async function autoCoachForUser(
   const { data: doneToday } = await admin.from("workouts")
     .select("id").eq("user_id", userId).eq("date", today).limit(1);
   const dayZeroFrozen = (doneToday?.length ?? 0) > 0;
-  const from = dayZeroFrozen ? week[1].date : today;
+  const from = dayZeroFrozen ? semaineMoteur[1].date : today;
+
+  // ── LES AJUSTEMENTS QUE L'ATHLÈTE A APPLIQUÉS (« Un avis sur ma semaine », Premium) ──
+  // Le plan vient d'être reconstruit de zéro : ce que l'athlète a accepté d'un geste est
+  // réappliqué ICI, à chaque passage, avec les garde-fous du moteur (voir
+  // lib/coach/ajustementApplique). Sans ça, la séance déplacée reviendrait à sa place dix
+  // minutes plus tard — et sur la montre avec elle.
+  const { data: ligneAjustements, error: eAjust } = await admin.from("notifications").select("id, data")
+    .eq("user_id", userId).eq("type", TYPE_AJUSTEMENTS).maybeSingle();
+  if (eAjust) console.error("[coach-auto] ajustements illisibles, plan publié sans eux :", eAjust.message);
+  const ajustementsEnregistres = ((ligneAjustements?.data ?? null) as { ajustements?: AjustementApplique[] } | null)?.ajustements ?? [];
+  const ajuste = appliquerAjustements(semaineMoteur, ajustementsEnregistres, {
+    from, qBudget: ctx.weekPlan.qBudget,
+    // Les jours où il court vraiment : déclarés, moins ceux qu'il rate systématiquement.
+    joursCourables: ctx.availability.days.filter((d) => !ctx.skippedWeekdays.includes(d)),
+    warm: ctx.warmCool.warm, cool: ctx.warmCool.cool,
+  });
+  for (const e of ajuste.ecartes) console.warn("[coach-auto] ajustement écarté :", e.ajustement.action, e.ajustement.date, "—", e.motif);
+  if (ligneAjustements?.id && ajuste.gardes.length !== ajustementsEnregistres.length) {
+    const { error: eElague } = await admin.from("notifications").update({ data: { ajustements: ajuste.gardes } }).eq("id", ligneAjustements.id);
+    if (eElague) console.error("[coach-auto] ajustements non élagués :", eElague.message);
+  }
+  const week = ajuste.week;
 
   // ── LE COACH AVANCÉ (Premium, et l'essai qui le montre) ─────────────────────
   // Le modèle relit les séances CLÉS et ajoute à leur « pourquoi » un conseil d'exécution
   // personnalisé — sans jamais toucher à la séance (voir lib/ai/relectureSemaine). Aucun
   // onglet, aucune question à poser : c'est le même plan, mieux expliqué. Starter garde le
   // moteur seul. Best effort : une panne ou un délai dépassé donne le plan sans conseil.
-  const coachAvance = !apercu && profilPeut(acces, "plan_ia");
+  const coachAvance = planComplet && profilPeut(acces, "plan_ia");
   const langue = normLang(String((profilAcces as { preferred_language?: string } | null)?.preferred_language ?? "fr"));
   const relecture = coachAvance
     ? await relireSemaine(admin as unknown as SupabaseClient, { userId, ctx, week, from, lang: langue })
@@ -193,6 +256,16 @@ export async function autoCoachForUser(
   // écrans dédoublonnent par date (`oneSessionPerDate`) et masqueraient donc le
   // problème, mais la montre, elle, reçoit ce qui est en base : l'athlète se
   // retrouverait avec deux séances contradictoires pour le même jour.
+  // AVANT la purge : le plan qu'elle va effacer. Sans lui, impossible de savoir si la
+  // réécriture change quelque chose — et la cloche annonçait « Plan mis à jour » chaque
+  // nuit (lib/coach/planNotifie). Illisible : on annonce, plutôt que de taire un changement.
+  const { data: lignesAvant, error: eAvant } = await admin.from("notifications").select("title, body, read, data")
+    .eq("user_id", userId).eq("type", "coach_session").gte("data->>date", from);
+  if (eAvant) console.error("[coach-auto] plan précédent illisible, la réécriture sera annoncée :", eAvant.message);
+  const planAvant: SeanceEcrite[] | null = eAvant ? null : (lignesAvant ?? []).map((l) => {
+    const dl = (l.data ?? {}) as { date?: string; moment?: string };
+    return { date: String(dl.date ?? ""), moment: dl.moment ?? null, title: String(l.title ?? ""), body: (l.body as string | null) ?? null, read: l.read === true };
+  });
   const { error: ePurge } = await admin.from("notifications").delete()
     .eq("user_id", userId).eq("type", "coach_session").gte("data->>date", from);
   if (ePurge) {
@@ -200,9 +273,15 @@ export async function autoCoachForUser(
     return { processed: false, days: 0, pushed: 0, emailed: false, emailSkipped: "purge impossible" };
   }
 
-  const rows = semaineCoach.filter((d: PlanDay) => d.date >= from).map((d: PlanDay) => ({
+  const aEcrire = semaineCoach.filter((d: PlanDay) => d.date >= from);
+  // Lues si rien n'a changé et que tout était déjà lu : pas de « Plan mis à jour » à vide.
+  const lue = planAvant != null && reecritureLue(planAvant, aEcrire.map((d) => ({
+    date: d.date, moment: d.moment ?? null, title: d.title.slice(0, 80), body: d.detail.slice(0, 200),
+  })));
+  const rows = aEcrire.map((d: PlanDay) => ({
     user_id: userId,
     type: "coach_session",
+    read: lue,
     // ⚠️ `title` et `body` restent en FRANÇAIS : ce sont les champs canoniques, ceux
     // que la montre analyse et que l'IA relit. La version lue par l'athlète est dans
     // `data.i18n`, et l'écran choisit la sienne. Voir lib/ai/planI18n.ts.
@@ -251,10 +330,12 @@ export async function autoCoachForUser(
   const ids = identifiantsDePaire(opts.athleteId, opts.apiKey);
   const athleteId = ids?.athleteId;
   const apiKey = ids?.apiKey;
-  if (athleteId && apiKey && !apercu) {
+  if (athleteId && apiKey && planComplet) {
     try {
-      const { data: objRow } = await admin.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle();
-      const objectiveRace = ((objRow?.data as { race?: string } | undefined)?.race) || null;
+      // L'objectif du CONTEXTE, pas la ligne brute : elle survit à la course, et chaque
+      // séance envoyée après le marathon de Lille s'intitulait encore « Prépa Marathon
+      // International de Lille — Footing ». Le contexte, lui, écarte un objectif passé.
+      const objectiveRace = ctx.objective?.race || null;
       const { data: prof } = await admin.from("profiles").select("*").eq("id", userId).maybeSingle();
       const warmMin = (prof?.warmup_min as number | null | undefined) ?? null;
       const coolMin = (prof?.cooldown_min as number | null | undefined) ?? null;
@@ -262,6 +343,8 @@ export async function autoCoachForUser(
       // UNE seule lecture pour toute la semaine : la montre ne change pas entre deux jours
       // du même plan, et un appel par jour ferait sept requêtes pour une seule réponse.
       const montre = await litMontre({ athleteId, apiKey });
+      // Les battements partent en % de la FC max que la montre applique (lib/coach/fcCible).
+      const ciblesFc = avecFcMaxMontre(ctx.ciblesFc, await fcMaxMontre({ athleteId, apiKey }));
       // Même règle que pour le calendrier : on ne pousse pas sur la montre une séance
       // pour un jour déjà couru. Elle y remplacerait, après coup, celle qui a servi.
       // ⚠️ CONFIRMED_DAYS compte des JOURS, pas des entrées. `slice(0, 5)` était juste
@@ -270,7 +353,7 @@ export async function autoCoachForUser(
       // doublent. On sélectionne donc les dates, puis toutes leurs séances.
       const datesConfirmees = [...new Set(week.map((x) => x.date))].sort().slice(0, CONFIRMED_DAYS);
       for (const d of week.filter((x) => x.date >= from && datesConfirmees.includes(x.date))) {
-        const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin, montre);
+        const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin, montre, ciblesFc);
         // ⚠️ UN JOUR SANS SÉANCE COURABLE DOIT ÊTRE NETTOYÉ, PAS IGNORÉ. `continue` seul
         // laissait sur la montre la séance poussée la veille, quand ce jour portait encore
         // un footing. Résultat constaté le 31/08/2026 : plan « Repos », montre « Footing ».
@@ -301,12 +384,13 @@ export async function autoCoachForUser(
     .eq("user_id", userId).eq("type", "auto_coach_state").maybeSingle();
   const lastEmailAt = (prevState?.data as { lastPlanEmailAt?: string } | null)?.lastPlanEmailAt ?? null;
   let emailed = false;
-  // ⚠️ L'e-mail « ton plan est à jour » annonce SEPT jours de prescription. L'envoyer
-  // pour un aperçu de deux jours promettrait un service qui n'est pas celui du palier.
-  let emailSkipped: string | undefined = apercu
-    ? "aperçu gratuit"
+  // ⚠️ L'e-mail « ton plan est à jour » part APRÈS UNE SÉANCE et dit ce qu'elle a montré
+  // et ce qu'elle change : c'est le coach adaptatif. Le plan gratuit ne lit pas les séances,
+  // il n'a donc rien de tel à annoncer.
+  let emailSkipped: string | undefined = objectifSeul
+    ? "plan gratuit (objectif seul)"
     : opts.notify ? undefined : "replanification sans séance nouvelle";
-  if (opts.notify && !apercu) {
+  if (opts.notify && planComplet) {
     const { sendPlanReadyEmail } = await import("@/lib/notify/planReady");
     const r = await sendPlanReadyEmail(admin, {
       userId,
@@ -341,6 +425,11 @@ export async function autoCoachForUser(
     at: new Date().toISOString(), days: rows.length, pushed,
     readiness: ctx.readiness.level,
     reasons: ctx.readiness.reasons.slice(0, 4),
+    // La récupération d'après-course, STRUCTURÉE (course, date de reprise) : le tableau de
+    // bord la rappelle dans la langue de l'athlète au lieu d'y promettre une séance de qualité.
+    recuperation: ctx.recuperation ?? null,
+    // Le tableau de bord tait le bandeau « Fais ton test VMA » tant que le programme dure.
+    marcheCourse: ctx.marcheCourse ? { etape: ctx.marcheCourse.etape, total: ctx.marcheCourse.total } : null,
     advice: ctx.readiness.advice.slice(0, 400),
     qBudget: ctx.weekPlan.qBudget,
     // La dernière qualité n'a survécu que grâce au plancher « préparation en cours » :
@@ -400,5 +489,13 @@ export async function autoCoachForUser(
     : await admin.from("notifications").insert({ user_id: userId, type: "auto_coach_state", title: "auto-coach", body: "", data: stateData });
   if (eEtat) console.error("[coach-auto] état non enregistré (risque d'e-mails répétés) :", eEtat.message);
 
-  return { processed: true, days: rows.length, pushed, emailed, emailSkipped };
+  // 6) CE QUE PREMIUM AURAIT CHANGÉ — pour un plan bâti sur la lecture essentielle seulement.
+  // Le même moteur sur le contexte complet, aucun modèle ; recalculé seulement quand ses
+  // entrées changent (voir lib/ai/rappelPremiumServeur). Après la publication : le plan de
+  // l'athlète ne doit jamais attendre un rappel commercial.
+  const rappelPremium = rappelPremiumPour(acces)
+    ? await actualiserRappelPremium(admin, { userId, ctx, semaine: semaineMoteur, affichee: semaineCoach, depuis: from, maintenant })
+    : undefined;
+
+  return { processed: true, days: rows.length, pushed, emailed, emailSkipped, ...(rappelPremium ? { rappelPremium } : {}) };
 }

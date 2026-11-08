@@ -54,8 +54,11 @@ export function AutourDeMoi({ valeur, onChange, positionEntrainement, d, compact
     return (
       <div className="flex flex-col gap-1">
         <button type="button" onClick={localiser} disabled={enCours}
-          className={`flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60 ${compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm"}`}>
-          {enCours ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}
+          className={compact
+            // Même forme que les filtres « Dates » et « Type » de la carte (30/09/2026).
+            ? "flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-300 hover:bg-zinc-50 disabled:opacity-60"
+            : "flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60"}>
+          {enCours ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className={`h-3.5 w-3.5 ${compact ? "text-emerald-600" : ""}`} />}
           {enCours ? d["near.locating"] : d["near.btn"]}
         </button>
         {info && <p role="status" className="max-w-xs text-xs text-amber-700">{info}</p>}
@@ -67,7 +70,7 @@ export function AutourDeMoi({ valeur, onChange, positionEntrainement, d, compact
     <div className="flex min-w-0 max-w-full flex-col gap-1">
       {/* ⚠️ `max-w-full` + libellé tronquable : à 375 px, « Autour de ta dernière sortie »
           et son rayon débordaient de la carte des filtres (vérifié à l'écran le 28/09/2026). */}
-      <div className={`flex min-w-0 max-w-full items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-600 font-semibold text-white ${compact ? "py-0.5 pl-2 pr-1 text-xs" : "py-1 pl-2.5 pr-1 text-sm"}`}>
+      <div className={`flex min-w-0 max-w-full items-center gap-1.5 border border-emerald-300 bg-emerald-600 font-semibold text-white ${compact ? "h-9 rounded-full pl-3 pr-1.5 text-sm" : "rounded-lg py-1 pl-2.5 pr-1 text-sm"}`}>
         <LocateFixed className="h-3.5 w-3.5 flex-shrink-0" />
         <span className="min-w-0 truncate">{valeur.source === "gps" ? d["near.gps"] : d["near.training"]}</span>
         <select aria-label={d["near.radius"]} value={valeur.rayonKm}

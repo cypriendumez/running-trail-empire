@@ -21,6 +21,8 @@
  * d'où une tolérance plus large que celle appliquée aux sources marchandes. Au-delà, ce
  * n'est plus un écart de méthode : c'est que la page décrit une autre chaussure.
  */
+import { UA_PACEVOBOT } from "../src/lib/races/robot";
+import { lirePoliment } from "./acces-poli";
 import fs from "node:fs";
 import path from "node:path";
 import { dansLesBornes, coherenceStackDrop, type Modele } from "../src/lib/shop/modele";
@@ -29,7 +31,10 @@ import { prendreVerrou } from "../src/lib/shop/verrou";
 
 const BASE = "https://runrepeat.com";
 const SORTIE = path.join(process.cwd(), "src/data/gear/chaussures.json");
-const UA = { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36", "Accept-Language": "en;q=0.9" };
+// ⚠️ PLUS DE DÉGUISEMENT EN NAVIGATEUR (01/10/2026) : ce script se présentait comme Chrome.
+// Il s'identifie désormais (PacevoBot) et passe par l'accès poli : robots.txt relu et
+// respecté automatiquement, liste d'opposition (scripts/acces-poli).
+const UA = { "User-Agent": UA_PACEVOBOT, "Accept-Language": "en;q=0.9" };
 
 /**
  * ⚠️ L'ÉCART ENTRE MESURE ET ANNONCE EST ORIENTÉ, ET LA TOLÉRANCE DOIT L'ÊTRE AUSSI.
@@ -135,7 +140,7 @@ export function pageCorrespond(html: string, marque: string, nom: string): boole
 }
 
 async function page(url: string): Promise<string | null> {
-  const r = await fetch(url, { headers: UA, redirect: "follow", signal: AbortSignal.timeout(25000) }).catch(() => null);
+  const r = await lirePoliment(url, { headers: UA, redirect: "follow", signal: AbortSignal.timeout(25000) }).catch(() => null);
   if (r && (r.status === 429 || r.status === 403 || r.status === 406)) {
     throw new Error(`la source refuse de répondre (HTTP ${r.status}) — reprise plus tard`);
   }

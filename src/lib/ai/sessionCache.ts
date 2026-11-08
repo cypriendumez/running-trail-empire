@@ -35,7 +35,7 @@ export type AiSession = { title: string; subtitle: string; tags: string[]; why: 
  * Et `intervals_api_key` n'a évidemment rien à faire dans une empreinte.
  */
 export const PROFILE_FINGERPRINT_COLUMNS = [
-  "age", "height_cm", "weight_kg", "gender", "chronotype", "mode",
+  "age", "height_cm", "weight_kg", "gender", "mode", "target_weekly_km",
   "running_years", "main_terrain", "main_terrains", "elevation_pref",
   "health_conditions", "injury_zones", "health_notes", "health_declared",
   "days_per_week", "available_days", "long_run_mode", "warmup_min", "cooldown_min",

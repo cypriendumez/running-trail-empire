@@ -17,6 +17,7 @@
  *   npx tsx tests/courses.crash.test.ts
  */
 import assert from "node:assert/strict";
+import { RX } from "../src/components/races/racesI18n";
 import { readFileSync, existsSync } from "node:fs";
 import { grouperEvenements, cleEvenement, normNom } from "../src/lib/races/groupes";
 import { correctedRaceType } from "../src/lib/raceType";
@@ -24,6 +25,7 @@ import { idCourseValide } from "../src/lib/races/favoris";
 import { jourFrance } from "../src/lib/races/jourFrance";
 import { typeDepuisUrl, anneeDepuisUrl, choisirFiche, typeCorrige, motsCles, distancesDeFiche, distancesManquantes, typePour, segmentNom, motProche } from "../src/lib/races/leSportif";
 import { joursAvant, sansAccents, correspond, domaineSource, ficheVerifiable, motifRegex, analyseRecherche, correspondCourse } from "../src/lib/races/temps";
+import { SITES_EXCLUS } from "../src/lib/races/robot";
 import { normaliserHeure, afficherHeure } from "../src/lib/races/heure";
 import { dateDeLaFiche, doitMettreAJour } from "../src/lib/races/fiche";
 import { analyserReponse, promptRecherche, promptExtraction, libelleFormat, libelleDate, MARQUEUR_INCONNU } from "../src/lib/races/heureWeb";
@@ -690,8 +692,16 @@ test("le compteur affiche le nombre de COURSES, pas le nombre de cartes", () => 
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
   assert.ok(/\(totalCount \?\? filtered\.length\) : filtered\.length\)\.toLocaleString/.test(src),
     "le grand compteur est repassé sur le nombre de cartes : le catalogue paraîtra deux fois plus pauvre");
-  assert.ok(/\{evenements\.length\.toLocaleString\(lang\)\} \{d\["events"\]\}/.test(src),
+  // 30/09/2026 : la sous-ligne dit la RELATION (« dans 8 003 événements »), et le bas de
+  // page donne les deux nombres ensemble — plus de « 8 000 » d'un côté, « 14 700 » de l'autre.
+  assert.ok(/tr\("f\.dansEvts", \{ e: evenements\.length\.toLocaleString\(lang\) \}\)/.test(src),
     "la sous-ligne n'annonce plus le nombre d'événements : l'écart avec les cartes devient inexplicable");
+  assert.ok(/tr\("pageInfo", \{ p: page \+ 1, t: totalPages, n: evenements\.length\.toLocaleString\(lang\), c: filtered\.length\.toLocaleString\(lang\) \}\)/.test(src),
+    "le bas de page ne donne plus le nombre de courses à côté du nombre d'événements");
+  for (const l of Object.keys(RX)) assert.ok(RX[l]["pageInfo"].includes("{c}") && RX[l]["f.dansEvts"].includes("{e}"), `${l} : libellé de compteur incomplet`);
+  const carte = readFileSync("src/components/races/RacesMapView.tsx", "utf8");
+  assert.ok(/const nbEvenements = useMemo\(\(\) => grouperEvenements\(filtered\)\.length/.test(carte) && !/\{d\["pins"\]\}/.test(carte),
+    "la carte compte encore des « pins » au lieu des événements de la liste");
   const i18n = readFileSync("src/components/races/racesI18n.ts", "utf8");
   assert.equal((i18n.match(/"events": "/g) ?? []).length, 5, "le libellé « événements » manque dans une langue");
 });
@@ -745,16 +755,32 @@ test("le bandeau « mes courses à venir » ne revient pas sur le catalogue", ()
 
 console.log("\nVÉRIFIABILITÉ — dire ce qu'on ne peut PAS revérifier");
 
-test("finishers est vérifiable, jogging-plus ne l'est pas", () => {
-  // 78 % du catalogue vient de finishers.com, qui autorise l'exploration et publie du
-  // schema.org : le contrôle nocturne y relit la date et corrige la nôtre.
-  // 22 % vient de jogging-plus, passé derrière un défi anti-robot qui répond 403 à
-  // TOUTE requête automatique. Ces fiches sont figées à leur date d'import, pour
-  // toujours. Laisser croire que les deux se valent se paierait en déplacement inutile.
+test("une source n'est vérifiable que si elle est RELUE : finishers oui, jogging-plus non", () => {
+  // finishers est relu chaque semaine (sorti de la liste d'opposition le 03/10/2026) ;
+  // jogging-plus oppose un défi anti-robot : ses fiches ne sont jamais revérifiées.
   assert.equal(ficheVerifiable("https://www.finishers.com/course/x"), true);
   assert.equal(ficheVerifiable("https://finishers.com/course/x"), true);
   assert.equal(ficheVerifiable("https://jogging-plus.com/calendrier/"), false);
   assert.equal(ficheVerifiable("https://www.jogging-plus.com/calendrier/"), false);
+  // Remis sur la liste d'opposition, finishers cesse aussitôt d'être déclaré vérifié.
+  (SITES_EXCLUS as string[]).push("finishers.com");
+  try { assert.equal(ficheVerifiable("https://www.finishers.com/course/x"), false); }
+  finally { (SITES_EXCLUS as string[]).pop(); }
+});
+
+test("le site OFFICIEL de l'organisateur, relu par la veille, rend la fiche vérifiable", () => {
+  assert.equal(ficheVerifiable("https://www.jogging-plus.com/calendrier/x", "https://www.foulees-lambersartoises.fr/"), true);
+  assert.equal(ficheVerifiable("https://www.jogging-plus.com/calendrier/", "https://www.letraildubuis.fr"), true);
+  // Un « site officiel » qui n'est qu'un autre calendrier, ou un site opposé, ne prouve rien.
+  assert.equal(ficheVerifiable("https://www.jogging-plus.com/calendrier/x", "https://www.milesrepublic.com/fr/events/y"), false);
+  assert.equal(ficheVerifiable("https://www.jogging-plus.com/calendrier/x", "https://www.jogging-plus.com/x"), false);
+  assert.equal(ficheVerifiable("https://www.jogging-plus.com/calendrier/x", "pas une adresse"), false);
+  // Un autre calendrier, qui n'est PAS sur la liste d'opposition, ne prouve rien non plus.
+  assert.equal(ficheVerifiable("https://www.jogging-plus.com/calendrier/x", "https://www.milesrepublic.com/fr/events/x"), false);
+  // Seule une page web se relit : ni ftp, ni mailto.
+  assert.equal(ficheVerifiable("https://www.jogging-plus.com/calendrier/x", "ftp://organisateur.fr/"), false);
+  assert.equal(ficheVerifiable("https://www.jogging-plus.com/calendrier/x", "mailto:contact@organisateur.fr"), false);
+  assert.equal(ficheVerifiable("https://www.jogging-plus.com/calendrier/x", null), false);
 });
 
 test("un domaine inconnu est traité comme NON vérifiable", () => {
@@ -769,7 +795,7 @@ test("la mise en garde est affichée quand la source ne peut pas être relue", (
   const src = readFileSync("src/components/races/RacesHub.tsx", "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
-  assert.ok(src.includes("!ficheVerifiable(details[selected.id]?.registration_url)"),
+  assert.ok(src.includes("!ficheVerifiable(details[selected.id]?.registration_url, details[selected.id]?.site_officiel)"),
     "la fiche ne dit plus quand sa source est invérifiable");
   const i18n = readFileSync("src/components/races/racesI18n.ts", "utf8");
   assert.equal((i18n.match(/"unverifiable": "/g) ?? []).length, 5, "la mise en garde manque dans une langue");

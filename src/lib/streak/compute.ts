@@ -50,6 +50,8 @@ export type StreakPrescription = {
   sessionType?: unknown;
   /** Créneau (« matin »/« soir ») — une journée doublée reste UNE journée. */
   moment?: unknown;
+  /** Le texte de la séance (français canonique) : dit si elle se remplace par du repos. */
+  subtitle?: unknown;
 };
 
 /** Ressenti post-séance : la seule source de douleur déclarée qui existe en base
@@ -72,6 +74,7 @@ export type DayReason =
   | "attente-synchro"   // la séance peut encore arriver
   | "protege-charge"    // surcharge : ne pas courir était le bon choix
   | "protege-douleur"   // douleur déclarée : ne pas courir était le bon choix
+  | "protege-course"    // lendemain d'une course courue : se reposer était le bon choix
   | "sans-plan"         // aucune prescription ce jour-là
   | "repos-charge"      // gros effort un jour de repos : ni récompensé, ni puni
   | "manquee";          // séance prescrite et non faite
@@ -211,6 +214,16 @@ const txt = (v: unknown) => String(v ?? "");
 
 /** Journée de repos prescrite. Les types du plan sont en français canonique. */
 export const estRepos = (type?: string | null): boolean => /repos|\brest\b/i.test(txt(type));
+/**
+ * LA SÉANCE QUI PROPOSE ELLE-MÊME LE REPOS. Constaté le 06/11/2026 : le 27/10, à J+2 du
+ * marathon de Lille, « Récupération… Ou repos complet si tu le sens mieux » — repos pris,
+ * journée comptée « manqué » : la série punissait l'option que le coach offrait.
+ * ⚠️ PAS LE TYPE « Récup » : la veille et l'avant-veille de course en sont aussi, et ne
+ * proposent pas le repos (c'est le déblocage). On lit ce que la séance DIT.
+ */
+// « Ou repos complet si tu le sens mieux » (récupération), « ou repos si les jambes sont
+// encore lourdes » (reprise à J+2 d'une course) : l'alternative est offerte par « ou repos ».
+export const reposPropose = (texte?: unknown): boolean => /\bou repos\b/i.test(txt(texte));
 
 /**
  * Renforcement musculaire. Invérifiable : une séance de gainage au salon n'arrive
@@ -256,10 +269,22 @@ export function acwrAu(date: string, tssParJour: Map<string, number>): number {
 
 // ── Le moteur ────────────────────────────────────────────────────────────────
 
+/** Une course de l'athlète (`race_objective.data` : l'objectif, ou la course qu'il a remplacée). */
+export type StreakCourse = { date?: unknown; distanceKm?: unknown };
+
+/** Les courses portées par l'objectif enregistré : lui-même, et la course précédente qu'il a remplacée. */
+export function coursesDeLObjectif(
+  o: { raceDate?: unknown; distanceKm?: unknown; precedente?: { raceDate?: unknown; distanceKm?: unknown } | null } | null | undefined,
+): StreakCourse[] {
+  return [o, o?.precedente].filter((c) => c != null).map((c) => ({ date: c!.raceDate, distanceKm: c!.distanceKm }));
+}
+
 export type StreakInput = {
   workouts: StreakWorkout[];
   prescriptions: StreakPrescription[];
   feedbacks?: StreakFeedback[];
+  /** Les courses de l'athlète : le lendemain d'une course COURUE est protégé. */
+  courses?: StreakCourse[];
   /** Aujourd'hui, `AAAA-MM-JJ`. Toujours fourni par l'appelant → fonction pure. */
   today: string;
   /** Profondeur d'observation, en jours. */
@@ -289,9 +314,12 @@ export function computeStreak(input: StreakInput): StreakResult {
   // créneaux le sont : un jour qui porte « Repos (matin) + Endurance (soir) » est
   // un jour d'entraînement, pas un jour de repos.
   const planParJour = new Map<string, string[]>();
+  // Le jour où CHAQUE séance prescrite se remplace par du repos (repos, ou « ou repos complet »).
+  const reposAccepte = new Map<string, boolean>();
   for (const p of prescriptions) {
     const d = txt(p.date).slice(0, 10);
     const t = txt(p.sessionType) || "?";
+    reposAccepte.set(d, (reposAccepte.get(d) ?? true) && (estRepos(t) || reposPropose(p.subtitle)));
     const l = planParJour.get(d) ?? [];
     // Un même créneau republié plusieurs fois ne doit pas peser deux fois.
     if (!l.includes(t)) l.push(t);
@@ -323,8 +351,23 @@ export function computeStreak(input: StreakInput): StreakResult {
    * ratio aigu:chronique de 1,82 : elle allait être protégée, pas rompue. On
    * annonçait une casse qui n'aurait jamais eu lieu.
    */
+  // ⚠️ LE LENDEMAIN D'UNE COURSE (Cyprien, 30/10/2026). Le marathon de Lille couru le 25/10,
+  // le plan publié le 26 prévoyait 25 min de récupération ; il s'est reposé, la série est
+  // tombée à 0 (« manqué »). Se reposer le lendemain d'une course est la bonne décision.
+  // « Courue » = une sortie d'au moins la moitié de la distance ce jour-là, la même règle
+  // que la récupération du coach (`lib/coach/apresCourse`).
+  const lendemainsDeCourse = new Set<string>();
+  for (const c of input.courses ?? []) {
+    const d = txt(c?.date).slice(0, 10);
+    const km = Number(c?.distanceKm);
+    if (d.length < 10 || !(km > 0)) continue;
+    const couru = Math.max(0, ...workouts.filter((w) => txt(w.date).slice(0, 10) === d).map((w) => Number(w.distance_km) || 0));
+    if (couru >= km * 0.5) lendemainsDeCourse.add(decaleJour(d, 1));
+  }
+
   const protectionDe = (d: string): DayReason | null =>
-    douleurProche(d) ? "protege-douleur"
+    lendemainsDeCourse.has(d) ? "protege-course"
+      : douleurProche(d) ? "protege-douleur"
       : acwrAu(d, tssParJour) >= SEUIL_SURCHARGE_ACWR ? "protege-charge"
       : null;
 
@@ -378,6 +421,12 @@ export function computeStreak(input: StreakInput): StreakResult {
     //    la série, elle, mesure la présence au rendez-vous.
     if (entraine) {
       days.push({ date: d, verdict: "tenu", reason: "seance-faite", prescribed, trained: true });
+      continue;
+    }
+
+    // 4 bis. La séance proposait le repos, et il a été pris : c'est l'option offerte.
+    if (reposAccepte.get(d) === true) {
+      days.push({ date: d, verdict: "tenu", reason: "repos-respecte", prescribed, trained: false });
       continue;
     }
 

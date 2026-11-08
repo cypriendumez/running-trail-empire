@@ -1,0 +1,59 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  SITES OFFICIELS — LE PASSAGE SANS IA, chaque mercredi.
+#
+#  Pour les ~2 500 courses reprises de jogging-plus (défi anti-robot, jamais contourné) :
+#    1. le site connu d'un jumeau finishers (même nom canonique, même ville) ;
+#    2. les sites que DATAtourisme (Licence Ouverte) donne pour un événement sportif de la
+#       même commune au nom voisin ;
+#    3. les adresses devinées depuis le nom (« coursedumarais.fr »), visitées seulement si
+#       le domaine existe.
+#  Aucun candidat n'est cru : chacun est lu poliment (robots.txt, liste d'opposition) et
+#  doit nommer la course, la situer, et porter son nom dans l'adresse ou le titre — sinon
+#  la dater au même jour. Aucune clé de modèle, aucun quota.
+#
+#  SECRETS REQUIS : NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (déjà présents).
+# ──────────────────────────────────────────────────────────────────────────────
+name: Sites officiels (sans IA)
+
+on:
+  schedule:
+    - cron: "20 2 * * 3"
+  workflow_dispatch:
+
+concurrency:
+  group: sites-officiels-gratuits
+  cancel-in-progress: false
+
+jobs:
+  chercher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Dépendances
+        run: npm ci --no-audit --no-fund
+      - name: Télécharger les événements DATAtourisme (Licence Ouverte)
+        # Un échec ici ne doit pas priver des deux autres sources : on continue sans.
+        run: npx tsx scripts/datatourisme-telecharger.ts fma.csv || echo "::warning::DATAtourisme indisponible — passage sans ses candidats."
+      - name: Chercher les sites officiels (sans IA)
+        run: |
+          if [ -f fma.csv ]; then
+            npx tsx scripts/sites-officiels.ts rapport-sites.json --gratuit --fma fma.csv --ecrire
+          else
+            npx tsx scripts/sites-officiels.ts rapport-sites.json --gratuit --ecrire
+          fi
+      - name: Garder le rapport
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sites-officiels-gratuits
+          path: rapport-sites.json
+          retention-days: 30
+          if-no-files-found: ignore

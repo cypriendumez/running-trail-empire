@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { setRaceObjective } from "@/lib/coach/objective";
 import { envoyerEmail } from "@/lib/email/envoyer";
 
-// POST /api/objective {race, distanceKm, targetTime, raceDate}
+// POST /api/objective {race, distanceKm, targetTime, raceDate, startTime?, officielle?}
 // → enregistre l'objectif de course du client (notifications type "race_objective"),
 //   prévient le coach par e-mail, et alimente l'IA coach (allure/distance visées).
 //   L'écriture + la re-synchro des séances sont centralisées dans setRaceObjective().
@@ -24,7 +24,9 @@ export async function POST(req: Request) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const body = await req.json().catch(() => ({})) as { race?: string; distanceKm?: number; targetTime?: string; raceDate?: string; startTime?: string };
+  const body = await req.json().catch(() => ({})) as { race?: string; distanceKm?: number; targetTime?: string; raceDate?: string; startTime?: string; officielle?: boolean };
+  // Défi personnel (test chrono, tentative de record) : seul un `false` explicite le dit.
+  const officielle = body.officielle !== false;
   const race = String(body.race ?? "").trim().slice(0, 80);
   const distanceKm = Math.round(Number(body.distanceKm) * 100) / 100;
   const raceDate = String(body.raceDate ?? "").slice(0, 10);
@@ -32,8 +34,9 @@ export async function POST(req: Request) {
   // ⚠️ FACULTATIVE, ET REFUSÉE PLUTÔT QUE DEVINÉE. Une heure de départ fausse est pire
   //    qu'une heure absente : elle se planifie, et on rate son départ en s'y fiant.
   //    Une saisie illisible n'enregistre donc RIEN, elle ne « corrige » pas.
-  const heureDepart = body.startTime ? normaliserHeure(body.startTime) : null;
-  if (body.startTime && !heureDepart) {
+  // Un défi personnel n'a pas d'heure de départ fixée par un organisateur.
+  const heureDepart = officielle && body.startTime ? normaliserHeure(body.startTime) : null;
+  if (officielle && body.startTime && !heureDepart) {
     return NextResponse.json({ error: "Heure de départ invalide (ex. 9h30)" }, { status: 400 });
   }
 
@@ -49,7 +52,7 @@ export async function POST(req: Request) {
   // l'affichait, et il avait disparu au rechargement suivant.
   let data;
   try {
-    data = await setRaceObjective(admin, user.id, { race, distanceKm, raceDate, targetSeconds, heureDepart });
+    data = await setRaceObjective(admin, user.id, { race, distanceKm, raceDate, targetSeconds, heureDepart, officielle });
   } catch (e) {
     console.error("[objectif]", (e as Error).message);
     return NextResponse.json({ error: "Objectif non enregistré. Réessaie dans un instant." }, { status: 500 });
@@ -69,7 +72,7 @@ export async function POST(req: Request) {
           to: [COACH_EMAIL],
           reply_to: (prof?.email as string) || undefined,
           subject: `🎯 Objectif de ${name} : ${race} (${data.targetTime})`,
-          text: `${name} vient de définir son objectif de course :\n\n• Course : ${race}\n• Distance : ${distanceKm} km\n• Date : ${dateFr} (${jStr})\n• Temps visé : ${data.targetTime}\n• Allure cible : ${data.targetPace}\n\n→ L'IA coach adapte déjà ses séances (forme, sommeil, historique, niveau) vers cet objectif.`,
+          text: `${name} vient de définir son objectif de course :\n\n• ${officielle ? "Course" : "Défi personnel (pas une course officielle)"} : ${race}\n• Distance : ${distanceKm} km\n• Date : ${dateFr} (${jStr})\n• Temps visé : ${data.targetTime}\n• Allure cible : ${data.targetPace}\n\n→ L'IA coach adapte déjà ses séances (forme, sommeil, historique, niveau) vers cet objectif.`,
         }, { userId: user.id, url: "/api/objective" });
     } catch { /* e-mail best-effort : l'objectif est déjà enregistré ; l'échec d'envoi est journalisé */ }
   }
@@ -94,7 +97,9 @@ export async function POST(req: Request) {
       return avertissementsAge({
         age, distanceKm, lang,
         trail: /trail|utmb|ultra|vertical|\bkv\b|montagne/i.test(race) || distanceKm > 45,
-      });
+      // Le règlement fédéral encadre l'inscription aux épreuves : un défi couru seul n'en a
+      // pas. L'avis médical, lui, reste.
+      }).filter((a) => officielle || a.niveau !== "reglement");
     } catch { return []; }
   })();
 

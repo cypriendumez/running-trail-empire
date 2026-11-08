@@ -18,8 +18,10 @@ const AUTO_SYNC_DAYS = 3;        // on tire les 3 derniers jours (inclut aujourd
  * Throttle 60 s pour ne pas marteler l'API.
  *
  * NB : intervals.icu ne permet PAS d'enregistrer un webhook avec une clé API (404 sur
- * /athlete/{id}/webhooks). Ce sondage est donc le mécanisme réel de fraîcheur — et la
- * route de sync republie le plan dès qu'une séance inédite arrive.
+ * /athlete/{id}/webhooks). Seuls les athlètes reliés par OAuth reçoivent les alertes de
+ * l'application (/api/webhooks/intervals), et aucune pour une séance venue de Strava :
+ * ce sondage reste donc le filet de tous les autres — et la route de sync republie le
+ * plan dès qu'une séance inédite arrive.
  */
 export function AutoSync() {
   const router = useRouter();

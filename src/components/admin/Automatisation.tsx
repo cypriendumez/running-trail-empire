@@ -27,7 +27,7 @@ export async function Automatisation() {
     <section className="rounded-2xl border border-zinc-200 bg-white p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h2 className="font-bold text-zinc-900">Automatisation</h2>
+          <h2 className="font-semibold text-zinc-900">Automatisation</h2>
           <p className="text-xs text-zinc-500">
             Ce que GitHub a réellement lancé — pas ce que les fichiers déclarent.
           </p>

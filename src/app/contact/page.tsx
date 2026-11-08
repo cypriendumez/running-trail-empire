@@ -27,7 +27,7 @@ export default async function ContactPage() {
     <div className="min-h-screen bg-white font-sans text-zinc-700">
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-6 py-12 sm:py-16">
-        <h1 className="mt-4 text-3xl font-bold tracking-tight text-zinc-900">{t.title}</h1>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-900">{t.title}</h1>
         <p className="mt-2 text-sm text-zinc-500">{t.sla}</p>
 
         <div className="mt-8 space-y-6 text-[15px] leading-relaxed">
@@ -35,7 +35,7 @@ export default async function ContactPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl border border-zinc-200 bg-white p-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">{t.email}</p>
+              <p className="text-xs font-semibold text-zinc-400 first-letter:uppercase">{t.email}</p>
               <a href={`mailto:${EMAIL}`} className="mt-1 block font-semibold text-zinc-900 hover:text-emerald-600 break-all">{EMAIL}</a>
               <a
                 href={`mailto:${EMAIL}?subject=${encodeURIComponent("Contact — Pacevo")}`}
@@ -46,7 +46,7 @@ export default async function ContactPage() {
             </div>
 
             <div className="rounded-2xl border border-zinc-200 bg-white p-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">{t.editor}</p>
+              <p className="text-xs font-semibold text-zinc-400 first-letter:uppercase">{t.editor}</p>
               <p className="mt-1 font-semibold text-zinc-900">Cyprien Dumez</p>
               <p className="mt-1 text-sm text-zinc-500">{EDITEUR.adresse}, {PAYS_EDITEUR[lang] ?? PAYS_EDITEUR.fr}</p>
             </div>

@@ -1,11 +1,12 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { enteteIntervals } from "@/lib/intervals/auth";
 
 const BASE = "https://intervals.icu/api/v1";
 
 function authHeader(apiKey: string) {
-  return { Authorization: "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64") };
+  return { Authorization: enteteIntervals(apiKey) };
 }
 
 export async function GET() {

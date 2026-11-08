@@ -19,7 +19,7 @@ export function Liste({
   const t = (k: string, p?: Record<string, string | number>) => texteCourses(lang, k, p);
   return (
     <main className="mx-auto max-w-4xl px-5 py-10 sm:py-14">
-      <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">{titre}</h1>
+      <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl">{titre}</h1>
       <p className="mt-2 text-zinc-600">{t("index.sous")}</p>
 
       {regions.length > 0 && (
@@ -70,7 +70,7 @@ export function Liste({
 
       {sansDate.length > 0 && (
         <section className="mt-10">
-          <h2 className="text-lg font-bold text-zinc-900">{t("index.sansDate")}</h2>
+          <h2 className="text-lg font-semibold text-zinc-900">{t("index.sansDate")}</h2>
           <ul className="mt-3 divide-y divide-zinc-100 rounded-2xl border border-zinc-200 bg-white">
             {sansDate.map((c) => {
               const km = Number(c.distance_km);

@@ -4,6 +4,8 @@ import { HealthCenter } from "@/components/health/HealthCenter";
 import { suiviParZone, actives, etatDe, type Signalement, type Douleur } from "@/lib/health/douleurs";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { estUnePanne } from "@/lib/dashboard/lectures";
+import { effectiveVma, bestVmaFromWorkouts } from "@/lib/running/fitness";
+import { coursesPourNutrition, type CourseNutri } from "@/lib/health/coursesNutrition";
 
 export const metadata = { title: "Santé" };
 
@@ -21,20 +23,40 @@ export default async function HealthPage() {
   const etats: { cle: string; id: string; etat: string }[] = [];
   let enPanne = false;
   let fil: { role: "user" | "model"; text: string }[] = [];
-  let contact: { nom: string; tel: string } = { nom: "", tel: "" };
+  let coursesNutrition: CourseNutri[] = [];
+  let poidsKg: number | null = null;
   if (user) {
-    // La consultation en cours (mémoire du kiné, /api/ai/physio) et le contact d'urgence
-    // (réglages) : lus ensemble, en une vague, avec les douleurs.
-    const [filRes, reglagesRes] = await Promise.all([
+    // La consultation en cours (mémoire du kiné, /api/ai/physio) et, pour la nutrition, les
+    // courses à venir et de quoi PRÉDIRE leur durée — la même VMA effective que le coach
+    // (`effectiveVma`, seule définition de l'app) : lus ensemble, en une vague.
+    const [filRes, objRes, planRes, profilRes, baseRes, seancesRes] = await Promise.all([
       supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "kine_chat").limit(1).maybeSingle(),
-      supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle(),
+      supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
+      supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "planned_race").order("created_at", { ascending: false }).limit(50),
+      supabase.from("profiles").select("pace_curve,garmin_vo2max,weight_kg").eq("id", user.id).single(),
+      supabase.from("performance_baselines").select("vma_kmh").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("workouts").select("distance_km,duration_seconds").eq("user_id", user.id).order("date", { ascending: false }).limit(200),
     ]);
+    for (const [nom, r] of [["objectif", objRes], ["courses", planRes], ["profil", profilRes], ["séances", seancesRes]] as const) {
+      if (r.error && estUnePanne(r)) console.error("[santé] lecture illisible :", nom, r.error.message);
+    }
+    const { vma } = effectiveVma({
+      vmaStored: baseRes.data?.vma_kmh ?? null,
+      paceCurveBest: (profilRes.data?.pace_curve as { best?: { m: number; sec: number }[] } | null)?.best ?? null,
+      garminVo2: profilRes.data?.garmin_vo2max ?? null,
+      fromRuns: bestVmaFromWorkouts((seancesRes.data ?? []) as { distance_km?: number | null; duration_seconds?: number | null }[]),
+    });
+    coursesNutrition = coursesPourNutrition(
+      objRes.data?.data as Parameters<typeof coursesPourNutrition>[0],
+      (planRes.data ?? []).map((r) => r.data as Parameters<typeof coursesPourNutrition>[1][number]),
+      aujourdhui(FUSEAU_DEFAUT), vma,
+    );
+    const p = Number(profilRes.data?.weight_kg);
+    poidsKg = Number.isFinite(p) && p > 0 ? p : null;
     const brut = (filRes.data?.data as { messages?: unknown } | null)?.messages;
     fil = (Array.isArray(brut) ? brut : [])
       .filter((m): m is { role: "user" | "model"; text: string } => !!m && typeof m === "object" && ((m as { role?: string }).role === "user" || (m as { role?: string }).role === "model") && typeof (m as { text?: unknown }).text === "string")
       .slice(-40);
-    const r = (reglagesRes.data?.data ?? {}) as Record<string, unknown>;
-    contact = { nom: typeof r.contactUrgenceNom === "string" ? r.contactUrgenceNom : "", tel: typeof r.contactUrgenceTel === "string" ? r.contactUrgenceTel : "" };
     /**
      * ⚠️ « AUCUNE DOULEUR » N'EST PAS « ON N'A PAS PU LIRE ».
      *
@@ -71,5 +93,5 @@ export default async function HealthPage() {
     enPanne = estUnePanne({ error });
     if (enPanne) console.error("[santé] douleurs illisibles :", error?.message);
   }
-  return <HealthCenter suivi={suivi} etats={etats} enPanne={enPanne} filInitial={fil} contactInitial={contact} />;
+  return <HealthCenter suivi={suivi} etats={etats} enPanne={enPanne} filInitial={fil} coursesNutrition={coursesNutrition} poidsKg={poidsKg} />;
 }

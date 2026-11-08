@@ -39,7 +39,7 @@ export function ClubsHub({ clubs, defis }: { clubs: ClubVue[]; defis: DefiVue[] 
     <div>
       <header className="flex flex-wrap items-center justify-between gap-3 pb-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-zinc-900">{t("clubs.title")}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">{t("clubs.title")}</h1>
           <p className="mt-1 text-sm text-zinc-500">{t("clubs.sub")}</p>
         </div>
         <button onClick={() => setForm((v) => !v)}
@@ -115,9 +115,9 @@ function CarteDefi({ d }: { d: DefiVue }) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-bold text-zinc-900">{d.name}</h2>
-            {d.done && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">{t("clubs.done")}</span>}
-            {d.clubName && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">{d.clubName}</span>}
+            <h2 className="font-semibold text-zinc-900">{d.name}</h2>
+            {d.done && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{t("clubs.done")}</span>}
+            {d.clubName && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-500">{d.clubName}</span>}
           </div>
           <p className="mt-0.5 text-xs text-zinc-500">
             {metricLabel(d.metric, lang)} · {t("clubs.goal")} {nb(d.target)} {metricUnit(d.metric, lang)} · {etat}
@@ -136,7 +136,7 @@ function CarteDefi({ d }: { d: DefiVue }) {
         <div className="mb-1 flex items-baseline justify-between text-xs">
           {/* La valeur RÉELLE, jamais plafonnée : 150 km sur un défi de 100 doit
               s'afficher 150, même si la barre, elle, est pleine. */}
-          <span className="font-bold text-zinc-900">{nb(d.value)} {metricUnit(d.metric, lang)}</span>
+          <span className="font-semibold text-zinc-900">{nb(d.value)} {metricUnit(d.metric, lang)}</span>
           <span className="text-zinc-400">{Math.round(d.ratio * 100)} %</span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
@@ -150,14 +150,14 @@ function CarteDefi({ d }: { d: DefiVue }) {
           n'y a pas d'adversaire, et on le dit franchement. */}
       {d.classement.length > 1 ? (
         <div className="border-t border-zinc-100">
-          <div className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+          <div className="px-4 py-2 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">
             {t("clubs.ranking", { n: d.classement.length })}
           </div>
           <div className="divide-y divide-zinc-50">
             {d.classement.slice(0, 8).map((l) => (
               <div key={l.userId} className={`flex items-center gap-3 px-4 py-2 text-sm ${
                 l.userId === d.moi ? "bg-emerald-50/60" : ""}`}>
-                <span className="w-6 shrink-0 text-center font-bold text-zinc-400">{l.rank}</span>
+                <span className="w-6 shrink-0 text-center font-semibold text-zinc-400">{l.rank}</span>
                 <span className="min-w-0 flex-1 truncate text-zinc-800">
                   {l.name}{l.userId === d.moi && <span className="ml-1 text-xs text-emerald-600">{t("clubs.you")}</span>}
                 </span>
@@ -204,9 +204,9 @@ function CarteClub({ c }: { c: ClubVue }) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-bold text-zinc-900">{c.name}</h2>
-            {c.role === "owner" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">{t("clubs.owner")}</span>}
-            {c.visibility === "private" && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">{t("clubs.private")}</span>}
+            <h2 className="font-semibold text-zinc-900">{c.name}</h2>
+            {c.role === "owner" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">{t("clubs.owner")}</span>}
+            {c.visibility === "private" && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-500">{t("clubs.private")}</span>}
           </div>
           <p className="mt-0.5 flex items-center gap-2 text-xs text-zinc-500">
             {c.member_count > 1 ? t("clubs.members", { n: c.member_count }) : t("clubs.member1", { n: c.member_count })}

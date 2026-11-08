@@ -21,10 +21,12 @@
  * reculs — la source nous refuse, insister ne ferait qu'aggraver. Code 3 dans ce second
  * cas ; ce qui a été lu reste dans le fichier et peut être appliqué.
  */
+import { UA_PACEVOBOT, siteExclu } from "../src/lib/races/robot";
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { seuil } from "./garde-fous";
 
-const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
+// L'identité déclarée de PacevoBot, en un seul endroit (lib/races/robot → pacevo.fr/robot).
+const UA = UA_PACEVOBOT;
 // 0,7 s + aléa entre deux pages, une seule à la fois : robots.txt de finishers ne fixe
 // aucun délai (vérifié le 28/09/2026) ; ~45 pages/min restent une lecture polie.
 const PAUSE_MS = 700;
@@ -118,6 +120,12 @@ async function main() {
   const abandonApres = seuil(process.argv, "--abandon-apres", 5);
   const debut = Date.now();
   let echecsDeSuite = 0;
+  // Sur la liste d'opposition (lib/races/robot) : aucune requête, un fichier vide, code 0.
+  if (siteExclu("https://www.finishers.com")) {
+    appendFileSync(sortie, "");
+    console.log("[collecte] finishers.com est sur la liste d'opposition (lib/races/robot) : aucune fiche lue.");
+    return;
+  }
   const slugs = readFileSync(fSlugs, "utf8").split("\n").map((s) => s.trim()).filter(Boolean);
   const faits = new Set<string>();
   // ⚠️ UN ÉCHEC RÉSEAU N'EST PAS UNE FICHE LUE. Nuit du 29/09/2026 : cinq heures sans
@@ -138,6 +146,7 @@ async function main() {
       // (28/09/2026, 21 h 03). Une coupure en pleine lecture est une erreur réseau comme une autre.
       let code = 0, html: string | null = null;
       try {
+        if (siteExclu("https://www.finishers.com")) throw new Error("finishers.com a demandé à ne plus être lu (lib/races/robot).");
         const r = await fetch(`https://www.finishers.com/course/${encodeURIComponent(slug)}`, { headers: { "User-Agent": UA, "Accept-Language": "fr-FR" }, signal: AbortSignal.timeout(20000) });
         code = r.status;
         if (r.ok) html = await r.text();

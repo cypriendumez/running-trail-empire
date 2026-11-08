@@ -73,21 +73,19 @@ test("le paiement est refusé si le lien client Stripe ne peut pas être enregis
     "l'échec n'interrompt plus le parcours : l'athlète serait envoyé payer avec un lien absent");
 });
 
-test("le journal n'efface le texte QUE si l'écriture a réussi", () => {
-  // ⚠️ L'ORDRE EST TOUT. `setText("")` avant le contrôle d'erreur détruit ce que
-  // l'athlète vient d'écrire, sous une confirmation. C'est ce que faisait le code.
-  const src = codeNu("src/components/journal/SmartJournal.tsx");
-  const i = src.indexOf('from("journal_entries").insert');
-  assert.ok(i > 0, "l'insertion du journal a disparu");
-  const apres = src.slice(i, i + 900);
-  const posErreur = apres.search(/if\s*\(\s*error\s*\)/);
-  const posEfface = apres.indexOf('setText("")');
-  assert.ok(posErreur > 0, "l'insertion du journal ne lit pas son erreur");
-  assert.ok(posEfface > 0, "le champ n'est plus vidé après un enregistrement réussi");
-  assert.ok(posErreur < posEfface,
-    "le champ est vidé AVANT le contrôle d'erreur : l'entrée de l'athlète serait perdue");
-  assert.ok(/return;/.test(apres.slice(posErreur, posEfface)),
-    "l'échec ne coupe pas la suite : « Sauvegardé ✓ » s'afficherait quand même");
+test("le Smart Journal est retiré (30/09/2026) : plus aucun écran n'écrit dans journal_entries", () => {
+  // Cyprien : « est-ce que c'est vraiment utile ? Si ce n'est pas utile, enlève-le ».
+  // Vérifié : rien ne lisait ces entrées — ni le coach, ni le plan. Le ressenti de fin de
+  // séance (lib/dashboard/ressenti) porte désormais ce que l'athlète dit de sa forme.
+  // La table reste en base (aucune donnée supprimée) ; un écran qui y réécrirait sans
+  // lecteur serait une écriture pour personne.
+  const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
+  const fichiers: string[] = [];
+  const parcourir = (d: string) => { for (const f of readdirSync(d)) { const p = `${d}/${f}`; if (statSync(p).isDirectory()) parcourir(p); else if (/\.tsx?$/.test(f)) fichiers.push(p); } };
+  parcourir("src/components"); parcourir("src/app/dashboard");
+  const ecrivains = fichiers.filter((f) => /from\("journal_entries"\)\.insert/.test(codeNu(f)));
+  assert.deepEqual(ecrivains, [], `le journal est revenu : ${ecrivains.join(", ")}`);
+  assert.ok(!/tab\.journal|SmartJournal/.test(codeNu("src/components/health/HealthCenter.tsx")), "l'onglet Journal est revenu dans Santé");
 });
 
 test("aucune écriture du profil n'échoue en silence", () => {
@@ -144,8 +142,13 @@ test("l'inscription ne génère pas un plan sur des données qu'elle n'a pas pu 
   // prescrit en première séance et s'enregistre côté serveur (/api/vma), plus depuis le
   // navigateur. Les trois qui restent (disponibilités, terrains, terrain principal) portent
   // toutes le plan de la première semaine : elles, doivent rester bloquantes.
-  assert.equal([...bloc.matchAll(/noter\(/g)].length, 3,
-    "les trois écritures isolées BLOQUANTES de l'inscription ne sont plus toutes contrôlées");
+  // ⚠️ PAR LEUR NOM, plus par leur nombre : le 11/10/2026, l'écriture du contexte et de la
+  // santé (ancienneté, dénivelé, pathologies) est passée de MUETTE à contrôlée — un test qui
+  // exigeait « exactement trois » rougissait sur la correction même qu'il devait protéger.
+  for (const [e, quoi] of [["eContexte", "contexte et santé"], ["eDispo", "disponibilités"], ["eTer", "terrains"], ["eTer1", "terrain principal"]]) {
+    assert.ok(new RegExp(`noter\\(${e}, `).test(src), `l'écriture « ${quoi} » de l'inscription n'est plus contrôlée`);
+  }
+  assert.ok([...bloc.matchAll(/noter\(/g)].length >= 3, "les écritures isolées BLOQUANTES de l'inscription ne sont plus toutes contrôlées");
   assert.ok(/if\s*\(\s*profileError\s*\|\|\s*echecs\.length\s*\)/.test(src),
     "un échec partiel laisse l'inscription se poursuivre comme si tout allait bien");
   /**
@@ -159,7 +162,8 @@ test("l'inscription ne génère pas un plan sur des données qu'elle n'a pas pu 
    * Hors de `echecs`, donc. Mais PAS muette : sans cette trace, une colonne absente ferait
    * disparaître en silence ce que l'athlète vient de saisir, et personne ne l'apprendrait.
    */
-  assert.ok(/if \(eFc\) console\.error\(/.test(src),
+  // Et depuis le 11/10/2026, pas seulement dans la console (que personne ne lit) : au journal.
+  assert.ok(/if \(eFc\) \{[\s\S]{0,120}console\.error\([\s\S]{0,400}fetch\("\/api\/log-error"/.test(src),
     "l'échec d'écriture des FC déclarées est muet : la saisie de l'athlète disparaîtrait sans trace");
 });
 
@@ -238,6 +242,51 @@ test("la synchronisation signale une VFC ou un sommeil non enregistrés", () => 
     "l'écriture de la VFC ne signale plus son échec");
   assert.ok(/const\s*\{\s*error:\s*eSommeil\s*\}/.test(src) && /failures\.push\(`sommeil/.test(src),
     "l'écriture du sommeil ne signale plus son échec");
+});
+
+test("chaque appelant de la synchronisation lit `failures` et le journalise", () => {
+  // ⚠️ LE MÊME DÉFAUT, UN ÉTAGE PLUS HAUT (12/10/2026). La synchro consignait chaque refus
+  // dans `failures` — et ses deux appelants serveur, le webhook intervals.icu et la chaîne
+  // du cron, ne lisaient que `synced` et `error`. Le refus était écrit pour personne.
+  //
+  // ANCRAGE : chaque APPEL, dans tout `src/`, et la région qui le suit jusqu'à l'appel
+  // suivant. Un troisième appelant qui oublierait `failures` rougit ici sans qu'on ait à
+  // penser à l'ajouter ; deux appels dans un même fichier ne se couvrent pas l'un l'autre.
+  const fichiers: string[] = [];
+  (function marche(d: string) {
+    for (const e of readdirSync(d)) {
+      const p = join(d, e);
+      if (statSync(p).isDirectory()) marche(p);
+      else if (/\.(ts|tsx)$/.test(p)) fichiers.push(p);
+    }
+  })("src");
+
+  const sites: string[] = [];
+  const fautes: string[] = [];
+  for (const f of fichiers) {
+    if (f === join("src", "lib", "intervals", "syncUser.ts")) continue; // la définition
+    const src = codeNu(f);
+    const appels = [...src.matchAll(/syncIntervalsForUser\(/g)].map((m) => m.index!);
+    appels.forEach((i, k) => {
+      sites.push(f);
+      const lus = (/const\s*\{([^{}]*)\}\s*=\s*await\s+$/.exec(src.slice(Math.max(0, i - 200), i))?.[1] ?? "")
+        .split(",").map((s) => s.split(":")[0].trim());
+      if (!lus.includes("failures")) { fautes.push(`${f} : \`failures\` n'est pas lu`); return; }
+      const region = src.slice(i, appels[k + 1] ?? src.length);
+      if (!/journaliserRefus\(\s*admin\s*,\s*\{[^}]*\bfailures\b[^}]*\}\s*\)/.test(region)) {
+        fautes.push(`${f} : \`failures\` est lu mais n'est pas journalisé`);
+      }
+    });
+  }
+  // Un balayage qui ne trouve rien passe toujours : l'appelant connu doit y être.
+  const chaine = join("src", "lib", "intervals", "syncAndCoach.ts");
+  assert.ok(sites.includes(chaine), `${chaine} n'appelle plus la synchro, ou le balayage ne le voit plus`);
+  // Le webhook l'appelait lui-même ; depuis le 16/10/2026 il passe par la chaîne (`synchroniser`),
+  // qui journalise sous le nom de la route appelante — vérifié sur la vraie route dans
+  // tests/synchro.crash.test.ts (« webhook : une séance refusée par la base arrive au journal »).
+  assert.ok(/synchroniser\(admin,[^)]*canal:\s*"webhook"/.test(codeNu(join("src", "app", "api", "webhooks", "intervals", "route.ts"))),
+    "le webhook ne passe plus par la chaîne qui journalise ses refus");
+  assert.deepEqual(fautes, [], `des refus d'écriture de la synchro se perdent :\n    ${fautes.join("\n    ")}`);
 });
 
 test("un objectif de course non écrit ne se déclare pas enregistré", () => {

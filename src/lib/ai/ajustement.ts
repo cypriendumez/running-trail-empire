@@ -12,7 +12,7 @@
  * de plus. »
  *
  * ── LA RÈGLE QUI REND ÇA ACCEPTABLE ──────────────────────────────────────────
- * ⚠️ LA PROPOSITION N'EST JAMAIS APPLIQUÉE AUTOMATIQUEMENT, et elle est VALIDÉE contre
+ * ⚠️ LA PROPOSITION N'EST JAMAIS APPLIQUÉE SANS L'ATHLÈTE, et elle est VALIDÉE contre
  * les mêmes bornes que le plan. Un modèle qui suggère d'ajouter une séance de qualité
  * alors que le budget est à zéro voit sa proposition REJETÉE ici, avant tout affichage.
  * Sans ce filtre, on aurait rouvert par la fenêtre le risque que le plan déterministe
@@ -31,6 +31,10 @@
 
 export type JourPlan = { date: string; type: string; title: string };
 
+/** La dernière proposition validée, mémorisée par le serveur (`notifications`) : c'est ELLE, et
+ *  jamais ce qu'enverrait le navigateur, que « Appliquer » rend réelle. */
+export const TYPE_PROPOSITION = "ai_ajustement";
+
 /** Ce que le modèle n'a PAS le droit de franchir. Calculé, jamais demandé au modèle. */
 export type Contraintes = {
   /** Séances de qualité que la semaine autorise. 0 = aucune intensité, point. */
@@ -41,6 +45,8 @@ export type Contraintes = {
   dates: string[];
   /** Motifs d'allègement, tels qu'affichés à l'athlète. Le modèle doit s'y référer. */
   raisons: string[];
+  /** Le type de chaque jour : une proposition doit pouvoir s'APPLIQUER (« Appliquer », Premium). */
+  types: Record<string, string>;
 };
 
 export type Ajustement = {
@@ -48,6 +54,9 @@ export type Ajustement = {
   date: string;
   /** Ce qu'on propose d'en faire : décaler, alléger, échanger, ou laisser tel quel. */
   action: "decaler" | "alleger" | "echanger" | "rien";
+  /** Pour « decaler » et « echanger » : l'autre jour, AAAA-MM-JJ. Sans lui, la proposition
+   *  ne pourrait pas s'appliquer — elle n'était qu'une phrase (« décale-la à samedi »). */
+  vers?: string;
   /** Deux phrases, dans la langue de l'athlète. */
   texte: string;
 };
@@ -61,6 +70,8 @@ export function contraintesDe(week: JourPlan[], qBudget: number, raisons: string
     typesQualite: week.filter((d) => EST_QUALITE.test(d.type)).map((d) => d.type),
     dates: week.map((d) => d.date),
     raisons: raisons.slice(0, 4),
+    // Le premier type de chaque jour (un jour doublé ne se déplace pas : voir lib/coach/ajustementApplique).
+    types: week.reduce<Record<string, string>>((t, d) => (t[d.date] ??= d.type, t), {}),
   };
 }
 
@@ -96,6 +107,29 @@ export function validerAjustement(
     return { ok: false, motif: `le jour ${date.slice(0, 12)} n'est pas dans le plan` };
   }
 
+  // ── CE QUI DOIT POUVOIR S'APPLIQUER EN UN GESTE (Premium, 30/10/2026) ───────
+  // Mêmes règles que lib/coach/ajustementApplique, vérifiées AVANT d'afficher : on ne
+  // propose pas un bouton « Appliquer » sur ce que le moteur refuserait.
+  const type = c.types[date] ?? "";
+  if (action === "alleger" && /^(repos|r[ée]cup|renfo|v[ée]lo)/i.test(type)) {
+    return { ok: false, motif: "rien à alléger ce jour-là" };
+  }
+  let vers: string | undefined;
+  if (action === "decaler" || action === "echanger") {
+    vers = String(o.vers ?? "");
+    if (!c.dates.includes(vers) || vers === date) return { ok: false, motif: `second jour absent ou hors du plan : ${vers.slice(0, 12)}` };
+    if (/^repos/i.test(type)) return { ok: false, motif: "on ne déplace pas un repos" };
+    const typeVers = c.types[vers] ?? "";
+    if (action === "decaler" && !/^repos/i.test(typeVers)) return { ok: false, motif: "on ne décale que vers un jour de repos" };
+    if (action === "echanger" && /^repos/i.test(typeVers)) return { ok: false, motif: "un échange se fait entre deux séances" };
+    // Deux séances dures d'affilée : ce que le moteur s'interdit, la proposition aussi.
+    const dur = (t: string) => EST_QUALITE.test(t) || /sortie longue|^course$/i.test(t);
+    const adjacents = (seq: string[]) => seq.slice(1).filter((t, i) => dur(t) && dur(seq[i])).length;
+    const avant = c.dates.map((d) => c.types[d] ?? "");
+    const apres = c.dates.map((d) => (d === date ? typeVers : d === vers ? type : c.types[d] ?? ""));
+    if (adjacents(apres) > adjacents(avant)) return { ok: false, motif: "deux séances dures d'affilée" };
+  }
+
   // ⚠️ LE GARDE-FOU QUI COMPTE. Décaler ou échanger une séance de qualité, c'est en
   // reposer une ailleurs dans la semaine. Quand le budget est à ZÉRO — fatigue réelle,
   // ratio aigu:chronique dans le rouge — la seule direction autorisée est d'alléger.
@@ -105,7 +139,7 @@ export function validerAjustement(
     return { ok: false, motif: "budget qualité à zéro : seul un allègement est recevable" };
   }
 
-  return { ok: true, ajustement: { date, action: action as Ajustement["action"], texte } };
+  return { ok: true, ajustement: { date, action: action as Ajustement["action"], ...(vers ? { vers } : {}), texte } };
 }
 
 /**
@@ -128,6 +162,12 @@ RÈGLES ABSOLUES
 - Tu ne vises qu'un jour figurant dans le plan.
 - Tu n'inventes aucun chiffre : n'utilise que ceux du contexte fourni.
 
+CE QUE FAIT CHAQUE ACTION SI L'ATHLÈTE L'APPLIQUE (la séance change vraiment, jusqu'à sa montre)
+- « alleger » : la séance du jour « date » devient une récupération de 25 min en Z1. Pas sur un repos, une récupération, du renfo ou du vélo.
+- « decaler » : la séance du jour « date » passe au jour « vers », qui DOIT être un jour de repos du plan ; « date » devient repos.
+- « echanger » : les séances de « date » et de « vers » (deux jours d'entraînement) échangent leur jour.
+- Jamais deux séances dures (qualité ou sortie longue) deux jours d'affilée.
+
 FORME — deux phrases maximum, ton direct, dans la langue demandée. Tu dis ce que tu changes ET pourquoi, en t'appuyant sur les motifs fournis.
 
-Réponds UNIQUEMENT par un objet JSON : {"date":"AAAA-MM-JJ","action":"decaler|alleger|echanger|rien","texte":"…"}`;
+Réponds UNIQUEMENT par un objet JSON : {"date":"AAAA-MM-JJ","action":"decaler|alleger|echanger|rien","vers":"AAAA-MM-JJ ou vide","texte":"…"}`;

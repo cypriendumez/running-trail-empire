@@ -8,15 +8,16 @@ import { Loader2 } from "lucide-react";
 const TrailBuilder = dynamic(() => import("./TrailBuilder").then((m) => m.TrailBuilder), {
   ssr: false,
   loading: () => (
-    <div className="flex h-72 items-center justify-center rounded-3xl border border-zinc-200 bg-white">
+    <div className="flex h-72 items-center justify-center rounded-2xl border border-zinc-200 bg-white">
       <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
     </div>
   ),
 });
 
-export function TrailBuilderLazy({ centre, onTrace }: {
+export function TrailBuilderLazy({ centre, onTrace, exportGpx }: {
   centre?: { lat: number; lon: number } | null;
   onTrace?: (points: { lat: number; lon: number }[]) => void;
+  exportGpx: boolean;
 }) {
-  return <TrailBuilder centre={centre} onTrace={onTrace} />;
+  return <TrailBuilder centre={centre} onTrace={onTrace} exportGpx={exportGpx} />;
 }

@@ -17,11 +17,13 @@
  *
  *   npx tsx --env-file=.env.local scripts/finishers-slugs.ts <sortie.txt> <deja-vus.txt> [a-revoir.txt]
  */
+import { UA_PACEVOBOT, siteExclu } from "../src/lib/races/robot";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { createClient } from "@supabase/supabase-js";
 
-const UA = "Mozilla/5.0 (compatible; PacevoBot/1.0; +https://pacevo.fr/contact)";
+// L'identité déclarée de PacevoBot, en un seul endroit (lib/races/robot → pacevo.fr/robot).
+const UA = UA_PACEVOBOT;
 
 export const AMORCE_VUS = "scripts/amorces/finishers-vus-2026-09-28.txt.gz";
 
@@ -43,6 +45,13 @@ export function slugsDuPlan(brut: Buffer): string[] {
 
 async function main() {
   const [sortie, fichierVus, fichierARevoir] = process.argv.slice(2);
+  // Sur la liste d'opposition (lib/races/robot) : AUCUNE requête, des fichiers vides et un
+  // code 0 — les étapes suivantes du mardi (veille, liens, DATAtourisme) tournent quand même.
+  if (siteExclu("https://www.finishers.com")) {
+    for (const f of [sortie, fichierARevoir]) if (f) writeFileSync(f, "");
+    console.log("[slugs] finishers.com est sur la liste d'opposition (lib/races/robot) : aucune requête, rien à lire.");
+    return;
+  }
   const r = await fetch("https://api.finishers.com/public/sitemap/events.xml", { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(60000) });
   if (!r.ok) throw new Error(`plan du site : ${r.status}`);
   const plan = slugsDuPlan(Buffer.from(await r.arrayBuffer()));

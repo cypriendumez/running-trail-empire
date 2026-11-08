@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { UA_PACEVOBOT } from "@/lib/races/robot";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import * as cheerio from "cheerio";
@@ -51,7 +52,7 @@ const MONTHS_FR: Record<string, number> = {
 };
 
 const FETCH_HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "User-Agent": UA_PACEVOBOT,
   "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
   "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
   "Accept-Encoding": "gzip, deflate, br",
@@ -710,8 +711,8 @@ export async function POST(req: Request) {
     //    cette route : un travail planifié qui échoue chaque semaine apprend juste à
     //    ignorer le rouge.
     //    Le rafraîchissement passe désormais par `/api/cron/races-liens`, qui lit les
-    //    données structurées des fiches finishers.com — un site qui, lui, autorise
-    //    explicitement l'exploration et publie son sitemap.
+    //    données structurées des fiches finishers.com — dont le robots.txt autorise
+    //    l'exploration ; ⚠️ ses CGU l'INTERDISENT (lues le 02/10/2026) : liste d'opposition.
     return NextResponse.json({
       error: "Aucune course trouvée — les sources explorées par cette route bloquent désormais les requêtes automatiques (défi anti-robot). Le rafraîchissement des dates passe par /api/cron/races-liens.",
       sources: {

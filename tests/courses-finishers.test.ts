@@ -223,32 +223,60 @@ test("classements des éditions passées : devinés, mais VÉRIFIÉS", () => {
   // Cas réel (30/09/2026) : le chronométreur de « La Ronda des Coudous » range chaque édition
   // sous une adresse qui porte l'année ; 2025 et 2024 existent, 2023 et 1999 non.
   const c = adressesEditions("http://inscriptionsenligne.fr.wiclax-results.com/La%20Ronda%20des%20Coudous%202026/", 2026)!;
-  assert.deepEqual(c.candidates.map((x) => x.annee), [2025, 2024, 2023]);
+  assert.deepEqual(c.candidates.map((x) => x.annee), [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016], "on ne remonte plus dix ans");
   assert.equal(c.candidates[0].url, "http://inscriptionsenligne.fr.wiclax-results.com/La%20Ronda%20des%20Coudous%202025/",
     "l'année qui suit « %20 » n'est pas reconnue (le « 0 » de l'espace encodé)");
   assert.equal(c.temoin, "http://inscriptionsenligne.fr.wiclax-results.com/La%20Ronda%20des%20Coudous%201999/", "plus de témoin pour démasquer un site qui répond à tout");
-  // L'année deux fois (ou dans la requête), ou absente : on ne devine pas.
-  assert.equal(adressesEditions("https://www.livetrail.net/histo/sainte2025/2025/", 2025), null);
-  assert.equal(adressesEditions("https://x.fr/resultats?annee=2025&ed=2025", 2025), null);
-  assert.equal(adressesEditions("https://x.fr/course-2025/resultats?annee=2025", 2025), null,
-    "l'année est aussi dans la requête : remplacer celle du chemin seule donnerait une adresse incohérente");
-  assert.equal(adressesEditions("https://x.fr/resultats", 2025), null);
+  assert.equal(adressesEditions("https://x.fr/r-2026/", 2026, 3)!.candidates.length, 3, "la profondeur demandée n'est plus respectée");
+  assert.equal(adressesEditions("https://x.fr/r-2008/", 2008)!.candidates.at(-1)!.annee, 2005, "on descend sous le plancher de 2005");
+  // L'année PARTOUT où elle figure, ensemble : chemin ET requête, plusieurs fois.
+  assert.equal(adressesEditions("https://www.livetrail.net/histo/sainte2025/2025/", 2025)!.candidates[0].url, "https://www.livetrail.net/histo/sainte2024/2024/");
+  assert.equal(adressesEditions("https://x.fr/course-2025/resultats?annee=2025&race=10", 2025)!.candidates[0].url, "https://x.fr/course-2024/resultats?annee=2024&race=10",
+    "l'année de la requête n'a pas suivi : l'adresse est incohérente");
+  assert.equal(adressesEditions("https://a.fr/r?q=Coudous%202025&x=%26", 2025)!.candidates[0].url, "https://a.fr/r?q=Coudous%202024&x=%26", "un « & » échappé est abîmé");
+  // Jamais dans le nom d'hôte, jamais une autre suite de chiffres.
+  assert.equal(adressesEditions("https://trail2025.fr/resultats/", 2025), null, "l'année du NOM DE DOMAINE est remplacée");
   assert.equal(adressesEditions("https://x.fr/course-12025/", 2025), null, "« 12025 » n'est pas l'année 2025");
+  assert.equal(adressesEditions("https://x.fr/20251/", 2025), null);
+  assert.equal(adressesEditions("https://x.fr/resultats", 2025), null);
+  // Entrées hostiles : rien ne casse, rien n'est inventé.
+  for (const [u, a] of [["", 2025], ["pas une adresse", 2025], ["javascript:alert(2025)", 2025], ["ftp://x.fr/2025/", 2025], ["https://x.fr/2025/", NaN],
+    ["https://x.fr/2025/", 2025.5], ["https://x.fr/1999/", 1999], ["https://x.fr/2200/", 2200]] as [string, number][]) {
+    assert.equal(adressesEditions(u, a), null, `${u} / ${a}`);
+  }
   // Une page n'EXISTE que si la réponse est 2xx ET porte encore l'année demandée.
   assert.equal(pageTrouvee(200, "http://a/La%20Ronda%202025/", 2025), true);
   assert.equal(pageTrouvee(200, "http://a/", 2025), false, "une redirection vers l'accueil passe pour l'édition 2025");
   assert.equal(pageTrouvee(404, "http://a/2025", 2025), false);
+  assert.equal(pageTrouvee(301, "http://a/2025", 2025), false);
   assert.equal(pageTrouvee(200, "http://a/%E0%A4%A/2025", 2025), true, "une adresse mal encodée fait planter la vérification");
-  // À l'écran : sans le lien principal, une fois par année, la plus récente d'abord, trois au plus.
+  assert.equal(pageTrouvee(200, "http://a/12025", 2025), false);
+  // À l'écran : sans le lien principal, une fois par année, la plus récente d'abord, huit au plus.
+  const huitPlus = Array.from({ length: 12 }, (_, k) => ({ annee: 2025 - k, url: `https://a/${2025 - k}` }));
+  assert.deepEqual(editionsAAfficher(huitPlus, null, null, "2026-09-30").map((e) => e.annee), [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018]);
   assert.deepEqual(editionsAAfficher([{ annee: 2023, url: "https://a/2023" }, { annee: 2025, url: "https://a/2025" }, { annee: 2025, url: "https://b/2025" },
-    { annee: 2024, url: "https://a/2024" }, { annee: 2022, url: "https://a/2022" }, { annee: 2026, url: "https://p" }, "x", { annee: 2021, url: "javascript:x" }], "https://p").map((e) => e.annee),
-    [2025, 2024, 2023]);
-  assert.deepEqual(editionsAAfficher(null, null), []);
-  assert.deepEqual(editionsAAfficher([{ annee: 2025, url: "javascript:alert(1)" }], null), [], "un lien non http(s) serait affiché");
+    { annee: 2024, url: "https://a/2024" }, "x", { annee: 2021, url: "javascript:x" }, { annee: NaN, url: "https://n" }], "https://a/2024", null, "2026-09-30").map((e) => e.annee),
+    [2025, 2023], "le lien principal est répété, ou une entrée hostile passe");
+  // Ni son ANNÉE : « Classement 2025 » puis une pastille « 2025 » vers une autre page.
+  assert.deepEqual(editionsAAfficher([{ annee: 2025, url: "https://b/2025" }, { annee: 2024, url: "https://b/2024" }], { url: "https://a/2025", annee: 2025 }, null, "2026-09-30")
+    .map((e) => e.annee), [2024], "l'année du lien principal est proposée une seconde fois");
+  assert.deepEqual(editionsAAfficher([{ annee: 2025, url: "https://b/2025" }], { url: "https://a/x", annee: null }, null, "2026-09-30").map((e) => e.annee), [2025]);
+  // ⚠️ Jamais l'édition À VENIR : pour la course du 30/09/2026, « 2026 » n'est pas proposé avant.
+  const ronda = [{ annee: 2026, url: "https://w/2026" }, { annee: 2025, url: "https://w/2025" }];
+  assert.deepEqual(editionsAAfficher(ronda, null, { date: "2026-09-30" }, "2026-09-29").map((e) => e.annee), [2025], "l'édition à venir (page vide) est proposée");
+  assert.deepEqual(editionsAAfficher(ronda, null, { date: "2026-09-30" }, "2026-09-30").map((e) => e.annee), [2025], "le jour même, avant la course");
+  assert.deepEqual(editionsAAfficher(ronda, null, { date: "2026-09-30" }, "2026-10-01").map((e) => e.annee), [2026, 2025], "le lendemain, 2026 doit apparaître");
+  assert.deepEqual(editionsAAfficher([{ annee: 2027, url: "https://w/2027" }], null, { date: "2099-01-01" }, "2026-09-30"), [], "une année future est proposée");
+  assert.deepEqual(editionsAAfficher([{ annee: 2004, url: "https://w/2004" }], null, null, "2026-09-30"), [], "une année sous le plancher est proposée");
+  for (const hostile of [null, undefined, 42, "x", {}, [null], [{}], [{ annee: "2025", url: "https://a" }]]) {
+    assert.deepEqual(editionsAAfficher(hostile, null, null, "2026-09-30"), [], JSON.stringify(hostile));
+  }
   // Et le script n'écrit RIEN sans la colonne (migration 033), et ouvre le témoin AVANT les candidates.
   const src = codeNu("scripts/resultats-editions.ts");
-  assert.ok(src.indexOf("await ouvrir(c.temoin)") < src.indexOf("await ouvrir(cand.url)") && /if \(!temoinTrouve\) for/.test(src), "un site qui répond à tout n'est plus démasqué");
-  assert.ok(/sonde\.error\?\.code === "42703"\) \{[^}]*process\.exit\(2\)/.test(src), "le script écrit sans vérifier que la colonne existe");
+  assert.ok(src.indexOf("await ouvrir(c.temoin)") < src.indexOf("await ouvrir(cand.url)") && /if \(!temoinTrouve && !incertain\) for/.test(src), "un site qui répond à tout n'est plus démasqué");
+  assert.ok(/const colonne = !\(sonde\.error\?\.code === "42703"\)/.test(src)
+    && src.indexOf("if (!colonne) {") > src.indexOf("if (!ECRIRE)") && src.indexOf("if (!colonne) {") < src.indexOf(".update({ resultats_editions")
+    && /if \(!colonne\) \{[^}]*process\.exit\(2\)/.test(src), "le script écrit sans vérifier que la colonne existe");
 });
 
 test("fiches jumelles : même événement sous deux adresses, une seule appliquée", () => {
@@ -357,6 +385,26 @@ test("le cas réel : 9 formats en base pour 3 réels — les vrais mis à jour, 
   assert.equal(p.retraits.length, 6);
   assert.equal(p.ajouts.length, 0);
   for (const m of p.majs) assert.ok(!("name" in m.patch) && !("type" in m.patch) && !("city" in m.patch), "on ne réécrit ni le nom, ni le type, ni la ville");
+});
+
+test("le lien de classement ÉCRIT depuis une fiche passe par la porte unique, avec la bonne année", () => {
+  const ecrit = (resultats: Fiche["resultats"]) => {
+    const p = planEvenement({ ...TUE, resultats }, [], { aujourdhui: AUJ, favoris: new Set(), colonnesNouvelles: true });
+    return { url: p.ajouts[0]?.resultats_url, annee: p.ajouts[0]?.resultats_annee };
+  };
+  // La fiche d'UN coureur devient le classement de l'édition ; l'année de la fiche est gardée.
+  assert.deepEqual(ecrit({ page: null, classement: "https://livetrail.net/histo/tue_2025/coureur.php?rech=12", annee: 2025 }),
+    { url: "https://livetrail.net/histo/tue_2025/classement.php", annee: 2025 });
+  // Un bouton de partage est refusé : repli sur la page, et l'année LUE sur la page — pas
+  // celle que la fiche donnait pour le lien refusé.
+  assert.deepEqual(ecrit({ page: "https://resultats-live.com/tue-2024", classement: "https://www.linkedin.com/shareArticle?mini=true", annee: 2026 }),
+    { url: "https://resultats-live.com/tue-2024", annee: 2024 }, "l'année du lien refusé est collée sur la page de repli");
+  // Sans classement cité, l'année de la fiche vaut pour sa page (comportement d'origine).
+  assert.deepEqual(ecrit({ page: "https://resultats-live.com/tue", classement: null, annee: 2025 }), { url: "https://resultats-live.com/tue", annee: 2025 });
+  // Le dossier de dépôt ne date pas le classement.
+  assert.deepEqual(ecrit({ page: "https://x.fr/wp-content/uploads/2026/02/resultats.pdf", classement: null }), { url: "https://x.fr/wp-content/uploads/2026/02/resultats.pdf", annee: null });
+  assert.deepEqual(ecrit({ page: null, classement: "https://x.fr/r?id=1&amp;b=2", annee: null }), { url: "https://x.fr/r?id=1&b=2", annee: null });
+  assert.deepEqual(ecrit({ page: null, classement: "https://dicodusport.fr/blog/resultats-2025/", annee: 2025 }), { url: null, annee: null }, "un blog tiers est écrit");
 });
 
 test("une fiche finishers remplace les lignes DATAtourisme du même événement", () => {

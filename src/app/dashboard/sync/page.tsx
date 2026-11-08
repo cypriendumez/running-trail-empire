@@ -2,16 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import {
-  Watch, RefreshCw, CheckCircle2, Activity,
-  Zap, Heart, Moon, Battery,
-  AlertCircle, ChevronRight, Upload, Info, WifiOff, Clock,
-  Key, Eye, EyeOff, Trash2, ExternalLink,
-  ArrowDown, MousePointerClick, Settings2, Link2, Code2, Sparkles,
-  Footprints, Mountain, Bike, Waves, XCircle, ArrowRight, AlertTriangle, HeartPulse, Droplet, BarChart3, Trophy,
-  type LucideIcon,
-} from "lucide-react";
+import { Watch, RefreshCw, CheckCircle2, Activity, Zap, Heart, Moon, Battery, AlertCircle, ChevronRight, Upload, Info, WifiOff, Clock, Key, Eye, EyeOff, Trash2, ExternalLink, ArrowDown, MousePointerClick, Settings2, Link2, Code2, Footprints, Mountain, Bike, Waves, XCircle, ArrowRight, AlertTriangle, HeartPulse, Droplet, BarChart3, Trophy, type LucideIcon, Smartphone } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { cleMessageErreur, etatCle } from "@/lib/intervals/connexionMontre";
 import { SY, SY_NODES, fillY } from "./syncI18n";
 import { cleanActivityName } from "@/lib/utils/activityName";
 
@@ -43,12 +36,27 @@ interface RecentActivity {
 
 interface WellnessDay {
   date: string;
+  /** Dans LA mesure de l'athlète (rMSSD, ou SDNN d'Apple Watch) — voir lib/health/vfc. */
   hrv?: number;
   sleep_h?: number;
   sleep_score?: number;
   body_battery?: number;
   spo2?: number;
+  /** Position face à SA base (zone normale ± 6 %), calculée par le serveur. */
+  state?: "recovery" | "optimal" | "competition" | null;
 }
+
+/**
+ * Les couleurs de l'état. ⚠️ Elles étaient tirées de seuils ABSOLUS (> 80 ms vert, > 55
+ * bleu, sinon « Récup ») : une SDNN d'Apple Watch était presque toujours « Récup », et un
+ * coureur à 90 ms de base presque toujours « Optimal ». L'état vient désormais du serveur,
+ * relatif à la base de l'athlète.
+ */
+const ETAT_VFC = {
+  competition: { cle: "state.optimal", badge: "text-emerald-600 bg-emerald-50", valeur: "text-emerald-600" },
+  optimal: { cle: "state.correct", badge: "text-blue-600 bg-blue-50", valeur: "text-blue-600" },
+  recovery: { cle: "state.recup", badge: "text-orange-600 bg-orange-50", valeur: "text-orange-500" },
+} as const;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function fmtDuration(sec: number) {
@@ -68,6 +76,14 @@ function activityIcon(type?: string): LucideIcon {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
+/**
+ * Les retours de `/api/intervals/oauth/callback` et les familles de portées. Rien d'autre ne
+ * s'affiche : l'adresse est modifiable par n'importe qui, elle ne choisit qu'un message connu.
+ */
+const STATUTS_OAUTH = ["ok", "partiel", "refuse", "invalide", "erreur", "indisponible"] as const;
+const FAMILLES_OAUTH = ["activity", "wellness", "calendar", "settings"] as const;
+type RetourOAuth = { statut: (typeof STATUTS_OAUTH)[number]; manque: string[]; inscription: boolean };
+
 export default function SyncPage() {
   const { lang } = useT();
   const d = SY[lang] ?? SY.fr;
@@ -81,23 +97,29 @@ export default function SyncPage() {
   const [days, setDays] = useState(30);
   const [activities, setActivities] = useState<RecentActivity[]>([]);
   const [wellness, setWellness] = useState<WellnessDay[]>([]);
+  const [metriqueVfc, setMetriqueVfc] = useState<"rmssd" | "sdnn" | null>(null);
   const [loadingData, setLoadingData] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"activities" | "wellness" | "setup">("activities");
 
-  // Credentials form state
-  const [credsAthleteId, setCredsAthleteId] = useState("");
+  // Credentials form state — UNE clé suffit depuis le 12/10/2026 : le compte se lit dessus
+  // (lib/intervals/compteDeLaCle), comme dans le questionnaire d'inscription.
   const [credsApiKey, setCredsApiKey] = useState("");
+  const [credsCompte, setCredsCompte] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [savingCreds, setSavingCreds] = useState(false);
   const [credsError, setCredsError] = useState<string | null>(null);
   const [credsSaved, setCredsSaved] = useState(false);
-  const [existingCreds, setExistingCreds] = useState<{ athleteId: string | null; apiKeyMasked: string | null } | null>(null);
+  const [existingCreds, setExistingCreds] = useState<{ athleteId: string | null; apiKeyMasked: string | null; mode?: "oauth" | "cle" | null } | null>(null);
+  // Connexion en un clic (OAuth) : proposée seulement si l'application est configurée.
+  const [oauth, setOauth] = useState(false);
+  const [voirCleManuelle, setVoirCleManuelle] = useState(false);
+  const [retourOAuth, setRetourOAuth] = useState<RetourOAuth | null>(null);
 
   function checkStatus() {
     fetch("/api/intervals/status")
       .then(r => r.json())
-      .then(d => setConfigured(d.configured ?? false))
+      .then(d => { setConfigured(d.configured ?? false); setOauth(d.oauth === true); })
       .catch(() => setConfigured(false));
   }
 
@@ -108,30 +130,31 @@ export default function SyncPage() {
     fetch("/api/intervals/credentials")
       .then(r => r.json())
       .then(d => {
-        setExistingCreds({ athleteId: d.athleteId, apiKeyMasked: d.apiKeyMasked });
-        if (d.athleteId) setCredsAthleteId(d.athleteId);
+        setExistingCreds({ athleteId: d.athleteId, apiKeyMasked: d.apiKeyMasked, mode: d.mode ?? null });
       })
       .catch(() => {});
   }, []);
 
-  // ── Smart validation — catches the most common mistakes ──
-  const idTrim = credsAthleteId.trim();
+  // Retour de l'écran d'autorisation d'intervals.icu : on lit le statut, puis l'adresse
+  // redevient propre (un rechargement ne réaffiche pas le message).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const statut = p.get("intervals");
+    if (!statut || !(STATUTS_OAUTH as readonly string[]).includes(statut)) return;
+    const manque = (p.get("manque") ?? "").split(",").filter((m) => (FAMILLES_OAUTH as readonly string[]).includes(m));
+    setRetourOAuth({ statut: statut as RetourOAuth["statut"], manque, inscription: p.get("depuis") === "inscription" });
+    if (statut !== "ok") setActiveTab("setup");
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+
+  // ── La clé : les MÊMES règles que le questionnaire (lib/intervals/connexionMontre) ──
+  // ⚠️ L'ancien formulaire acceptait une clé VIDE pour « garder l'actuelle » quand des
+  // identifiants existaient — mais la route exige la clé : le bouton promettait une mise à
+  // jour qui répondait 400. Il faut désormais une clé pour mettre à jour.
   const keyTrim = credsApiKey.trim();
-  const idValid = /^i\d{3,}$/i.test(idTrim);
-  const idHint =
-    idTrim === "" ? null :
-    idTrim.includes("@") ? d["hint.idEmail"] :
-    !idTrim.toLowerCase().startsWith("i") ? d["hint.idStart"] :
-    !idValid ? d["hint.idFormat"] :
-    null;
-  const keyValid = /^[a-z0-9]{16,}$/i.test(keyTrim);
-  const keyHint =
-    keyTrim === "" ? null :
-    keyTrim.length < 20 && /[A-Z!?@#$%^&*]/.test(keyTrim) ? d["hint.keyPwd"] :
-    !keyValid ? d["hint.keyLen"] :
-    null;
-  // When updating existing creds, an empty key field is allowed (keep current)
-  const keyFieldOk = keyTrim === "" ? !!existingCreds?.athleteId : keyValid;
+  const etat = etatCle(credsApiKey);
+  const keyValid = etat.valide;
+  const keyHint = etat.indice === "mdp" ? d["hint.keyPwd"] : etat.indice === "format" ? d["hint.keyLen"] : null;
 
   async function handleSaveCredentials(e: React.FormEvent) {
     e.preventDefault();
@@ -142,13 +165,17 @@ export default function SyncPage() {
       const res = await fetch("/api/intervals/credentials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ athleteId: credsAthleteId, apiKey: credsApiKey }),
+        body: JSON.stringify({ apiKey: keyTrim }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? d["err.save"]);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const k = cleMessageErreur(data?.code);
+        throw new Error(k === "mErrCle" ? d["err.cle"] : k === "mErrIndispo" ? d["err.indispo"] : typeof data?.error === "string" ? data.error : d["err.save"]);
+      }
       setCredsSaved(true);
       setCredsApiKey("");
-      setExistingCreds({ athleteId: credsAthleteId, apiKeyMasked: credsApiKey.slice(0, 4) + "●●●●●●●●●●●●" });
+      setCredsCompte(typeof data.nom === "string" ? data.nom : null);
+      setExistingCreds({ athleteId: typeof data.athleteId === "string" ? data.athleteId : null, apiKeyMasked: keyTrim.slice(0, 4) + "●●●●●●●●●●●●", mode: "cle" });
       checkStatus();
     } catch (err) {
       setCredsError(String(err).replace("Error: ", ""));
@@ -160,8 +187,8 @@ export default function SyncPage() {
   async function handleDeleteCredentials() {
     if (!confirm(d["cf.delete"])) return;
     await fetch("/api/intervals/credentials", { method: "DELETE" });
-    setCredsAthleteId("");
     setCredsApiKey("");
+    setCredsCompte(null);
     setExistingCreds(null);
     setCredsSaved(false);
     checkStatus();
@@ -176,7 +203,7 @@ export default function SyncPage() {
         fetch(`/api/intervals/data?type=wellness&days=${days}`),
       ]);
       if (actRes.ok) { const d = await actRes.json(); setActivities(d.activities ?? []); }
-      if (wellRes.ok) { const d = await wellRes.json(); setWellness(d.wellness ?? []); }
+      if (wellRes.ok) { const d = await wellRes.json(); setWellness(d.wellness ?? []); setMetriqueVfc(d.metriqueVfc ?? null); }
     } finally {
       setLoadingData(false);
     }
@@ -259,11 +286,11 @@ export default function SyncPage() {
         {/* ── Header ── */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3.5">
-            <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-800 to-zinc-950 text-white shadow-[0_10px_26px_-10px_rgba(16,24,40,0.6)]">
+            <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-zinc-900 text-white">
               <Watch className="h-6 w-6" />
             </span>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{d["title"]}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">{d["title"]}</h1>
               <p className="mt-0.5 text-sm text-zinc-500">
                 Garmin · COROS · Polar via <strong className="font-semibold text-zinc-600">Intervals.icu</strong>
               </p>
@@ -290,7 +317,7 @@ export default function SyncPage() {
         </div>
 
         {/* ── Sync bar ── */}
-        <div className="rounded-3xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_14px_36px_-22px_rgba(16,24,40,0.18)]">
+        <div className="rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_14px_36px_-22px_rgba(16,24,40,0.18)]">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex flex-wrap items-center gap-2">
               <label className="text-sm font-medium text-zinc-600">{d["period"]}</label>
@@ -310,7 +337,7 @@ export default function SyncPage() {
               {syncing && (
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-28 overflow-hidden rounded-full bg-zinc-200">
-                    <motion.div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600" animate={{ width: `${syncProgress}%` }} transition={{ duration: 0.4 }} />
+                    <motion.div className="h-full rounded-full bg-emerald-600" animate={{ width: `${syncProgress}%` }} transition={{ duration: 0.4 }} />
                   </div>
                   <span className="w-8 text-right text-xs font-semibold tabular-nums text-zinc-600">{syncProgress}%</span>
                 </div>
@@ -318,7 +345,7 @@ export default function SyncPage() {
               <button
                 onClick={handleSync}
                 disabled={syncing || !configured}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-br from-zinc-800 to-zinc-950 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_18px_-8px_rgba(16,24,40,0.5)] transition-all hover:shadow-[0_10px_22px_-8px_rgba(16,24,40,0.6)] active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
+                className="flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition hover:shadow-[0_10px_22px_-8px_rgba(16,24,40,0.6)] active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
               >
                 <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
                 {syncing ? d["syncing"] : d["syncNow"]}
@@ -360,6 +387,44 @@ export default function SyncPage() {
           )}
         </div>
 
+        {/* ── Retour de l'autorisation intervals.icu ── */}
+        {retourOAuth && (
+          <div role="status" className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm ${
+            retourOAuth.statut === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-900" :
+            retourOAuth.statut === "partiel" ? "border-amber-200 bg-amber-50 text-amber-900" :
+            "border-red-200 bg-red-50 text-red-900"
+          }`}>
+            {retourOAuth.statut === "ok"
+              ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+              : <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 flex-shrink-0" />}
+            <div className="flex-1">
+              <p className="font-semibold">{d[`ret.${retourOAuth.statut}`]}</p>
+              {retourOAuth.statut === "ok" && (
+                <p className="mt-0.5">{retourOAuth.inscription ? d["ret.okBienvenue"] : d["ret.okSub"]}</p>
+              )}
+              {retourOAuth.statut === "partiel" && (
+                <>
+                  <ul className="mt-1.5 list-disc space-y-0.5 pl-5">
+                    {retourOAuth.manque.map((m) => <li key={m}>{d[`sc.${m}`]}</li>)}
+                  </ul>
+                  <p className="mt-1.5">{d["ret.partielFix"]}</p>
+                  <a href="/api/intervals/oauth/start?retour=sync"
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700">
+                    <Link2 aria-hidden="true" className="h-3.5 w-3.5" /> {d["oa.again"]}
+                  </a>
+                </>
+              )}
+              {retourOAuth.statut !== "ok" && retourOAuth.statut !== "partiel" && (
+                <p className="mt-0.5">{d["ret.retry"]}</p>
+              )}
+            </div>
+            <button type="button" onClick={() => setRetourOAuth(null)} aria-label={d["ret.close"]}
+              className="rounded-lg p-1 opacity-70 transition-opacity hover:opacity-100">
+              <XCircle aria-hidden="true" className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {/* ── Tabs ── */}
         <div className="flex w-fit gap-1 rounded-2xl bg-zinc-100/80 p-1 ring-1 ring-zinc-200/60">
           {([
@@ -382,9 +447,9 @@ export default function SyncPage() {
         {activeTab === "activities" && (
           <div className="space-y-4">
             {/* Upload GPX */}
-            <div className="rounded-3xl border border-dashed border-zinc-300 bg-white p-5 transition-colors hover:border-zinc-400">
+            <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-5 transition-colors hover:border-zinc-400">
               <label className="group flex cursor-pointer items-center gap-3">
-                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-100 to-zinc-200 text-zinc-500 transition-colors group-hover:from-zinc-200 group-hover:to-zinc-300">
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-500 transition-colors group-hover:bg-zinc-200">
                   <Upload className="h-5 w-5" />
                 </div>
                 <div>
@@ -401,8 +466,8 @@ export default function SyncPage() {
                 <RefreshCw className="w-6 h-6 animate-spin text-zinc-300" />
               </div>
             ) : activities.length === 0 ? (
-              <div className="flex flex-col items-center rounded-3xl border border-zinc-200 bg-white py-16 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-50 to-zinc-100 ring-1 ring-zinc-100"><Activity className="h-7 w-7 text-zinc-300" /></div>
+              <div className="flex flex-col items-center rounded-2xl border border-zinc-200 bg-white py-16 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-50 ring-1 ring-zinc-100"><Activity className="h-7 w-7 text-zinc-300" /></div>
                 <p className="mt-3 text-sm text-zinc-400">{d["act.empty"]}</p>
               </div>
             ) : (
@@ -415,25 +480,25 @@ export default function SyncPage() {
                 const avgHr = hrs.length ? Math.round(hrs.reduce((s, h) => s + h, 0) / hrs.length) : null;
                 return (
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-emerald-50 p-4 text-center">
-                      <Activity className="mx-auto mb-1.5 h-5 w-5 text-emerald-500" />
-                      <div className="text-2xl font-bold tabular-nums text-emerald-700">{Math.round(totalKm)}</div>
+                    <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 text-center">
+                      <Activity className="mx-auto mb-1.5 h-[18px] w-[18px] text-zinc-400" strokeWidth={1.5} />
+                      <div className="text-2xl font-semibold tabular-nums text-zinc-900">{Math.round(totalKm)}</div>
                       <div className="text-xs text-zinc-500">km</div>
                     </div>
-                    <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-sky-50 p-4 text-center">
-                      <Clock className="mx-auto mb-1.5 h-5 w-5 text-blue-500" />
-                      <div className="text-2xl font-bold tabular-nums text-blue-700">{fmtDuration(totalMin * 60)}</div>
+                    <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 text-center">
+                      <Clock className="mx-auto mb-1.5 h-[18px] w-[18px] text-zinc-400" strokeWidth={1.5} />
+                      <div className="text-2xl font-semibold tabular-nums text-zinc-900">{fmtDuration(totalMin * 60)}</div>
                       <div className="text-xs text-zinc-500">{d["u.duration"]}</div>
                     </div>
-                    <div className="rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50 to-red-50 p-4 text-center">
-                      <Heart className="mx-auto mb-1.5 h-5 w-5 text-rose-500" />
-                      <div className="text-2xl font-bold tabular-nums text-rose-600">{avgHr ?? "—"}</div>
+                    <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 text-center">
+                      <Heart className="mx-auto mb-1.5 h-[18px] w-[18px] text-zinc-400" strokeWidth={1.5} />
+                      <div className="text-2xl font-semibold tabular-nums text-zinc-900">{avgHr ?? "—"}</div>
                       <div className="text-xs text-zinc-500">{d["u.avgHr"]}</div>
                     </div>
                   </div>
                 );
               })()}
-              <div className="overflow-hidden rounded-3xl border border-zinc-200/70 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_14px_36px_-24px_rgba(16,24,40,0.16)]">
+              <div className="overflow-hidden rounded-2xl border border-zinc-200/70 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_14px_36px_-24px_rgba(16,24,40,0.16)]">
                 <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-3">
                   <h2 className="text-sm font-semibold text-zinc-900">{ty("act.count", { n: activities.length })}</h2>
                   <span className="text-xs text-zinc-400">{ty("act.over", { d: days })}</span>
@@ -468,12 +533,12 @@ export default function SyncPage() {
                         )}
                         {act.tss && (
                           <div className="text-center">
-                            <div className="font-semibold text-violet-600">{act.tss}</div>
+                            <div className="font-semibold tabular-nums text-zinc-900">{act.tss}</div>
                             <div>TSS</div>
                           </div>
                         )}
                         {act.training_effect && (
-                          <div className={`text-center font-bold ${act.training_effect >= 4 ? "text-red-500" : act.training_effect >= 3 ? "text-orange-500" : "text-emerald-500"}`}>
+                          <div className={`text-center font-semibold ${act.training_effect >= 4 ? "text-red-500" : act.training_effect >= 3 ? "text-orange-500" : "text-emerald-500"}`}>
                             <div>{act.training_effect.toFixed(1)}</div>
                             <div className="font-normal">TE</div>
                           </div>
@@ -488,7 +553,7 @@ export default function SyncPage() {
                             </span>
                           )}
                           {act.ground_contact_time_ms && (
-                            <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium">
+                            <span className="px-2 py-0.5 bg-zinc-100 text-zinc-600 rounded-md text-xs font-medium">
                               {act.ground_contact_time_ms}ms GCT
                             </span>
                           )}
@@ -519,6 +584,11 @@ export default function SyncPage() {
               <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
                 <div className="px-5 py-3 border-b border-zinc-100">
                   <h2 className="font-semibold text-zinc-900 text-sm">{ty("well.count", { n: wellness.length })}</h2>
+                  {/* Une série en SDNN (Apple Watch par défaut) : on le dit, et on donne le
+                      réglage qui apporte la VFC de nuit. */}
+                  {metriqueVfc === "sdnn" && (
+                    <p className="mt-1.5 max-w-prose text-xs leading-relaxed text-zinc-500">{d["well.sdnn"]}</p>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -526,7 +596,7 @@ export default function SyncPage() {
                       <tr className="text-xs text-zinc-400 border-b border-zinc-100">
                         <th className="text-left px-5 py-2.5 font-medium">{d["th.date"]}</th>
                         <th className="text-center px-3 py-2.5 font-medium">
-                          <span className="flex items-center justify-center gap-1"><Heart className="w-3 h-3" />{d["th.hrv"]}</span>
+                          <span className="flex items-center justify-center gap-1"><Heart className="w-3 h-3" />{d["th.hrv"]}{metriqueVfc === "sdnn" && <span className="font-normal">SDNN</span>}</span>
                         </th>
                         <th className="text-center px-3 py-2.5 font-medium">
                           <span className="flex items-center justify-center gap-1"><Moon className="w-3 h-3" />{d["th.sleep"]}</span>
@@ -541,17 +611,15 @@ export default function SyncPage() {
                     </thead>
                     <tbody className="divide-y divide-zinc-50">
                       {wellness.map((w) => {
-                        const state = !w.hrv ? null
-                          : w.hrv > 80 ? { label: d["state.optimal"], color: "text-emerald-600 bg-emerald-50" }
-                          : w.hrv > 55 ? { label: d["state.correct"], color: "text-blue-600 bg-blue-50" }
-                          : { label: d["state.recup"], color: "text-orange-600 bg-orange-50" };
+                        const etat = w.hrv && w.state ? ETAT_VFC[w.state] : null;
+                        const state = etat ? { label: d[etat.cle], color: etat.badge } : null;
                         return (
                           <tr key={w.date} className="hover:bg-zinc-50 transition-colors">
                             <td className="px-5 py-3 text-zinc-700 font-medium">
                               {new Date(w.date + "T12:00:00").toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "short" })}
                             </td>
                             <td className="px-3 py-3 text-center">
-                              {w.hrv ? <span className={`font-bold ${w.hrv > 80 ? "text-emerald-600" : w.hrv > 55 ? "text-blue-600" : "text-orange-500"}`}>{w.hrv} ms</span> : <span className="text-zinc-300">—</span>}
+                              {w.hrv ? <span className={`font-semibold ${etat?.valeur ?? "text-zinc-700"}`}>{w.hrv} ms</span> : <span className="text-zinc-300">—</span>}
                             </td>
                             <td className="px-3 py-3 text-center">
                               {w.sleep_h ? <span className="font-semibold text-zinc-800">{w.sleep_h.toFixed(1)}h</span> : <span className="text-zinc-300">—</span>}
@@ -564,7 +632,7 @@ export default function SyncPage() {
                               ) : <span className="text-zinc-300">—</span>}
                             </td>
                             <td className="px-3 py-3 text-center">
-                              {w.body_battery ? <span className="font-semibold text-violet-600">{w.body_battery}</span> : <span className="text-zinc-300">—</span>}
+                              {w.body_battery ? <span className="font-semibold tabular-nums text-zinc-900">{w.body_battery}</span> : <span className="text-zinc-300">—</span>}
                             </td>
                             <td className="px-3 py-3 text-center">
                               {w.spo2 ? <span className="font-medium text-zinc-700">{w.spo2.toFixed(1)}%</span> : <span className="text-zinc-300">—</span>}
@@ -589,14 +657,16 @@ export default function SyncPage() {
 
             {/* ── Already connected banner ── */}
             {configured && existingCreds?.athleteId && (
-              <div className="bg-gradient-to-r from-emerald-50 to-emerald-50 border border-emerald-200 rounded-2xl p-5 flex items-center gap-4">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex items-center gap-4">
                 <div className="w-11 h-11 bg-emerald-500 rounded-2xl flex items-center justify-center flex-shrink-0">
                   <CheckCircle2 className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold text-emerald-800 text-sm">{d["connected.title"]}</p>
                   <p className="text-xs text-emerald-700 mt-0.5">
-                    {d["acc.word"]} <span className="font-mono font-semibold">{existingCreds.athleteId}</span> · {d["key.word"]} <span className="font-mono">{existingCreds.apiKeyMasked}</span>
+                    {d["acc.word"]} <span className="font-mono font-semibold">{existingCreds.athleteId}</span> · {existingCreds.mode === "oauth"
+                      ? d["oa.mode"]
+                      : <>{d["key.word"]} <span className="font-mono">{existingCreds.apiKeyMasked}</span></>}
                   </p>
                   <p className="text-xs text-emerald-600 mt-1">
                     {nodes.connectedHint}
@@ -619,7 +689,7 @@ export default function SyncPage() {
                     <Watch className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="font-bold text-lg leading-tight">{d["wiz.title"]}</h2>
+                    <h2 className="font-semibold text-lg leading-tight">{d["wiz.title"]}</h2>
                     <p className="text-zinc-300 text-sm mt-0.5">{d["wiz.sub"]}</p>
                   </div>
                 </div>
@@ -629,7 +699,7 @@ export default function SyncPage() {
                   <ChevronRight className="w-4 h-4 text-zinc-400" />
                   <span className="px-3 py-1.5 bg-white/10 rounded-lg">Intervals.icu</span>
                   <ChevronRight className="w-4 h-4 text-zinc-400" />
-                  <span className="px-3 py-1.5 bg-emerald-500/90 rounded-lg flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> {d["wiz.thisApp"]}</span>
+                  <span className="px-3 py-1.5 bg-emerald-500/90 rounded-lg flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5" strokeWidth={1.5} /> {d["wiz.thisApp"]}</span>
                 </div>
               </div>
 
@@ -637,7 +707,7 @@ export default function SyncPage() {
               <div className="p-6 space-y-0">
                 {/* STEP 1 */}
                 <div className="relative pl-14 pb-8">
-                  <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-bold text-sm">1</div>
+                  <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-semibold text-sm">1</div>
                   <div className="absolute left-[17px] top-9 bottom-0 w-0.5 bg-zinc-100" />
                   <h3 className="font-semibold text-zinc-900 text-sm">{d["s1.title"]}</h3>
                   <p className="text-sm text-zinc-500 mt-1">
@@ -646,9 +716,21 @@ export default function SyncPage() {
                   {/* La landing affiche désormais le logo Apple Watch. Sans cette ligne,
                       l'athlète venu pour ça arrivait sur un guide qui ne nomme que Garmin,
                       COROS, Polar et Suunto — et repartait. */}
-                  <p className="mt-2 rounded-lg bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-500">
-                    {d["s1.apple"]}
-                  </p>
+                  <div className="mt-2 rounded-lg bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-500">
+                    <p>
+                      {d["s1.apple"]}{" "}
+                      <a href="https://apps.apple.com/app/id6739638454" target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-semibold text-emerald-700 underline-offset-2 hover:underline">
+                        {d["s1.appleLien"]} <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                      </a>
+                    </p>
+                    {/* L'app ne lit Santé que sur un iPhone déverrouillé : la séance part quand elle
+                        tourne. La recette d'automatisation est la même que dans le questionnaire. */}
+                    <p className="mt-1.5 font-medium text-zinc-700">{d["s1.appleEnvoi"]}</p>
+                    {/* Par défaut, l'app envoie la SDNN (moyenne des relevés de la journée) : l'option
+                        « Sleeping HRV (rMSSD) » donne la VFC de nuit, que Pacevo préfère (lib/health/vfc). */}
+                    <p className="mt-1.5">{d["s1.appleVfc"]}</p>
+                  </div>
                   <a href="https://intervals.icu" target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-zinc-900 hover:bg-zinc-700 px-3 py-2 rounded-lg mt-3 transition-colors">
                     {d["s1.cta"]} <ExternalLink className="w-3.5 h-3.5" />
@@ -657,7 +739,7 @@ export default function SyncPage() {
 
                 {/* STEP 2 */}
                 <div className="relative pl-14 pb-8">
-                  <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-bold text-sm">2</div>
+                  <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-semibold text-sm">2</div>
                   <div className="absolute left-[17px] top-9 bottom-0 w-0.5 bg-zinc-100" />
                   <h3 className="font-semibold text-zinc-900 text-sm">{d["s2.title"]}</h3>
                   <p className="text-sm text-zinc-500 mt-1">
@@ -674,7 +756,7 @@ export default function SyncPage() {
                       {["Garmin", "COROS", "Polar"].map((b, i) => (
                         <div key={b} className={`rounded-lg border p-2 text-center text-[11px] font-semibold ${i === 0 ? "border-blue-300 bg-blue-50 text-blue-700 ring-2 ring-blue-200" : "border-zinc-200 bg-white text-zinc-500"}`}>
                           {b}
-                          {i === 0 && <div className="flex items-center justify-center gap-0.5 mt-1 text-[10px] text-blue-500 font-normal"><MousePointerClick className="w-3 h-3" /> {d["s2.click"]}</div>}
+                          {i === 0 && <div className="flex items-center justify-center gap-0.5 mt-1 text-[11px] text-blue-500 font-normal"><MousePointerClick className="w-3 h-3" /> {d["s2.click"]}</div>}
                         </div>
                       ))}
                     </div>
@@ -685,9 +767,28 @@ export default function SyncPage() {
                   </a>
                 </div>
 
+                {/* AUTORISATION EN UN CLIC (OAuth) — remplace les étapes 3 et 4 quand elle est proposée. */}
+                {oauth && (
+                  <div className="relative pl-14 pb-8">
+                    <div className="absolute left-0 top-0 w-9 h-9 bg-emerald-600 text-white rounded-full flex items-center justify-center">
+                      <Link2 aria-hidden="true" className="w-4 h-4" />
+                    </div>
+                    <h3 className="font-semibold text-zinc-900 text-sm">{d["oa.title"]}</h3>
+                    <p className="text-sm text-zinc-500 mt-1">{d["oa.desc"]}</p>
+                    <a href="/api/intervals/oauth/start?retour=sync"
+                      className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 mt-3">
+                      <Link2 aria-hidden="true" className="h-4 w-4" /> {existingCreds?.mode === "oauth" ? d["oa.again"] : d["oa.button"]}
+                    </a>
+                    <button type="button" onClick={() => setVoirCleManuelle((v) => !v)} aria-expanded={voirCleManuelle}
+                      className="mt-3 block text-xs font-medium text-zinc-500 underline-offset-2 hover:text-zinc-800 hover:underline">
+                      {d["oa.cle"]}
+                    </button>
+                  </div>
+                )}
+                <div hidden={oauth && !voirCleManuelle}>
                 {/* STEP 3 */}
                 <div className="relative pl-14 pb-8">
-                  <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-bold text-sm">3</div>
+                  <div className="absolute left-0 top-0 w-9 h-9 bg-zinc-900 text-white rounded-full flex items-center justify-center font-semibold text-sm">3</div>
                   <div className="absolute left-[17px] top-9 bottom-0 w-0.5 bg-zinc-100" />
                   <h3 className="font-semibold text-zinc-900 text-sm">{d["s3.title"]}</h3>
                   <p className="text-sm text-zinc-500 mt-1">
@@ -701,27 +802,18 @@ export default function SyncPage() {
                         <span className="w-2 h-2 rounded-full bg-amber-300" />
                         <span className="w-2 h-2 rounded-full bg-emerald-300" />
                       </div>
-                      <span className="text-[10px] text-zinc-400 ml-1 flex items-center gap-1"><Code2 className="w-3 h-3" /> intervals.icu — {d["s3.devAccess"]}</span>
+                      <span className="text-[11px] text-zinc-400 ml-1 flex items-center gap-1"><Code2 className="w-3 h-3" /> intervals.icu — {d["s3.devAccess"]}</span>
                     </div>
-                    <div className="p-3 space-y-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-blue-50 border-2 border-blue-300 rounded-lg px-3 py-2 animate-pulse">
-                          <p className="text-[10px] text-blue-400 font-medium">Athlete ID</p>
-                          <p className="font-mono text-sm font-bold text-blue-700">i564686</p>
-                        </div>
-                        <div className="flex items-center gap-1 text-blue-500 w-20">
-                          <ArrowDown className="w-4 h-4 flex-shrink-0 rotate-90" />
-                          <span className="text-[11px] font-semibold leading-tight">{d["s3.code1"]}</span>
-                        </div>
-                      </div>
+                    <div className="p-3">
+                      {/* Une seule valeur à copier : l'Athlete ID se déduit de la clé. */}
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-emerald-50 border-2 border-emerald-300 rounded-lg px-3 py-2 animate-pulse">
-                          <p className="text-[10px] text-emerald-500 font-medium">API Key</p>
-                          <p className="font-mono text-xs font-bold text-emerald-700 truncate">a1b2c3d4e5f6…</p>
+                          <p className="text-[11px] text-emerald-500 font-medium">API Key</p>
+                          <p className="font-mono text-xs font-semibold text-emerald-700 truncate">a1b2c3d4e5f6…</p>
                         </div>
                         <div className="flex items-center gap-1 text-emerald-600 w-20">
                           <ArrowDown className="w-4 h-4 flex-shrink-0 rotate-90" />
-                          <span className="text-[11px] font-semibold leading-tight">{d["s3.code2"]}</span>
+                          <span className="text-[11px] font-semibold leading-tight">{d["s3.aCopier"]}</span>
                         </div>
                       </div>
                     </div>
@@ -739,7 +831,7 @@ export default function SyncPage() {
 
                 {/* STEP 4 — the form */}
                 <div className="relative pl-14">
-                  <div className={`absolute left-0 top-0 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${configured ? "bg-emerald-500 text-white" : "bg-zinc-900 text-white"}`}>
+                  <div className={`absolute left-0 top-0 w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm ${configured ? "bg-emerald-500 text-white" : "bg-zinc-900 text-white"}`}>
                     {configured ? <CheckCircle2 className="w-5 h-5" /> : "4"}
                   </div>
                   <h3 className="font-semibold text-zinc-900 text-sm">{d["s4.title"]}</h3>
@@ -748,40 +840,21 @@ export default function SyncPage() {
                   </p>
 
                   <form onSubmit={handleSaveCredentials} className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div>
                       <div>
-                        <label className="text-xs font-medium text-zinc-600 block mb-1.5">
-                          1️⃣ Athlete ID <span className="text-zinc-400">{d["f.athleteHint"]}</span>
+                        <label htmlFor="sync-cle-api" className="text-xs font-medium text-zinc-600 block mb-1.5">
+                          {d["f.apiKey"]} <span className="text-zinc-400">{d["f.apiKeyHint"]}</span>
                         </label>
                         <div className="relative">
                           <input
-                            type="text"
-                            value={credsAthleteId}
-                            onChange={e => setCredsAthleteId(e.target.value)}
-                            placeholder="i000000"
-                            required
-                            className={`w-full px-3 py-2.5 pr-9 rounded-xl border text-sm font-mono focus:outline-none focus:ring-2 transition-colors ${
-                              idHint ? "border-red-300 focus:ring-red-400 bg-red-50/40" :
-                              idValid ? "border-emerald-300 focus:ring-emerald-400 bg-emerald-50/40" :
-                              "border-zinc-200 focus:ring-zinc-900 bg-white"
-                            }`}
-                          />
-                          {idValid && <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-1/2 -translate-y-1/2" />}
-                          {idHint && <AlertCircle className="w-4 h-4 text-red-400 absolute right-3 top-1/2 -translate-y-1/2" />}
-                        </div>
-                        {idHint && <p className="text-[11px] text-red-500 mt-1 flex items-start gap-1"><AlertTriangle className="mt-px h-3.5 w-3.5 flex-shrink-0" />{idHint}</p>}
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-zinc-600 block mb-1.5">
-                          2️⃣ {d["f.apiKey"]} <span className="text-zinc-400">{d["f.apiKeyHint"]}</span>
-                        </label>
-                        <div className="relative">
-                          <input
+                            id="sync-cle-api"
+                            autoComplete="off" spellCheck={false} autoCapitalize="none"
+                            aria-invalid={keyHint ? true : undefined}
                             type={showApiKey ? "text" : "password"}
                             value={credsApiKey}
                             onChange={e => setCredsApiKey(e.target.value)}
                             placeholder={existingCreds?.apiKeyMasked ? d["f.keyPlaceholder"] : "a1b2c3d4e5f6…"}
-                            required={!existingCreds?.athleteId}
+                            required
                             className={`w-full px-3 py-2.5 pr-16 rounded-xl border text-sm font-mono focus:outline-none focus:ring-2 transition-colors ${
                               keyHint ? "border-red-300 focus:ring-red-400 bg-red-50/40" :
                               keyValid ? "border-emerald-300 focus:ring-emerald-400 bg-emerald-50/40" :
@@ -806,18 +879,22 @@ export default function SyncPage() {
                       </div>
                     )}
                     {credsSaved && (
-                      <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5">
-                        <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                        {d["f.saved"]}
+                      <div className="flex items-start gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5">
+                        <CheckCircle2 className="mt-px w-4 h-4 flex-shrink-0" />
+                        <span>
+                          {credsCompte && <span className="block font-semibold">{d["f.account"].replace("{nom}", credsCompte)}</span>}
+                          {d["f.saved"]}
+                        </span>
                       </div>
                     )}
 
-                    <button type="submit" disabled={savingCreds || !idValid || !keyFieldOk}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 hover:bg-zinc-700 text-white rounded-xl text-sm font-semibold disabled:opacity-40 transition-all">
+                    <button type="submit" disabled={savingCreds || !keyValid}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 hover:bg-zinc-700 text-white rounded-xl text-sm font-semibold disabled:opacity-40 transition">
                       {savingCreds ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                       {savingCreds ? d["f.checking"] : existingCreds?.athleteId ? d["f.update"] : d["f.connect"]}
                     </button>
                   </form>
+                </div>
                 </div>
               </div>
             </div>
@@ -841,7 +918,7 @@ export default function SyncPage() {
                   { logo: "H", name: "Huawei", color: "bg-rose-600", models: "Watch GT, Watch Ultimate" },
                 ].map(d => (
                   <div key={d.name} className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-50">
-                    <div className={`w-8 h-8 ${d.color} text-white rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0`}>{d.logo}</div>
+                    <div className={`w-8 h-8 ${d.color} text-white rounded-lg flex items-center justify-center font-semibold text-sm flex-shrink-0`}>{d.logo}</div>
                     <div>
                       <p className="text-xs font-semibold text-zinc-800">{d.name}</p>
                       <p className="text-xs text-zinc-400 leading-tight mt-0.5">{d.models}</p>

@@ -30,7 +30,7 @@ const NOMS_FR: Record<CleProgramme, string> = {
 
 export const PLANS_I18N: Record<Lang, PlansDict> = {
   fr: {
-    titre: "Plans d'entraînement", sousTitre: "Des plans complets, construits sur TON volume actuel et ton niveau. Ils complètent le coach : lui décide de ta séance de demain, ceux-ci montrent la trajectoire des prochains mois.",
+    titre: "Plans d'entraînement", sousTitre: "Des plans complets, construits sur ton volume actuel et ton niveau. Ils complètent le coach : lui décide de ta séance de demain, ceux-ci montrent la trajectoire des prochains mois.",
     niveau: "Ton niveau", niveaux: { debutant: "Débutant", intermediaire: "Intermédiaire", confirme: "Confirmé", elite: "Élite" },
     volumeActuel: "Ton volume actuel", parSemaine: "km/sem", duree: "Durée", semaines: "semaines",
     choisir: "Voir le plan", retour: "Tous les plans",

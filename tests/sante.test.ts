@@ -32,35 +32,40 @@ const LANGUES = ["fr", "en", "de", "es", "pt"] as const;
 
 console.log("\n=== SANTÉ & KINÉ IA ===\n");
 
-test("l'onglet Sécurité ne promet plus ce qui n'existe pas", () => {
-  // Le code NU : le commentaire qui raconte ces fausses promesses doit rester lisible
-  // (c'est la mémoire du défaut), seul l'affichage est contrôlé.
-  const src = codeNu(CENTRE);
-  // Les quatre fausses promesses, dans les cinq langues : elles ne doivent plus exister.
+const CONTACT = "src/components/settings/ContactUrgence.tsx";
+
+test("l'onglet Sécurité a quitté Santé (30/09/2026) ; ce qui reste ne promet rien de faux", () => {
+  // Cyprien : « sécurité, ça ne sert à rien, enlève-le ». Le contact d'urgence, lui, sert
+  // à l'enregistrement de sortie : il vit désormais dans Paramètres › Sécurité.
+  const centre = codeNu(CENTRE);
+  assert.ok(!/"guardian"|tab\.guardian|emergencyPhone/.test(centre), "l'onglet Sécurité est revenu dans Santé");
+  const src = codeNu(CONTACT);
+  // Les fausses promesses de l'ancien « Guardian », dans les cinq langues : jamais plus.
   for (const faux of [/détection de chute/i, /fall detection/i, /Sturzerkennung/i, /detección de caídas/i, /deteção de quedas/i,
     /arrêt cardiaque/i, /cardiac arrest/i, /Herzstillstand/i, /paro cardíaco/i, /paragem cardíaca/i,
     /SMS \+ (appel|call|Anruf|llamada|chamada)/i, /alerte automatique/i, /automatic alert/i]) {
-    assert.ok(!faux.test(src), `l'onglet Sécurité annonce à nouveau « ${faux} » — aucune ligne de code ne le fait`);
+    assert.ok(!faux.test(src), `le contact d'urgence annonce à nouveau « ${faux} » — aucune ligne de code ne le fait`);
   }
-  // Et il dit explicitement ce qu'il ne fait pas.
-  const codeSrc = src;
-  assert.match(codeSrc, /"sec\.honest"/, "la phrase qui dit ce que Pacevo NE fait PAS a disparu");
-  assert.ok(!/guardianEnabled/.test(codeSrc), "l'interrupteur « Guardian » (qui n'allumait rien) est revenu");
-  // Ce qui reste existe vraiment : le partage live (page /dashboard/trail) et l'appel direct.
-  assert.match(codeSrc, /href="\/dashboard\/trail"/, "le lien vers le partage de position en direct a disparu");
-  assert.match(codeSrc, /href=\{`tel:\$\{emergencyPhone/, "le contact d'urgence n'est plus appelable");
+  // Et il dit ce qu'il ne fait pas, dans les cinq langues.
+  for (const vrai of [/n'appelle et n'écrit à personne tout seul/, /never calls or messages anyone on its own/, /ruft niemanden von selbst an/, /no llama ni escribe a nadie por su cuenta/, /não liga nem escreve a ninguém por si só/]) {
+    assert.match(src, vrai, `la phrase qui dit ce que Pacevo NE fait PAS a disparu (${vrai})`);
+  }
+  assert.match(src, /href=\{`tel:\$\{enregistre\.tel\.replace/, "le contact d'urgence n'est plus appelable");
+  assert.match(codeNu("src/components/settings/SettingsView.tsx"), /<ContactUrgence initial=\{\{ nom: s\(settings\.contactUrgenceNom\), tel: s\(settings\.contactUrgenceTel\) \}\} \/>/,
+    "le contact d'urgence n'est plus réglable nulle part (l'enregistrement de sortie en a besoin)");
+  assert.match(readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8"), /\(Paramètres › Sécurité\)/, "l'enregistrement renvoie encore vers Santé › Sécurité, qui n'existe plus");
 });
 
 test("le contact d'urgence est VRAIMENT enregistré, et l'échec est dit", () => {
-  const src = codeNu(CENTRE);
+  const src = codeNu(CONTACT);
   assert.match(src, /fetch\("\/api\/settings"[\s\S]{0,200}contactUrgenceNom/, "le contact n'est plus envoyé aux réglages");
-  assert.match(src, /if \(r\.ok\) toast\.success\(tr\("gd\.savedContact"\)\);\s*else toast\.error\(tr\("sec\.saveFail"\)\)/,
+  assert.match(src, /if \(r\.ok\) \{ toast\.success\(t\("ok"\)\);[\s\S]{0,120}?\}\s*else toast\.error\(t\("ko"\)\)/,
     "un enregistrement refusé s'annoncerait encore comme réussi");
   const api = codeNu("src/app/api/settings/route.ts");
   assert.match(api, /body\.contactUrgenceNom === "string"/, "/api/settings n'accepte plus le nom du contact");
   assert.match(api, /body\.contactUrgenceTel[\s\S]{0,120}replace\(/, "le numéro n'est plus nettoyé avant écriture");
-  // Et il est relu côté serveur, sinon le champ repart vide à chaque visite.
-  assert.match(codeNu("src/app/dashboard/health/page.tsx"), /contactUrgenceNom/, "la page ne relit plus le contact enregistré");
+  // Et il est relu côté serveur (les réglages passent à la vue), sinon le champ repart vide.
+  assert.match(codeNu("src/app/dashboard/settings/page.tsx"), /\.eq\("type", "user_settings"\)/, "la page ne relit plus les réglages enregistrés");
 });
 
 test("la consultation survit à un rechargement, et peut être remise à zéro", () => {
@@ -187,14 +192,18 @@ test("le Profil n'a plus d'interrupteur qui ne commande rien", () => {
 
 test("les libellés Santé ajoutés existent dans les cinq langues", () => {
   const src = readFileSync(CENTRE, "utf8");
-  const cles = ["sec.title", "sec.sub", "sec.live", "sec.liveDesc", "sec.liveBtn", "sec.contact", "sec.contactDesc", "sec.honest", "sec.kit", "sec.k1", "sec.k5", "sec.call", "sec.saveFail",
-    "chat.new", "chat.newConfirm", "chat.resumed", "chat.newFail", "bilan.title", "bilan.hyp", "bilan.urgent", "bilan.exos", "bilan.charge", "bilan.reprise", "bilan.plan", "bilan.planned", "bilan.planFail", "bilan.voirCal",
+  const cles = ["chat.new", "chat.newConfirm", "chat.resumed", "chat.newFail", "bilan.title", "bilan.hyp", "bilan.urgent", "bilan.exos", "bilan.charge", "bilan.reprise", "bilan.plan", "bilan.planned", "bilan.planFail", "bilan.voirCal",
     "bilan.proba.haute", "bilan.proba.moyenne", "bilan.proba.faible"];
   for (const k of cles) {
     const n = [...src.matchAll(new RegExp(`"${k.replace(/\./g, "\\.")}":`, "g"))].length;
     assert.equal(n, LANGUES.length, `« ${k} » présent ${n} fois, attendu ${LANGUES.length}`);
   }
   assert.ok(src.includes('"bilan.planned": "{n}') || /"bilan\.planned": "[^"]*\{n\}/.test(src), "« bilan.planned » ne porte plus le nombre de séances");
+  // Le contact d'urgence et la nutrition, eux aussi, en cinq langues.
+  for (const f of [CONTACT, "src/components/health/NutritionCourse.tsx"]) {
+    const x = readFileSync(f, "utf8");
+    for (const l of LANGUES) assert.ok(new RegExp(`\\n  ${l}: \\{`).test(x), `${f} : langue ${l} absente`);
+  }
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

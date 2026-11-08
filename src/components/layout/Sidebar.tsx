@@ -65,20 +65,21 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
         href={href}
         title={typeof label === "string" && collapsed ? label : undefined}
         className={cn(
-          "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
-          active ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900",
+          // Rangée de 36 px, état actif = une marche de surface et un filet (passe « unslop »,
+          // 06/11/2026) : plus d'aplat noir ni de barre verte.
+          "group relative flex h-9 items-center gap-2.5 px-2.5 rounded-lg text-sm transition-colors",
+          active ? "bg-zinc-100 font-medium text-zinc-900 shadow-[inset_0_0_0_1px_rgba(24,24,27,0.06)]" : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900",
         )}
       >
-        {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-emerald-500" />}
         <span className="relative flex-shrink-0">
-          <Icon className="w-[18px] h-[18px]" />
+          <Icon className={cn("w-[18px] h-[18px]", active ? "text-zinc-900" : "text-zinc-400 group-hover:text-zinc-600")} strokeWidth={1.5} />
           {count > 0 && collapsed && (
-            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-white ring-2 ring-white">{count > 9 ? "9+" : count}</span>
+            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-emerald-500 px-1 text-[11px] font-medium text-white ring-2 ring-white">{count > 9 ? "9+" : count}</span>
           )}
         </span>
         {!collapsed && <span className="flex-1">{label}</span>}
         {!collapsed && count > 0 && (
-          <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-white shadow-sm">{count > 99 ? "99+" : count}</span>
+          <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-md bg-emerald-600 px-1.5 text-[11px] font-medium tabular-nums text-white">{count > 99 ? "99+" : count}</span>
         )}
       </Link>
     );
@@ -86,7 +87,7 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
 
   return (
     <aside className={cn(
-      // ⚠️ `transition-all` ANIMAIT TOUT, sur un élément pleine hauteur : chaque image
+      // ⚠️ `transition` ANIMAIT TOUT, sur un élément pleine hauteur : chaque image
       // recalculait la mise en page de la barre entière. On ne déclare que la seule
       // propriété qui change réellement — la largeur du repli.
       "hidden md:flex h-screen flex-col border-r border-zinc-100 bg-white transition-[width] duration-300 ease-out",
@@ -104,11 +105,11 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
       </Link>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 overflow-y-auto">
         {NAV_GROUPES.map((g, gi) => (
-          <div key={gi} className={gi > 0 ? "mt-5" : ""}>
+          <div key={gi} className={gi > 0 ? "mt-6" : ""}>
             {g.titleKey && !collapsed && (
-              <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500">{t(g.titleKey)}</div>
+              <div className="px-2.5 mb-2 text-xs font-medium text-zinc-400 first-letter:uppercase">{t(g.titleKey)}</div>
             )}
             {g.titleKey && collapsed && gi > 0 && <div className="mx-3 mb-2 border-t border-zinc-100" />}
             <div className="space-y-0.5">
@@ -121,12 +122,12 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
       {/* Encart Premium — comptes gratuits uniquement (comme la maquette) */}
       {!collapsed && tier === "free" && (
         <div className="px-3 pb-1">
-          <Link href="/pricing" className="block rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white p-3 transition-shadow hover:shadow-sm">
+          <Link href="/pricing" className="block rounded-xl border border-zinc-200/80 bg-white p-3 transition-colors hover:border-zinc-300">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-amber-500 text-white"><Crown className="h-4 w-4" /></span>
-              <span className="text-sm font-bold text-zinc-900">{pc.title}</span>
+              <Crown className="h-4 w-4 flex-shrink-0 text-zinc-400" strokeWidth={1.5} />
+              <span className="text-sm font-medium text-zinc-900">{pc.title}</span>
             </div>
-            <p className="mt-1.5 text-[11px] leading-snug text-zinc-500">{pc.sub}</p>
+            <p className="mt-1 text-xs leading-snug text-zinc-500">{pc.sub}</p>
           </Link>
         </div>
       )}
@@ -135,24 +136,24 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
       <div className="p-3 border-t border-zinc-100 space-y-0.5">
         {estEditeur && (
           <Link href="/admin"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-all">
-            <ShieldCheck className="w-[18px] h-[18px] flex-shrink-0" />
+            className="flex h-9 items-center gap-2.5 px-2.5 rounded-lg text-sm font-medium text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-colors">
+            <ShieldCheck className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={1.5} />
             {!collapsed && "Espace coach"}
           </Link>
         )}
         <NavItem href="/dashboard/profile" icon={User} label={t("nav.profile")} />
         <Link href="/dashboard/settings"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-all">
-          <Settings className="w-[18px] h-[18px] flex-shrink-0" />
+          className="group flex h-9 items-center gap-2.5 px-2.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors">
+          <Settings className="w-[18px] h-[18px] flex-shrink-0 text-zinc-400 group-hover:text-zinc-600" strokeWidth={1.5} />
           {!collapsed && t("nav.settings")}
         </Link>
         <button onClick={signOut}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-red-50 hover:text-red-600 transition-all">
-          <LogOut className="w-[18px] h-[18px] flex-shrink-0" />
+          className="group w-full flex h-9 items-center gap-2.5 px-2.5 rounded-lg text-sm text-zinc-600 hover:bg-zinc-50 hover:text-red-700 transition-colors">
+          <LogOut className="w-[18px] h-[18px] flex-shrink-0 text-zinc-400 group-hover:text-red-600" strokeWidth={1.5} />
           {!collapsed && t("nav.logout")}
         </button>
         <button onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs text-zinc-400 hover:bg-zinc-50 transition-all">
+          className="w-full flex h-9 items-center gap-2.5 px-2.5 rounded-lg text-xs text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600 transition-colors">
           <ChevronLeft className={cn("w-4 h-4 transition-transform flex-shrink-0", collapsed && "rotate-180")} />
           {!collapsed && t("nav.collapse")}
         </button>

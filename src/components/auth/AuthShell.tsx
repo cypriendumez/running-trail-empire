@@ -64,7 +64,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
         </Link>
 
         <div className="relative">
-          <h2 className="text-[2.6rem] font-bold leading-[1.08] tracking-tight text-white">
+          <h2 className="text-[2.6rem] font-semibold leading-[1.08] tracking-tight text-white">
             {s.title1}<br />{s.title2}
           </h2>
           <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-white/60">
@@ -81,7 +81,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
           <div className="mt-10 flex gap-10 border-t border-white/10 pt-7">
             {CHIFFRES_AUTH.map((valeur, i) => (
               <div key={s.stats[i]}>
-                <div className="text-2xl font-bold tabular-nums text-white">{valeur}</div>
+                <div className="text-2xl font-semibold tabular-nums text-white">{valeur}</div>
                 <div className="mt-1 text-xs leading-tight text-white/45">{s.stats[i]}</div>
               </div>
             ))}

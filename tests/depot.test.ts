@@ -14,6 +14,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -22,6 +23,17 @@ function test(nom: string, fn: () => void) {
 }
 
 const DOUBLON = /[^/]* [0-9](\.[^/]*)?$/;
+
+/**
+ * OÙ VIT LE DÉPÔT (12/10/2026). ⚠️ Dans un worktree, `.git` est un FICHIER (« gitdir: … ») :
+ * lire `.git/index` en dur y levait ENOTDIR — et comme `npm test` enchaîne par `&&`, tous
+ * les fichiers de test suivants sautaient sans un mot. Les références (et les copies iCloud)
+ * vivent dans le répertoire COMMUN, l'index dans celui du worktree. Dans le dépôt
+ * principal, ces deux chemins valent `.git` et `.git/index` : rien n'y change.
+ */
+const revParse = (...args: string[]) => execFileSync("git", ["rev-parse", ...args], { encoding: "utf8" }).trim();
+const GIT_COMMUN = revParse("--git-common-dir");
+const INDEX = revParse("--git-path", "index");
 
 test("le motif des doublons iCloud est GÉNÉRIQUE, pas une liste de fichiers", () => {
   // ⚠️ La version précédente nommait `/.next*` après coup, une fois les 2 106 fichiers
@@ -34,7 +46,7 @@ test("le motif des doublons iCloud est GÉNÉRIQUE, pas une liste de fichiers", 
 test("le motif ne masque AUCUN fichier légitime", () => {
   // ⚠️ Un motif trop large est pire que le défaut : il cache un vrai fichier, et
   // personne ne s'en aperçoit avant que la production ne le réclame.
-  const suivis = readFileSync(".git/index", "utf8").length > 0; // le dépôt est bien là
+  const suivis = readFileSync(INDEX, "utf8").length > 0; // le dépôt est bien là
   assert.ok(suivis, "impossible de lire l'index git");
   // On rejoue le motif sur l'arborescence de travail.
   const coupables: string[] = [];
@@ -64,12 +76,12 @@ test("aucune RÉFÉRENCE dupliquée ne traîne dans .git", () => {
    * Les copies d'index sont donc SIGNALÉES, pas sanctionnées.
    */
   const refs: string[] = [];
-  for (const rep of [".git/refs/heads", ".git/refs/remotes/origin"]) {
+  for (const rep of [`${GIT_COMMUN}/refs/heads`, `${GIT_COMMUN}/refs/remotes/origin`]) {
     if (!existsSync(rep)) continue;
     for (const e of readdirSync(rep)) if (DOUBLON.test(e)) refs.push(`${rep}/${e}`);
   }
-  const index = existsSync(".git")
-    ? readdirSync(".git").filter((e) => /^index [0-9]+$/.test(e))
+  const index = existsSync(GIT_COMMUN)
+    ? readdirSync(GIT_COMMUN).filter((e) => /^index [0-9]+$/.test(e))
     : [];
   if (index.length) {
     console.log(`     ⓘ ${index.length} copie(s) inerte(s) de .git/index laissées par iCloud — sans effet, mais signe que .git est synchronisé.`);

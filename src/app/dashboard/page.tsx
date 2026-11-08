@@ -2,22 +2,26 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { fuseauOuDefaut } from "@/lib/time/fuseau";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { lecturesEnEchec } from "@/lib/dashboard/lectures";
-import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import type { AnalyseMemorisee } from "@/lib/dashboard/derniereAnalyse";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { TestVmaBanner } from "@/components/dashboard/TestVmaBanner";
 import { InviteAvis } from "@/components/dashboard/InviteAvis";
 import { TYPE_AVIS } from "@/lib/avis/store";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
-import { meilleurEffort, loadRisk, effectiveVma } from "@/lib/running/fitness";
+import { objectifEnCours } from "@/lib/coach/prochaineCourse";
+import { loadRisk } from "@/lib/running/fitness";
+import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { validerRecordDeclare, type RecordDeclare } from "@/lib/dashboard/records";
-import type { SourceVma } from "@/components/dashboard/BentoDashboard";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { seancesSansRessenti } from "@/lib/dashboard/ressenti";
-import { computeStreak, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
+import { computeStreak, coursesDeLObjectif, jourLocal, decaleJour, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
 import { accesDe } from "@/lib/billing/access";
 import { estAdmin } from "@/lib/admin/acces";
+import { serieVfc } from "@/lib/health/vfc";
+import type { HRVData } from "@/types";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
@@ -40,10 +44,12 @@ export default async function DashboardPage() {
   const streakToday = jourLocal(new Date(), fuseauAthlete);
   const streakFrom = decaleJour(streakToday, -119);
 
-  // Le jour de l'athlète, calculé AVANT les requêtes : il en filtre une.
-  const today = aujourdhui(FUSEAU_DEFAUT);
+  // ⚠️ LE JOUR DE L'ATHLÈTE (06/11/2026). C'était `aujourdhui(FUSEAU_DEFAUT)`, le jour de
+  // PARIS : pour un coureur d'un autre fuseau, entre minuit à Paris et minuit chez lui, la
+  // séance de demain s'affichait comme « Séance du jour ». Le même jour que la série.
+  const today = streakToday;
 
-  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes, analysesRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -59,7 +65,12 @@ export default async function DashboardPage() {
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(60),
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "race_objective").maybeSingle(),
     supabase.from("performance_baselines").select("vma_kmh,max_hr,tested_at").eq("user_id", user!.id).order("tested_at", { ascending: false }).limit(1).single(),
-    supabase.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()),
+    // ⚠️ COMPTÉ AVEC LA CLÉ DE SERVICE, ET SANS SOI-MÊME (06/11/2026). Avec la session, la
+    // règle RLS `profiles_select_own` ne laisse voir que son propre profil : la carte
+    // annonçait « +1 nouveaux cette semaine » à un inscrit de la semaine, qui se comptait
+    // lui-même, et 0 à tous les autres. Un COMPTE seulement (`head`), aucune ligne lue.
+    createAdminClient().from("profiles").select("id", { count: "exact", head: true })
+      .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()).neq("id", user!.id),
     // ── RECORDS PAR DISTANCE — requête DÉDIÉE, sur TOUT l'historique ──────────────
     // La liste principale est plafonnée à 40 activités, soit ici deux mois seulement.
     // La carte « Records personnels » se calculait dessus et annonçait donc, avec le
@@ -109,12 +120,21 @@ export default async function DashboardPage() {
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "record_declare").limit(8),
     // Les paires du Garage, pour « quelles chaussures as-tu portées ? » dans le ressenti.
     supabase.from("shoes").select("id, brand, model, current_km, max_km").eq("user_id", user!.id).eq("is_active", true).limit(12),
+    // La décision du coach pour la semaine (la même que lit le calendrier) : la phrase du
+    // jour ne doit jamais promettre une séance que le plan ne contient pas.
+    supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "auto_coach_state").maybeSingle(),
+    // Les analyses de séance MÉMORISÉES (`/api/ai/analyse-seance`) : la carte « Analyse IA »
+    // les lit, elle n'en déclenche aucune — chaque analyse est un appel payant au modèle.
+    supabase.from("notifications").select("body,data").eq("user_id", user!.id).eq("type", "seance_analyse").order("created_at", { ascending: false }).limit(20),
   ]);
   if (garageRes.error) console.error("[accueil] garage illisible :", garageRes.error.message);
   if (declaresRes.error) console.error("[accueil] records déclarés illisibles :", declaresRes.error.message);
   const recordsDeclares = ((declaresRes.data ?? []) as { data: unknown }[])
     .map((r) => validerRecordDeclare(r.data, "9999-12-31"))
     .filter((r): r is RecordDeclare => r != null);
+  // VFC : UNE seule mesure par athlète (rMSSD, ou la SDNN d'une Apple Watch en réglages
+  // par défaut) et l'état face à SA base — jamais `hrv_ms` brut (lib/health/vfc).
+  const vfc = serieVfc((hrvRes.data ?? []) as HRVData[]);
 
   // L'état d'abonnement se déduit du profil déjà chargé : `created_at` donne l'essai,
   // `subscription_tier` la formule. Aucune requête de plus.
@@ -129,37 +149,48 @@ export default async function DashboardPage() {
       (r) => slotKey(r.data as { date?: unknown; moment?: unknown }),
     ).map((r) => r.data),
     feedbacks: ((feedbackRes.data ?? []) as { data: { date?: unknown; pain?: unknown } }[]).map((r) => r.data),
+    // Le lendemain d'une course courue est protégé : l'objectif et la course qu'il a remplacée.
+    courses: coursesDeLObjectif((objRes.data?.data ?? null) as Parameters<typeof coursesDeLObjectif>[0]),
     today: streakToday,
   });
   const newMembersWeek = newMembersRes.count ?? 0;
 
-  const objective = (objRes.data?.data ?? null) as Objective | null;
+  // ⚠️ UNE COURSE PASSÉE N'EST PLUS L'OBJECTIF. Cinq jours après le marathon de Lille, la
+  // carte proposait « Modifier mon objectif » prérempli avec Lille, 2 h 40 et le 25/10, et
+  // la carte de forme jugeait encore la vitesse contre ce chrono. La course passée reste
+  // nommée — « c'est derrière toi » — mais le formulaire s'ouvre vide, sur la suivante.
+  // Jour de l'ATHLÈTE (cookie de fuseau), le même que celui de la série.
+  const objectifEnregistre = (objRes.data?.data ?? null) as Objective | null;
+  const objective = objectifEnCours(objectifEnregistre, streakToday);
+  // ⚠️ LA PHRASE DU JOUR SUIT LE PLAN (lib/dashboard/discipline › phraseDuJour). Une
+  // récupération n'est rappelée que tant que sa date de reprise est à venir : l'état du
+  // coach peut dater, si aucune séance n'a été synchronisée depuis.
+  const etatCoach = (etatCoachRes.data?.data ?? null) as { qBudget?: unknown; recuperation?: { course?: unknown; reprise?: unknown } | null; marcheCourse?: { etape?: unknown } | null } | null;
+  // Programme marche-course en cours (lib/coach/marcheCourse) : pas de test VMA à réclamer,
+  // le coach n'en prescrit pas tant que l'athlète ne court pas 30 minutes d'affilée.
+  const enMarcheCourse = typeof etatCoach?.marcheCourse?.etape === "number";
+  const recupCoach = etatCoach?.recuperation;
+  const planCoach = etatCoach ? {
+    qBudget: typeof etatCoach.qBudget === "number" ? etatCoach.qBudget : null,
+    recuperation: recupCoach && typeof recupCoach.course === "string" && typeof recupCoach.reprise === "string" && recupCoach.reprise > streakToday
+      ? { course: recupCoach.course, reprise: recupCoach.reprise } : null,
+  } : null;
+  const derniereCourse = objectifEnregistre && !objective
+    ? { race: objectifEnregistre.race, raceDate: objectifEnregistre.raceDate }
+    : null;
 
   // VMA actuelle (test sinon estimée) + risque de charge (déload proactif).
   const wks = (workoutsRes.data ?? []) as { date: string; type?: string | null; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; max_hr?: number | null; tss?: number | null }[];
-  const obsMaxHr = Math.max(0, ...wks.map(w => Number(w.max_hr ?? 0)));
-  const garminVo2 = Number((profileRes.data as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || 0;
-  // VMA : test → efforts réels (reflète l'allure de course) → dérivée de la VO2max Garmin (repli).
-  // MÊME calcul que le coach — la même fonction, pas une chaîne parallèle. Celle-ci
-  // ignorait purement et simplement la courbe d'allure : le tableau de bord annonçait
-  // 18,7 km/h pendant que le plan était calé sur 17,3, pour le même athlète.
-  const effort = meilleurEffort(wks, obsMaxHr > 120 ? obsMaxHr : null);
-  const vmaCalculee = effectiveVma({
-    vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
-    paceCurveBest: ((profileRes.data as { pace_curve?: { best?: { m: number; sec: number }[] } | null } | null)?.pace_curve)?.best,
-    garminVo2: garminVo2 || null,
-    fromRuns: effort?.vma ?? null,
+  // VMA et sa source : le module partagé avec la page détaillée (lib/dashboard/vmaAffichee),
+  // lui-même branché sur `effectiveVma` — une seule chaîne de VMA dans toute l'application.
+  const { vma: currentVma, source: sourceVma } = vmaAffichee({
+    seances: wks,
+    baseline: baseRes.data as { vma_kmh?: number | null; tested_at?: string | null } | null,
+    profil: profileRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null,
   });
-  const currentVma = vmaCalculee.vma ?? 0;
-  // D'OÙ VIENT LE CHIFFRE — sans quoi « 19,8 km/h » ne disait pas s'il suivait la forme
-  // ou datait de six mois. Il la suit (recalculé à chaque affichage) ; on le montre.
-  const sourceVma: SourceVma | null = vmaCalculee.source === "séances" && effort
-    ? { type: "seances", date: effort.date, km: effort.distanceKm }
-    : vmaCalculee.source === "test"
-      ? { type: "test", date: String((baseRes.data as { tested_at?: string } | null)?.tested_at ?? "").slice(0, 10) || null }
-      : vmaCalculee.source === "courbe" ? { type: "courbe" }
-      : vmaCalculee.source === "vo2max" ? { type: "vo2max" } : null;
-  const risk = loadRisk(wks);
+  // Sur l'historique de charge d'UN AN (pas les 40 dernières séances) et au jour de
+  // l'athlète (pas celui de Paris) : la même série que la carte Charge & affûtage.
+  const risk = loadRisk((chargeRes.data ?? []) as { date: string; type?: string | null; duration_seconds?: number | null; tss?: number | null }[], streakToday);
 
   // Prochaine séance prescrite par le coach (aujourd'hui ou à venir) → prioritaire sur l'IA/l'algo.
   type CoachText = { title?: string; subtitle?: string; tags?: string[]; why?: string };
@@ -170,7 +201,8 @@ export default async function DashboardPage() {
   const coachSession = cn
     // Le français reste ici ; `i18n` voyage à côté et c'est le composant client qui
     // choisit la langue (le sélecteur est instantané, il ne recharge pas la page).
-    ? { title: cn.title, subtitle: cn.data.subtitle || cn.body || "", tags: cn.data.tags ?? [], why: cn.data.why ?? "", i18n: cn.data.i18n }
+    // `date` : la carte verte dit « Séance du jour » seulement si c'est bien celle du jour.
+    ? { title: cn.title, subtitle: cn.data.subtitle || cn.body || "", tags: cn.data.tags ?? [], why: cn.data.why ?? "", i18n: cn.data.i18n, date: cn.data.date ?? null }
     : null;
 
   // Ressenti demandé pour CHAQUE séance récente (≤ 4 j) qui n'en a pas — désignée par son
@@ -243,11 +275,12 @@ export default async function DashboardPage() {
         la seule chose sur laquelle on agit en ouvrant l'application (Cyprien, 23/09/2026 :
         « quand j'ouvre l'application on voit toute la page verte »). On demande un avis
         APRÈS avoir rendu service, pas avant. */}
-    <TestVmaBanner measured={vmaMesuree || estFondateur} />
+    <TestVmaBanner measured={vmaMesuree || estFondateur || enMarcheCourse} />
     <BentoDashboard
       donneesIncompletes={donneesIncompletes}
       profile={stripProfileSecrets(profileRes.data)}
-      hrv={hrvRes.data ?? []}
+      hrv={vfc.lignes}
+      metriqueVfc={vfc.metrique}
       workouts={workoutsRes.data ?? []}
       plan={planRes.data}
       league={leagueRes.data}
@@ -259,6 +292,11 @@ export default async function DashboardPage() {
       coachSession={coachSession}
       ressenti={ressenti}
       objective={objective}
+      derniereCourse={derniereCourse}
+      planCoach={planCoach}
+      cibleVolumeKm={typeof (etatCoach as { targetKm?: unknown } | null)?.targetKm === "number" ? (etatCoach as { targetKm: number }).targetKm : null}
+      analyses={(analysesRes.data ?? []) as AnalyseMemorisee[]}
+      montreReliee={!!(profileRes.data as { intervals_api_key?: string | null } | null)?.intervals_api_key}
       currentVma={currentVma}
       sourceVma={sourceVma}
       loadRisk={risk}

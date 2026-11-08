@@ -85,8 +85,16 @@ export type TextesPlan = {
   // (lib/watch/intervals) le lirait comme des répétitions et poserait des allures
   // sur ce qui doit rester une marche.
   marcheCourseTitre: string;
-  marcheCourseDetail: (duree: string) => string;
   marcheCourseWhy: string;
+  /** Programme marche-course des débutants complets (`lib/coach/marcheCourse`). ⚠️ Le
+   *  français est lu par la montre : « N × (X min de course … / Y min de marche) » et
+   *  « X min de course continue » doivent garder cette forme. */
+  mcTitre: (etape: string, total: string) => string;
+  mcAlternance: (reps: number, courseMin: number, marcheMin: number) => string;
+  mcContinu: (min: number) => string;
+  mcWhy: (etape: string, total: string) => string;
+  renfoDebutant: string;
+  renfoDebutantWhy: string;
   sansImpactTitre: string;
   sansImpactDetail: (duree: string) => string;
   sansImpactWhy: string;
@@ -109,6 +117,20 @@ export type TextesPlan = {
   suffixeAllegee: string;
   qualiteDetail: (echauff: number, corps: string, calme: number, affutage: boolean, allegee: boolean) => string;
   qualiteWhySauvee: (origineCross: string) => string;
+  /** Suffixe « (reprise) » : la séance qui suit une course courue (`lib/coach/apresCourse`). */
+  suffixeReprise: string;
+  /** Pourquoi cette séance de reprise ; le nom de la course est un nom propre. */
+  qualiteWhyReprise: (course: string) => string;
+  /** Journée de DOUBLE SEUIL (méthode norvégienne) : titres du matin et du soir, et pourquoi. */
+  /** Course B ou C de la saison (`lib/coach/saison`) : le nom est un nom propre. */
+  courseSecondaireTitre: (nom: string, priorite: string) => string;
+  courseBDetail: string;
+  courseBWhy: string;
+  courseCDetail: string;
+  courseCWhy: string;
+  dsTitreMatin: string;
+  dsTitreSoir: string;
+  dsWhy: string;
   qualiteWhy: string;
 
   // ── Endurance ───────────────────────────────────────────────────────────────
@@ -126,12 +148,16 @@ export type TextesPlan = {
   lignesDroites: string;
   enduranceDetail: (echauff: number, corps: string, allure: string, calme: number, gap: string, scinder: boolean, cycle: string) => string;
   enduranceWhyTropIntense: (pct: string) => string;
+  /** ⚠️ La CIBLE de la semaine, pas ce qui est couru : « tu es sur ~32 km cette semaine »
+   *  se lisait comme un bilan, constaté le 06/11/2026 chez un coureur à 0 km en 7 jours. */
   enduranceWhy: (cible: string) => string;
 
   // ── Renforcement ────────────────────────────────────────────────────────────
   renfoTitre: string;
   renfoAffutage: string;
   renfoBase: (series: number) => string;
+  /** Renforcement pendant la récupération d'après-course, avant la reprise de l'intensité. */
+  renfoRecup: string;
   renfoSpecifique: (series: number) => string;
   renfoDeveloppement: (series: number, enPlus: boolean) => string;
   renfoWhy: string;
@@ -212,8 +238,13 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongDetail: (e, d, n) => `Échauffement ${e} min très facile → ${d} à 2h en FC Z2, allure conversationnelle, cadence souple → 10 min de retour au calme. Pas d'allure cible : c'est du volume aérobie sans impact.${n}`,
     veloLongWhy: "Le volume aérobie de la semaine, sans les contraintes d'impact de la course.",
     marcheCourseTitre: "Marche/course",
-    marcheCourseDetail: (d) => `Environ ${d} en alternant course très facile et marche : cours deux minutes en restant capable de parler, puis marche une minute, et recommence jusqu'au bout. La marche fait PARTIE de la séance, ce n'est pas un échec.`,
     marcheCourseWhy: "Ton cœur encaisse déjà la course continue ; tes tendons et tes articulations, pas encore. L'alternance donne le même travail aérobie en divisant les chocs, et c'est ce qui évite la périostite du deuxième mois.",
+    mcTitre: (e, t) => `Marche/course · étape ${e}/${t}`,
+    mcAlternance: (n, c, m) => `5 min de marche active → Corps : ${n} × (${c} min de course très facile / ${m} min de marche) → 5 min de marche pour finir. Cours assez lentement pour pouvoir parler. La marche fait partie de la séance, ce n'est pas un échec.`,
+    mcContinu: (m) => `5 min de marche active → Corps : ${m} min de course continue très facile → 5 min de marche pour finir. Si tu dois marcher un moment, marche, puis repars : l'étape se refait sans regret.`,
+    mcWhy: (e, t) => `Étape ${e} sur ${t} du programme marche-course : trois séances par étape, puis la course s'allonge. Le but : 30 minutes de course continue en une dizaine de semaines, sans te blesser — le souffle progresse vite, les tendons et les os prennent des semaines. Une étape te semble dure ? Refais-la, rien ne presse.`,
+    renfoDebutant: `20 min, POUR COMMENCER : gainage 3×20 s (sur les genoux si besoin), squats au poids du corps 3×10, fentes 2×8 par jambe, pont fessier 3×12, montées de mollets 3×12, équilibre sur une jambe 2×20 s. Le but : préparer tendons et articulations aux impacts de la course.`,
+    renfoDebutantWhy: `Au début, les blessures viennent surtout des tibias, des chevilles et des genoux, qui encaissent les impacts avant d'y être prêts. Un peu de renforcement chaque semaine réduit nettement ce risque.`,
     sansImpactTitre: "Volume sans impact (vélo ou elliptique)",
     sansImpactDetail: (d) => `Environ ${d} à vélo, en elliptique ou en rameur, en FC Z2 — allure conversationnelle, aucune allure cible. Remplace le footing du jour : même temps d'effort, zéro impact au sol.`,
     sansImpactWhy: "Une part du volume passe hors course pour construire le moteur sans répéter les chocs, le temps que la charge articulaire redevienne soutenable.",
@@ -232,6 +263,16 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteTitreSeuil: "Séance au seuil",
     qualiteTitreSpecifique: "Allure spécifique objectif",
     suffixeAllegee: " (allégée)",
+    suffixeReprise: " (reprise)",
+    qualiteWhyReprise: (c) => `Reprise après ${c} : une seule séance de qualité cette semaine, au seuil et volontairement courte. Elle réveille le rythme sans entamer une récupération qui n'est pas finie — ni VMA ni course tant qu'elle dure. Si les jambes sont encore lourdes à l'échauffement, transforme-la en footing.`,
+    courseSecondaireTitre: (n, p) => `${n} · course ${p}`,
+    courseBDetail: "Course de préparation : échauffe-toi 15 min avec quelques accélérations, puis cours-la vite mais sans te mettre dans le rouge — c'est une répétition générale de ton objectif, pas l'objectif. Note tes sensations et ton allure.",
+    courseBWhy: "Une course B se prépare légèrement — deux jours calmes avant, une semaine allégée — et se récupère ensuite : elle sert ton objectif sans le compromettre.",
+    courseCDetail: "Course d'entraînement : échauffe-toi 15 min, puis cours-la à l'effort d'une séance au seuil, pas à fond. Retour au calme 10 min.",
+    courseCWhy: "Une course C remplace une séance de qualité de la semaine : pas d'affûtage, on s'en sert pour s'entraîner en conditions de course.",
+    dsTitreMatin: "Double seuil · matin",
+    dsTitreSoir: "Double seuil · soir",
+    dsWhy: "Méthode norvégienne : deux séances au seuil le même jour, toutes deux SOUS le seuil — c'est le cumul qui construit le seuil, pas l'intensité. Elle se pilote normalement au lactate ; sans lactatemètre, l'erreur classique est de courir trop vite et d'en faire deux séances dures. Tiens l'allure écrite, même si tu te sens bien.",
     qualiteDetail: (e, c, k, taper, all) => `Échauffement ${e} min progressif FC Z1→Z2 + 3 à 5 lignes droites de 80 m → Corps : ${c} → Retour au calme ${k} min FC Z1.${taper ? " ⚠️ Affûtage : garde l'intensité mais coupe le nombre de répétitions d'un tiers." : ""}${all ? " ⚠️ Version allégée : coupe le nombre de répétitions d'un tiers et garde l'allure. On préserve le stimulus, pas le volume." : ""}`,
     qualiteWhySauvee: (o) => `Ta charge récente est très au-dessus de ta charge de fond${o} — mais ton échéance approche et une semaine sans la moindre allure spécifique se paie le jour J. Donc : UNE séance, raccourcie, plutôt que zéro. Si les sensations ne viennent pas à l'échauffement, transforme-la en footing sans culpabiliser.`,
     qualiteWhy: "La séance de qualité de ton bloc, calée sur ta VMA et ton objectif. C'est elle qui te fait progresser.",
@@ -245,11 +286,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
   lignesDroites: " Termine par 5 lignes droites de 100 m en accélération progressive, récupération complète en marchant : ça entretient la vitesse sans fatiguer.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Échauffement ${e} min progressif FC Z1→Z2 → Corps : ${c} en Z2${a}, tu dois pouvoir tenir une conversation → Retour au calme ${k} min FC Z1.${g}${s ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Tu passes ${p} % de ton temps de course en zone 3 et plus, alors que la cible est 20 %. Tes footings sont courus trop vite — c'est le frein n°1 à la progression. Ralentis jusqu'à pouvoir tenir une conversation complète : c'est censé paraître TROP facile.`,
-    enduranceWhy: (c) => `Le socle aérobie. Avec les autres séances, tu es sur ~${c} km cette semaine — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,
+    enduranceWhy: (c) => `Le socle aérobie. Ta semaine vise ~${c} km au total, séances comprises — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,
 
     renfoTitre: "Renforcement musculaire",
     renfoAffutage: `20 à 25 min, ENTRETIEN seulement : gainage 3×45 s, montées de mollets 2×15, proprioception 2×30 s par jambe, quelques bondissements courts. AUCUNE charge lourde ni série longue à l'approche de la course — on préserve la fraîcheur, la force est déjà acquise.`,
     renfoBase: (s) => `35 à 45 min, FONDATIONS : gainage complet (planche, latéral, dos) ${s}×45 s, squats ${s}×12, fentes ${s}×10 par jambe, montées de mollets ${s}×15, ischios nordic curls ${s}×6, proprioception sur une jambe ${s}×30 s. Amplitude et contrôle avant tout — c'est la phase où l'on construit le tendon.`,
+    renfoRecup: `20 min, RÉCUPÉRATION : mobilité des hanches et des chevilles, gainage 3×30 s (planche, latéral), pont fessier 2×12, montées de mollets lentes 2×12, proprioception 2×30 s par jambe. Aucun saut ni travail excentrique (nordic curls, descentes) : les fibres abîmées par la course se réparent encore.`,
     renfoSpecifique: (s) => `30 à 35 min, FORCE UTILE À LA COURSE : squats bulgares ${s}×8 par jambe, fentes sautées ${s}×8, montées de mollets sur une jambe ${s}×12, nordic curls ${s}×6, gainage dynamique ${s}×40 s, bondissements ${s}×10. Explosif et court : on transfère la force vers la foulée, on ne cherche plus le volume.`,
     renfoDeveloppement: (s, plus) => `30 à 40 min, DÉVELOPPEMENT : gainage (planche, latéral) ${s}×45 s, squats ${s}×12, fentes ${s}×10 par jambe, montées de mollets ${s}×15, ischios nordic curls ${s}×6, proprioception sur une jambe ${s}×30 s. ${plus ? "Série supplémentaire par rapport à la semaine dernière — la surcharge vaut aussi pour le renfo." : "Charge maintenue cette semaine (assimilation)."}`,
     renfoWhy: "La prévention de blessure n°1, et un gain direct d'économie de foulée. Elle se périodise comme la course : fondations, puis force utile, puis simple entretien à l'approche du jour J.",
@@ -323,8 +365,13 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongDetail: (e, d, n) => `Warm-up ${e} min very easy → ${d} to 2h at HR Z2, conversational, smooth cadence → 10 min of cool-down. No target pace: this is aerobic volume without impact.${n}`,
     veloLongWhy: "The aerobic volume of the week, without the impact load of running.",
     marcheCourseTitre: "Walk/run",
-    marcheCourseDetail: (d) => `About ${d} alternating very easy running and walking: run two minutes while still able to talk, then walk one minute, and repeat to the end. The walking is PART of the session, not a failure.`,
     marcheCourseWhy: "Your heart already handles continuous running; your tendons and joints do not yet. Alternating gives the same aerobic work while dividing the impact — that is what prevents the second-month shin splints.",
+    mcTitre: (e, t) => `Walk/run · stage ${e}/${t}`,
+    mcAlternance: (n, c, m) => `5 min brisk walk → Main set: ${n} × (${c} min very easy running / ${m} min walking) → 5 min walk to finish. Run slowly enough to talk. Walking is part of the session, not a failure.`,
+    mcContinu: (m) => `5 min brisk walk → Main set: ${m} min of very easy continuous running → 5 min walk to finish. If you need to walk for a bit, walk, then start again: repeating a stage is fine.`,
+    mcWhy: (e, t) => `Stage ${e} of ${t} of the walk/run programme: three sessions per stage, then the running gets longer. The goal: 30 minutes of continuous running in about ten weeks, without injury — your breathing improves fast, tendons and bones take weeks. A stage feels hard? Repeat it, there is no rush.`,
+    renfoDebutant: `20 min, TO GET STARTED: plank 3×20 s (on your knees if needed), bodyweight squats 3×10, lunges 2×8 per leg, glute bridges 3×12, calf raises 3×12, single-leg balance 2×20 s. The aim: get tendons and joints ready for the impact of running.`,
+    renfoDebutantWhy: `Early on, injuries mostly hit the shins, ankles and knees, which take the impact before they are ready for it. A little strength work every week clearly lowers that risk.`,
     sansImpactTitre: "Impact-free volume (bike or elliptical)",
     sansImpactDetail: (d) => `About ${d} on the bike, elliptical or rower, at HR Z2 — conversational, no target pace. Replaces today's easy run: same time on task, zero ground impact.`,
     sansImpactWhy: "Part of the volume moves off running to build the engine without repeating the impact, until the joint load becomes sustainable again.",
@@ -343,6 +390,16 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteTitreSeuil: "Threshold session",
     qualiteTitreSpecifique: "Goal race pace",
     suffixeAllegee: " (eased)",
+    suffixeReprise: " (comeback)",
+    qualiteWhyReprise: (c) => `Easing back after ${c}: one quality session this week, at threshold and deliberately short. It wakes the rhythm up without eating into a recovery that is not over yet — no VO2max work or racing while it lasts. If your legs still feel heavy in the warm-up, turn it into an easy run.`,
+    courseSecondaireTitre: (n, p) => `${n} · ${p} race`,
+    courseBDetail: "Tune-up race: warm up 15 min with a few strides, then run it fast but without going into the red — it is a dress rehearsal for your goal, not the goal. Note how it felt and your pace.",
+    courseBWhy: "A B race gets a light taper — two easy days before, a lighter week — and a recovery afterwards: it serves your goal without compromising it.",
+    courseCDetail: "Training race: warm up 15 min, then run it at threshold-session effort, not all out. Cool down 10 min.",
+    courseCWhy: "A C race replaces one quality session of the week: no taper, you use it to train in race conditions.",
+    dsTitreMatin: "Double threshold · morning",
+    dsTitreSoir: "Double threshold · evening",
+    dsWhy: "Norwegian method: two threshold sessions on the same day, both BELOW threshold — the total builds the threshold, not the intensity. It is normally steered by blood lactate; without a lactate meter, the classic mistake is running too fast and turning it into two hard sessions. Hold the written pace, even if you feel good.",
     qualiteDetail: (e, c, k, taper, all) => `Warm-up ${e} min building HR Z1→Z2 + 3 to 5 strides of 80 m → Main set: ${c} → Cool-down ${k} min HR Z1.${taper ? " ⚠️ Taper: keep the intensity but cut the number of reps by a third." : ""}${all ? " ⚠️ Eased version: cut the number of reps by a third and keep the pace. We preserve the stimulus, not the volume." : ""}`,
     qualiteWhySauvee: (o) => `Your recent load is well above your chronic load${o} — but your race is coming and a week without any race-specific pace is paid for on the day. So: ONE session, shortened, rather than none. If the sensations do not come during the warm-up, turn it into an easy run without guilt.`,
     qualiteWhy: "The quality session of your block, set on your MAS and your goal. This is the one that makes you progress.",
@@ -356,11 +413,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
   lignesDroites: " Finish with 5 × 100 m strides, building the pace, walking back to full recovery: it keeps your speed without adding fatigue.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Warm-up ${e} min building HR Z1→Z2 → Main set: ${c} at Z2${a}, you must be able to hold a conversation → Cool-down ${k} min HR Z1.${g}${s ? " 💡 At your volume, split it into TWO runs in the day (morning + evening) rather than one endless jog." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ You spend ${p} % of your running time in zone 3 and above, when the target is 20 %. Your easy runs are run too fast — that is the number 1 brake on progress. Slow down until you can hold a full conversation: it is supposed to feel TOO easy.`,
-    enduranceWhy: (c) => `The aerobic base. With the other sessions you are on ~${c} km this week — it is the easy volume that builds deep fitness, not the hard sessions.`,
+    enduranceWhy: (c) => `The aerobic base. Your week aims for ~${c} km in total, all sessions included — it is the easy volume that builds deep fitness, not the hard sessions.`,
 
     renfoTitre: "Strength work",
     renfoAffutage: `20 to 25 min, MAINTENANCE only: core 3×45 s, calf raises 2×15, proprioception 2×30 s per leg, a few short bounds. NO heavy load and no long sets close to the race — we protect freshness, the strength is already banked.`,
     renfoBase: (s) => `35 to 45 min, FOUNDATIONS: full core (plank, side, back) ${s}×45 s, squats ${s}×12, lunges ${s}×10 per leg, calf raises ${s}×15, nordic hamstring curls ${s}×6, single-leg proprioception ${s}×30 s. Range and control above all — this is the phase where the tendon is built.`,
+    renfoRecup: `20 min, RECOVERY: hip and ankle mobility, core 3×30 s (plank, side plank), glute bridges 2×12, slow calf raises 2×12, single-leg balance 2×30 s per leg. No jumps and no eccentric work (Nordic curls, downhill running): the fibres damaged by the race are still repairing.`,
     renfoSpecifique: (s) => `30 to 35 min, STRENGTH THAT TRANSFERS TO RUNNING: Bulgarian split squats ${s}×8 per leg, jump lunges ${s}×8, single-leg calf raises ${s}×12, nordic curls ${s}×6, dynamic core ${s}×40 s, bounds ${s}×10. Explosive and short: we transfer strength into the stride, we no longer chase volume.`,
     renfoDeveloppement: (s, plus) => `30 to 40 min, DEVELOPMENT: core (plank, side) ${s}×45 s, squats ${s}×12, lunges ${s}×10 per leg, calf raises ${s}×15, nordic hamstring curls ${s}×6, single-leg proprioception ${s}×30 s. ${plus ? "One set more than last week — progressive overload applies to strength work too." : "Load held this week (assimilation)."}`,
     renfoWhy: "The number 1 injury prevention, and a direct gain in running economy. It is periodised like the running: foundations, then transferable strength, then simple maintenance as race day approaches.",
@@ -434,8 +492,13 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongDetail: (e, d, n) => `Aufwärmen ${e} min sehr locker → ${d} bis 2h bei HF Z2, Unterhaltungstempo, runde Trittfrequenz → 10 min Auslaufen. Kein Zieltempo: Das ist aerober Umfang ohne Belastungsspitzen.${n}`,
     veloLongWhy: "Der aerobe Umfang der Woche, ohne die Aufprallbelastung des Laufens.",
     marcheCourseTitre: "Geh-/Lauf-Wechsel",
-    marcheCourseDetail: (d) => `Etwa ${d} im Wechsel aus sehr lockerem Laufen und Gehen: zwei Minuten laufen, so dass du noch sprechen kannst, dann eine Minute gehen, und so weiter bis zum Schluss. Das Gehen gehört ZUR Einheit, es ist kein Scheitern.`,
     marcheCourseWhy: "Dein Herz verkraftet Dauerlauf bereits, deine Sehnen und Gelenke noch nicht. Der Wechsel bringt denselben aeroben Reiz bei halber Stoßbelastung — genau das verhindert das Schienbeinkantensyndrom im zweiten Monat.",
+    mcTitre: (e, t) => `Gehen/Laufen · Stufe ${e}/${t}`,
+    mcAlternance: (n, c, m) => `5 Min zügiges Gehen → Hauptteil: ${n} × (${c} Min sehr lockeres Laufen / ${m} Min Gehen) → 5 Min Gehen zum Abschluss. Lauf so langsam, dass du dich unterhalten kannst. Das Gehen gehört zur Einheit, es ist kein Scheitern.`,
+    mcContinu: (m) => `5 Min zügiges Gehen → Hauptteil: ${m} Min sehr lockeres Dauerlaufen → 5 Min Gehen zum Abschluss. Musst du ein Stück gehen, geh und lauf dann weiter: Eine Stufe zu wiederholen ist völlig in Ordnung.`,
+    mcWhy: (e, t) => `Stufe ${e} von ${t} des Geh-Lauf-Programms: drei Einheiten pro Stufe, dann wird das Laufen länger. Ziel: 30 Minuten am Stück in etwa zehn Wochen, ohne Verletzung — die Ausdauer wächst schnell, Sehnen und Knochen brauchen Wochen. Fühlt sich eine Stufe schwer an? Wiederhole sie, es eilt nicht.`,
+    renfoDebutant: `20 Min, FÜR DEN EINSTIEG: Unterarmstütz 3×20 s (bei Bedarf auf den Knien), Kniebeugen mit Körpergewicht 3×10, Ausfallschritte 2×8 pro Bein, Glute Bridge 3×12, Wadenheben 3×12, Einbeinstand 2×20 s. Ziel: Sehnen und Gelenke auf die Stöße des Laufens vorbereiten.`,
+    renfoDebutantWhy: `Am Anfang treffen Verletzungen vor allem Schienbeine, Sprunggelenke und Knie, die die Stöße abfangen, bevor sie dafür bereit sind. Ein wenig Krafttraining pro Woche senkt dieses Risiko deutlich.`,
     sansImpactTitre: "Umfang ohne Stoßbelastung (Rad oder Crosstrainer)",
     sansImpactDetail: (d) => `Etwa ${d} auf dem Rad, Crosstrainer oder Ruderergometer, in HF Z2 — im Gesprächstempo, keine Pace-Vorgabe. Ersetzt den heutigen Dauerlauf: gleiche Belastungszeit, null Aufprall.`,
     sansImpactWhy: "Ein Teil des Umfangs läuft abseits des Laufens, um den Motor zu bauen, ohne die Stöße zu wiederholen — bis die Gelenkbelastung wieder tragbar ist.",
@@ -454,6 +517,16 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteTitreSeuil: "Schwelleneinheit",
     qualiteTitreSpecifique: "Wettkampftempo des Ziels",
     suffixeAllegee: " (reduziert)",
+    suffixeReprise: " (Wiedereinstieg)",
+    qualiteWhyReprise: (c) => `Wiedereinstieg nach ${c}: diese Woche eine einzige Qualitätseinheit, an der Schwelle und bewusst kurz. Sie weckt den Rhythmus, ohne die noch nicht abgeschlossene Erholung anzugreifen — kein VO2max-Training und kein Wettkampf, solange sie dauert. Fühlen sich die Beine beim Aufwärmen noch schwer an, mach einen lockeren Dauerlauf daraus.`,
+    courseSecondaireTitre: (n, p) => `${n} · ${p}-Rennen`,
+    courseBDetail: "Vorbereitungsrennen: 15 Min einlaufen mit ein paar Steigerungen, dann schnell laufen, aber ohne in den roten Bereich zu gehen — eine Generalprobe für dein Ziel, nicht das Ziel. Notiere Gefühl und Tempo.",
+    courseBWhy: "Ein B-Rennen bekommt ein leichtes Tapering — zwei ruhige Tage davor, eine leichtere Woche — und danach Erholung: Es dient deinem Ziel, ohne es zu gefährden.",
+    courseCDetail: "Trainingsrennen: 15 Min einlaufen, dann im Tempo einer Schwelleneinheit laufen, nicht voll. 10 Min auslaufen.",
+    courseCWhy: "Ein C-Rennen ersetzt eine Qualitätseinheit der Woche: kein Tapering, du trainierst damit unter Wettkampfbedingungen.",
+    dsTitreMatin: "Doppelte Schwelle · Morgen",
+    dsTitreSoir: "Doppelte Schwelle · Abend",
+    dsWhy: "Norwegische Methode: zwei Schwelleneinheiten am selben Tag, beide UNTER der Schwelle — die Summe baut die Schwelle auf, nicht die Intensität. Normalerweise wird sie per Laktat gesteuert; ohne Laktatmessgerät ist der klassische Fehler, zu schnell zu laufen und daraus zwei harte Einheiten zu machen. Halte das angegebene Tempo, auch wenn du dich gut fühlst.",
     qualiteDetail: (e, c, k, taper, all) => `Aufwärmen ${e} min ansteigend HF Z1→Z2 + 3 bis 5 Steigerungen über 80 m → Hauptteil: ${c} → Auslaufen ${k} min HF Z1.${taper ? " ⚠️ Tapering: Intensität halten, aber die Anzahl der Wiederholungen um ein Drittel kürzen." : ""}${all ? " ⚠️ Reduzierte Fassung: Anzahl der Wiederholungen um ein Drittel kürzen, Tempo beibehalten. Wir erhalten den Reiz, nicht den Umfang." : ""}`,
     qualiteWhySauvee: (o) => `Deine jüngste Belastung liegt deutlich über deiner Grundbelastung${o} — aber dein Termin rückt näher, und eine Woche ganz ohne wettkampfspezifisches Tempo zahlst du am Tag X. Also: EINE Einheit, verkürzt, statt keiner. Wenn beim Aufwärmen die Sensationen ausbleiben, mach ohne schlechtes Gewissen einen lockeren Dauerlauf daraus.`,
     qualiteWhy: "Die Qualitätseinheit deines Blocks, abgestimmt auf deine maximale aerobe Geschwindigkeit und dein Ziel. Sie ist es, die dich weiterbringt.",
@@ -467,11 +540,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
   lignesDroites: " Zum Abschluss 5 × 100 m Steigerungen mit vollständiger Gehpause: das erhält die Schnelligkeit, ohne zu ermüden.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Aufwärmen ${e} min ansteigend HF Z1→Z2 → Hauptteil: ${c} in Z2${a}, du musst dich unterhalten können → Auslaufen ${k} min HF Z1.${g}${s ? " 💡 Bei deinem Umfang teile ihn auf ZWEI Läufe am Tag auf (morgens + abends) statt eines endlosen Dauerlaufs." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Du verbringst ${p} % deiner Laufzeit in Zone 3 und höher, Ziel sind 20 %. Deine lockeren Läufe sind zu schnell — das ist die Bremse Nummer 1 für den Fortschritt. Werde so langsam, dass du dich vollständig unterhalten kannst: Es soll sich ZU leicht anfühlen.`,
-    enduranceWhy: (c) => `Die aerobe Basis. Mit den übrigen Einheiten liegst du diese Woche bei ~${c} km — es ist der lockere Umfang, der die Grundform baut, nicht die harten Einheiten.`,
+    enduranceWhy: (c) => `Die aerobe Basis. Deine Woche zielt auf insgesamt ~${c} km, alle Einheiten zusammen — es ist der lockere Umfang, der die Grundform baut, nicht die harten Einheiten.`,
 
     renfoTitre: "Kräftigung",
     renfoAffutage: `20 bis 25 min, nur ERHALTUNG: Rumpf 3×45 s, Wadenheben 2×15, Propriozeption 2×30 s pro Bein, ein paar kurze Sprünge. KEINE schweren Lasten und keine langen Sätze kurz vor dem Wettkampf — wir schützen die Frische, die Kraft ist längst da.`,
     renfoBase: (s) => `35 bis 45 min, FUNDAMENT: kompletter Rumpf (Unterarmstütz, seitlich, Rücken) ${s}×45 s, Kniebeugen ${s}×12, Ausfallschritte ${s}×10 pro Bein, Wadenheben ${s}×15, Nordic Curls ${s}×6, Propriozeption auf einem Bein ${s}×30 s. Bewegungsumfang und Kontrolle vor allem — das ist die Phase, in der die Sehne gebaut wird.`,
+    renfoRecup: `20 min, ERHOLUNG: Mobilität für Hüfte und Sprunggelenke, Rumpfstabilität 3×30 s (Unterarmstütz, Seitstütz), Glute Bridge 2×12, langsames Wadenheben 2×12, Einbeinstand 2×30 s pro Bein. Keine Sprünge und keine exzentrische Arbeit (Nordic Curls, Bergabläufe): Die im Wettkampf geschädigten Muskelfasern reparieren sich noch.`,
     renfoSpecifique: (s) => `30 bis 35 min, LAUFSPEZIFISCHE KRAFT: bulgarische Kniebeugen ${s}×8 pro Bein, Sprungausfallschritte ${s}×8, einbeiniges Wadenheben ${s}×12, Nordic Curls ${s}×6, dynamischer Rumpf ${s}×40 s, Sprünge ${s}×10. Explosiv und kurz: Wir übertragen die Kraft in den Laufschritt, Umfang ist nicht mehr das Ziel.`,
     renfoDeveloppement: (s, plus) => `30 bis 40 min, ENTWICKLUNG: Rumpf (Unterarmstütz, seitlich) ${s}×45 s, Kniebeugen ${s}×12, Ausfallschritte ${s}×10 pro Bein, Wadenheben ${s}×15, Nordic Curls ${s}×6, Propriozeption auf einem Bein ${s}×30 s. ${plus ? "Ein Satz mehr als letzte Woche — progressive Überlastung gilt auch für die Kräftigung." : "Belastung diese Woche gehalten (Verarbeitung)."}`,
     renfoWhy: "Die Verletzungsprävention Nummer 1 und ein direkter Gewinn an Laufökonomie. Sie wird periodisiert wie das Laufen: Fundament, dann laufspezifische Kraft, dann nur noch Erhaltung, wenn der Tag X näher rückt.",
@@ -545,8 +619,13 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongDetail: (e, d, n) => `Calentamiento ${e} min muy suave → ${d} a 2h en FC Z2, ritmo conversacional, cadencia ágil → 10 min de vuelta a la calma. Sin ritmo objetivo: es volumen aeróbico sin impacto.${n}`,
     veloLongWhy: "El volumen aeróbico de la semana, sin las exigencias de impacto de la carrera.",
     marcheCourseTitre: "Caminar/correr",
-    marcheCourseDetail: (d) => `Unos ${d} alternando carrera muy suave y caminata: corre dos minutos pudiendo hablar, luego camina un minuto, y repite hasta el final. Caminar FORMA PARTE de la sesión, no es un fracaso.`,
     marcheCourseWhy: "Tu corazón ya aguanta la carrera continua; tus tendones y articulaciones todavía no. Alternar da el mismo trabajo aeróbico dividiendo los impactos, y es lo que evita la periostitis del segundo mes.",
+    mcTitre: (e, t) => `Caminar/correr · etapa ${e}/${t}`,
+    mcAlternance: (n, c, m) => `5 min caminando a buen paso → Parte principal: ${n} × (${c} min de carrera muy suave / ${m} min caminando) → 5 min caminando para terminar. Corre lo bastante despacio como para poder hablar. Caminar forma parte de la sesión, no es un fracaso.`,
+    mcContinu: (m) => `5 min caminando a buen paso → Parte principal: ${m} min de carrera continua muy suave → 5 min caminando para terminar. Si necesitas caminar un rato, camina y vuelve a empezar: repetir una etapa no pasa nada.`,
+    mcWhy: (e, t) => `Etapa ${e} de ${t} del programa de caminar y correr: tres sesiones por etapa, luego la carrera se alarga. El objetivo: 30 minutos de carrera continua en unas diez semanas, sin lesionarte; el aliento mejora rápido, los tendones y los huesos tardan semanas. ¿Una etapa se te hace dura? Repítela, no hay prisa.`,
+    renfoDebutant: `20 min, PARA EMPEZAR: plancha 3×20 s (de rodillas si hace falta), sentadillas con el peso del cuerpo 3×10, zancadas 2×8 por pierna, puente de glúteos 3×12, elevaciones de gemelos 3×12, equilibrio sobre una pierna 2×20 s. El objetivo: preparar tendones y articulaciones para los impactos de la carrera.`,
+    renfoDebutantWhy: `Al principio, las lesiones afectan sobre todo a tibias, tobillos y rodillas, que encajan los impactos antes de estar preparados. Un poco de fuerza cada semana reduce claramente ese riesgo.`,
     sansImpactTitre: "Volumen sin impacto (bici o elíptica)",
     sansImpactDetail: (d) => `Unos ${d} en bici, elíptica o remo, en FC Z2 — ritmo conversacional, sin ritmo objetivo. Sustituye el rodaje de hoy: mismo tiempo de esfuerzo, cero impacto contra el suelo.`,
     sansImpactWhy: "Parte del volumen sale de la carrera para construir el motor sin repetir los impactos, hasta que la carga articular vuelva a ser sostenible.",
@@ -565,6 +644,16 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteTitreSeuil: "Sesión de umbral",
     qualiteTitreSpecifique: "Ritmo específico del objetivo",
     suffixeAllegee: " (aligerada)",
+    suffixeReprise: " (vuelta)",
+    qualiteWhyReprise: (c) => `Vuelta tras ${c}: una sola sesión de calidad esta semana, de umbral y corta a propósito. Despierta el ritmo sin comerse una recuperación que aún no ha terminado: ni VMA ni carreras mientras dure. Si en el calentamiento las piernas siguen pesadas, conviértela en rodaje.`,
+    courseSecondaireTitre: (n, p) => `${n} · carrera ${p}`,
+    courseBDetail: "Carrera de preparación: calienta 15 min con algunas progresiones y córrela rápido pero sin entrar en rojo; es un ensayo general de tu objetivo, no el objetivo. Anota tus sensaciones y tu ritmo.",
+    courseBWhy: "Una carrera B se prepara ligeramente (dos días tranquilos antes, una semana más suave) y se recupera después: sirve a tu objetivo sin comprometerlo.",
+    courseCDetail: "Carrera de entrenamiento: calienta 15 min y córrela al esfuerzo de una sesión de umbral, no a tope. Vuelta a la calma 10 min.",
+    courseCWhy: "Una carrera C sustituye una sesión de calidad de la semana: sin puesta a punto, te sirve para entrenar en condiciones de carrera.",
+    dsTitreMatin: "Doble umbral · mañana",
+    dsTitreSoir: "Doble umbral · tarde",
+    dsWhy: "Método noruego: dos sesiones de umbral el mismo día, ambas POR DEBAJO del umbral; es la suma la que construye el umbral, no la intensidad. Normalmente se controla con lactato; sin lactatómetro, el error clásico es correr demasiado rápido y convertirlo en dos sesiones duras. Mantén el ritmo indicado, aunque te sientas bien.",
     qualiteDetail: (e, c, k, taper, all) => `Calentamiento ${e} min progresivo FC Z1→Z2 + 3 a 5 progresiones de 80 m → Parte principal: ${c} → Vuelta a la calma ${k} min FC Z1.${taper ? " ⚠️ Afinamiento: mantén la intensidad pero recorta un tercio las repeticiones." : ""}${all ? " ⚠️ Versión aligerada: recorta un tercio las repeticiones y mantén el ritmo. Preservamos el estímulo, no el volumen." : ""}`,
     qualiteWhySauvee: (o) => `Tu carga reciente está muy por encima de tu carga de fondo${o} — pero tu cita se acerca y una semana sin nada de ritmo específico se paga el día D. Así que: UNA sesión, acortada, mejor que ninguna. Si las sensaciones no llegan en el calentamiento, conviértela en rodaje sin culpa.`,
     qualiteWhy: "La sesión de calidad de tu bloque, ajustada a tu VAM y a tu objetivo. Es la que te hace progresar.",
@@ -578,11 +667,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     lignesDroites: " Termina con 5 rectas de 100 m en progresión, recuperando andando por completo: mantiene la velocidad sin cansarte.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Calentamiento ${e} min progresivo FC Z1→Z2 → Parte principal: ${c} en Z2${a}, tienes que poder mantener una conversación → Vuelta a la calma ${k} min FC Z1.${g}${s ? " 💡 Con tu volumen, divídelo en DOS salidas en el día (mañana + tarde) en vez de un rodaje interminable." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Pasas el ${p} % de tu tiempo de carrera en zona 3 o más, cuando el objetivo es el 20 %. Tus rodajes van demasiado rápidos — es el freno n.º 1 al progreso. Baja hasta poder mantener una conversación completa: tiene que parecer DEMASIADO fácil.`,
-    enduranceWhy: (c) => `La base aeróbica. Con las demás sesiones estás en ~${c} km esta semana — es el volumen fácil el que construye la forma de fondo, no las sesiones duras.`,
+    enduranceWhy: (c) => `La base aeróbica. Tu semana apunta a ~${c} km en total, sesiones incluidas — es el volumen fácil el que construye la forma de fondo, no las sesiones duras.`,
 
     renfoTitre: "Trabajo de fuerza",
     renfoAffutage: `20 a 25 min, solo MANTENIMIENTO: core 3×45 s, elevaciones de gemelos 2×15, propiocepción 2×30 s por pierna, algunos saltos cortos. NINGUNA carga pesada ni serie larga cerca de la carrera — preservamos la frescura, la fuerza ya está adquirida.`,
     renfoBase: (s) => `35 a 45 min, CIMIENTOS: core completo (plancha, lateral, espalda) ${s}×45 s, sentadillas ${s}×12, zancadas ${s}×10 por pierna, elevaciones de gemelos ${s}×15, nordic curls de isquios ${s}×6, propiocepción a una pierna ${s}×30 s. Amplitud y control ante todo — es la fase en la que se construye el tendón.`,
+    renfoRecup: `20 min, RECUPERACIÓN: movilidad de caderas y tobillos, core 3×30 s (plancha, lateral), puente de glúteos 2×12, elevaciones lentas de gemelos 2×12, propiocepción 2×30 s por pierna. Nada de saltos ni de trabajo excéntrico (nordic curls, bajadas): las fibras dañadas por la carrera aún se están reparando.`,
     renfoSpecifique: (s) => `30 a 35 min, FUERZA ÚTIL PARA CORRER: sentadillas búlgaras ${s}×8 por pierna, zancadas saltadas ${s}×8, elevaciones de gemelos a una pierna ${s}×12, nordic curls ${s}×6, core dinámico ${s}×40 s, saltos ${s}×10. Explosivo y corto: transferimos la fuerza a la zancada, ya no buscamos volumen.`,
     renfoDeveloppement: (s, plus) => `30 a 40 min, DESARROLLO: core (plancha, lateral) ${s}×45 s, sentadillas ${s}×12, zancadas ${s}×10 por pierna, elevaciones de gemelos ${s}×15, nordic curls de isquios ${s}×6, propiocepción a una pierna ${s}×30 s. ${plus ? "Una serie más que la semana pasada — la sobrecarga progresiva vale también para la fuerza." : "Carga mantenida esta semana (asimilación)."}`,
     renfoWhy: "La prevención de lesiones n.º 1, y una ganancia directa de economía de zancada. Se periodiza como la carrera: cimientos, luego fuerza útil, y solo mantenimiento al acercarse el día D.",
@@ -656,8 +746,13 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     veloLongDetail: (e, d, n) => `Aquecimento ${e} min muito fácil → ${d} a 2h em FC Z2, ritmo conversacional, cadência solta → 10 min de retorno à calma. Sem ritmo alvo: é volume aeróbio sem impacto.${n}`,
     veloLongWhy: "O volume aeróbio da semana, sem as exigências de impacto da corrida.",
     marcheCourseTitre: "Caminhar/correr",
-    marcheCourseDetail: (d) => `Cerca de ${d} alternando corrida muito fácil e caminhada: corre dois minutos conseguindo falar, depois caminha um minuto, e repete até ao fim. A caminhada FAZ PARTE da sessão, não é um fracasso.`,
     marcheCourseWhy: "O teu coração já aguenta a corrida contínua; os teus tendões e articulações ainda não. Alternar dá o mesmo trabalho aeróbio dividindo os impactos, e é isso que evita a periostite do segundo mês.",
+    mcTitre: (e, t) => `Caminhar/correr · etapa ${e}/${t}`,
+    mcAlternance: (n, c, m) => `5 min de caminhada rápida → Parte principal: ${n} × (${c} min de corrida muito leve / ${m} min de caminhada) → 5 min de caminhada para terminar. Corre devagar o suficiente para conseguires falar. Caminhar faz parte da sessão, não é um fracasso.`,
+    mcContinu: (m) => `5 min de caminhada rápida → Parte principal: ${m} min de corrida contínua muito leve → 5 min de caminhada para terminar. Se precisares de caminhar um pouco, caminha e volta a correr: repetir uma etapa não faz mal.`,
+    mcWhy: (e, t) => `Etapa ${e} de ${t} do programa de caminhada e corrida: três sessões por etapa, depois a corrida aumenta. O objetivo: 30 minutos de corrida contínua em cerca de dez semanas, sem lesões; o fôlego melhora depressa, tendões e ossos levam semanas. Uma etapa parece-te difícil? Repete-a, não há pressa.`,
+    renfoDebutant: `20 min, PARA COMEÇAR: prancha 3×20 s (de joelhos se precisares), agachamentos com o peso do corpo 3×10, afundos 2×8 por perna, ponte de glúteos 3×12, elevações de gémeos 3×12, equilíbrio numa perna 2×20 s. O objetivo: preparar tendões e articulações para os impactos da corrida.`,
+    renfoDebutantWhy: `No início, as lesões atingem sobretudo canelas, tornozelos e joelhos, que absorvem os impactos antes de estarem prontos. Um pouco de reforço todas as semanas reduz claramente esse risco.`,
     sansImpactTitre: "Volume sem impacto (bicicleta ou elíptica)",
     sansImpactDetail: (d) => `Cerca de ${d} de bicicleta, elíptica ou remo, em FC Z2 — ritmo conversacional, sem ritmo alvo. Substitui o rodagem de hoje: mesmo tempo de esforço, zero impacto no solo.`,
     sansImpactWhy: "Parte do volume sai da corrida para construir o motor sem repetir os impactos, até a carga articular voltar a ser sustentável.",
@@ -676,6 +771,16 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     qualiteTitreSeuil: "Sessão de limiar",
     qualiteTitreSpecifique: "Ritmo específico do objetivo",
     suffixeAllegee: " (aliviada)",
+    suffixeReprise: " (retoma)",
+    qualiteWhyReprise: (c) => `Retoma após ${c}: uma única sessão de qualidade esta semana, no limiar e curta de propósito. Desperta o ritmo sem comprometer uma recuperação que ainda não terminou — nem VMA nem provas enquanto durar. Se as pernas ainda estiverem pesadas no aquecimento, transforma-a em corrida fácil.`,
+    courseSecondaireTitre: (n, p) => `${n} · prova ${p}`,
+    courseBDetail: "Prova de preparação: aquece 15 min com algumas acelerações e corre-a depressa, mas sem entrar no vermelho; é um ensaio geral do teu objetivo, não o objetivo. Anota as sensações e o ritmo.",
+    courseBWhy: "Uma prova B prepara-se de forma ligeira (dois dias calmos antes, uma semana mais leve) e recupera-se depois: serve o teu objetivo sem o comprometer.",
+    courseCDetail: "Prova de treino: aquece 15 min e corre-a ao esforço de uma sessão de limiar, não no máximo. Retorno à calma 10 min.",
+    courseCWhy: "Uma prova C substitui uma sessão de qualidade da semana: sem afinamento, serve para treinar em condições de prova.",
+    dsTitreMatin: "Duplo limiar · manhã",
+    dsTitreSoir: "Duplo limiar · tarde",
+    dsWhy: "Método norueguês: duas sessões de limiar no mesmo dia, ambas ABAIXO do limiar; é a soma que constrói o limiar, não a intensidade. Normalmente controla-se com lactato; sem lactatómetro, o erro clássico é correr depressa demais e transformá-la em duas sessões duras. Mantém o ritmo indicado, mesmo que te sintas bem.",
     qualiteDetail: (e, c, k, taper, all) => `Aquecimento ${e} min progressivo FC Z1→Z2 + 3 a 5 progressões de 80 m → Parte principal: ${c} → Retorno à calma ${k} min FC Z1.${taper ? " ⚠️ Afinamento: mantém a intensidade mas corta um terço das repetições." : ""}${all ? " ⚠️ Versão aliviada: corta um terço das repetições e mantém o ritmo. Preservamos o estímulo, não o volume." : ""}`,
     qualiteWhySauvee: (o) => `A tua carga recente está muito acima da tua carga de fundo${o} — mas a tua prova aproxima-se e uma semana sem qualquer ritmo específico paga-se no dia D. Portanto: UMA sessão, encurtada, em vez de nenhuma. Se as sensações não aparecerem no aquecimento, transforma-a em corrida fácil sem culpa.`,
     qualiteWhy: "A sessão de qualidade do teu bloco, ajustada à tua VAM e ao teu objetivo. É ela que te faz progredir.",
@@ -689,11 +794,12 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     lignesDroites: " Termina com 5 acelerações de 100 m, recuperando a andar por completo: mantém a velocidade sem cansar.",
     enduranceDetail: (e, c, a, k, g, s, cy) => `Aquecimento ${e} min progressivo FC Z1→Z2 → Parte principal: ${c} em Z2${a}, tens de conseguir manter uma conversa → Retorno à calma ${k} min FC Z1.${g}${s ? " 💡 Com o teu volume, divide em DUAS saídas no dia (manhã + tarde) em vez de uma corrida interminável." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Passas ${p} % do teu tempo de corrida em zona 3 ou acima, quando o alvo são 20 %. As tuas corridas fáceis vão depressa demais — é o travão n.º 1 ao progresso. Abranda até conseguires manter uma conversa completa: é suposto parecer DEMASIADO fácil.`,
-    enduranceWhy: (c) => `A base aeróbia. Com as outras sessões estás em ~${c} km esta semana — é o volume fácil que constrói a forma de fundo, não as sessões duras.`,
+    enduranceWhy: (c) => `A base aeróbia. A tua semana aponta para ~${c} km no total, sessões incluídas — é o volume fácil que constrói a forma de fundo, não as sessões duras.`,
 
     renfoTitre: "Reforço muscular",
     renfoAffutage: `20 a 25 min, só MANUTENÇÃO: core 3×45 s, elevações de gémeos 2×15, propriocepção 2×30 s por perna, alguns saltos curtos. NENHUMA carga pesada nem série longa perto da prova — preservamos a frescura, a força já está adquirida.`,
     renfoBase: (s) => `35 a 45 min, FUNDAÇÕES: core completo (prancha, lateral, costas) ${s}×45 s, agachamentos ${s}×12, afundos ${s}×10 por perna, elevações de gémeos ${s}×15, nordic curls de isquiotibiais ${s}×6, propriocepção a uma perna ${s}×30 s. Amplitude e controlo acima de tudo — é a fase em que se constrói o tendão.`,
+    renfoRecup: `20 min, RECUPERAÇÃO: mobilidade de ancas e tornozelos, core 3×30 s (prancha, lateral), ponte de glúteos 2×12, elevações lentas de gémeos 2×12, propriocepção 2×30 s por perna. Nada de saltos nem de trabalho excêntrico (nordic curls, descidas): as fibras danificadas pela prova ainda estão a recuperar.`,
     renfoSpecifique: (s) => `30 a 35 min, FORÇA ÚTIL À CORRIDA: agachamentos búlgaros ${s}×8 por perna, afundos saltados ${s}×8, elevações de gémeos a uma perna ${s}×12, nordic curls ${s}×6, core dinâmico ${s}×40 s, saltos ${s}×10. Explosivo e curto: transferimos a força para a passada, já não procuramos volume.`,
     renfoDeveloppement: (s, plus) => `30 a 40 min, DESENVOLVIMENTO: core (prancha, lateral) ${s}×45 s, agachamentos ${s}×12, afundos ${s}×10 por perna, elevações de gémeos ${s}×15, nordic curls de isquiotibiais ${s}×6, propriocepção a uma perna ${s}×30 s. ${plus ? "Uma série a mais do que na semana passada — a sobrecarga progressiva vale também para o reforço." : "Carga mantida esta semana (assimilação)."}`,
     renfoWhy: "A prevenção de lesões n.º 1, e um ganho direto de economia de passada. Periodiza-se como a corrida: fundações, depois força útil, e simples manutenção à medida que o dia D se aproxima.",

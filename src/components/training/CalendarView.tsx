@@ -2,10 +2,8 @@
 
 import { useState, useRef, useMemo } from "react";
 import { toast } from "sonner";
-import {
-  Target, X, Plus, StickyNote, Flag, Loader2, Trash2,
-  ChevronLeft, ChevronRight, LayoutGrid, List, CalendarRange,
-  CalendarDays, CalendarClock, ListChecks, ArrowLeft, Sparkles, ChevronDown, AlertTriangle } from "lucide-react";
+import { Target, X, Plus, StickyNote, Flag, Loader2, Trash2, ChevronLeft, ChevronRight, LayoutGrid, List, CalendarRange, CalendarDays, CalendarClock, ListChecks, ArrowLeft, ChevronDown, AlertTriangle, Crown, Info } from "lucide-react";
+import Link from "next/link";
 import { RenfoGuide } from "@/components/training/RenfoGuide";
 import { fmtDistance, type UnitSystem } from "@/lib/units";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -17,6 +15,7 @@ import { libelleType } from "@/lib/ai/planI18n";
 import { AvisCoach } from "@/components/training/AvisCoach";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { useFuseau } from "@/lib/time/FuseauProvider";
+import type { RappelAffiche } from "@/lib/coach/rappelPremium";
 
 /** Le même jour dans une autre langue — affichage seulement (cf. lib/ai/planI18n.ts). */
 export type PlannedText = { title?: string; subtitle?: string; why?: string; tags?: string[] };
@@ -30,7 +29,9 @@ export type Planned = { date: string; type: string; title: string; detail: strin
    *  montre. Une langue absente retombe sur le français, jamais sur du vide. */
   i18n?: Record<string, PlannedText> };
 export type CalNote = { id: string; date: string; text: string };
-export type CalRace = { id: string; date: string; name: string; location: string; distanceKm: number | null; isObjective?: boolean };
+export type CalRace = { id: string; date: string; name: string; location: string; distanceKm: number | null; isObjective?: boolean;
+  /** Priorité dans la saison (`lib/coach/saison`) ; l'objectif déclaré est toujours A. */
+  priorite?: "A" | "B" | "C" };
 
 /**
  * Explication du plan de la semaine, sérialisée par le coach autonome AU MOMENT où il
@@ -110,7 +111,7 @@ function sessionDetail(type: string, detail: string): SessionDetail | null {
   return { mode: "wrapped", body: extractBody(raw) };
 }
 
-export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], races: racesProp = [], coachState = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10, enPanne = false, realismeMasque = null, vueParDefaut = "month" }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number; /** La lecture des séances a ÉCHOUÉ : le mois est vide par accident, pas parce qu'il n'y a rien. */ enPanne?: boolean; /** Clé de l'avertissement de réalisme que l'athlète a choisi de ne plus voir (réglages). */ realismeMasque?: string | null; /** Vue ouverte à l'arrivée : « agenda » sur téléphone (décidé côté serveur, donc sans clignotement). */ vueParDefaut?: "month" | "agenda" }) {
+export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], races: racesProp = [], coachState = null, rappelPremium = null, weekStart = "mon", units = "metric", warmupMin = 15, cooldownMin = 10, enPanne = false, realismeMasque = null, vueParDefaut = "month" }: { sessions: Planned[]; notes?: CalNote[]; races?: CalRace[]; coachState?: CoachState | null; /** Ce que Premium aurait changé à ce plan (Starter seulement, décidé par la page). */ rappelPremium?: RappelAffiche | null; weekStart?: "mon" | "sun"; units?: UnitSystem; warmupMin?: number; cooldownMin?: number; /** La lecture des séances a ÉCHOUÉ : le mois est vide par accident, pas parce qu'il n'y a rien. */ enPanne?: boolean; /** Clé de l'avertissement de réalisme que l'athlète a choisi de ne plus voir (réglages). */ realismeMasque?: string | null; /** Vue ouverte à l'arrivée : « agenda » sur téléphone (décidé côté serveur, donc sans clignotement). */ vueParDefaut?: "month" | "agenda" }) {
   const { t, lang } = useT();
   // LA SÉANCE EST AFFICHÉE DANS LA LANGUE DE L'ATHLÈTE, résolue ICI et pas au serveur :
   // le sélecteur de langue est instantané et ne recharge pas la page. `type` n'est jamais
@@ -127,7 +128,8 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
   const [races, setRaces] = useState<CalRace[]>(racesProp);
   const [adding, setAdding] = useState<null | "note" | "race">(null);
   const [noteText, setNoteText] = useState("");
-  const [race, setRace] = useState({ name: "", location: "", distanceKm: "" });
+  // Priorité par défaut : C — noter une course ne doit rien bouleverser (lib/coach/saison).
+  const [race, setRace] = useState({ name: "", location: "", distanceKm: "", priorite: "C" as "A" | "B" | "C" });
   const [busy, setBusy] = useState(false);
   /** Créneau affiché quand la journée est doublée (0 = matin, 1 = soir). Remis à zéro
    *  à chaque changement de jour : garder l'index du jour précédent afficherait le soir
@@ -157,7 +159,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
     }, 250);
   };
   const pickRace = (s: { name: string; city: string; distanceKm: number | null }) => {
-    setRace({ name: s.name, location: s.city || "", distanceKm: s.distanceKm != null ? String(s.distanceKm) : "" });
+    setRace((r) => ({ ...r, name: s.name, location: s.city || "", distanceKm: s.distanceKm != null ? String(s.distanceKm) : "" }));
     setSuggest([]);
   };
 
@@ -175,7 +177,15 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
   const racesByDate: Record<string, CalRace[]> = {};
   for (const r of races) (racesByDate[r.date] ??= []).push(r);
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  // ⚠️ LE JOUR DE L'ATHLÈTE, PAS CELUI DE LA MACHINE. C'était `new Date()` mis à minuit :
+  // entre minuit et 1 h à Paris, le serveur (UTC) vivait encore la veille — grille, jour
+  // surligné et compteurs de la semaine décalés d'un jour, erreur React #418 au chargement
+  // (01/11/2026 à 0 h 01). On part du jour civil dans le fuseau de l'athlète, posé à minuit
+  // LOCAL : les calculs qui suivent (getDate, setDate…) donnent alors les mêmes jours des
+  // deux côtés.
+  const fuseauGrille = useFuseau();
+  const [jy, jm, jd] = jourLocal(new Date(), fuseauGrille).split("-").map(Number);
+  const today = new Date(jy, jm - 1, jd);
   const todayKey = fmtKey(today);
   const baseStart = new Date(today);
   baseStart.setDate(today.getDate() - (weekStart === "sun" ? today.getDay() : (today.getDay() + 6) % 7));
@@ -237,7 +247,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
   const plainSingle = detail && detail.mode === "plain" ? detail.text : null;
 
   const openDay = (key: string) => {
-    setSel(key); setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "" }); setSuggest([]);
+    setSel(key); setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "", priorite: "C" }); setSuggest([]);
     setMomentIdx(0);   // on ouvre toujours sur la première séance du jour
     // Si le jour a une séance, on remonte vers le hero pour y afficher son détail.
     if ((coachByDate[key] ?? []).length) heroRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -249,23 +259,36 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
     setBusy(true);
     try {
       const payload = adding === "race"
-        ? { date: sel, kind: "race", name: race.name, location: race.location, distanceKm: race.distanceKm }
+        ? { date: sel, kind: "race", name: race.name, location: race.location, distanceKm: race.distanceKm, priorite: race.priorite }
         : { date: sel, kind: "note", text: noteText };
       const r = await fetch("/api/calendar-entry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await r.json();
       if (!j.ok) { toast.error(j.error || t("cal.toast.failed")); return; }
       if (adding === "race") {
-        setRaces((rs) => [...rs, { id: j.id, date: sel, name: race.name, location: race.location, distanceKm: race.distanceKm ? Number(race.distanceKm) : null }]);
+        setRaces((rs) => [...rs, { id: j.id, date: sel, name: race.name, location: race.location, distanceKm: race.distanceKm ? Number(race.distanceKm) : null, priorite: race.priorite }]);
         toast.success(t("cal.toast.raceAdded"));
       } else {
         setNotes((ns) => [...ns, { id: j.id, date: sel, text: noteText }]);
         toast.success(t("cal.toast.noteAdded"));
       }
-      setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "" }); setSuggest([]);
+      setAdding(null); setNoteText(""); setRace({ name: "", location: "", distanceKm: "", priorite: "C" }); setSuggest([]);
     } catch { toast.error(t("cal.toast.saveFailed")); }
     finally { setBusy(false); }
   };
 
+  // Priorité d'une course notée (lib/coach/saison) : le serveur régénère le plan.
+  const changerPriorite = async (id: string, priorite: "A" | "B" | "C") => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/calendar-entry", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, priorite }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) { toast.error(j.error || t("cal.toast.failed")); return; }
+      setRaces((rs) => rs.map((x) => (x.id === id ? { ...x, priorite } : x)));
+      toast.success(t("cal.toast.prioOk"));
+    } catch { toast.error(t("cal.toast.failed")); }
+    finally { setBusy(false); }
+  };
   const del = async (id: string, kind: "note" | "race") => {
     try {
       const r = await fetch(`/api/calendar-entry?id=${id}`, { method: "DELETE" });
@@ -288,12 +311,12 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
             {/* Le TYPE reste français dans la donnée (catégorie, couleur, séance montre) ;
                 seul son LIBELLÉ suit la langue — sinon un écran allemand affichait
                 « SORTIE LONGUE » au-dessus d'un texte allemand. */}
-            <div className={`font-extrabold uppercase tracking-wide ${dense ? "text-[9px]" : "text-[10px]"}`} style={{ color: c.fg }}>{libelleType(s.type, lang)}</div>
+            <div className={`font-medium ${dense ? "text-[10px]" : "text-[11px]"}`} style={{ color: c.fg }}>{libelleType(s.type, lang)}</div>
             {s.confirmed === false && (
-              <span title={t("cal.provisional.hint")} className={`rounded bg-white/80 px-1 font-bold text-zinc-400 ${dense ? "text-[8px]" : "text-[9px]"}`}>~</span>
+              <span title={t("cal.provisional.hint")} className={`rounded bg-white/80 px-1 font-semibold text-zinc-400 ${dense ? "text-[10px]" : "text-[10px]"}`}>~</span>
             )}
           </div>
-          <div className={`font-bold leading-tight text-zinc-800 ${dense ? "line-clamp-2 text-[11.5px]" : "text-sm"}`}>{s.title}</div>
+          <div className={`font-semibold leading-tight text-zinc-800 ${dense ? "line-clamp-2 text-[11.5px]" : "text-sm"}`}>{s.title}</div>
           {/* ⚠️ EN VUE MOIS, ON AFFICHAIT LA PROSE ENTIÈRE, COUPÉE À 3 LIGNES. Or toute
               séance de course commence par le même échauffement reconstruit
               (« Échauffement 20 min progressif FC Z1→Z2 + 3 à 5 lignes droites… ») : les
@@ -311,14 +334,14 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
               <div className={`mt-0.5 whitespace-pre-line leading-snug text-zinc-500 ${dense ? "line-clamp-2 text-[10px]" : "text-xs"}`}>{resume}</div>
             ) : null;
           })()}
-          {s.tags.length > 0 && <div className="mt-1 flex flex-wrap gap-0.5">{s.tags.slice(0, dense ? 3 : 6).map((tg) => <span key={tg} className={`rounded bg-white/70 px-1 py-px font-semibold text-zinc-500 ${dense ? "text-[8.5px]" : "text-[10px]"}`}>{tg}</span>)}</div>}
+          {s.tags.length > 0 && <div className="mt-1 flex flex-wrap gap-0.5">{s.tags.slice(0, dense ? 3 : 6).map((tg) => <span key={tg} className={`rounded bg-white/70 px-1 py-px font-semibold text-zinc-500 ${dense ? "text-[10px]" : "text-[10px]"}`}>{tg}</span>)}</div>}
         </div>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
+    <div className="min-h-screen">
       {/* ⚠️ UN MOIS VIDE PAR ACCIDENT RESSEMBLE À UN MOIS SANS PLAN. Si la lecture des
           séances a échoué, on le DIT — sinon l'athlète croit que son plan a disparu. */}
       {enPanne && (
@@ -328,30 +351,29 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
         </div>
       )}
       {/* ── Hero : par défaut = présentation du plan ; quand une séance est sélectionnée = son détail ── */}
-      <div ref={heroRef} className="relative overflow-hidden rounded-3xl text-white" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 45%,#0d9488 100%)" }}>
-        <div className="pointer-events-none absolute -top-24 -right-16 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 left-1/3 h-72 w-72 rounded-full bg-teal-300/10 blur-3xl" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+      {/* Un vert profond, une seule teinte, comme la séance du jour du tableau de bord (passe
+          « unslop », 06/11/2026) : plus de halos flous ni de liseré brillant. */}
+      <div ref={heroRef} className="relative overflow-hidden rounded-2xl text-white shadow-[0_1px_2px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.08)]" style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}>
         {/* Marges resserrées sur téléphone (29/09/2026, « on défile trop ») : le bandeau
             prenait près d'un demi-écran avant la première séance. */}
         <div className="relative z-10 mx-auto max-w-6xl px-4 py-4 sm:px-5 sm:py-8">
           {coach ? (
             /* Détail de la séance du jour sélectionné */
             <>
-              <button onClick={() => setSel(null)} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[12px] font-semibold text-white/90 ring-1 ring-white/20 backdrop-blur-md transition hover:bg-white/20">
+              <button onClick={() => setSel(null)} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[12px] font-semibold text-white/90 ring-1 ring-white/20 transition hover:bg-white/20">
                 <ArrowLeft className="h-3.5 w-3.5" /> {t("cal.hero.overview")}
               </button>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ring-1 ring-white/20 backdrop-blur-md">
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2 py-1 text-xs font-medium">
                   <span className="h-2 w-2 rounded-full" style={{ background: typeColor(coach.type).bg }} />
                   {libelleType(coach.type, lang)}
                 </span>
-                <span className="text-[12px] font-semibold uppercase tracking-wide text-white/70 first-letter:uppercase">
+                <span className="text-[13px] text-white/70 first-letter:uppercase">
                   {sel && formatDateCivile(sel, lang, { weekday: "long", day: "numeric", month: "long" })}
                 </span>
                 {/* Jour prévisionnel : on le dit franchement plutôt que de laisser croire
                     à un plan figé — c'est justement parce qu'il bouge qu'il est personnalisé. */}
-                <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ring-1 backdrop-blur-md ${coach.confirmed === false ? "bg-white/10 text-white/70 ring-white/20" : "bg-emerald-400/20 text-emerald-50 ring-emerald-200/30"}`}>
+                <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium ${coach.confirmed === false ? "bg-white/10 text-white/70" : "bg-white/15 text-white"}`}>
                   {coach.confirmed === false ? `~ ${t("cal.provisional")}` : `✓ ${t("cal.confirmed")}`}
                 </span>
               </div>
@@ -363,25 +385,25 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
                   sélecteur, la seconde séance resterait invisible alors qu'elle est bien
                   publiée et poussée sur la montre. */}
               {daySessions.length > 1 && (
-                <div className="mt-3 inline-flex rounded-full bg-white/10 p-0.5 ring-1 ring-white/20 backdrop-blur-md">
+                <div className="mt-3 inline-flex rounded-full bg-white/10 p-0.5 ring-1 ring-white/20">
                   {daySessions.map((ds, i) => (
                     <button key={i} onClick={() => setMomentIdx(i)}
                       aria-pressed={i === momentIdx}
-                      className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                         i === momentIdx ? "bg-white text-zinc-900" : "text-white/70 hover:text-white"}`}>
                       {ds.moment === "matin" ? t("cal.morning") : ds.moment === "soir" ? t("cal.evening") : `#${i + 1}`}
                     </button>
                   ))}
                 </div>
               )}
-              <h1 className="mt-2 text-2xl font-bold tracking-tight drop-shadow-sm sm:text-3xl">{coach.title}</h1>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{coach.title}</h1>
               {phases ? (
                 <div className="mt-2.5 max-w-2xl space-y-1.5">
                   {phases.map((p, i) => (
                     <div key={i} className="flex items-baseline gap-2.5">
                       {p.label
-                        ? <span className="w-28 flex-shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-amber-200/90">{p.label}</span>
-                        : <span className="relative top-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-200/70" />}
+                        ? <span className="w-28 flex-shrink-0 text-[13px] text-white/60">{p.label}</span>
+                        : <span className="relative top-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-white/40" />}
                       <span className={`text-[14px] leading-relaxed ${p.strong ? "font-semibold text-white" : "text-white/85"}`}>{p.text}</span>
                     </div>
                   ))}
@@ -391,25 +413,25 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
               ) : null}
               {coach.tags.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {coach.tags.map((tg) => <span key={tg} className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white/90 ring-1 ring-white/15 backdrop-blur-md">{tg}</span>)}
+                  {coach.tags.map((tg) => <span key={tg} className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white/90 ring-1 ring-white/15">{tg}</span>)}
                 </div>
               )}
-              {coach.why && <div className="mt-3 max-w-2xl rounded-xl bg-white/10 p-3 text-sm leading-relaxed text-white/90 ring-1 ring-white/15 backdrop-blur-md"><b>{t("cal.panel.why")}&nbsp;:</b> {coach.why}</div>}
-              {coach.feel && <div className="mt-2 flex max-w-2xl items-start gap-2 text-sm leading-relaxed text-white/80"><Target className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-200" /><span><b className="text-white">{t("cal.panel.feel")}&nbsp;:</b> {coach.feel}</span></div>}
+              {coach.why && <div className="mt-3 max-w-2xl rounded-xl bg-white/10 p-3 text-sm leading-relaxed text-white/90 ring-1 ring-white/15"><b>{t("cal.panel.why")}&nbsp;:</b> {coach.why}</div>}
+              {coach.feel && <div className="mt-2 flex max-w-2xl items-start gap-2 text-sm leading-relaxed text-white/80"><Target className="mt-0.5 h-4 w-4 flex-shrink-0 text-white/60" strokeWidth={1.5} /><span><b className="text-white">{t("cal.panel.feel")}&nbsp;:</b> {coach.feel}</span></div>}
             </>
           ) : (
             /* Présentation par défaut du calendrier */
             <>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/20 backdrop-blur-md">
-                <CalendarDays className="h-3.5 w-3.5 text-amber-300" />
-                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-50">{t("cal.eyebrow")}</span>
+              <span className="inline-flex items-center gap-1.5 text-[13px] text-emerald-100/75">
+                <CalendarDays className="h-4 w-4" strokeWidth={1.5} />
+                {t("cal.eyebrow")}
               </span>
-              <h1 className="mt-2 text-xl font-bold tracking-tight drop-shadow-sm sm:mt-3 sm:text-3xl">{t("cal.title")}</h1>
+              <h1 className="mt-2 text-xl font-semibold tracking-tight sm:mt-3 sm:text-3xl">{t("cal.title")}</h1>
               <p className="mt-1 max-w-2xl text-[13.5px] leading-snug text-white/85 sm:mt-1.5 sm:text-[15px] sm:leading-relaxed">{t("cal.subtitle")}</p>
               <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-4 sm:gap-2">
                 {heroChips.map((c, i) => (
-                  <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[12px] font-semibold sm:px-3 sm:py-1.5 sm:text-[13px] text-white/90 ring-1 ring-white/15 backdrop-blur-md">
-                    <c.Icon className="h-3.5 w-3.5 text-amber-200" />
+                  <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[12px] font-semibold sm:px-3 sm:py-1.5 sm:text-[13px] text-white/90 ring-1 ring-white/15">
+                    <c.Icon className="h-3.5 w-3.5 text-white/60" strokeWidth={1.5} />
                     {c.text}
                   </span>
                 ))}
@@ -421,7 +443,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
 
       <div className="mx-auto max-w-6xl px-0 py-3 sm:px-5 sm:py-6">
       {/* Pourquoi le plan ressemble à ça — voir le commentaire du type CoachState. */}
-      <CoachWhy state={coachState} lang={lang} t={t} sessions={sessionsProp} realismeMasque={realismeMasque} />
+      <CoachWhy state={coachState} rappel={rappelPremium} lang={lang} t={t} sessions={sessionsProp} realismeMasque={realismeMasque} />
 
       {/* Barre de contrôle : navigation période + bascule de vue */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -442,7 +464,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
 
       {/* Légende des types de séance */}
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-2xl border border-zinc-100 bg-zinc-50/60 px-4 py-2.5">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">{t("cal.legend")}</span>
+        <span className="text-xs font-medium text-zinc-400">{t("cal.legend")}</span>
         {LEGEND_ORDER.map((cat) => (
           <span key={cat} className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600">
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: CAT_COLOR[cat].bg }} />
@@ -457,7 +479,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
           <div className="-mx-1 overflow-x-auto px-1 pb-1">
             <div className="min-w-[700px] lg:min-w-0">
               <div className="mb-2.5 grid grid-cols-7 gap-2 sm:gap-3">
-                {dayHeaders.map((d, i) => <div key={i} className="text-center text-[11px] font-bold uppercase tracking-widest text-zinc-400 first-letter:uppercase">{d}</div>)}
+                {dayHeaders.map((d, i) => <div key={i} className="text-center text-xs font-medium text-zinc-400 first-letter:uppercase">{d}</div>)}
               </div>
 
               <div className="space-y-4">
@@ -468,7 +490,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
                   return (
                     <div key={wi}>
                       <div className="mb-1.5 flex items-center justify-between gap-2">
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-300 first-letter:uppercase">{t("cal.weekOf", { date: week[0].toLocaleDateString(lang, { day: "numeric", month: "short" }) })}</div>
+                        <div className="text-xs text-zinc-400 first-letter:uppercase">{t("cal.weekOf", { date: week[0].toLocaleDateString(lang, { day: "numeric", month: "short" }) })}</div>
                         <div className="flex items-center gap-2">
                           {count > 0 ? (
                             <>
@@ -491,16 +513,16 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
                           const empty = daySess.length === 0 && dayRaces.length === 0 && nNotes === 0;
                           return (
                             <button key={key} onClick={() => openDay(key)}
-                              className={`group flex min-h-[136px] flex-col rounded-2xl border p-2 text-left transition-all duration-200
-                                ${isToday ? "border-emerald-400 bg-emerald-50/40 ring-1 ring-emerald-200" : empty ? "border-zinc-200/70 bg-zinc-50/40 hover:border-emerald-300 hover:bg-white" : "border-zinc-200/80 bg-white hover:border-emerald-300 hover:shadow-md"}
+                              className={`group flex min-h-[136px] flex-col rounded-xl border p-2 text-left transition-colors duration-150
+                                ${isToday ? "border-emerald-500 bg-white" : empty ? "border-zinc-200/70 bg-zinc-50/40 hover:border-emerald-300 hover:bg-white" : "border-zinc-200/80 bg-white hover:border-emerald-300 hover:border-zinc-300"}
                                 ${active ? "ring-2 ring-emerald-400" : ""}`}>
-                              <div className={`mb-1.5 flex justify-center text-sm font-bold ${isToday ? "" : "text-zinc-400"}`}>
+                              <div className={`mb-1.5 flex justify-center text-sm font-semibold ${isToday ? "" : "text-zinc-400"}`}>
                                 <span className={isToday ? "flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-[13px] text-white shadow-sm" : ""}>{d.getDate()}</span>
                               </div>
                               <div className="flex flex-1 flex-col gap-1">
                                 {daySess.map((s, i) => <SessionCard key={i} s={s} dense />)}
                                 {dayRaces.map((r) => (
-                                  <div key={r.id} className="flex items-center gap-1 rounded-lg bg-amber-100 px-1.5 py-1 text-[10px] font-bold text-amber-800"><Flag className="h-3 w-3 flex-shrink-0" /><span className="truncate">{r.name}</span></div>
+                                  <div key={r.id} className="flex items-center gap-1 rounded-lg bg-amber-100 px-1.5 py-1 text-[10px] font-semibold text-amber-800"><Flag className="h-3 w-3 flex-shrink-0" /><span className="truncate">{r.name}</span></div>
                                 ))}
                                 {nNotes > 0 && <div className="flex items-center gap-1 rounded-lg bg-zinc-100 px-1.5 py-1 text-[10px] font-semibold text-zinc-500"><StickyNote className="h-3 w-3" />{nNotes}</div>}
                                 {empty && <div className="flex flex-1 items-center justify-center text-zinc-300 opacity-0 transition-opacity group-hover:opacity-100"><Plus className="h-4 w-4" /></div>}
@@ -520,7 +542,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
         /* ── Vue Agenda : chronologie des séances/courses/notes à venir ── */
         <div>
           {agendaDates.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-16 text-center">
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-16 text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm"><CalendarRange className="h-7 w-7 text-zinc-300" /></div>
               <p className="max-w-xs text-sm text-zinc-500">{t("cal.agenda.empty")}</p>
             </div>
@@ -535,17 +557,17 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
                 return (
                   <div key={key} className="flex gap-3 sm:gap-4">
                     <div className="flex w-12 flex-shrink-0 flex-col items-center pt-1 sm:w-14">
-                      <div className="text-[11px] font-bold uppercase tracking-wide text-zinc-400 first-letter:uppercase">{d.toLocaleDateString(lang, { weekday: "short" })}</div>
-                      <div className={`text-2xl font-bold leading-tight ${isToday ? "text-emerald-600" : "text-zinc-900"}`}>{d.getDate()}</div>
+                      <div className="text-xs text-zinc-400 first-letter:uppercase">{d.toLocaleDateString(lang, { weekday: "short" })}</div>
+                      <div className={`text-2xl font-semibold leading-tight ${isToday ? "text-emerald-600" : "text-zinc-900"}`}>{d.getDate()}</div>
                       <div className="text-[10px] text-zinc-400 first-letter:uppercase">{d.toLocaleDateString(lang, { month: "short" })}</div>
                     </div>
                     <div className="flex-1 space-y-2 border-l border-zinc-100 pb-4 pl-3 sm:pl-4">
-                      {isToday && <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">{t("cal.today")}</span>}
-                      {daySess.map((s, i) => <button key={i} onClick={() => openDay(key)} className="block w-full transition-transform hover:-translate-y-0.5"><SessionCard s={s} /></button>)}
+                      {isToday && <span className="inline-flex text-xs font-medium text-emerald-700">{t("cal.today")}</span>}
+                      {daySess.map((s, i) => <button key={i} onClick={() => openDay(key)} className="block w-full"><SessionCard s={s} /></button>)}
                       {dayRaces.map((r) => (
                         <button key={r.id} onClick={() => openDay(key)} className="flex w-full items-center gap-2.5 rounded-xl bg-amber-50 px-3.5 py-2.5 text-left ring-1 ring-amber-100 transition-colors hover:bg-amber-100/70">
                           <Flag className="h-4 w-4 flex-shrink-0 text-amber-600" />
-                          <div className="min-w-0"><div className="truncate font-bold text-zinc-900">{r.name}</div><div className="truncate text-xs text-zinc-500">{[r.location, r.distanceKm != null ? fmtDistance(r.distanceKm, units) : ""].filter(Boolean).join(" · ") || t("cal.panel.plannedRace")}</div></div>
+                          <div className="min-w-0"><div className="truncate font-semibold text-zinc-900">{r.name}</div><div className="truncate text-xs text-zinc-500">{[r.location, r.distanceKm != null ? fmtDistance(r.distanceKm, units) : ""].filter(Boolean).join(" · ") || t("cal.panel.plannedRace")}</div></div>
                         </button>
                       ))}
                       {dayNotes.map((n) => (
@@ -562,9 +584,9 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
 
       {/* Panneau du jour sélectionné */}
       {sel && (
-        <div className="mt-5 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+        <div className="mt-5 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
           <div className="flex items-center justify-between gap-2 bg-zinc-900 px-5 py-3 text-white">
-            <div className="text-sm font-bold first-letter:uppercase">{formatDateCivile(sel, lang, { weekday: "long", day: "numeric", month: "long" })}</div>
+            <div className="text-sm font-semibold first-letter:uppercase">{formatDateCivile(sel, lang, { weekday: "long", day: "numeric", month: "long" })}</div>
             <button onClick={() => setSel(null)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 transition hover:bg-white/25"><X className="h-4 w-4" /></button>
           </div>
 
@@ -578,8 +600,20 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
                 <div className="flex items-center gap-2.5">
                   <Flag className="h-5 w-5 flex-shrink-0 text-amber-600" />
                   <div>
-                    <div className="font-bold text-zinc-900">{r.name}</div>
+                    <div className="font-semibold text-zinc-900">{r.name}</div>
                     <div className="text-xs text-zinc-500">{[r.location, r.distanceKm != null ? fmtDistance(r.distanceKm, units) : ""].filter(Boolean).join(" · ") || t("cal.panel.plannedRace")}</div>
+                    {/* Priorité dans la saison : l'objectif déclaré reste A, les autres se choisissent. */}
+                    {!r.isObjective && (
+                      <div role="radiogroup" aria-label={t("cal.race.prio")} className="mt-1.5 flex gap-1">
+                        {(["A", "B", "C"] as const).map((p) => (
+                          <button key={p} type="button" role="radio" aria-checked={(r.priorite ?? "C") === p} disabled={busy}
+                            onClick={() => (r.priorite ?? "C") !== p && changerPriorite(r.id, p)}
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 transition-colors ${(r.priorite ?? "C") === p ? "bg-amber-500 text-white ring-amber-500" : "bg-white text-amber-700 ring-amber-200 hover:bg-amber-100"}`}>
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <button onClick={() => del(r.id, "race")} className="text-zinc-300 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
@@ -621,7 +655,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
                             <span className="block truncate text-sm font-semibold text-zinc-800">{s.name}</span>
                             <span className="block truncate text-[11px] text-zinc-400">{[s.city, s.date ? new Date(s.date).toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" }) : ""].filter(Boolean).join(" · ")}</span>
                           </span>
-                          {s.distanceKm != null && <span className="flex-shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">{fmtDistance(s.distanceKm, units)}</span>}
+                          {s.distanceKm != null && <span className="flex-shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">{fmtDistance(s.distanceKm, units)}</span>}
                         </button>
                       ))}
                     </div>
@@ -630,6 +664,18 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
                 <div className="flex gap-2">
                   <input value={race.location} onChange={(e) => setRace({ ...race, location: e.target.value })} placeholder={t("cal.race.locPh")} className="flex-1 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
                   <input value={race.distanceKm} onChange={(e) => setRace({ ...race, distanceKm: e.target.value })} type="number" placeholder={t("cal.race.kmPh")} className="w-20 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
+                </div>
+                <div>
+                  <div className="mb-1 text-xs font-medium text-zinc-500">{t("cal.race.prio")}</div>
+                  <div role="radiogroup" aria-label={t("cal.race.prio")} className="grid grid-cols-3 gap-1">
+                    {(["A", "B", "C"] as const).map((p) => (
+                      <button key={p} type="button" role="radio" aria-checked={race.priorite === p} onClick={() => setRace({ ...race, priorite: p })}
+                        className={`rounded-xl px-2 py-1.5 text-xs font-semibold ring-1 transition-colors ${race.priorite === p ? "bg-amber-500 text-white ring-amber-500" : "bg-white text-amber-800 ring-amber-200 hover:bg-amber-50"}`}>
+                        {p === "A" ? t("cal.race.prioA") : p === "B" ? t("cal.race.prioB") : t("cal.race.prioC")}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-zinc-500">{t("cal.race.prioHint")}</p>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={addEntry} disabled={busy || !race.name.trim()} className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flag className="h-4 w-4" />} {t("cal.plan")}</button>
@@ -658,7 +704,7 @@ export function CalendarView({ sessions: sessionsProp, notes: notesProp = [], ra
  * On n'affiche rien s'il n'y a rien de notable à dire : un bandeau permanent redevient
  * un décor qu'on ne lit plus.
  */
-function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: CoachState | null; lang: string; t: (k: string, p?: Record<string, string | number>) => string; sessions: Planned[]; realismeMasque?: string | null }) {
+function CoachWhy({ state, rappel = null, lang, t, sessions, realismeMasque = null }: { state: CoachState | null; rappel?: RappelAffiche | null; lang: string; t: (k: string, p?: Record<string, string | number>) => string; sessions: Planned[]; realismeMasque?: string | null }) {
   const fuseau = useFuseau();
   // La clé mémorisée côté serveur, puis celle qu'on vient d'enregistrer d'un clic : le
   // bloc disparaît tout de suite, sans attendre un rechargement. (Déclaré AVANT le
@@ -707,8 +753,13 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
   // défaut du premier jet : la fonction était livrée et invisible pour presque tout le
   // monde.
   if (!noQuality && !easedQuality && !hasObjective && !warnings.length && !state.lastSession?.label && !(state.qualiteManquee ?? []).length) {
-    return semaine.length
-      ? <div className="mb-4"><AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} /></div>
+    return semaine.length || rappel
+      ? (
+        <div className="mb-4">
+          {rappel && <RappelPremium rappel={rappel} lang={lang} t={t} />}
+          {semaine.length > 0 && <AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} />}
+        </div>
+      )
       : null;
   }
 
@@ -738,8 +789,8 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
           ce repli : une mise en garde ne doit pas perdre en visibilité. */}
       <details className="group">
         <summary className="cursor-pointer list-none">
-          <span className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${tone.dot}`}>
-            <Sparkles className="h-3.5 w-3.5" /> {t("cal.why.title")}
+          <span className={`flex items-center gap-1.5 text-xs font-medium ${tone.dot}`}>
+            <Info className="h-3.5 w-3.5" strokeWidth={1.5} /> {t("cal.why.title")}
             <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
           </span>
           {/* La ligne actionnable, visible repliée COMME dépliée : c'est la réponse à
@@ -754,6 +805,19 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
           {(noQuality || easedQuality) && (
             <span className={`mt-1.5 block text-sm leading-relaxed ${tone.body}`}>
               {t(noQuality ? "cal.why.noQuality" : "cal.why.easedQuality")}
+              {/* ⚠️ LES MOTIFS SUIVENT LES DEUX-POINTS, repliés comme dépliés. Repliée, la
+                  phrase « … ce n'est pas un oubli : » ne disait rien : ce qui la suivait à
+                  l'écran était l'encadré de réalisme, et l'athlète l'a lu comme LA raison
+                  (Cyprien, 30/10/2026 : « c'est faux, je comprends rien »). Deux ou trois
+                  motifs courts, pas les 123 mots du raisonnement. Des <span> et non une
+                  liste : un <summary> n'accepte que du contenu de phrase. */}
+              {reasons.map((r, i) => <span key={i} className="mt-0.5 block">· {r}</span>)}
+              {/* La charge d'un autre sport est la cause la plus souvent invisible : le
+                  calendrier ne montre que la course, donc une semaine de randonnée ne
+                  laissait aucune trace expliquant l'allègement. */}
+              {state.cross?.label && (
+                <span className="mt-0.5 block">· {t("cal.why.cross")} : {state.cross.label}{state.cross.sharePct ? ` (${state.cross.sharePct} %)` : ""}</span>
+              )}
             </span>
           )}
           {/* Visible repliée : c'est la réponse à « où est passée ma séance ? ». */}
@@ -801,18 +865,10 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
         </div>
       )}
 
-      {noQuality || easedQuality ? (
+      {(noQuality || easedQuality) && (hasObjective || nextQuality.length > 0) ? (
         <div className={`mt-2 text-sm leading-relaxed ${tone.body}`}>
-          {/* L'intro est déjà dans le résumé : la répéter ici ferait doublon au dépliage. */}
-          <ul className="mt-1 space-y-0.5">
-            {reasons.map((r, i) => <li key={i}>· {r}</li>)}
-            {/* La charge d'un autre sport est la cause la plus souvent invisible : le
-                calendrier ne montre que la course, donc une semaine de randonnée ne
-                laissait aucune trace expliquant l'allègement. */}
-            {state.cross?.label && (
-              <li>· {t("cal.why.cross")} : {state.cross.label}{state.cross.sharePct ? ` (${state.cross.sharePct} %)` : ""}</li>
-            )}
-          </ul>
+          {/* L'intro et ses motifs sont déjà dans le résumé : les répéter ici ferait doublon
+              au dépliage. */}
           {hasObjective && <p className="mt-1.5">{t(noQuality ? "cal.why.noQualityTail" : "cal.why.easedQualityTail", { race })}</p>}
           {nextQuality.length > 0 && (
             <p className="mt-1.5"><span className="font-semibold">{t("cal.why.nextWeek")} :</span> {nextQuality.join(" + ")}</p>
@@ -837,7 +893,7 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
         <div className="mt-3 rounded-xl border border-red-200 bg-red-50/80 px-3.5 py-3">
         <details className="group">
           <summary className="cursor-pointer list-none">
-            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-red-700">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-red-700">
               <Flag className="h-3.5 w-3.5" /> {t("cal.why.realism")}
               <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
             </span>
@@ -862,7 +918,31 @@ function CoachWhy({ state, lang, t, sessions, realismeMasque = null }: { state: 
         </div>
       )}
 
+      {/* Hors du repli, comme l'avertissement : il parle de la semaine affichée juste au-dessous. */}
+      {rappel && <RappelPremium rappel={rappel} lang={lang} t={t} />}
+
       <AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} />
+    </div>
+  );
+}
+
+/**
+ * « Premium aurait changé ton plan » — l'écart entre le plan Starter et le plan complet,
+ * calculé par le coach (lib/coach/rappelPremium). La phrase est déjà écrite dans les cinq
+ * langues : le composant ne fabrique rien, il choisit la sienne.
+ */
+function RappelPremium({ rappel, lang, t }: { rappel: RappelAffiche; lang: string; t: (k: string) => string }) {
+  const dans = (x: Record<string, string>) => x[lang] ?? x.fr;
+  return (
+    <div className="mt-2 rounded-xl bg-white/70 px-3 py-2 text-sm leading-relaxed text-zinc-700">
+      <p className="flex items-center gap-1.5 text-xs font-medium text-amber-600">
+        <Crown className="h-3.5 w-3.5" /> {t("cal.premium.titre")}
+      </p>
+      <p className="mt-1">{dans(rappel.phrase)}</p>
+      {rappel.detail && <p className="mt-0.5 text-xs text-zinc-500">{dans(rappel.detail)}</p>}
+      <Link href="/pricing" className="mt-1 inline-block text-xs font-semibold text-emerald-700 underline-offset-2 hover:underline">
+        {t("cal.premium.cta")}
+      </Link>
     </div>
   );
 }

@@ -66,7 +66,7 @@ export function ShopComingSoon() {
       <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50">
         <ShoppingBag className="h-7 w-7 text-emerald-600" />
       </div>
-      <h1 className="text-2xl font-black tracking-tight text-zinc-900">{d.title}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">{d.title}</h1>
       <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-zinc-600">{d.lead}</p>
       <ul className="mx-auto mt-8 grid max-w-md gap-3 text-left">
         {points.map(({ icon: Icon, text }) => (

@@ -145,5 +145,27 @@ test("une restauration qui n'a rien restauré ne répond pas « c'est fait »", 
   assert.ok(/\.eq\("user_id", user\.id\)/.test(bloc), "le message d'un autre athlète devient restaurable");
 });
 
+test("messages privés (30/09/2026) : fils par conversation, Entrée envoie, e-mail au coach à CHAQUE message", () => {
+  const src = readFileSync("src/components/messages/MessageThread.tsx", "utf8");
+  // Chaque message appartient à UNE conversation — sinon le message d'un ami s'affiche dans le fil du coach.
+  const page = readFileSync("src/app/dashboard/messages/page.tsx", "utf8");
+  assert.ok(/r\.type === "athlete_message" \? String\(d\.from_id \?\? ""\) : r\.type === "athlete_message_sent" \? String\(d\.to_id \?\? ""\) : "coach"/.test(page),
+    "les messages ne sont plus rangés par conversation");
+  assert.ok(/const fil = visibles\.filter\(\(m\) => \(m\.avec \?\? COACH\) === conv\)/.test(src), "le fil mélange les conversations");
+  assert.ok(/if \(e\.key === "Enter" && !e\.shiftKey && !e\.nativeEvent\.isComposing\) \{ e\.preventDefault\(\); void doSend\(\); \}/.test(src),
+    "Entrée n'envoie plus (ou Maj+Entrée n'ajoute plus de ligne)");
+  // Plus d'objet à remplir, plus de dossiers de courrier.
+  assert.ok(!/subjectPh|"f\.trash"|"f\.drafts"/.test(src), "l'écran de courrier (objet, corbeille, brouillons) est revenu");
+  // Un message supprimé se rattrape.
+  assert.ok(/toast\(d\["supprime"\], \{ action: \{ label: d\["annuler"\], onClick: \(\) => \{ void restore\(id\); \} \} \}\)/.test(src), "une suppression ne peut plus être annulée");
+  // Écrire au fondateur par e-mail : l'adresse PUBLIQUE de l'éditeur, jamais une adresse personnelle.
+  assert.ok(/const mailto = `mailto:\$\{EDITEUR\.email\}/.test(src) && !/outlook|cypriendumez/i.test(src.replace(/\/\*[\s\S]*?\*\//g, "")), "le lien e-mail n'utilise plus l'adresse publique de l'éditeur");
+  // Et chaque message au coach part AUSSI dans sa boîte, avec une adresse de réponse.
+  const route = readFileSync("src/app/api/messages/route.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  assert.ok(/if \(COACH_EMAIL\) \{/.test(route) && !/RESEND_API_KEY && COACH_EMAIL/.test(route), "l'e-mail au coach dépend encore de la clé Resend (saut silencieux)");
+  assert.ok(/await envoyerEmail\("messages", \{\s*to: \[COACH_EMAIL\], reply_to: emailAthlete \|\| undefined/.test(route), "l'e-mail au coach n'est plus envoyé, attendu, ou sans adresse de réponse");
+  assert.ok(/<b>\$\{esc\(name\)\}<\/b>/.test(route), "le nom de l'athlète part dans l'e-mail sans échappement");
+});
+
 console.log(`\n${passed} test(s) de messagerie passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }

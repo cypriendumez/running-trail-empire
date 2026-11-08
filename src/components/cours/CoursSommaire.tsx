@@ -26,7 +26,7 @@ export function CoursSommaire({ items, label = "Sommaire" }: { items: { id: stri
 
   return (
     <nav className="sticky top-6 space-y-1">
-      <div className="mb-2 px-3 text-[11px] font-bold uppercase tracking-wide text-zinc-400">{label}</div>
+      <div className="mb-2 px-3 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{label}</div>
       {items.map((i) => {
         const on = active === i.id;
         return (
@@ -34,7 +34,7 @@ export function CoursSommaire({ items, label = "Sommaire" }: { items: { id: stri
             key={i.id}
             href={`#${i.id}`}
             aria-current={on ? "true" : undefined}
-            className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all ${
+            className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition ${
               on ? "bg-white font-semibold text-zinc-900 shadow-sm" : "text-zinc-500 hover:bg-white hover:text-zinc-900 hover:shadow-sm"
             }`}
           >

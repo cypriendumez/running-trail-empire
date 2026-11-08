@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -6,11 +6,12 @@ import { getPublicLang } from "@/lib/i18n/serverLang";
 import { nomAffichable, nomRegion, regionCanonique } from "@/lib/races/libelles";
 import { lienInscription, lienClassement, heureLisible } from "@/lib/races/liensCourse";
 import { editionsAAfficher } from "@/lib/races/editionsResultats";
+import { lienSortantPropre } from "@/lib/races/lienPropre";
 import { nomDestination, estCalendrierTiers, organisateurReel } from "@/lib/races/destination";
 import { texteCourses } from "../coursesI18n";
 import { jourFrance } from "@/lib/races/jourFrance";
 import {
-  estPubliable, estPubliableSansDate, aUneDate, idDepuisSlug, bornesId, slugCourse,
+  estPubliable, estPubliableSansDate, aUneDate, idDepuisSlug, bornesId, slugCourse, basculeALaLecture,
   titrePage, descriptionPage, dateEnClair,
   type CoursePublique,
 } from "@/lib/races/publique";
@@ -39,9 +40,12 @@ async function lire(slug: string): Promise<CoursePublique | null> {
   const bornes = bornesId(idDepuisSlug(slug) ?? "");
   if (!bornes) return null;
   const sb = createAdminClient();
-  // Migration 033 (éditions passées) d'abord, avec le même repli si la colonne manque.
-  const avec033 = await sb.from("races").select(CHAMPS + CHAMPS_032 + ",resultats_editions")
+  // Migrations 034 (parcours) puis 033 (éditions passées), avec le même repli si une colonne manque.
+  const avec034 = await sb.from("races").select(CHAMPS + CHAMPS_032 + ",resultats_editions,parcours_url")
     .gte("id", bornes.bas).lte("id", bornes.haut).limit(2);
+  const avec033 = avec034.error?.code === "42703"
+    ? await sb.from("races").select(CHAMPS + CHAMPS_032 + ",resultats_editions").gte("id", bornes.bas).lte("id", bornes.haut).limit(2)
+    : avec034;
   const complet = avec033.error?.code === "42703"
     ? await sb.from("races").select(CHAMPS + CHAMPS_032).gte("id", bornes.bas).lte("id", bornes.haut).limit(2)
     : avec033;
@@ -51,7 +55,25 @@ async function lire(slug: string): Promise<CoursePublique | null> {
   // Deux résultats voudraient dire que huit caractères ne suffisent plus à distinguer :
   // on préfère une page absente à une page qui parlerait d'une autre course.
   if (error || !data || data.length !== 1) return null;
-  return data[0] as CoursePublique;
+  return basculeALaLecture(data[0] as CoursePublique, jourFrance());
+}
+
+/**
+ * ⚠️ UNE COURSE SUPPRIMÉE N'EST PAS UNE PAGE MORTE (Search Console, 29/10/2026). Le
+ * dédoublonnage du mardi efface l'un des deux exemplaires d'une course ; l'adresse de
+ * l'exemplaire effacé, déjà connue de Google, répondait 404 alors que sa jumelle existe.
+ * Le déclencheur de la migration 039 note la jumelle à chaque suppression : on y renvoie.
+ * Table absente (migration pas encore passée) : la lecture échoue, l'adresse répond 404
+ * comme avant.
+ */
+async function jumelleDe(slug: string): Promise<string | null> {
+  const court = idDepuisSlug(slug);
+  if (!court) return null;
+  const { data, error } = await createAdminClient().from("races_redirections")
+    .select("nouvel_id").eq("ancien_court", court).maybeSingle();
+  if (error || !data?.nouvel_id) return null;
+  const c = await lire(String(data.nouvel_id).replace(/-/g, "").slice(0, 8));
+  return c && publiable(c) ? slugCourse(c) : null;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -75,20 +97,33 @@ const Ligne = ({ k, v }: { k: string; v: string }) => (
 );
 
 export default async function CoursePage({ params }: { params: Promise<{ slug: string }> }) {
-  const c = await lire((await params).slug);
+  const demande = (await params).slug;
+  const c = await lire(demande);
   const lang = await getPublicLang();
   const t = (k: string, p?: Record<string, string | number>) => texteCourses(lang, k, p);
+  if (!c) {
+    const jumelle = await jumelleDe(demande);
+    if (jumelle) permanentRedirect(`/courses/${jumelle}`);
+  }
   // ⚠️ LE MÊME FILTRE QUE LE SITEMAP. Une course sans date réelle ou déjà courue n'a pas
   // de page : la publier laisserait en ligne une information périmée que Google
   // continuerait de servir pendant des semaines.
   if (!c || !publiable(c)) notFound();
+  // ⚠️ UNE SEULE ADRESSE PAR COURSE. Seul l'identifiant désigne la course : une adresse
+  // déjà indexée survit donc à la correction du nom, de la ville ou de la distance. Elle
+  // répondait 200 avec une canonique vers la nouvelle — la Search Console les rangeait
+  // en « Autre page avec balise canonique correcte » (alerte du 24/10/2026). Une
+  // redirection définitive transmet l'ancienne à la nouvelle au lieu de servir un double.
+  const canonique = slugCourse(c);
+  if (demande !== canonique) permanentRedirect(`/courses/${canonique}`);
 
   const km = Number(c.distance_km);
   const dplus = Number(c.elevation_gain_m);
   const lieu = [c.city, c.department].filter(Boolean).join(", ");
   const insc = lienInscription(c);
   const classement = lienClassement(c, c);
-  const editions = editionsAAfficher((c as { resultats_editions?: unknown }).resultats_editions, classement?.direct ? classement.url : null);
+  const editions = editionsAAfficher((c as { resultats_editions?: unknown }).resultats_editions, classement?.direct ? classement : null, c);
+  const parcours = lienSortantPropre((c as { parcours_url?: unknown }).parcours_url);
   // Le champ « organisation » ne vaut que s'il ne désigne pas la source du lien.
   const organisateur = organisateurReel(c.organization, c.registration_url);
   // ⚠️ `terrain` EST UN TABLEAU. `{c.terrain && …}` rendait donc une ligne « Terrain »
@@ -103,7 +138,9 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   // ⚠️ AUCUNE DONNÉE STRUCTURÉE D'ÉVÉNEMENT SANS DATE. `SportsEvent` exige `startDate` :
   // en déclarer un sans date produirait une donnée invalide, et en inventer une serait
   // pire — un moteur affiche cette date dans ses résultats comme un fait vérifié.
-  const jsonLd: Record<string, unknown> | null = !aUneDate(c) ? null : {
+  // ⚠️ NI UNE DATE ESTIMÉE (30/09/2026) : « ≈ 26 sept. 2027 » est une déduction de
+  // l'édition précédente — Google l'aurait affichée comme la date officielle.
+  const jsonLd: Record<string, unknown> | null = !aUneDate(c) || c.date_confirmee === false ? null : {
     "@context": "https://schema.org",
     "@type": "SportsEvent",
     name: nomAffichable(c.name),
@@ -137,7 +174,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
         {c.region && <> · <Link href={`/courses?region=${encodeURIComponent(regionCanonique(c.region))}`} className="hover:text-zinc-900">{nomRegion(c.region)}</Link></>}
       </nav>
 
-      <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">{nomAffichable(c.name)}</h1>
+      <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl">{nomAffichable(c.name)}</h1>
       <p className="mt-2 text-lg text-zinc-600">
         {/* ⚠️ JAMAIS DE DATE INVENTÉE. « 2099-01-01 » est le repère interne de
             « prochaine édition non annoncée » : l'écrire tel quel donnerait
@@ -156,7 +193,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
 
       {!aUneDate(c) && (
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-          <h2 className="text-sm font-bold text-amber-900">{t("sansDate.titre")}</h2>
+          <h2 className="text-sm font-semibold text-amber-900">{t("sansDate.titre")}</h2>
           <p className="mt-1 text-sm text-amber-900/80">{t("sansDate.texte")}</p>
         </div>
       )}
@@ -185,6 +222,13 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
           {classement.direct
             ? (classement.annee ? t("resultats.direct", { a: classement.annee }) : t("resultats.voir"))
             : t("resultats.chercher")}
+        </a>
+      )}
+      {/* Le tracé publié par l'organisateur (veille des pages officielles, migration 034). */}
+      {parcours && (
+        <a href={parcours} target="_blank" rel="noopener noreferrer nofollow"
+          className="ml-0 mt-3 inline-flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-5 py-3 font-semibold text-zinc-700 transition-colors hover:border-emerald-300 hover:bg-emerald-50 sm:ml-3">
+          {t("parcours")}
         </a>
       )}
       {/* Classements des éditions PASSÉES, chacune vérifiée (lib/races/editionsResultats). */}
@@ -219,7 +263,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
       </p>
 
       <section className="mt-12 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6">
-        <h2 className="text-lg font-bold text-zinc-900">{t("prep.titre")}</h2>
+        <h2 className="text-lg font-semibold text-zinc-900">{t("prep.titre")}</h2>
         <p className="mt-1.5 text-sm text-zinc-600">
           {t("prep.texte")}
         </p>

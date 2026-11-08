@@ -123,6 +123,11 @@ jobs:
       - name: Appliquer les fiches (seuils de sécurité)
         run: npx tsx scripts/finishers-appliquer.ts "$ETAT/fiches-semaine.jsonl" --ecrire
 
+      # Les fiches reprises de jogging-plus (source fermée) reçoivent le site officiel connu
+      # de leur jumeau finishers (même nom canonique, même ville) : la veille les relit ensuite.
+      - name: Sites officiels des fiches à source fermée (jumeaux)
+        run: npx tsx scripts/sites-officiels.ts --jumeaux-seulement --ecrire
+
       - name: Retirer les épreuves qui ne sont pas de la course à pied
         run: npx tsx scripts/retirer-non-course.ts --ecrire
 
@@ -132,8 +137,16 @@ jobs:
       - name: Contrôler les liens « Classement » et « S'inscrire »
         run: npx tsx scripts/verifier-liens-courses.ts "$ETAT/liens-controle-$(date -u +%Y%m%d).json" --ecrire
 
-      # Classements des éditions PASSÉES (2025, 2024…) : chaque adresse devinée est OUVERTE,
-      # un site qui répond à tout est écarté. AVANT la sauvegarde de l'état : le cache voyage.
+      # Classements des éditions PASSÉES (2025, 2024…) : adresses devinées chez les
+      # chronométreurs ET liens « Résultats 2024 » des organisateurs — chacune OUVERTE avant
+      # d'être retenue. AVANT la sauvegarde de l'état : les deux caches voyagent.
+      # LA VEILLE COMPLÈTE (01/10/2026) : la page officielle de CHAQUE course est relue —
+      # classement (le plus récent, par distance), dates (estimées → confirmées), lien
+      # d'inscription et tracé du parcours quand il manque. La veille quotidienne
+      # (`veille-courses.yml`) ne relit que les courses de J-12 à J+60.
+      - name: Veille des pages officielles — résultats, dates, inscriptions, parcours
+        run: npx tsx scripts/veille-courses.ts "$ETAT/veille-rapport.json" --ecrire
+
       - name: Classements des éditions passées — vérification
         run: npx tsx scripts/resultats-editions.ts "$ETAT/editions-resultats.jsonl"
 
@@ -147,6 +160,8 @@ jobs:
             .cache-courses/resultats-sites.jsonl
             .cache-courses/liens-controle-*.json
             .cache-courses/editions-resultats.jsonl
+            .cache-courses/editions-sites-verifiees.jsonl
+            .cache-courses/veille-rapport.json
           retention-days: 90
           if-no-files-found: error
           include-hidden-files: true

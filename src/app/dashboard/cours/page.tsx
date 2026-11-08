@@ -91,15 +91,13 @@ export default async function CoursPage() {
       {/* Hero — resserré le 21/09/2026 (Cyprien : « trop grand, il prend trop de place ») :
           padding 40→20 px, titre 4xl→3xl, sous-titre plus petit et limité à 2 lignes sur
           téléphone. */}
-      <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg,#064e3b 0%,#047857 45%,#0d9488 100%)" }}>
-        <div className="pointer-events-none absolute -top-24 -right-16 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 -left-10 h-80 w-80 rounded-full bg-teal-300/10 blur-3xl" />
+      <div className="relative overflow-hidden" style={{ background: "linear-gradient(170deg,#065f46 0%,#064e3b 100%)" }}>
         <div className="relative z-10 mx-auto max-w-6xl px-5 py-5 sm:py-7 text-white">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/20 backdrop-blur-md">
             <GraduationCap className="h-3.5 w-3.5 text-amber-300" />
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-50">{ui.heroEyebrow}</span>
+            <span className="text-[11px] font-semibold text-amber-50 first-letter:uppercase">{ui.heroEyebrow}</span>
           </span>
-          <h1 className="mt-2.5 text-2xl sm:text-3xl font-bold tracking-tight drop-shadow-sm">{ui.heroTitle}</h1>
+          <h1 className="mt-2.5 text-2xl sm:text-3xl font-semibold tracking-tight">{ui.heroTitle}</h1>
           <p className="mt-1.5 max-w-2xl text-[13.5px] sm:text-[15px] leading-relaxed text-white/85 line-clamp-2 sm:line-clamp-none">{ui.heroSub}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {[fill(ui.chipChapters, { n: chapters.length }), fill(ui.chipNotions, { n: totalNotions }), ui.chipCoach].map((c) => (
@@ -148,10 +146,10 @@ export default async function CoursPage() {
                 <section key={ch.id} id={ch.id} className="scroll-mt-6">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-sm" style={{ background: `linear-gradient(135deg,${m.from},${m.to})` }}>
-                        <Icon className="h-5 w-5" />
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200/80 bg-white text-zinc-500">
+                        <Icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
                       </span>
-                      <h2 className="text-xl font-bold text-zinc-900 leading-tight">{ch.title}</h2>
+                      <h2 className="text-xl font-semibold text-zinc-900 leading-tight">{ch.title}</h2>
                     </div>
                     <AskCoachButton label={ui.askCoach} question={fill(ui.askCoachQuestion, { chapter: ch.title.replace(/^\d+ · /, "") })} />
                   </div>
@@ -165,11 +163,11 @@ export default async function CoursPage() {
                   )}
                   <div className="grid gap-3 sm:grid-cols-2">
                     {ch.concepts.map((c, i) => (
-                      <div key={c.term} id={slugify(`${ch.id}-${c.term}`)} className="scroll-mt-24 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+                      <div key={c.term} id={slugify(`${ch.id}-${c.term}`)} className="scroll-mt-24 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md">
                         <div className="flex flex-wrap items-baseline gap-x-2">
                           <span className="mr-0.5 inline-block h-2 w-2 flex-shrink-0 self-center rounded-full" style={{ background: m.from }} />
-                          <h3 className="font-bold text-zinc-900">{c.term}</h3>
-                          {c.short && <span className="text-xs italic text-zinc-400">— {c.short}</span>}
+                          <h3 className="font-semibold text-zinc-900">{c.term}</h3>
+                          {c.short && <span className="text-xs text-zinc-400">— {c.short}</span>}
                         </div>
                         <p className="mt-2 text-sm leading-relaxed text-zinc-600">{c.def}</p>
                         {c.why && <p className="mt-2 text-sm leading-relaxed text-zinc-600"><b className={m.accent}>{ui.whyLabel}</b> {c.why}</p>}
@@ -189,7 +187,7 @@ export default async function CoursPage() {
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       {ch.erreurs && ch.erreurs.length > 0 && (
                         <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-                          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-amber-800"><AlertTriangle className="h-4 w-4" aria-hidden />{ui.erreursLabel}</div>
+                          <div className="flex items-center gap-2 text-xs font-semibold text-amber-800 first-letter:uppercase"><AlertTriangle className="h-4 w-4" aria-hidden />{ui.erreursLabel}</div>
                           <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-amber-950">
                             {ch.erreurs.map((e) => <li key={e} className="flex gap-2"><span className="mt-[9px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500" />{e}</li>)}
                           </ul>
@@ -198,10 +196,10 @@ export default async function CoursPage() {
                       {ch.action && (
                         <Link href={ch.action.href} className="group flex flex-col justify-between rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 transition hover:border-emerald-400 hover:shadow-md">
                           <div>
-                            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-emerald-800"><Target className="h-4 w-4" aria-hidden />{ui.actionLabel}</div>
+                            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800 first-letter:uppercase"><Target className="h-4 w-4" aria-hidden />{ui.actionLabel}</div>
                             <p className="mt-2 text-sm leading-relaxed text-emerald-950">{ch.action.text}</p>
                           </div>
-                          <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 group-hover:gap-2.5 transition-all">{ch.action.label}<ArrowRight className="h-4 w-4" /></span>
+                          <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 group-hover:gap-2.5 transition">{ch.action.label}<ArrowRight className="h-4 w-4" /></span>
                         </Link>
                       )}
                     </div>
@@ -243,9 +241,9 @@ export default async function CoursPage() {
                 { href: "/dashboard/health", title: ui.practice.sante, desc: ui.practice.santeDesc },
               ].map((l) => (
                 <a key={l.href} href={l.href}
-                  className="group rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
+                  className="group rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition hover:border-emerald-300 hover:shadow-md">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-zinc-900">{l.title}</span>
+                    <span className="font-semibold text-zinc-900">{l.title}</span>
                     <span className="text-emerald-600 opacity-0 transition-opacity group-hover:opacity-100">→</span>
                   </div>
                   <p className="mt-1 text-xs leading-relaxed text-zinc-500">{l.desc}</p>

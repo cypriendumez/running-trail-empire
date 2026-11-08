@@ -22,7 +22,7 @@ export function RichText({ texte, className = "" }: { texte: string; className?:
         if (b.type === "titre") {
           const taille = b.niveau === 1 ? "text-[15px]" : b.niveau === 2 ? "text-sm" : "text-[13px]";
           return (
-            <h4 key={i} className={`${taille} font-bold text-zinc-900 ${i > 0 ? "pt-1.5" : ""}`}>
+            <h4 key={i} className={`${taille} font-semibold text-zinc-900 ${i > 0 ? "pt-1.5" : ""}`}>
               <Ligne contenu={b.contenu} />
             </h4>
           );
@@ -35,7 +35,7 @@ export function RichText({ texte, className = "" }: { texte: string; className?:
                   {/* Une puce ET un numéro sur la même ligne, c'est deux marqueurs pour
                       une seule idée : le numéro remplace la puce, il ne s'y ajoute pas. */}
                   {b.ordonnee
-                    ? <span className="mt-px w-4 flex-shrink-0 text-right text-xs font-bold tabular-nums text-emerald-600">{j + 1}.</span>
+                    ? <span className="mt-px w-4 flex-shrink-0 text-right text-xs font-semibold tabular-nums text-emerald-600">{j + 1}.</span>
                     : <span className="mt-[7px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500/70" aria-hidden />}
                   <span className="min-w-0 flex-1"><Ligne contenu={it} /></span>
                 </li>

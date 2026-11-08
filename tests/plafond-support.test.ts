@@ -18,6 +18,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { PLAFOND_JOUR, PLAFOND_SUPPORT_JOUR } from "../src/lib/billing/aiQuota";
+import { PRIX_AFFICHES, REMISE_ETUDIANTE_PCT } from "../src/lib/billing/prix";
+import { OFFRE_FONDATEUR } from "../src/lib/brand/waitlist";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -42,7 +44,8 @@ test("le gratuit garde des questions, mais un nombre fini", () => {
 
 test("un compte qui paie n'est jamais bloqué sur une question d'interface", () => {
   assert.equal(PLAFOND_SUPPORT_JOUR.starter, 20);
-  assert.equal(PLAFOND_SUPPORT_JOUR.premium, 30);
+  // 30 jusqu'au 31/10/2026 : ramené à 20 pour que le pire cas reste rentable (voir plus bas).
+  assert.equal(PLAFOND_SUPPORT_JOUR.premium, 20);
   for (const f of ["starter", "premium", "essai"] as const) {
     assert.ok(PLAFOND_SUPPORT_JOUR[f] > PLAFOND_SUPPORT_JOUR.gratuit,
       `${f} n'a pas plus de questions que le gratuit : la formule n'apporte rien ici`);
@@ -52,10 +55,39 @@ test("un compte qui paie n'est jamais bloqué sur une question d'interface", () 
   assert.ok(PLAFOND_SUPPORT_JOUR.starter > PLAFOND_JOUR.starter);
 });
 
-test("la hiérarchie des formules tient aussi sur l'aide", () => {
-  assert.ok(PLAFOND_SUPPORT_JOUR.premium > PLAFOND_SUPPORT_JOUR.starter,
-    "le plus cher n'est plus le plus servi");
+test("la hiérarchie des formules tient : Premium jamais moins servi, et plus servi sur le coach", () => {
+  // Depuis le 31/10/2026, l'aide est la même en Starter et en Premium ; l'écart se joue sur le
+  // coach, qui est ce que Premium vend.
+  assert.ok(PLAFOND_SUPPORT_JOUR.premium >= PLAFOND_SUPPORT_JOUR.starter, "Premium a moins d'aide que Starter");
+  assert.ok(PLAFOND_JOUR.premium > PLAFOND_JOUR.starter, "le plus cher n'est plus le plus servi sur le coach");
   assert.ok(PLAFOND_JOUR.gratuit === 0, "le gratuit ne doit toujours consommer AUCUN appel coach");
+});
+
+console.log("\nMÊME AU PIRE, AUCUNE FORMULE NE VEND À PERTE");
+
+test("coach, aide et relecture saturés chaque jour, remise la plus forte comprise : encore un bénéfice", () => {
+  // L'audit du 31/10/2026, figé. HYPOTHÈSES (à revoir si l'une change) :
+  //  · un appel au coach 0,30 c€ HT, une question d'aide 0,28 c€ HT (mesurés) ; la relecture
+  //    Premium (coach avancé, hors plafond) ≈ 0,11 €/mois ;
+  //  · TVA de 20 % NON récupérable sur ces achats (franchise en base) ;
+  //  · Stripe 2,9 % + 0,25 € (prudent : cartes premium ou hors UE) ;
+  //  · cotisations 16 % : BIC services avec l'ACRE (15,9 %) + formation (0,1 %), le taux de 2027,
+  //    l'année où la remise fondateur s'applique (elle ne vaut que la première année).
+  const APPEL = 0.003, AIDE = 0.0028, RELECTURE = 0.11, TVA_ACHATS = 1.2, COTISATIONS = 0.16;
+  const pireIA = (f: "starter" | "premium") =>
+    (PLAFOND_JOUR[f] * 30 * APPEL + PLAFOND_SUPPORT_JOUR[f] * 30 * AIDE + (f === "premium" ? RELECTURE : 0)) * TVA_ACHATS;
+  for (const f of ["starter", "premium"] as const) {
+    for (const remise of [0, REMISE_ETUDIANTE_PCT, OFFRE_FONDATEUR.remisePct]) {
+      for (const periode of ["mois", "an"] as const) {
+        const encaisse = (PRIX_AFFICHES[f][periode] / 100) * (1 - remise / 100);
+        const parMois = periode === "an" ? encaisse / 12 : encaisse;
+        const stripe = (encaisse * 0.029 + 0.25) / (periode === "an" ? 12 : 1);
+        const benefice = parMois - stripe - parMois * COTISATIONS - pireIA(f);
+        assert.ok(benefice > 0,
+          `${f} ${periode}${remise ? ` −${remise} %` : ""} : au pire ${benefice.toFixed(2)} €/mois — la formule vend à perte`);
+      }
+    }
+  }
 });
 
 console.log("\nLES DEUX COMPTEURS NE SE MARCHENT PAS DESSUS");

@@ -63,7 +63,7 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
       <Link href="/dashboard/shop" className="text-[13px] text-zinc-500 hover:text-zinc-900">← {tx("shop.retour")}</Link>
 
       <header className="mt-3 mb-6">
-        <div className="text-[12px] font-semibold uppercase tracking-wider text-zinc-500">{m.marque}</div>
+        <div className="text-[12px] font-semibold text-zinc-500 first-letter:uppercase">{m.marque}</div>
         <h1 className="text-[28px] font-semibold tracking-tight text-zinc-900 sm:text-[34px]">{m.nom}</h1>
         <div className="mt-2 flex flex-wrap gap-1.5">
           <Badge tone="neutral">{tx(`shop.t.${m.terrain}`)}</Badge>
@@ -141,7 +141,7 @@ export function FicheModele({ m, avis, bouts, manquantes, proches, offres, offre
                 {proches.map((p) => (
                   <Link key={p.slug} href={`/dashboard/shop/${p.slug}`}
                     className="rounded-xl p-3 ring-1 ring-inset ring-zinc-200 transition hover:ring-zinc-400">
-                    <div className="text-[11px] uppercase tracking-wider text-zinc-500">{p.marque}</div>
+                    <div className="text-[11px] text-zinc-500 first-letter:uppercase">{p.marque}</div>
                     <div className="text-[14px] font-semibold text-zinc-900">{p.nom}</div>
                     <div className="mt-1 text-[12px] text-zinc-500">
                       {p.poidsG ? `${p.poidsG.valeur} g` : "—"} · {p.dropMm != null ? `${p.dropMm.valeur} mm` : "—"}

@@ -89,8 +89,11 @@ test("le plan ajoute l'axe, et JAMAIS pendant l'affûtage", () => {
   assert.match(src, /const axes = ctx\.cycle\.taper \? \[\] : axesRenforcement\(\{/,
     "du travail supplémentaire est ajouté en affûtage, où tout l'objectif est de garder du jus");
   assert.match(src, /PLAN_T\[l\]\.renfoAxe\[a\]/, "l'axe n'est plus rendu dans le texte de la séance");
+  // Base, développement, spécifique — et la reprise d'après-course (fondations), depuis le
+  // 05/11/2026. La récupération proprement dite (`renfoRecup`) et l'affûtage n'en ont pas.
   const n = (src.match(/\+ enPlus/g) ?? []).length;
-  assert.equal(n, 3, `${n} phase(s) portent l'axe : base, développement et spécifique doivent toutes l'avoir`);
+  assert.equal(n, 4, `${n} phase(s) portent l'axe : base, développement, spécifique et reprise doivent toutes l'avoir`);
+  assert.doesNotMatch(src, /renfoRecup \+ enPlus/, "du travail supplémentaire est ajouté pendant la récupération d'après-course");
 });
 
 test("le contexte expose des MÉDIANES, pas des valeurs isolées", () => {

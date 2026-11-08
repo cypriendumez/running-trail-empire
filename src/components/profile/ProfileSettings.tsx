@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect , useId } from "react";
+import { tousLesModeles, suggererModeles, toutesLesMarques, compact } from "@/lib/gear/modelesChaussures";
+import { useState, useRef, useEffect , useId, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -9,14 +10,14 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { trouver, cotesPourGarage, type ModeleLeger } from "@/lib/shop/indexLeger";
 import { vo2maxEstimate, vo2maxLabel, racePredictions, predictRaceSec, type VmaSource } from "@/lib/running/fitness";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { stripProfileSecrets } from "@/lib/profile/safe";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthLabel } from "@/data/healthCatalog";
 import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
 import type { Lang } from "@/lib/i18n/translations";
 import { JOURS_ESSAI } from "@/lib/billing/access";
-import { PRIX_AFFICHES, euros, MOIS_OFFERTS } from "@/lib/billing/prix";
+import { PRIX_AFFICHES, euros, moisOfferts } from "@/lib/billing/prix";
 import { EDITEUR } from "@/lib/brand/editeur";
 import { messageAbo, type EtatAbonnement } from "@/lib/billing/etatAbonnement";
+import { fenetreRetractation } from "@/lib/billing/retractation";
 import {
   User, Activity, Footprints, CreditCard, Target, Bell,
   Flame, TrendingUp, Zap, Trophy, Calendar, Plus, Trash2,
@@ -24,6 +25,7 @@ import {
   CheckCircle, X, Save, AlertCircle, Star, Camera, Loader2, Download,
 } from "lucide-react";
 import { formatDateCivile } from "@/lib/time/fuseau";
+import { TestLactateCard } from "@/components/profile/TestLactateCard";
 
 // ── i18n local (5 langues) — la page Profil naît traduite. ──────────────────────
 type Tr = (k: string, p?: Record<string, string | number>) => string;
@@ -40,14 +42,16 @@ const P: Record<string, Record<string, string>> = {
     "split.note": "Les compteurs ci-dessus ne comptent que la course à pied — c'est aussi ce que le coach utilise pour dimensionner tes séances. Le vélo et la randonnée comptent dans ta fatigue, pas dans ton volume de course.",
     "pi.title": "Informations personnelles",
     "photo.title": "Photo de profil", "photo.hint": "JPG, PNG, WebP · max 5 Mo", "photo.uploading": "Upload…", "photo.change": "Changer la photo",
-    "f.name": "Nom complet", "f.age": "Âge", "f.height": "Taille (cm)", "f.weight": "Poids (kg)", "f.lang": "Langue", "f.bio": "Bio courte", "f.bioPh": "Coureur trail passionné, objectif UTMB 2027…", "f.warmup": "⏱️ Échauffement habituel", "f.cooldown": "🧊 Retour au calme habituel", "f.wcHint": "Cale l'échauffement et le retour au calme (fréquence cardiaque douce, Z1) des séances envoyées à ta montre. Le corps de séance garde ses allures précises.", "f.longMode": "Sorties longues", "f.longRun": "🏃 En course", "f.longBike": "🚴 En vélo", "f.longHint": "Beaucoup de pros remplacent la sortie longue par du vélo : même volume aérobie, sans l'impact. Ton coach et l'IA s'adaptent automatiquement.",
-    "f.exp": "Ancienneté en course à pied", "f.exp0": "< 1 an", "f.exp1": "1 an", "f.exp2": "2 ans", "f.exp4": "3-5 ans", "f.exp8": "6-10 ans", "f.exp12": "10 ans +", "f.expHint": "Ton cœur progresse en semaines, tes tendons en années. Le coach IA s'en sert pour plafonner la charge et éviter la blessure du coureur qui va trop vite.", "f.terr": "🗺️ Terrain habituel", "f.terrHint": "Sur sable ou en montagne, l'allure au km ne veut plus rien dire : le coach bascule sur la fréquence cardiaque et la durée.", "f.elev": "⛰️ Rapport au dénivelé", "f.elevEvite": "Je l'évite", "f.elevModere": "Modéré", "f.elevAime": "J'aime ça", "f.elevSpec": "Mon terrain", "f.elevHint": "Détermine la place des côtes et du D+ dans tes semaines.",
+    "f.name": "Nom complet", "f.age": "Âge", "f.height": "Taille (cm)", "f.weight": "Poids (kg)", "f.lang": "Langue", "f.bio": "Bio courte", "f.bioPh": "Coureur trail passionné, objectif UTMB 2027…", "f.warmup": "⏱️ Échauffement habituel", "f.cooldown": "Retour au calme habituel", "f.wcHint": "Cale l'échauffement et le retour au calme (fréquence cardiaque douce, Z1) des séances envoyées à ta montre. Le corps de séance garde ses allures précises.", "f.longMode": "Sorties longues", "f.longRun": "En course", "f.longBike": "En vélo", "f.longHint": "Beaucoup de pros remplacent la sortie longue par du vélo : même volume aérobie, sans l'impact. Ton coach et l'IA s'adaptent automatiquement.",
+    "f.exp": "Ancienneté en course à pied", "f.exp0": "< 1 an", "f.exp1": "1 an", "f.exp2": "2 ans", "f.exp4": "3-5 ans", "f.exp8": "6-10 ans", "f.exp12": "10 ans +", "f.expHint": "Ton cœur progresse en semaines, tes tendons en années. Le coach IA s'en sert pour plafonner la charge et éviter la blessure du coureur qui va trop vite.", "f.terr": "Terrain habituel", "f.terrHint": "Sur sable ou en montagne, l'allure au km ne veut plus rien dire : le coach bascule sur la fréquence cardiaque et la durée.", "f.elev": "Rapport au dénivelé", "f.elevEvite": "Je l'évite", "f.elevModere": "Modéré", "f.elevAime": "J'aime ça", "f.elevSpec": "Mon terrain", "f.elevHint": "Détermine la place des côtes et du D+ dans tes semaines.",
+    "f.q30": "Peux-tu courir 30 minutes sans t'arrêter ?", "f.q30Oui": "Oui", "f.q30Non": "Pas encore", "f.q30Hint": "« Pas encore » : ton plan suit le programme marche-course, sans test VMA, jusqu'à 30 minutes de course d'affilée.",
     "f.dpw": "Séances de course par semaine", "f.dpwHint": "Un plan qu'on ne peut pas suivre ne sert à rien : le coach ne dépassera jamais ce nombre.", "f.days": "Jours disponibles", "f.daysHint": "Décoche les jours où courir est impossible.", "f.dayShort": "D,L,M,M,J,V,S",
     "h.title": "Santé & antécédents", "h.sub": "Privé. Sert à ton coach IA pour ne jamais te prescrire une séance qui te mettrait en danger.", "h.cond": "Pathologies", "h.inj": "Zones de blessure récurrentes", "h.notes": "Autre chose à signaler ?", "h.notesPh": "Traitement en cours, opération, contre-indication du médecin…", "h.disc": "Pacevo ne remplace pas un avis médical. En cas de doute, consulte un professionnel de santé.",
     "h.none": "Rien à signaler, je suis en bonne santé",
     "f.terrMulti": "plusieurs choix possibles",
     "notif.title": "Notifications", "notif.workout": "Rappels de séance", "notif.goal": "Objectifs atteints", "notif.league": "Classement ligue", "notif.coach": "Conseils du coach IA", "notif.save": "Sauvegarder les préférences", "notif.news": "Résumé du lundi matin", "notif.newsHint": "L'actualité running et trail de la semaine, une fois par semaine. Rien d'autre.", "notif.newsOff": "Tu ne reçois plus le résumé hebdomadaire.",
-    "double.title": "Deux séances par jour", "double.checking": "Vérification de ton volume et de ta forme…", "double.checkFail": "Impossible de vérifier maintenant — le réglage est bien enregistré, le coach appliquera ses propres critères.", "double.ok": "✅ C'est bon : le coach pourra scinder une sortie facile en deux dès que ce sera utile.", "double.blocked": "⚠️ Enregistré, mais le coach ne doublera pas encore :", "double.kept": "Ton réglage est conservé : dès que ce point sera levé, le plan se scindera tout seul.", "double.noThreshold": "Le double SEUIL (méthode norvégienne) reste hors de portée pour l'instant :", "double.hint": "Le coach pourra scinder une sortie facile en deux (matin + soir) quand ton volume le justifie. Même volume, mieux absorbé — il te dira ce qui manque tant qu'il ne le fait pas.", "privacy.private": "Compte privé", "privacy.privateHint": "Seuls tes amis (vous vous suivez tous les deux) peuvent commenter tes publications.", "privacy.publicHint": "N'importe qui peut commenter les publications que tu rends visibles.",
+    "double.title": "Deux séances par jour", "double.checking": "Vérification de ton volume et de ta forme…", "double.checkFail": "Impossible de vérifier maintenant — le réglage est bien enregistré, le coach appliquera ses propres critères.", "double.ok": "C'est bon : le coach pourra scinder une sortie facile en deux dès que ce sera utile.", "double.blocked": "Enregistré, mais le coach ne doublera pas encore :", "double.kept": "Ton réglage est conservé : dès que ce point sera levé, le plan se scindera tout seul.", "double.noThreshold": "Le double SEUIL (méthode norvégienne) reste hors de portée pour l'instant :", "double.hint": "Le coach pourra scinder une sortie facile en deux (matin + soir) quand ton volume le justifie. Même volume, mieux absorbé — il te dira ce qui manque tant qu'il ne le fait pas.", "privacy.private": "Compte privé", "privacy.privateHint": "Seuls tes amis (vous vous suivez tous les deux) peuvent commenter tes publications.", "privacy.publicHint": "N'importe qui peut commenter les publications que tu rends visibles.",
+    "double.seuilTitle": "Méthode norvégienne : double seuil", "double.seuilHint": "Deux journées par semaine avec deux séances au seuil (matin et soir), toutes deux sous le seuil. Réservé aux gros volumes : le coach vérifie ton volume et ton ancienneté.", "double.seuilOk": "Le coach posera deux journées de double seuil par semaine, dès que ta fraîcheur le permet (ni affûtage ni récupération).",
     "guard.title": "Le coach allège quand tu es fatigué", "guard.desc": "Ce n'est pas une option à activer. Dès que ta VFC baisse, que tu signales une douleur, que ton ressenti monte ou que ta charge grimpe trop vite, le coach retire de l'intensité de la semaine — pour tout le monde, à chaque replanification.", "guard.voir": "Voir pourquoi dans le calendrier →",
     "gdpr.title": "Données & confidentialité", "gdpr.desc": "Conformément au RGPD, tu peux récupérer toutes tes données à tout moment.", "gdpr.export": "Exporter mes données (JSON)", "gdpr.exporting": "Export…", "gdpr.privacy": "Politique de confidentialité", "gdpr.delPre": "Pour supprimer ton compte et toutes tes données, écris à ", "gdpr.delPost": " — suppression sous 30 jours.",
     "goals.title": "Mes objectifs", "goals.summary": "{a} en cours · {b} atteints", "goals.new": "Nouvel objectif", "goals.type": "Type", "goals.name": "Nom", "goals.namePhRace": "Marathon de Paris 2027", "goals.namePhOther": "Objectif hebdo", "goals.targetVal": "Valeur cible ({unit})", "goals.targetValPh": "42.2", "goals.targetDate": "Date cible", "goals.create": "Créer l'objectif", "goals.emptyTitle": "Aucun objectif défini", "goals.emptyDesc": "Fixez-vous une course cible, un volume hebdo…", "goals.achieved": "Atteint ✓", "goals.past": "Passé", "goals.context": "Contexte actuel", "goals.ctxMonth": "km ce mois", "goals.ctxYear": "km cette année", "goals.ctxStreak": "jours de suite",
@@ -64,7 +68,8 @@ const P: Record<string, Record<string, string>> = {
     "sub.title": "Abonnement actuel", "sub.plan": "Plan {tier}", "sub.freeDesc": "Accès limité aux fonctionnalités de base", "sub.proDesc": "Accès complet à toutes les fonctionnalités", "sub.active": "✓ Actif", "sub.free": "Gratuit", "sub.pro": "Pro",
     "feat.dash": "Dashboard & statistiques", "feat.journal": "Journal intelligent (NLP)", "feat.plans3": "Plans d'entraînement (3 max)", "feat.plansUnli": "Plans d'entraînement illimités", "feat.coach": "Coach IA personnalisé (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Analyses VMA & zones cardiaques", "feat.sync": "Sync montres GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub & recommandations", "feat.leagues": "Ligues & classements",
     "sub.renouvelle": "Prochain prélèvement le {d}", "sub.annule": "Résilié — ton accès reste ouvert jusqu'au {d}", "sub.essai": "Essai gratuit jusqu'au {d}, aucun prélèvement d'ici là", "sub.echec": "Ton dernier paiement a échoué. Mets ta carte à jour pour ne pas perdre l'accès.", "sub.manage": "Gérer mon abonnement", "sub.manageDesc": "Changer de formule, passer au tarif annuel, mettre à jour ta carte, récupérer tes factures ou résilier.", "sub.manageCta": "Ouvrir mon espace de facturation", "sub.manageOpening": "Ouverture…", "sub.manageErr": "Impossible d'ouvrir l'espace de facturation. Réessaie dans un instant.", "sub.cancelNote": "Si tu résilies, ton accès reste ouvert jusqu'à la fin de la période déjà payée — aucun prélèvement ensuite.", "sub.secure": "Paiement et facturation gérés par Stripe. Pacevo ne voit jamais ton numéro de carte.", "sub.goPro": "Passer à Starter ou Premium", "sub.unlock": "Débloquez le module IA", "sub.perMonth": "/mois", "sub.yearly": "{an}/an · {mois} mois offerts", "sub.trial": "Commencer l'essai gratuit de {n} jours",
-    "t.saveErr": "Erreur lors de la sauvegarde", "t.saveOk": "Profil mis à jour !", "t.uploadErr": "Erreur lors de l'upload", "t.photoOk": "Photo de profil mise à jour !", "t.netErr": "Erreur réseau", "t.goalsSql": "Objectifs pas encore activés — lance le SQL fourni dans Supabase.", "t.createErr": "Erreur lors de la création", "t.goalAdd": "Objectif ajouté !", "t.goalDel": "Objectif supprimé", "t.addErr": "Erreur lors de l'ajout", "t.shoeAdd": "Chaussure ajoutée !", "t.shoeDel": "Chaussure retirée du garage", "t.exportOk": "Tes données ont été exportées (JSON).", "t.exportErr": "Export impossible, réessaie.",
+    "retr.title": "Droit de rétractation", "retr.desc": "Tu as souscrit ton abonnement le {d}. Tu peux y renoncer jusqu'au {fin} inclus, sans te justifier : tu paies seulement la part du service déjà fournie, le reste t'est remboursé.", "retr.cta": "Renoncer au contrat ici", "retr.formTitle": "Confirmer ta rétractation", "retr.nom": "Ton nom et prénom", "retr.contrat": "Contrat concerné : abonnement {f}, souscrit le {d}.", "retr.accuse": "L'accusé de réception sera envoyé à {email}.", "retr.confirm": "Confirmer ma rétractation", "retr.sending": "Envoi…", "retr.ok": "C'est fait : ta rétractation est enregistrée. Un accusé de réception vient de partir à {email}.", "retr.okRembourse": "Remboursement : {m}, sous 14 jours au plus tard, sur ton moyen de paiement.", "retr.okRien": "Rien n'avait été prélevé : il n'y a rien à rembourser.", "retr.okManuel": "La part non utilisée de ton paiement te sera remboursée sous 14 jours au plus tard.", "retr.err": "La demande n'a pas pu être envoyée. Réessaie dans un instant, ou écris-nous à {email}.",
+    "t.saveErr": "Erreur lors de la sauvegarde", "t.saveOk": "Profil mis à jour", "t.uploadErr": "Erreur lors de l'upload", "t.photoOk": "Photo de profil mise à jour", "t.netErr": "Erreur réseau", "t.goalsSql": "Objectifs pas encore activés — lance le SQL fourni dans Supabase.", "t.createErr": "Erreur lors de la création", "t.goalAdd": "Objectif ajouté", "t.goalDel": "Objectif supprimé", "t.addErr": "Erreur lors de l'ajout", "t.shoeAdd": "Chaussure ajoutée", "t.shoeDel": "Chaussure retirée du garage", "t.exportOk": "Tes données ont été exportées (JSON).", "t.exportErr": "Export impossible, réessaie.",
   },
   en: {
     "tab.profile": "Profile", "tab.goals": "Goals", "tab.performance": "Performance", "tab.shoes": "Shoes", "tab.subscription": "Subscription",
@@ -75,14 +80,16 @@ const P: Record<string, Record<string, string>> = {
     "split.note": "The counters above only include running — the same figure your coach uses to size your sessions. Cycling and hiking count towards fatigue, not towards running volume.",
     "pi.title": "Personal information",
     "photo.title": "Profile photo", "photo.hint": "JPG, PNG, WebP · max 5 MB", "photo.uploading": "Uploading…", "photo.change": "Change photo",
-    "f.name": "Full name", "f.age": "Age", "f.height": "Height (cm)", "f.weight": "Weight (kg)", "f.lang": "Language", "f.bio": "Short bio", "f.bioPh": "Passionate trail runner, UTMB 2027 goal…", "f.warmup": "⏱️ Usual warm-up", "f.cooldown": "🧊 Usual cool-down", "f.wcHint": "Sets the warm-up and cool-down (easy heart rate, Z1) of the sessions sent to your watch. The main set keeps its exact paces.", "f.longMode": "Long sessions", "f.longRun": "🏃 Running", "f.longBike": "🚴 Cycling", "f.longHint": "Many pros swap the long run for cycling: same aerobic volume, no impact. Your coach and the AI adapt automatically.",
-    "f.exp": "Running experience", "f.exp0": "< 1 year", "f.exp1": "1 year", "f.exp2": "2 years", "f.exp4": "3-5 years", "f.exp8": "6-10 years", "f.exp12": "10+ years", "f.expHint": "Your heart adapts in weeks, your tendons in years. The AI coach uses this to cap training load and prevent overuse injuries.", "f.terr": "🗺️ Usual terrain", "f.terrHint": "On sand or in the mountains, pace per km means nothing: your coach switches to heart rate and duration.", "f.elev": "⛰️ Relationship with elevation", "f.elevEvite": "I avoid it", "f.elevModere": "Moderate", "f.elevAime": "I enjoy it", "f.elevSpec": "My terrain", "f.elevHint": "Sets how much hill work and vertical gain your weeks contain.",
+    "f.name": "Full name", "f.age": "Age", "f.height": "Height (cm)", "f.weight": "Weight (kg)", "f.lang": "Language", "f.bio": "Short bio", "f.bioPh": "Passionate trail runner, UTMB 2027 goal…", "f.warmup": "⏱️ Usual warm-up", "f.cooldown": "Usual cool-down", "f.wcHint": "Sets the warm-up and cool-down (easy heart rate, Z1) of the sessions sent to your watch. The main set keeps its exact paces.", "f.longMode": "Long sessions", "f.longRun": "Running", "f.longBike": "Cycling", "f.longHint": "Many pros swap the long run for cycling: same aerobic volume, no impact. Your coach and the AI adapt automatically.",
+    "f.exp": "Running experience", "f.exp0": "< 1 year", "f.exp1": "1 year", "f.exp2": "2 years", "f.exp4": "3-5 years", "f.exp8": "6-10 years", "f.exp12": "10+ years", "f.expHint": "Your heart adapts in weeks, your tendons in years. The AI coach uses this to cap training load and prevent overuse injuries.", "f.terr": "Usual terrain", "f.terrHint": "On sand or in the mountains, pace per km means nothing: your coach switches to heart rate and duration.", "f.elev": "Relationship with elevation", "f.elevEvite": "I avoid it", "f.elevModere": "Moderate", "f.elevAime": "I enjoy it", "f.elevSpec": "My terrain", "f.elevHint": "Sets how much hill work and vertical gain your weeks contain.",
+    "f.q30": "Can you run for 30 minutes without stopping?", "f.q30Oui": "Yes", "f.q30Non": "Not yet", "f.q30Hint": "“Not yet”: your plan follows the walk/run programme, with no VO2max test, until you run 30 minutes non-stop.",
     "f.dpw": "Runs per week", "f.dpwHint": "A plan you can't follow is worthless: your coach will never exceed this number.", "f.days": "Available days", "f.daysHint": "Untick the days when running is impossible.", "f.dayShort": "S,M,T,W,T,F,S",
     "h.title": "Health & history", "h.sub": "Private. Used by your AI coach to never prescribe a session that could put you at risk.", "h.cond": "Conditions", "h.inj": "Recurring injury areas", "h.notes": "Anything else we should know?", "h.notesPh": "Current medication, surgery, doctor's restriction…", "h.disc": "Pacevo is not a substitute for medical advice. When in doubt, consult a healthcare professional.",
     "h.none": "Nothing to report, I'm in good health",
     "f.terrMulti": "select all that apply",
     "notif.title": "Notifications", "notif.workout": "Workout reminders", "notif.goal": "Goals achieved", "notif.league": "League ranking", "notif.coach": "AI coach tips", "notif.save": "Save preferences", "notif.news": "Monday morning digest", "notif.newsHint": "The week in running and trail, once a week. Nothing else.", "notif.newsOff": "You no longer receive the weekly digest.",
-    "double.title": "Two sessions a day", "double.checking": "Checking your volume and form…", "double.checkFail": "Cannot check right now — the setting is saved, and the coach will apply its own criteria.", "double.ok": "✅ All set: the coach may split an easy run in two as soon as it helps.", "double.blocked": "⚠️ Saved, but the coach will not double yet:", "double.kept": "Your setting is kept: as soon as this is cleared, the plan will split on its own.", "double.noThreshold": "Double THRESHOLD (Norwegian method) is out of reach for now:", "double.hint": "The coach may split an easy run in two (morning + evening) when your volume justifies it. Same volume, better absorbed — it will tell you what is missing until then.", "privacy.private": "Private account", "privacy.privateHint": "Only your friends (you follow each other) can comment on your posts.", "privacy.publicHint": "Anyone can comment on the posts you make visible.",
+    "double.title": "Two sessions a day", "double.checking": "Checking your volume and form…", "double.checkFail": "Cannot check right now — the setting is saved, and the coach will apply its own criteria.", "double.ok": "All set: the coach may split an easy run in two as soon as it helps.", "double.blocked": "Saved, but the coach will not double yet:", "double.kept": "Your setting is kept: as soon as this is cleared, the plan will split on its own.", "double.noThreshold": "Double THRESHOLD (Norwegian method) is out of reach for now:", "double.hint": "The coach may split an easy run in two (morning + evening) when your volume justifies it. Same volume, better absorbed — it will tell you what is missing until then.", "privacy.private": "Private account", "privacy.privateHint": "Only your friends (you follow each other) can comment on your posts.", "privacy.publicHint": "Anyone can comment on the posts you make visible.",
+    "double.seuilTitle": "Norwegian method: double threshold", "double.seuilHint": "Two days a week with two threshold sessions (morning and evening), both below threshold. For high mileage only: the coach checks your volume and experience.", "double.seuilOk": "The coach will set two double-threshold days a week, whenever your freshness allows (no taper, no recovery).",
     "guard.title": "Your coach eases off when you're tired", "guard.desc": "This is not a setting to switch on. As soon as your HRV drops, you report a pain, your perceived effort climbs or your load rises too fast, the coach takes intensity out of the week — for everyone, at every replanning.", "guard.voir": "See why in your calendar →",
     "gdpr.title": "Data & privacy", "gdpr.desc": "Under GDPR, you can retrieve all your data at any time.", "gdpr.export": "Export my data (JSON)", "gdpr.exporting": "Exporting…", "gdpr.privacy": "Privacy policy", "gdpr.delPre": "To delete your account and all your data, email ", "gdpr.delPost": " — deletion within 30 days.",
     "goals.title": "My goals", "goals.summary": "{a} ongoing · {b} achieved", "goals.new": "New goal", "goals.type": "Type", "goals.name": "Name", "goals.namePhRace": "Paris Marathon 2027", "goals.namePhOther": "Weekly goal", "goals.targetVal": "Target value ({unit})", "goals.targetValPh": "42.2", "goals.targetDate": "Target date", "goals.create": "Create goal", "goals.emptyTitle": "No goal set", "goals.emptyDesc": "Set yourself a target race, a weekly volume…", "goals.achieved": "Achieved ✓", "goals.past": "Past", "goals.context": "Current context", "goals.ctxMonth": "km this month", "goals.ctxYear": "km this year", "goals.ctxStreak": "days in a row",
@@ -99,7 +106,8 @@ const P: Record<string, Record<string, string>> = {
     "sub.title": "Current subscription", "sub.plan": "{tier} plan", "sub.freeDesc": "Limited access to basic features", "sub.proDesc": "Full access to all features", "sub.active": "✓ Active", "sub.free": "Free", "sub.pro": "Pro",
     "feat.dash": "Dashboard & stats", "feat.journal": "Smart journal (NLP)", "feat.plans3": "Training plans (3 max)", "feat.plansUnli": "Unlimited training plans", "feat.coach": "Personalized AI coach (Claude)", "feat.ghost": "AI Ghost Runner", "feat.vma": "vVO2max & HR-zone analysis", "feat.sync": "GPS watch sync (Garmin, Polar…)", "feat.shop": "Shopping Hub & recommendations", "feat.leagues": "Leagues & rankings",
     "sub.renouvelle": "Next charge on {d}", "sub.annule": "Cancelled — your access stays open until {d}", "sub.essai": "Free trial until {d}, nothing charged before then", "sub.echec": "Your last payment failed. Update your card to keep your access.", "sub.manage": "Manage my subscription", "sub.manageDesc": "Switch plan, move to yearly billing, update your card, download invoices or cancel.", "sub.manageCta": "Open my billing portal", "sub.manageOpening": "Opening…", "sub.manageErr": "Could not open the billing portal. Try again in a moment.", "sub.cancelNote": "If you cancel, your access stays open until the end of the period you already paid for — nothing is charged after that.", "sub.secure": "Payments and billing handled by Stripe. Pacevo never sees your card number.", "sub.goPro": "Upgrade to Starter or Premium", "sub.unlock": "Unlock the AI module", "sub.perMonth": "/mo", "sub.yearly": "{an}/yr · {mois} months free", "sub.trial": "Start the {n}-day free trial",
-    "t.saveErr": "Error while saving", "t.saveOk": "Profile updated!", "t.uploadErr": "Upload error", "t.photoOk": "Profile photo updated!", "t.netErr": "Network error", "t.goalsSql": "Goals not enabled yet — run the provided SQL in Supabase.", "t.createErr": "Error while creating", "t.goalAdd": "Goal added!", "t.goalDel": "Goal deleted", "t.addErr": "Error while adding", "t.shoeAdd": "Shoe added!", "t.shoeDel": "Shoe removed from garage", "t.exportOk": "Your data has been exported (JSON).", "t.exportErr": "Export failed, try again.",
+    "retr.title": "Right of withdrawal", "retr.desc": "You took out your subscription on {d}. You can withdraw until {fin} inclusive, without giving a reason: you only pay for the part of the service already provided, the rest is refunded.", "retr.cta": "Withdraw from contract here", "retr.formTitle": "Confirm your withdrawal", "retr.nom": "Your full name", "retr.contrat": "Contract concerned: {f} subscription, taken out on {d}.", "retr.accuse": "The acknowledgement will be sent to {email}.", "retr.confirm": "Confirm my withdrawal", "retr.sending": "Sending…", "retr.ok": "Done: your withdrawal is recorded. An acknowledgement has just been sent to {email}.", "retr.okRembourse": "Refund: {m}, within 14 days at the latest, to your payment method.", "retr.okRien": "Nothing had been charged: there is nothing to refund.", "retr.okManuel": "The unused part of your payment will be refunded within 14 days at the latest.", "retr.err": "The request could not be sent. Try again in a moment, or write to us at {email}.",
+    "t.saveErr": "Error while saving", "t.saveOk": "Profile updated", "t.uploadErr": "Upload error", "t.photoOk": "Profile photo updated", "t.netErr": "Network error", "t.goalsSql": "Goals not enabled yet — run the provided SQL in Supabase.", "t.createErr": "Error while creating", "t.goalAdd": "Goal added", "t.goalDel": "Goal deleted", "t.addErr": "Error while adding", "t.shoeAdd": "Shoe added", "t.shoeDel": "Shoe removed from garage", "t.exportOk": "Your data has been exported (JSON).", "t.exportErr": "Export failed, try again.",
   },
   de: {
     "tab.profile": "Profil", "tab.goals": "Ziele", "tab.performance": "Leistung", "tab.shoes": "Schuhe", "tab.subscription": "Abo",
@@ -110,14 +118,16 @@ const P: Record<string, Record<string, string>> = {
     "split.note": "Die Zähler oben berücksichtigen nur das Laufen — genau der Wert, mit dem dein Coach deine Einheiten bemisst. Rad und Wandern zählen zur Ermüdung, nicht zum Laufumfang.",
     "pi.title": "Persönliche Daten",
     "photo.title": "Profilbild", "photo.hint": "JPG, PNG, WebP · max. 5 MB", "photo.uploading": "Hochladen…", "photo.change": "Bild ändern",
-    "f.name": "Vollständiger Name", "f.age": "Alter", "f.height": "Größe (cm)", "f.weight": "Gewicht (kg)", "f.lang": "Sprache", "f.bio": "Kurz-Bio", "f.bioPh": "Begeisterter Trailrunner, Ziel UTMB 2027…", "f.warmup": "⏱️ Übliches Aufwärmen", "f.cooldown": "🧊 Übliches Auslaufen", "f.wcHint": "Legt Aufwärmen und Auslaufen (lockere Herzfrequenz, Z1) der an deine Uhr gesendeten Einheiten fest. Der Hauptteil behält seine genauen Tempi.", "f.longMode": "Lange Einheiten", "f.longRun": "🏃 Laufen", "f.longBike": "🚴 Radfahren", "f.longHint": "Viele Profis ersetzen den langen Lauf durch Radfahren: gleiches aerobes Volumen, ohne Belastung. Dein Coach und die KI passen sich automatisch an.",
-    "f.exp": "Lauferfahrung", "f.exp0": "< 1 Jahr", "f.exp1": "1 Jahr", "f.exp2": "2 Jahre", "f.exp4": "3-5 Jahre", "f.exp8": "6-10 Jahre", "f.exp12": "10+ Jahre", "f.expHint": "Dein Herz passt sich in Wochen an, deine Sehnen in Jahren. Der KI-Coach begrenzt damit die Belastung und beugt Überlastungsverletzungen vor.", "f.terr": "🗺️ Übliches Terrain", "f.terrHint": "Auf Sand oder im Gebirge sagt das Tempo pro km nichts aus: Dein Coach steuert über Herzfrequenz und Dauer.", "f.elev": "⛰️ Verhältnis zu Höhenmetern", "f.elevEvite": "Ich meide sie", "f.elevModere": "Moderat", "f.elevAime": "Mag ich", "f.elevSpec": "Mein Terrain", "f.elevHint": "Bestimmt den Anteil an Bergläufen und Höhenmetern in deinen Wochen.",
+    "f.name": "Vollständiger Name", "f.age": "Alter", "f.height": "Größe (cm)", "f.weight": "Gewicht (kg)", "f.lang": "Sprache", "f.bio": "Kurz-Bio", "f.bioPh": "Begeisterter Trailrunner, Ziel UTMB 2027…", "f.warmup": "⏱️ Übliches Aufwärmen", "f.cooldown": "Übliches Auslaufen", "f.wcHint": "Legt Aufwärmen und Auslaufen (lockere Herzfrequenz, Z1) der an deine Uhr gesendeten Einheiten fest. Der Hauptteil behält seine genauen Tempi.", "f.longMode": "Lange Einheiten", "f.longRun": "Laufen", "f.longBike": "Radfahren", "f.longHint": "Viele Profis ersetzen den langen Lauf durch Radfahren: gleiches aerobes Volumen, ohne Belastung. Dein Coach und die KI passen sich automatisch an.",
+    "f.exp": "Lauferfahrung", "f.exp0": "< 1 Jahr", "f.exp1": "1 Jahr", "f.exp2": "2 Jahre", "f.exp4": "3-5 Jahre", "f.exp8": "6-10 Jahre", "f.exp12": "10+ Jahre", "f.expHint": "Dein Herz passt sich in Wochen an, deine Sehnen in Jahren. Der KI-Coach begrenzt damit die Belastung und beugt Überlastungsverletzungen vor.", "f.terr": "Übliches Terrain", "f.terrHint": "Auf Sand oder im Gebirge sagt das Tempo pro km nichts aus: Dein Coach steuert über Herzfrequenz und Dauer.", "f.elev": "Verhältnis zu Höhenmetern", "f.elevEvite": "Ich meide sie", "f.elevModere": "Moderat", "f.elevAime": "Mag ich", "f.elevSpec": "Mein Terrain", "f.elevHint": "Bestimmt den Anteil an Bergläufen und Höhenmetern in deinen Wochen.",
+    "f.q30": "Kannst du 30 Minuten am Stück laufen?", "f.q30Oui": "Ja", "f.q30Non": "Noch nicht", "f.q30Hint": "„Noch nicht“: Dein Plan folgt dem Geh-Lauf-Programm, ohne VMA-Test, bis du 30 Minuten am Stück läufst.",
     "f.dpw": "Läufe pro Woche", "f.dpwHint": "Ein Plan, dem du nicht folgen kannst, ist wertlos: Dein Coach überschreitet diese Zahl nie.", "f.days": "Verfügbare Tage", "f.daysHint": "Hake die Tage ab, an denen Laufen unmöglich ist.", "f.dayShort": "S,M,D,M,D,F,S",
     "h.title": "Gesundheit & Vorgeschichte", "h.sub": "Privat. Dein KI-Coach nutzt dies, um dir nie eine riskante Einheit zu verordnen.", "h.cond": "Erkrankungen", "h.inj": "Wiederkehrende Verletzungsbereiche", "h.notes": "Sonst noch etwas?", "h.notesPh": "Laufende Medikation, Operation, ärztliche Einschränkung…", "h.disc": "Pacevo ersetzt keine ärztliche Beratung. Im Zweifel wende dich an medizinisches Fachpersonal.",
     "h.none": "Nichts zu melden, ich bin gesund",
     "f.terrMulti": "Mehrfachauswahl möglich",
     "notif.title": "Benachrichtigungen", "notif.workout": "Trainings-Erinnerungen", "notif.goal": "Erreichte Ziele", "notif.league": "Liga-Ranking", "notif.coach": "Tipps des KI-Coachs", "notif.save": "Einstellungen speichern", "notif.news": "Montagmorgen-Überblick", "notif.newsHint": "Die Laufwoche, einmal pro Woche. Sonst nichts.", "notif.newsOff": "Du erhältst den wöchentlichen Überblick nicht mehr.",
-    "double.title": "Zwei Einheiten pro Tag", "double.checking": "Umfang und Form werden geprüft…", "double.checkFail": "Prüfung derzeit nicht möglich — die Einstellung ist gespeichert, der Coach wendet seine eigenen Kriterien an.", "double.ok": "✅ Passt: Der Coach kann einen lockeren Lauf teilen, sobald es sinnvoll ist.", "double.blocked": "⚠️ Gespeichert, aber der Coach verdoppelt noch nicht:", "double.kept": "Deine Einstellung bleibt erhalten: Sobald das erfüllt ist, teilt sich der Plan von selbst.", "double.noThreshold": "Doppelte SCHWELLE (norwegische Methode) ist vorerst außer Reichweite:", "double.hint": "Der Coach kann einen lockeren Lauf teilen (morgens + abends), wenn dein Umfang es rechtfertigt. Gleicher Umfang, besser verkraftet — bis dahin sagt er dir, was fehlt.", "privacy.private": "Privates Konto", "privacy.privateHint": "Nur deine Freunde (ihr folgt euch gegenseitig) können deine Beiträge kommentieren.", "privacy.publicHint": "Jede Person kann die Beiträge kommentieren, die du sichtbar machst.",
+    "double.title": "Zwei Einheiten pro Tag", "double.checking": "Umfang und Form werden geprüft…", "double.checkFail": "Prüfung derzeit nicht möglich — die Einstellung ist gespeichert, der Coach wendet seine eigenen Kriterien an.", "double.ok": "Passt: Der Coach kann einen lockeren Lauf teilen, sobald es sinnvoll ist.", "double.blocked": "Gespeichert, aber der Coach verdoppelt noch nicht:", "double.kept": "Deine Einstellung bleibt erhalten: Sobald das erfüllt ist, teilt sich der Plan von selbst.", "double.noThreshold": "Doppelte SCHWELLE (norwegische Methode) ist vorerst außer Reichweite:", "double.hint": "Der Coach kann einen lockeren Lauf teilen (morgens + abends), wenn dein Umfang es rechtfertigt. Gleicher Umfang, besser verkraftet — bis dahin sagt er dir, was fehlt.", "privacy.private": "Privates Konto", "privacy.privateHint": "Nur deine Freunde (ihr folgt euch gegenseitig) können deine Beiträge kommentieren.", "privacy.publicHint": "Jede Person kann die Beiträge kommentieren, die du sichtbar machst.",
+    "double.seuilTitle": "Norwegische Methode: doppelte Schwelle", "double.seuilHint": "Zwei Tage pro Woche mit zwei Schwelleneinheiten (morgens und abends), beide unter der Schwelle. Nur für hohe Umfänge: Der Coach prüft deinen Umfang und deine Erfahrung.", "double.seuilOk": "Der Coach plant zwei Tage mit doppelter Schwelle pro Woche, sobald deine Frische es erlaubt (kein Tapering, keine Erholung).",
     "guard.title": "Dein Coach nimmt Tempo raus, wenn du müde bist", "guard.desc": "Das ist keine Option zum Einschalten. Sobald deine HRV sinkt, du Schmerzen meldest, dein Empfinden steigt oder deine Belastung zu schnell wächst, nimmt der Coach Intensität aus der Woche — bei allen, bei jeder Neuplanung.", "guard.voir": "Im Kalender nachlesen, warum →",
     "gdpr.title": "Daten & Datenschutz", "gdpr.desc": "Gemäß DSGVO kannst du jederzeit alle deine Daten abrufen.", "gdpr.export": "Meine Daten exportieren (JSON)", "gdpr.exporting": "Export…", "gdpr.privacy": "Datenschutzerklärung", "gdpr.delPre": "Um dein Konto und alle Daten zu löschen, schreibe an ", "gdpr.delPost": " — Löschung innerhalb von 30 Tagen.",
     "goals.title": "Meine Ziele", "goals.summary": "{a} laufend · {b} erreicht", "goals.new": "Neues Ziel", "goals.type": "Typ", "goals.name": "Name", "goals.namePhRace": "Marathon Paris 2027", "goals.namePhOther": "Wochenziel", "goals.targetVal": "Zielwert ({unit})", "goals.targetValPh": "42.2", "goals.targetDate": "Zieldatum", "goals.create": "Ziel erstellen", "goals.emptyTitle": "Kein Ziel festgelegt", "goals.emptyDesc": "Setze dir ein Zielrennen, ein Wochenvolumen…", "goals.achieved": "Erreicht ✓", "goals.past": "Vorbei", "goals.context": "Aktueller Kontext", "goals.ctxMonth": "km diesen Monat", "goals.ctxYear": "km dieses Jahr", "goals.ctxStreak": "Tage in Folge",
@@ -134,7 +144,8 @@ const P: Record<string, Record<string, string>> = {
     "sub.title": "Aktuelles Abo", "sub.plan": "{tier}-Plan", "sub.freeDesc": "Eingeschränkter Zugang zu Basisfunktionen", "sub.proDesc": "Voller Zugang zu allen Funktionen", "sub.active": "✓ Aktiv", "sub.free": "Kostenlos", "sub.pro": "Pro",
     "feat.dash": "Dashboard & Statistiken", "feat.journal": "Intelligentes Tagebuch (NLP)", "feat.plans3": "Trainingspläne (max. 3)", "feat.plansUnli": "Unbegrenzte Trainingspläne", "feat.coach": "Personalisierter KI-Coach (Claude)", "feat.ghost": "KI Ghost Runner", "feat.vma": "vVO2max- & HF-Zonen-Analyse", "feat.sync": "GPS-Uhr-Sync (Garmin, Polar…)", "feat.shop": "Shopping-Hub & Empfehlungen", "feat.leagues": "Ligen & Ranglisten",
     "sub.renouvelle": "Nächste Abbuchung am {d}", "sub.annule": "Gekündigt — dein Zugang bleibt bis zum {d}", "sub.essai": "Kostenlos testen bis {d}, vorher wird nichts abgebucht", "sub.echec": "Deine letzte Zahlung ist fehlgeschlagen. Aktualisiere deine Karte, um den Zugang zu behalten.", "sub.manage": "Abo verwalten", "sub.manageDesc": "Tarif wechseln, auf Jahreszahlung umstellen, Karte aktualisieren, Rechnungen laden oder kündigen.", "sub.manageCta": "Rechnungsbereich öffnen", "sub.manageOpening": "Wird geöffnet…", "sub.manageErr": "Der Rechnungsbereich lässt sich nicht öffnen. Versuch es gleich noch einmal.", "sub.cancelNote": "Bei einer Kündigung bleibt dein Zugang bis zum Ende des bereits bezahlten Zeitraums bestehen — danach wird nichts mehr abgebucht.", "sub.secure": "Zahlung und Abrechnung über Stripe. Pacevo sieht deine Kartennummer nie.", "sub.goPro": "Auf Starter oder Premium wechseln", "sub.unlock": "KI-Modul freischalten", "sub.perMonth": "/Monat", "sub.yearly": "{an}/Jahr · {mois} Monate geschenkt", "sub.trial": "{n} Tage kostenlos testen",
-    "t.saveErr": "Fehler beim Speichern", "t.saveOk": "Profil aktualisiert!", "t.uploadErr": "Upload-Fehler", "t.photoOk": "Profilbild aktualisiert!", "t.netErr": "Netzwerkfehler", "t.goalsSql": "Ziele noch nicht aktiviert — führe das bereitgestellte SQL in Supabase aus.", "t.createErr": "Fehler beim Erstellen", "t.goalAdd": "Ziel hinzugefügt!", "t.goalDel": "Ziel gelöscht", "t.addErr": "Fehler beim Hinzufügen", "t.shoeAdd": "Schuh hinzugefügt!", "t.shoeDel": "Schuh aus der Garage entfernt", "t.exportOk": "Deine Daten wurden exportiert (JSON).", "t.exportErr": "Export fehlgeschlagen, versuche es erneut.",
+    "retr.title": "Widerrufsrecht", "retr.desc": "Du hast dein Abo am {d} abgeschlossen. Du kannst es bis einschließlich {fin} ohne Angabe von Gründen widerrufen: Du zahlst nur den bereits erbrachten Teil der Leistung, der Rest wird erstattet.", "retr.cta": "Vertrag hier widerrufen", "retr.formTitle": "Widerruf bestätigen", "retr.nom": "Dein vollständiger Name", "retr.contrat": "Betroffener Vertrag: {f}-Abo, abgeschlossen am {d}.", "retr.accuse": "Die Eingangsbestätigung wird an {email} gesendet.", "retr.confirm": "Widerruf bestätigen", "retr.sending": "Wird gesendet…", "retr.ok": "Erledigt: Dein Widerruf ist erfasst. Eine Eingangsbestätigung wurde gerade an {email} gesendet.", "retr.okRembourse": "Erstattung: {m}, spätestens innerhalb von 14 Tagen, auf dein Zahlungsmittel.", "retr.okRien": "Es war nichts abgebucht: Es gibt nichts zu erstatten.", "retr.okManuel": "Der nicht genutzte Teil deiner Zahlung wird spätestens innerhalb von 14 Tagen erstattet.", "retr.err": "Die Anfrage konnte nicht gesendet werden. Versuche es gleich noch einmal oder schreib uns an {email}.",
+    "t.saveErr": "Fehler beim Speichern", "t.saveOk": "Profil aktualisiert", "t.uploadErr": "Upload-Fehler", "t.photoOk": "Profilbild aktualisiert", "t.netErr": "Netzwerkfehler", "t.goalsSql": "Ziele noch nicht aktiviert — führe das bereitgestellte SQL in Supabase aus.", "t.createErr": "Fehler beim Erstellen", "t.goalAdd": "Ziel hinzugefügt", "t.goalDel": "Ziel gelöscht", "t.addErr": "Fehler beim Hinzufügen", "t.shoeAdd": "Schuh hinzugefügt", "t.shoeDel": "Schuh aus der Garage entfernt", "t.exportOk": "Deine Daten wurden exportiert (JSON).", "t.exportErr": "Export fehlgeschlagen, versuche es erneut.",
   },
   es: {
     "tab.profile": "Perfil", "tab.goals": "Objetivos", "tab.performance": "Rendimiento", "tab.shoes": "Zapatillas", "tab.subscription": "Suscripción",
@@ -145,14 +156,16 @@ const P: Record<string, Record<string, string>> = {
     "split.note": "Los contadores de arriba solo incluyen la carrera a pie — la misma cifra que usa tu entrenador para dimensionar tus sesiones. El ciclismo y el senderismo cuentan para la fatiga, no para el volumen de carrera.",
     "pi.title": "Información personal",
     "photo.title": "Foto de perfil", "photo.hint": "JPG, PNG, WebP · máx. 5 MB", "photo.uploading": "Subiendo…", "photo.change": "Cambiar foto",
-    "f.name": "Nombre completo", "f.age": "Edad", "f.height": "Altura (cm)", "f.weight": "Peso (kg)", "f.lang": "Idioma", "f.bio": "Bio corta", "f.bioPh": "Corredor de trail apasionado, objetivo UTMB 2027…", "f.warmup": "⏱️ Calentamiento habitual", "f.cooldown": "🧊 Vuelta a la calma habitual", "f.wcHint": "Fija el calentamiento y la vuelta a la calma (frecuencia cardíaca suave, Z1) de las sesiones enviadas a tu reloj. La parte principal mantiene sus ritmos exactos.", "f.longMode": "Sesiones largas", "f.longRun": "🏃 Corriendo", "f.longBike": "🚴 En bici", "f.longHint": "Muchos pros sustituyen la tirada larga por bici: mismo volumen aeróbico, sin impacto. Tu entrenador y la IA se adaptan automáticamente.",
-    "f.exp": "Antigüedad corriendo", "f.exp0": "< 1 año", "f.exp1": "1 año", "f.exp2": "2 años", "f.exp4": "3-5 años", "f.exp8": "6-10 años", "f.exp12": "10+ años", "f.expHint": "Tu corazón se adapta en semanas, tus tendones en años. El entrenador IA lo usa para limitar la carga y evitar lesiones por exceso.", "f.terr": "🗺️ Terreno habitual", "f.terrHint": "En arena o en montaña, el ritmo por km no significa nada: tu entrenador pasa a frecuencia cardíaca y duración.", "f.elev": "⛰️ Relación con el desnivel", "f.elevEvite": "Lo evito", "f.elevModere": "Moderado", "f.elevAime": "Me gusta", "f.elevSpec": "Mi terreno", "f.elevHint": "Define cuántas cuestas y desnivel tendrán tus semanas.",
+    "f.name": "Nombre completo", "f.age": "Edad", "f.height": "Altura (cm)", "f.weight": "Peso (kg)", "f.lang": "Idioma", "f.bio": "Bio corta", "f.bioPh": "Corredor de trail apasionado, objetivo UTMB 2027…", "f.warmup": "⏱️ Calentamiento habitual", "f.cooldown": "Vuelta a la calma habitual", "f.wcHint": "Fija el calentamiento y la vuelta a la calma (frecuencia cardíaca suave, Z1) de las sesiones enviadas a tu reloj. La parte principal mantiene sus ritmos exactos.", "f.longMode": "Sesiones largas", "f.longRun": "Corriendo", "f.longBike": "En bici", "f.longHint": "Muchos pros sustituyen la tirada larga por bici: mismo volumen aeróbico, sin impacto. Tu entrenador y la IA se adaptan automáticamente.",
+    "f.exp": "Antigüedad corriendo", "f.exp0": "< 1 año", "f.exp1": "1 año", "f.exp2": "2 años", "f.exp4": "3-5 años", "f.exp8": "6-10 años", "f.exp12": "10+ años", "f.expHint": "Tu corazón se adapta en semanas, tus tendones en años. El entrenador IA lo usa para limitar la carga y evitar lesiones por exceso.", "f.terr": "Terreno habitual", "f.terrHint": "En arena o en montaña, el ritmo por km no significa nada: tu entrenador pasa a frecuencia cardíaca y duración.", "f.elev": "Relación con el desnivel", "f.elevEvite": "Lo evito", "f.elevModere": "Moderado", "f.elevAime": "Me gusta", "f.elevSpec": "Mi terreno", "f.elevHint": "Define cuántas cuestas y desnivel tendrán tus semanas.",
+    "f.q30": "¿Puedes correr 30 minutos sin parar?", "f.q30Oui": "Sí", "f.q30Non": "Todavía no", "f.q30Hint": "«Todavía no»: tu plan sigue el programa de caminar y correr, sin test de VMA, hasta que corras 30 minutos seguidos.",
     "f.dpw": "Carreras por semana", "f.dpwHint": "Un plan que no puedes seguir no sirve: tu entrenador nunca superará este número.", "f.days": "Días disponibles", "f.daysHint": "Desmarca los días en que correr es imposible.", "f.dayShort": "D,L,M,X,J,V,S",
     "h.title": "Salud y antecedentes", "h.sub": "Privado. Tu entrenador IA lo usa para no prescribirte nunca una sesión que te ponga en riesgo.", "h.cond": "Patologías", "h.inj": "Zonas de lesión recurrentes", "h.notes": "¿Algo más que debamos saber?", "h.notesPh": "Tratamiento en curso, operación, contraindicación médica…", "h.disc": "Pacevo no sustituye el consejo médico. Ante la duda, consulta a un profesional sanitario.",
     "h.none": "Nada que señalar, estoy bien de salud",
     "f.terrMulti": "varias opciones posibles",
     "notif.title": "Notificaciones", "notif.workout": "Recordatorios de sesión", "notif.goal": "Objetivos logrados", "notif.league": "Clasificación de liga", "notif.coach": "Consejos del entrenador IA", "notif.save": "Guardar preferencias", "notif.news": "Resumen del lunes por la mañana", "notif.newsHint": "La semana del running y el trail, una vez por semana. Nada más.", "notif.newsOff": "Ya no recibes el resumen semanal.",
-    "double.title": "Dos sesiones al día", "double.checking": "Comprobando tu volumen y tu forma…", "double.checkFail": "No se puede comprobar ahora — el ajuste está guardado y el entrenador aplicará sus criterios.", "double.ok": "✅ Listo: el entrenador podrá dividir una tirada suave en cuanto sea útil.", "double.blocked": "⚠️ Guardado, pero el entrenador aún no doblará:", "double.kept": "Tu ajuste se conserva: en cuanto se resuelva, el plan se dividirá solo.", "double.noThreshold": "El doble UMBRAL (método noruego) queda fuera de alcance por ahora:", "double.hint": "El entrenador podrá dividir una tirada suave en dos (mañana + tarde) cuando tu volumen lo justifique. Mismo volumen, mejor asimilado — hasta entonces te dirá qué falta.", "privacy.private": "Cuenta privada", "privacy.privateHint": "Solo tus amigos (os seguís mutuamente) pueden comentar tus publicaciones.", "privacy.publicHint": "Cualquiera puede comentar las publicaciones que hagas visibles.",
+    "double.title": "Dos sesiones al día", "double.checking": "Comprobando tu volumen y tu forma…", "double.checkFail": "No se puede comprobar ahora — el ajuste está guardado y el entrenador aplicará sus criterios.", "double.ok": "Listo: el entrenador podrá dividir una tirada suave en cuanto sea útil.", "double.blocked": "Guardado, pero el entrenador aún no doblará:", "double.kept": "Tu ajuste se conserva: en cuanto se resuelva, el plan se dividirá solo.", "double.noThreshold": "El doble UMBRAL (método noruego) queda fuera de alcance por ahora:", "double.hint": "El entrenador podrá dividir una tirada suave en dos (mañana + tarde) cuando tu volumen lo justifique. Mismo volumen, mejor asimilado — hasta entonces te dirá qué falta.", "privacy.private": "Cuenta privada", "privacy.privateHint": "Solo tus amigos (os seguís mutuamente) pueden comentar tus publicaciones.", "privacy.publicHint": "Cualquiera puede comentar las publicaciones que hagas visibles.",
+    "double.seuilTitle": "Método noruego: doble umbral", "double.seuilHint": "Dos días por semana con dos sesiones de umbral (mañana y tarde), ambas por debajo del umbral. Solo para grandes volúmenes: el entrenador comprueba tu volumen y tu experiencia.", "double.seuilOk": "El entrenador pondrá dos días de doble umbral por semana, en cuanto tu frescura lo permita (ni puesta a punto ni recuperación).",
     "guard.title": "Tu entrenador afloja cuando estás cansado", "guard.desc": "No es una opción que haya que activar. En cuanto tu VFC baja, señalas un dolor, tu sensación sube o tu carga crece demasiado rápido, el entrenador quita intensidad de la semana: para todos, en cada replanificación.", "guard.voir": "Ver por qué en el calendario →",
     "gdpr.title": "Datos y privacidad", "gdpr.desc": "Conforme al RGPD, puedes recuperar todos tus datos en cualquier momento.", "gdpr.export": "Exportar mis datos (JSON)", "gdpr.exporting": "Exportando…", "gdpr.privacy": "Política de privacidad", "gdpr.delPre": "Para eliminar tu cuenta y todos tus datos, escribe a ", "gdpr.delPost": " — eliminación en 30 días.",
     "goals.title": "Mis objetivos", "goals.summary": "{a} en curso · {b} logrados", "goals.new": "Nuevo objetivo", "goals.type": "Tipo", "goals.name": "Nombre", "goals.namePhRace": "Maratón de París 2027", "goals.namePhOther": "Objetivo semanal", "goals.targetVal": "Valor objetivo ({unit})", "goals.targetValPh": "42.2", "goals.targetDate": "Fecha objetivo", "goals.create": "Crear objetivo", "goals.emptyTitle": "Ningún objetivo definido", "goals.emptyDesc": "Fíjate una carrera objetivo, un volumen semanal…", "goals.achieved": "Logrado ✓", "goals.past": "Pasado", "goals.context": "Contexto actual", "goals.ctxMonth": "km este mes", "goals.ctxYear": "km este año", "goals.ctxStreak": "días seguidos",
@@ -169,7 +182,8 @@ const P: Record<string, Record<string, string>> = {
     "sub.title": "Suscripción actual", "sub.plan": "Plan {tier}", "sub.freeDesc": "Acceso limitado a las funciones básicas", "sub.proDesc": "Acceso completo a todas las funciones", "sub.active": "✓ Activo", "sub.free": "Gratis", "sub.pro": "Pro",
     "feat.dash": "Panel y estadísticas", "feat.journal": "Diario inteligente (NLP)", "feat.plans3": "Planes de entrenamiento (máx. 3)", "feat.plansUnli": "Planes de entrenamiento ilimitados", "feat.coach": "Entrenador IA personalizado (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Análisis de VAM y zonas cardíacas", "feat.sync": "Sync relojes GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub y recomendaciones", "feat.leagues": "Ligas y clasificaciones",
     "sub.renouvelle": "Próximo cobro el {d}", "sub.annule": "Cancelada — tu acceso sigue abierto hasta el {d}", "sub.essai": "Prueba gratuita hasta el {d}, sin ningún cobro antes", "sub.echec": "Tu último pago ha fallado. Actualiza tu tarjeta para no perder el acceso.", "sub.manage": "Gestionar mi suscripción", "sub.manageDesc": "Cambiar de plan, pasar a la tarifa anual, actualizar tu tarjeta, descargar facturas o cancelar.", "sub.manageCta": "Abrir mi área de facturación", "sub.manageOpening": "Abriendo…", "sub.manageErr": "No se ha podido abrir el área de facturación. Inténtalo dentro de un momento.", "sub.cancelNote": "Si cancelas, tu acceso sigue abierto hasta el final del periodo ya pagado — después no se cobra nada.", "sub.secure": "Pagos y facturación gestionados por Stripe. Pacevo nunca ve el número de tu tarjeta.", "sub.goPro": "Pasar a Starter o Premium", "sub.unlock": "Desbloquea el módulo IA", "sub.perMonth": "/mes", "sub.yearly": "{an}/año · {mois} meses gratis", "sub.trial": "Empezar la prueba gratuita de {n} días",
-    "t.saveErr": "Error al guardar", "t.saveOk": "¡Perfil actualizado!", "t.uploadErr": "Error al subir", "t.photoOk": "¡Foto de perfil actualizada!", "t.netErr": "Error de red", "t.goalsSql": "Objetivos aún no activados — ejecuta el SQL proporcionado en Supabase.", "t.createErr": "Error al crear", "t.goalAdd": "¡Objetivo añadido!", "t.goalDel": "Objetivo eliminado", "t.addErr": "Error al añadir", "t.shoeAdd": "¡Zapatilla añadida!", "t.shoeDel": "Zapatilla retirada del garaje", "t.exportOk": "Tus datos se han exportado (JSON).", "t.exportErr": "Exportación fallida, inténtalo de nuevo.",
+    "retr.title": "Derecho de desistimiento", "retr.desc": "Contrataste tu suscripción el {d}. Puedes desistir hasta el {fin} inclusive, sin justificarlo: solo pagas la parte del servicio ya prestada y se te reembolsa el resto.", "retr.cta": "Desistir del contrato aquí", "retr.formTitle": "Confirmar tu desistimiento", "retr.nom": "Tu nombre y apellidos", "retr.contrat": "Contrato afectado: suscripción {f}, contratada el {d}.", "retr.accuse": "El acuse de recibo se enviará a {email}.", "retr.confirm": "Confirmar mi desistimiento", "retr.sending": "Enviando…", "retr.ok": "Hecho: tu desistimiento está registrado. Acabamos de enviar un acuse de recibo a {email}.", "retr.okRembourse": "Reembolso: {m}, en un plazo máximo de 14 días, en tu medio de pago.", "retr.okRien": "No se había cobrado nada: no hay nada que reembolsar.", "retr.okManuel": "La parte no utilizada de tu pago se te reembolsará en un plazo máximo de 14 días.", "retr.err": "No se pudo enviar la solicitud. Vuelve a intentarlo en un momento o escríbenos a {email}.",
+    "t.saveErr": "Error al guardar", "t.saveOk": "Perfil actualizado", "t.uploadErr": "Error al subir", "t.photoOk": "Foto de perfil actualizada", "t.netErr": "Error de red", "t.goalsSql": "Objetivos aún no activados — ejecuta el SQL proporcionado en Supabase.", "t.createErr": "Error al crear", "t.goalAdd": "Objetivo añadido", "t.goalDel": "Objetivo eliminado", "t.addErr": "Error al añadir", "t.shoeAdd": "Zapatilla añadida", "t.shoeDel": "Zapatilla retirada del garaje", "t.exportOk": "Tus datos se han exportado (JSON).", "t.exportErr": "Exportación fallida, inténtalo de nuevo.",
   },
   pt: {
     "tab.profile": "Perfil", "tab.goals": "Objetivos", "tab.performance": "Desempenho", "tab.shoes": "Ténis", "tab.subscription": "Subscrição",
@@ -180,14 +194,16 @@ const P: Record<string, Record<string, string>> = {
     "split.note": "Os contadores acima incluem apenas a corrida — o mesmo valor que o teu treinador usa para dimensionar as sessões. Ciclismo e caminhada contam para a fadiga, não para o volume de corrida.",
     "pi.title": "Informações pessoais",
     "photo.title": "Foto de perfil", "photo.hint": "JPG, PNG, WebP · máx. 5 MB", "photo.uploading": "A enviar…", "photo.change": "Mudar foto",
-    "f.name": "Nome completo", "f.age": "Idade", "f.height": "Altura (cm)", "f.weight": "Peso (kg)", "f.lang": "Idioma", "f.bio": "Bio curta", "f.bioPh": "Corredor de trail apaixonado, objetivo UTMB 2027…", "f.warmup": "⏱️ Aquecimento habitual", "f.cooldown": "🧊 Retorno à calma habitual", "f.wcHint": "Define o aquecimento e o retorno à calma (frequência cardíaca fácil, Z1) das sessões enviadas para o teu relógio. A parte principal mantém os ritmos exatos.", "f.longMode": "Sessões longas", "f.longRun": "🏃 A correr", "f.longBike": "🚴 De bicicleta", "f.longHint": "Muitos profissionais trocam a saída longa por bicicleta: mesmo volume aeróbio, sem impacto. O teu treinador e a IA adaptam-se automaticamente.",
-    "f.exp": "Experiência a correr", "f.exp0": "< 1 ano", "f.exp1": "1 ano", "f.exp2": "2 anos", "f.exp4": "3-5 anos", "f.exp8": "6-10 anos", "f.exp12": "10+ anos", "f.expHint": "O teu coração adapta-se em semanas, os teus tendões em anos. O treinador IA usa isto para limitar a carga e evitar lesões por excesso.", "f.terr": "🗺️ Terreno habitual", "f.terrHint": "Na areia ou na montanha, o ritmo por km não diz nada: o treinador passa para frequência cardíaca e duração.", "f.elev": "⛰️ Relação com o desnível", "f.elevEvite": "Evito-o", "f.elevModere": "Moderado", "f.elevAime": "Gosto", "f.elevSpec": "O meu terreno", "f.elevHint": "Define o peso das subidas e do desnível nas tuas semanas.",
+    "f.name": "Nome completo", "f.age": "Idade", "f.height": "Altura (cm)", "f.weight": "Peso (kg)", "f.lang": "Idioma", "f.bio": "Bio curta", "f.bioPh": "Corredor de trail apaixonado, objetivo UTMB 2027…", "f.warmup": "⏱️ Aquecimento habitual", "f.cooldown": "Retorno à calma habitual", "f.wcHint": "Define o aquecimento e o retorno à calma (frequência cardíaca fácil, Z1) das sessões enviadas para o teu relógio. A parte principal mantém os ritmos exatos.", "f.longMode": "Sessões longas", "f.longRun": "A correr", "f.longBike": "De bicicleta", "f.longHint": "Muitos profissionais trocam a saída longa por bicicleta: mesmo volume aeróbio, sem impacto. O teu treinador e a IA adaptam-se automaticamente.",
+    "f.exp": "Experiência a correr", "f.exp0": "< 1 ano", "f.exp1": "1 ano", "f.exp2": "2 anos", "f.exp4": "3-5 anos", "f.exp8": "6-10 anos", "f.exp12": "10+ anos", "f.expHint": "O teu coração adapta-se em semanas, os teus tendões em anos. O treinador IA usa isto para limitar a carga e evitar lesões por excesso.", "f.terr": "Terreno habitual", "f.terrHint": "Na areia ou na montanha, o ritmo por km não diz nada: o treinador passa para frequência cardíaca e duração.", "f.elev": "Relação com o desnível", "f.elevEvite": "Evito-o", "f.elevModere": "Moderado", "f.elevAime": "Gosto", "f.elevSpec": "O meu terreno", "f.elevHint": "Define o peso das subidas e do desnível nas tuas semanas.",
+    "f.q30": "Consegues correr 30 minutos sem parar?", "f.q30Oui": "Sim", "f.q30Non": "Ainda não", "f.q30Hint": "«Ainda não»: o teu plano segue o programa de caminhada e corrida, sem teste de VMA, até correres 30 minutos seguidos.",
     "f.dpw": "Corridas por semana", "f.dpwHint": "Um plano que não consegues seguir não serve: o treinador nunca ultrapassa este número.", "f.days": "Dias disponíveis", "f.daysHint": "Desmarca os dias em que correr é impossível.", "f.dayShort": "D,S,T,Q,Q,S,S",
     "h.title": "Saúde e antecedentes", "h.sub": "Privado. O teu treinador IA usa isto para nunca te prescrever uma sessão que te ponha em risco.", "h.cond": "Patologias", "h.inj": "Zonas de lesão recorrentes", "h.notes": "Mais alguma coisa a assinalar?", "h.notesPh": "Medicação em curso, operação, contraindicação médica…", "h.disc": "A Pacevo não substitui aconselhamento médico. Na dúvida, consulta um profissional de saúde.",
     "h.none": "Nada a assinalar, estou de boa saúde",
     "f.terrMulti": "várias opções possíveis",
     "notif.title": "Notificações", "notif.workout": "Lembretes de sessão", "notif.goal": "Objetivos alcançados", "notif.league": "Classificação da liga", "notif.coach": "Conselhos do treinador IA", "notif.save": "Guardar preferências", "notif.news": "Resumo de segunda de manhã", "notif.newsHint": "A semana da corrida e do trail, uma vez por semana. Nada mais.", "notif.newsOff": "Já não recebes o resumo semanal.",
-    "double.title": "Duas sessões por dia", "double.checking": "A verificar o teu volume e a tua forma…", "double.checkFail": "Não é possível verificar agora — a definição está guardada e o treinador aplicará os seus critérios.", "double.ok": "✅ Tudo certo: o treinador poderá dividir um treino leve assim que for útil.", "double.blocked": "⚠️ Guardado, mas o treinador ainda não vai duplicar:", "double.kept": "A tua definição fica guardada: assim que isto for resolvido, o plano divide-se sozinho.", "double.noThreshold": "O duplo LIMIAR (método norueguês) está fora de alcance por agora:", "double.hint": "O treinador pode dividir um treino leve em dois (manhã + tarde) quando o teu volume o justificar. Mesmo volume, melhor absorvido — até lá dir-te-á o que falta.", "privacy.private": "Conta privada", "privacy.privateHint": "Só os teus amigos (seguem-se mutuamente) podem comentar as tuas publicações.", "privacy.publicHint": "Qualquer pessoa pode comentar as publicações que tornares visíveis.",
+    "double.title": "Duas sessões por dia", "double.checking": "A verificar o teu volume e a tua forma…", "double.checkFail": "Não é possível verificar agora — a definição está guardada e o treinador aplicará os seus critérios.", "double.ok": "Tudo certo: o treinador poderá dividir um treino leve assim que for útil.", "double.blocked": "Guardado, mas o treinador ainda não vai duplicar:", "double.kept": "A tua definição fica guardada: assim que isto for resolvido, o plano divide-se sozinho.", "double.noThreshold": "O duplo LIMIAR (método norueguês) está fora de alcance por agora:", "double.hint": "O treinador pode dividir um treino leve em dois (manhã + tarde) quando o teu volume o justificar. Mesmo volume, melhor absorvido — até lá dir-te-á o que falta.", "privacy.private": "Conta privada", "privacy.privateHint": "Só os teus amigos (seguem-se mutuamente) podem comentar as tuas publicações.", "privacy.publicHint": "Qualquer pessoa pode comentar as publicações que tornares visíveis.",
+    "double.seuilTitle": "Método norueguês: duplo limiar", "double.seuilHint": "Dois dias por semana com duas sessões de limiar (manhã e tarde), ambas abaixo do limiar. Só para grandes volumes: o treinador verifica o teu volume e a tua experiência.", "double.seuilOk": "O treinador vai marcar dois dias de duplo limiar por semana, assim que a tua frescura o permitir (sem afinamento nem recuperação).",
     "guard.title": "O teu treinador alivia quando estás cansado", "guard.desc": "Não é uma opção para ativar. Assim que a tua VFC desce, assinalas uma dor, a tua perceção sobe ou a tua carga cresce depressa demais, o treinador retira intensidade da semana — para toda a gente, em cada replaneamento.", "guard.voir": "Ver porquê no calendário →",
     "gdpr.title": "Dados e privacidade", "gdpr.desc": "Em conformidade com o RGPD, podes recuperar todos os teus dados a qualquer momento.", "gdpr.export": "Exportar os meus dados (JSON)", "gdpr.exporting": "A exportar…", "gdpr.privacy": "Política de privacidade", "gdpr.delPre": "Para eliminar a tua conta e todos os dados, escreve para ", "gdpr.delPost": " — eliminação em 30 dias.",
     "goals.title": "Os meus objetivos", "goals.summary": "{a} em curso · {b} alcançados", "goals.new": "Novo objetivo", "goals.type": "Tipo", "goals.name": "Nome", "goals.namePhRace": "Maratona de Paris 2027", "goals.namePhOther": "Objetivo semanal", "goals.targetVal": "Valor-alvo ({unit})", "goals.targetValPh": "42.2", "goals.targetDate": "Data-alvo", "goals.create": "Criar objetivo", "goals.emptyTitle": "Nenhum objetivo definido", "goals.emptyDesc": "Define uma prova-alvo, um volume semanal…", "goals.achieved": "Alcançado ✓", "goals.past": "Passado", "goals.context": "Contexto atual", "goals.ctxMonth": "km este mês", "goals.ctxYear": "km este ano", "goals.ctxStreak": "dias seguidos",
@@ -204,7 +220,8 @@ const P: Record<string, Record<string, string>> = {
     "sub.title": "Subscrição atual", "sub.plan": "Plano {tier}", "sub.freeDesc": "Acesso limitado às funcionalidades básicas", "sub.proDesc": "Acesso completo a todas as funcionalidades", "sub.active": "✓ Ativo", "sub.free": "Gratuito", "sub.pro": "Pro",
     "feat.dash": "Painel e estatísticas", "feat.journal": "Diário inteligente (NLP)", "feat.plans3": "Planos de treino (máx. 3)", "feat.plansUnli": "Planos de treino ilimitados", "feat.coach": "Treinador IA personalizado (Claude)", "feat.ghost": "Ghost Runner IA", "feat.vma": "Análise de VAM e zonas cardíacas", "feat.sync": "Sync relógios GPS (Garmin, Polar…)", "feat.shop": "Shopping Hub e recomendações", "feat.leagues": "Ligas e classificações",
     "sub.renouvelle": "Próxima cobrança a {d}", "sub.annule": "Cancelada — o teu acesso fica aberto até {d}", "sub.essai": "Teste grátis até {d}, sem qualquer cobrança antes", "sub.echec": "O teu último pagamento falhou. Atualiza o cartão para não perderes o acesso.", "sub.manage": "Gerir a minha subscrição", "sub.manageDesc": "Mudar de plano, passar à tarifa anual, atualizar o cartão, obter as faturas ou cancelar.", "sub.manageCta": "Abrir a minha área de faturação", "sub.manageOpening": "A abrir…", "sub.manageErr": "Não foi possível abrir a área de faturação. Tenta daqui a pouco.", "sub.cancelNote": "Se cancelares, o acesso fica aberto até ao fim do período já pago — depois não há qualquer cobrança.", "sub.secure": "Pagamentos e faturação geridos pela Stripe. A Pacevo nunca vê o número do teu cartão.", "sub.goPro": "Passar a Starter ou Premium", "sub.unlock": "Desbloqueia o módulo IA", "sub.perMonth": "/mês", "sub.yearly": "{an}/ano · {mois} meses grátis", "sub.trial": "Começar o teste gratuito de {n} dias",
-    "t.saveErr": "Erro ao guardar", "t.saveOk": "Perfil atualizado!", "t.uploadErr": "Erro no envio", "t.photoOk": "Foto de perfil atualizada!", "t.netErr": "Erro de rede", "t.goalsSql": "Objetivos ainda não ativados — executa o SQL fornecido no Supabase.", "t.createErr": "Erro ao criar", "t.goalAdd": "Objetivo adicionado!", "t.goalDel": "Objetivo eliminado", "t.addErr": "Erro ao adicionar", "t.shoeAdd": "Ténis adicionado!", "t.shoeDel": "Ténis removido da garagem", "t.exportOk": "Os teus dados foram exportados (JSON).", "t.exportErr": "Exportação falhou, tenta novamente.",
+    "retr.title": "Direito de retratação", "retr.desc": "Fizeste a tua subscrição a {d}. Podes retratar-te até {fin}, inclusive, sem justificação: pagas apenas a parte do serviço já prestada e o resto é reembolsado.", "retr.cta": "Retratar-me do contrato aqui", "retr.formTitle": "Confirmar a tua retratação", "retr.nom": "O teu nome completo", "retr.contrat": "Contrato em causa: subscrição {f}, feita a {d}.", "retr.accuse": "O aviso de receção será enviado para {email}.", "retr.confirm": "Confirmar a minha retratação", "retr.sending": "A enviar…", "retr.ok": "Feito: a tua retratação está registada. Acabámos de enviar um aviso de receção para {email}.", "retr.okRembourse": "Reembolso: {m}, no prazo máximo de 14 dias, no teu meio de pagamento.", "retr.okRien": "Não tinha sido cobrado nenhum valor: não há nada a reembolsar.", "retr.okManuel": "A parte não utilizada do teu pagamento será reembolsada no prazo máximo de 14 dias.", "retr.err": "Não foi possível enviar o pedido. Tenta novamente daqui a pouco ou escreve-nos para {email}.",
+    "t.saveErr": "Erro ao guardar", "t.saveOk": "Perfil atualizado", "t.uploadErr": "Erro no envio", "t.photoOk": "Foto de perfil atualizada", "t.netErr": "Erro de rede", "t.goalsSql": "Objetivos ainda não ativados — executa o SQL fornecido no Supabase.", "t.createErr": "Erro ao criar", "t.goalAdd": "Objetivo adicionado", "t.goalDel": "Objetivo eliminado", "t.addErr": "Erro ao adicionar", "t.shoeAdd": "Ténis adicionado", "t.shoeDel": "Ténis removido da garagem", "t.exportOk": "Os teus dados foram exportados (JSON).", "t.exportErr": "Exportação falhou, tenta novamente.",
   },
 };
 
@@ -259,11 +276,11 @@ function calcZones(maxHr: number, tr: Tr) {
 
 // ── Goal types config (label traduit via labelKey) ─────────────────────────────
 const GOAL_TYPES = [
-  { value: "race", labelKey: "gt.race", icon: "🏁", unit: "km" },
-  { value: "weekly_km", labelKey: "gt.weekly", icon: "📅", unit: "km" },
-  { value: "monthly_km", labelKey: "gt.monthly", icon: "📆", unit: "km" },
-  { value: "pace", labelKey: "gt.pace", icon: "⚡", unit: "min/km" },
-  { value: "weight", labelKey: "gt.weight", icon: "⚖️", unit: "kg" },
+  { value: "race", labelKey: "gt.race", icon: "", unit: "km" },
+  { value: "weekly_km", labelKey: "gt.weekly", icon: "", unit: "km" },
+  { value: "monthly_km", labelKey: "gt.monthly", icon: "", unit: "km" },
+  { value: "pace", labelKey: "gt.pace", icon: "", unit: "min/km" },
+  { value: "weight", labelKey: "gt.weight", icon: "", unit: "kg" },
 ];
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -271,9 +288,9 @@ function StatCard({ label, value, unit, icon, color }: {
   label: string; value: string | number; unit?: string; icon: React.ReactNode; color: string;
 }) {
   return (
-    <div className={`rounded-2xl p-4 ${color} flex flex-col gap-1`}>
-      <div className="flex items-center gap-1.5 text-xs font-medium opacity-70">{icon}{label}</div>
-      <div className="text-2xl font-black text-zinc-900">
+    <div className="flex flex-col gap-1 rounded-2xl border border-zinc-200/80 bg-white p-4">
+      <div className="flex items-center gap-1.5 text-[13px] text-zinc-500"><span className="text-zinc-400">{icon}</span>{label}</div>
+      <div className="text-2xl font-semibold tracking-tight tabular-nums text-zinc-900">
         {value}<span className="text-sm font-medium text-zinc-500 ml-1">{unit}</span>
       </div>
     </div>
@@ -314,22 +331,8 @@ function Toggle({ enabled, onToggle, label }: { enabled: boolean; onToggle: () =
   );
 }
 
-// Marques + modèles populaires (autocomplétion du garage) — clés en minuscules.
-const SHOE_BRANDS = ["Nike", "Hoka", "Adidas", "Asics", "Saucony", "Brooks", "New Balance", "Salomon", "On", "Puma", "Mizuno", "Altra"];
-const SHOE_MODELS: Record<string, string[]> = {
-  nike: ["Vaporfly 3", "Alphafly 3", "Pegasus 41", "Pegasus Plus", "Vomero 18", "Structure 25", "Invincible 3", "Zoom Fly 6", "Streakfly", "Pegasus Trail 5", "Ultrafly", "Kiger 10"],
-  hoka: ["Mach 6", "Clifton 9", "Bondi 9", "Rocket X 2", "Speedgoat 6", "Mafate 4", "Challenger 7", "Arahi 7", "Skyward X", "Cielo X1", "Torrent 3", "Tecton X 2"],
-  adidas: ["Adizero Adios Pro 4", "Adizero Boston 12", "Adizero SL", "Supernova Rise", "Ultraboost Light", "Takumi Sen 10", "Terrex Agravic Speed", "Terrex Speed Ultra"],
-  asics: ["Metaspeed Sky Paris", "Metaspeed Edge Paris", "Novablast 4", "Gel-Nimbus 26", "Gel-Kayano 31", "Gel-Cumulus 26", "Magic Speed 4", "Superblast 2", "Trabuco Max 3", "Fuji Lite 4"],
-  saucony: ["Endorphin Speed 4", "Endorphin Pro 4", "Endorphin Elite", "Kinvara 15", "Ride 17", "Triumph 22", "Guide 17", "Peregrine 14", "Xodus Ultra 3"],
-  brooks: ["Ghost 16", "Glycerin 21", "Hyperion Max 2", "Hyperion Elite 4", "Launch 10", "Adrenaline GTS 23", "Caldera 7", "Cascadia 18", "Catamount 3"],
-  "new balance": ["FuelCell SC Elite v4", "FuelCell Rebel v4", "SuperComp Trainer v3", "Fresh Foam X 1080v14", "Fresh Foam More v5", "Hierro v8", "SC Trail"],
-  salomon: ["S/Lab Genesis", "Sense Ride 5", "Speedcross 6", "Pulsar Trail Pro 2", "Ultra Glide 2", "S/Lab Pulsar 3", "Thundercross", "Aero Glide 2"],
-  on: ["Cloudmonster 2", "Cloudboom Strike", "Cloudsurfer 2", "Cloudeclipse", "Cloudultra 2", "Cloudvista 2"],
-  puma: ["Deviate Nitro 3", "Deviate Nitro Elite 3", "Velocity Nitro 3", "ForeverRun Nitro 2", "Fast-R Nitro Elite 2"],
-  mizuno: ["Wave Rebellion Pro 2", "Wave Neo Ultra", "Wave Sky 8", "Wave Rider 28", "Wave Inspire 20", "Wave Mujin 10"],
-  altra: ["Escalante 4", "Torin 8", "Lone Peak 8", "Olympus 6", "Mont Blanc Carbon", "Vanish Carbon"],
-};
+// Autocomplétion du garage : toutes les générations de chaque gamme, prolongées par le
+// catalogue du comparateur (lib/gear/modelesChaussures) — plus une liste figée à la main.
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals, stats, fitness, userId, etatAbo, catalogue = [] }: {
@@ -397,6 +400,43 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     } catch { setPortail("erreur"); }
   }
 
+  /**
+   * LA FONCTION DE RÉTRACTATION — « Renoncer au contrat ici ».
+   *
+   * ⚠️ OBLIGATOIRE DEPUIS LE 19/06/2026 pour un contrat conclu en ligne : un bouton libellé
+   * ainsi, visible pendant les 14 jours, une étape de confirmation (nom + contrat), puis
+   * un accusé de réception par e-mail (art. L221-21). La date limite vient de
+   * `lib/billing/retractation`, la même fonction que la route : le bouton ne disparaît
+   * jamais avant que la route cesse d'accepter.
+   */
+  // L'horloge n'est lue qu'APRÈS le montage : un calcul fait au rendu serveur puis refait
+  // dans le navigateur peut différer autour de minuit, et React rejetterait l'hydratation.
+  const [horloge, setHorloge] = useState<Date | null>(null);
+  useEffect(() => { setHorloge(new Date()); }, []);
+  const fenetreRetr = horloge
+    ? fenetreRetractation(etatAbo?.statut === "canceled" ? null : etatAbo?.souscritLe ?? null, horloge)
+    : { ouverte: false, dernierJour: null };
+  const [retr, setRetr] = useState<"ferme" | "formulaire" | "envoi" | "fait" | "erreur">("ferme");
+  const [retrNom, setRetrNom] = useState(typeof profile?.full_name === "string" ? profile.full_name : "");
+  const [retrRes, setRetrRes] = useState<{ email: string; rembourseCentimes: number | null; message?: string }>({ email: "", rembourseCentimes: null });
+  async function renoncer() {
+    setRetr("envoi");
+    try {
+      const r = await fetch("/api/stripe/retractation", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nom: retrNom, confirmation: true }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j?.ok) {
+        setRetrRes({ email: String(j.email ?? ""), rembourseCentimes: typeof j.rembourseCentimes === "number" ? j.rembourseCentimes : null });
+        setRetr("fait");
+        return;
+      }
+      setRetrRes({ email: "", rembourseCentimes: null, message: typeof j?.error === "string" ? j.error : undefined });
+      setRetr("erreur");
+    } catch { setRetr("erreur"); }
+  }
+
   // Abonnement au résumé hebdomadaire. Il ne vit PAS dans `form` : les champs de `form`
   // attendent le bouton « Sauvegarder », alors qu'un consentement e-mail doit prendre
   // effet au clic. On le charge donc à part, depuis la table des abonnés.
@@ -414,8 +454,11 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   // Lien direct vers le Garage (« Ouvrir le Garage » du questionnaire de ressenti) : lu APRÈS
   // le montage — le rendu serveur ne connaît pas l'adresse, un état initial différent romprait
   // l'hydratation.
+  // Même principe pour l'onglet Abonnement : c'est le lien du rappel légal avant
+  // reconduction (`lib/billing/reconduction`) — l'abonné doit atterrir là où il résilie.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("onglet") === "garage") setTab("shoes");
+    if (new URLSearchParams(window.location.search).get("onglet") === "abonnement") setTab("subscription");
   }, []);
   const [saving, setSaving] = useState(false);
   /** Verdict « peux-tu doubler ? », demandé au serveur QUAND l'athlète coche la case.
@@ -448,6 +491,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     // Pas de valeur de repli : afficher « plat » comme sélectionné alors que rien n'est
     // enregistré ferait croire à l'athlète qu'il a répondu. Aucune puce active = pas de réponse.
     running_years: profile?.running_years == null ? null : Number(profile.running_years),
+    // Absent (colonne pas encore créée, ou jamais répondu) : null, aucune puce active.
+    peut_courir_30min: typeof profile?.peut_courir_30min === "boolean" ? profile.peut_courir_30min as boolean : null,
     main_terrains: (Array.isArray(profile?.main_terrains) ? profile.main_terrains.map(String)
       : profile?.main_terrain ? [String(profile.main_terrain)] : []) as string[],
     elevation_pref: String(profile?.elevation_pref ?? ""),
@@ -471,6 +516,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     // volume, la fraîcheur et l'absence de douleur le permettent — et il DIT ce qui
     // manque le cas échéant (une case cochée sans effet est un mensonge silencieux).
     double_sessions: Boolean(profile?.double_sessions ?? false),
+    // Colonne `double_seuil` (SQL lancé à la main) : absente → non cochée.
+    double_seuil: profile?.double_seuil === true,
   });
 
   const [newGoal, setNewGoal] = useState({ type: "race", label: "", target_value: "", target_date: "" });
@@ -540,6 +587,24 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     const { error: eDouble } = await supabase.from("profiles")
       .update({ double_sessions: form.double_sessions }).eq("id", userId);
     noter(eDouble, "double_sessions");
+
+    // Marche-course — écriture ISOLÉE, et seulement si la réponse a CHANGÉ : la colonne
+    // `peut_courir_30min` vient d'un SQL lancé à la main ; tant qu'elle manque, un profil
+    // qui ne touche pas à la question ne doit pas échouer à l'enregistrement.
+    const avant30 = typeof profile?.peut_courir_30min === "boolean" ? profile.peut_courir_30min : null;
+    if (form.peut_courir_30min !== avant30) {
+      const { error: e30 } = await supabase.from("profiles")
+        .update({ peut_courir_30min: form.peut_courir_30min }).eq("id", userId);
+      noter(e30, "marche-course");
+    }
+
+    // Double seuil — écriture ISOLÉE et seulement si la réponse a CHANGÉ : la colonne
+    // `double_seuil` vient d'un SQL lancé à la main.
+    if (form.double_seuil !== (profile?.double_seuil === true)) {
+      const { error: eDs } = await supabase.from("profiles")
+        .update({ double_seuil: form.double_seuil }).eq("id", userId);
+      noter(eDs, "double seuil");
+    }
 
     // Disponibilités — écriture ISOLÉE (colonnes de la migration 011, cf. terrains).
     const { error: eDispo } = await supabase.from("profiles").update({
@@ -692,14 +757,11 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   async function exportData() {
     setExporting(true);
     try {
-      const supabase = createClient();
-      const [prof, wk, base, gl] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", userId).single(),
-        supabase.from("workouts").select("*").eq("user_id", userId),
-        supabase.from("performance_baselines").select("*").eq("user_id", userId),
-        supabase.from("user_goals").select("*").eq("user_id", userId),
-      ]);
-      const payload = { exported_at: new Date().toISOString(), profile: stripProfileSecrets(prof.data ?? null), workouts: wk.data ?? [], baselines: base.data ?? [], goals: gl.data ?? [] };
+      // L'export passe par le serveur : le secret intervals.icu est retiré AVANT la réponse,
+      // il n'entre jamais dans le navigateur (audit M1). Voir /api/account/export.
+      const res = await fetch("/api/account/export", { cache: "no-store" });
+      if (!res.ok) throw new Error(`export ${res.status}`);
+      const payload = await res.json();
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -736,13 +798,9 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   //    du catalogue portent leurs cotes ; les ~100 noms écrits en dur n'en ont aucune,
   //    mais ils couvrent des générations que le catalogue n'a pas encore. Les remplacer
   //    ferait disparaître des modèles que des athlètes ont réellement au pied.
-  const marquesCat = Array.from(new Set(catalogue.map(m => m.marque)));
-  const toutesMarques = Array.from(new Set([...marquesCat, ...SHOE_BRANDS]));
-  const shoeBrandOpts = toutesMarques.filter(b => b.toLowerCase().includes(shoeBrandQ) && b.toLowerCase() !== shoeBrandQ).slice(0, 8);
-  const modelesCat = catalogue.filter(m => !shoeBrandQ || m.marque.toLowerCase() === shoeBrandQ).map(m => m.nom);
-  const shoeModelPool = Array.from(new Set([...modelesCat, ...(SHOE_MODELS[shoeBrandQ] ?? Object.values(SHOE_MODELS).flat())]));
-  const shoeModelQ = newShoe.model.trim().toLowerCase();
-  const shoeModelOpts = shoeModelPool.filter(m => m.toLowerCase().includes(shoeModelQ) && m.toLowerCase() !== shoeModelQ).slice(0, 10);
+  const tousModeles = useMemo(() => tousLesModeles(catalogue), [catalogue]);
+  const shoeBrandOpts = toutesLesMarques(tousModeles).filter(b => compact(b).includes(compact(shoeBrandQ)) && b.toLowerCase() !== shoeBrandQ).slice(0, 8);
+  const shoeModelOpts = suggererModeles(tousModeles, newShoe.brand, newShoe.model, 10);
 
   // ── Graphiques façon Garmin : tendance VO2max + prédicteur de course (allures) ──
   const vo2Hist = Array.isArray(g?.vo2maxHistory) ? g!.vo2maxHistory! : [];
@@ -801,19 +859,19 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadingAvatar}
-            className="w-20 h-20 rounded-3xl overflow-hidden shadow-lg relative focus:outline-none"
+            className="w-20 h-20 rounded-2xl overflow-hidden shadow-lg relative focus:outline-none"
             title={tr("photo.change")}
           >
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-3xl font-black">
+              <div className="w-full h-full bg-emerald-700 flex items-center justify-center text-white text-3xl font-semibold">
                 {String(form.full_name)[0]?.toUpperCase() ?? "U"}
               </div>
             )}
             {/* Hover overlay */}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-3xl">
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
               {uploadingAvatar
                 ? <Loader2 className="w-6 h-6 text-white animate-spin" />
                 : <Camera className="w-6 h-6 text-white" />
@@ -826,7 +884,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
           </span>
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-black text-zinc-900">{form.full_name || tr("hero.myProfile")}</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900">{form.full_name || tr("hero.myProfile")}</h1>
           {form.bio && <p className="text-sm text-zinc-500 mt-0.5 line-clamp-1">{form.bio}</p>}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             <span className={`text-xs px-2.5 py-1 rounded-lg font-semibold capitalize ${leagueStyle}`}>
@@ -860,7 +918,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
       {stats.bySport && (
         <div className="rounded-2xl border border-zinc-200 bg-white p-4">
           <div className="flex items-baseline justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{tr("split.title")}</span>
+            <span className="text-xs font-semibold text-zinc-500 first-letter:uppercase">{tr("split.title")}</span>
             <span className="text-[11px] text-zinc-500">{tr("split.year")}</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -875,7 +933,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   <span className={`h-2 w-2 rounded-full ${dot}`} />
                   <span className="text-[11px] font-medium text-zinc-600">{tr(key)}</span>
                 </div>
-                <div className="text-lg font-black text-zinc-900 tabular-nums">
+                <div className="text-lg font-semibold text-zinc-900 tabular-nums">
                   {Math.round(value)}<span className="text-xs font-semibold text-zinc-500 ml-0.5">km</span>
                 </div>
               </div>
@@ -889,7 +947,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
       <div className="flex gap-1 p-1 bg-zinc-100 rounded-2xl overflow-x-auto">
         {tabs.map(t => (
           <button key={t.v} onClick={() => setTab(t.v)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition ${
               tab === t.v ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
             }`}>
             <t.icon className="w-3.5 h-3.5" />
@@ -912,7 +970,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xl font-black">
+                      <div className="w-full h-full bg-emerald-700 flex items-center justify-center text-white text-xl font-semibold">
                         {String(form.full_name)[0]?.toUpperCase() ?? "U"}
                       </div>
                     )}
@@ -924,7 +982,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingAvatar}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-700 hover:border-emerald-400 hover:text-emerald-600 transition-all disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-700 hover:border-emerald-400 hover:text-emerald-600 transition disabled:opacity-50"
                     >
                       {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
                       {uploadingAvatar ? tr("photo.uploading") : tr("photo.change")}
@@ -967,7 +1025,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     <div className="grid grid-cols-3 gap-1.5">
                       {[5,10,15,20,25,30].map(m => (
                         <button key={m} type="button" onClick={() => setForm(f => ({...f, warmup_min: m}))}
-                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${form.warmup_min === m ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                          className={`py-2 rounded-xl text-sm font-medium border transition ${form.warmup_min === m ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                           {m} min
                         </button>
                       ))}
@@ -978,7 +1036,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     <div className="grid grid-cols-3 gap-1.5">
                       {[5,10,15,20,25,30].map(m => (
                         <button key={m} type="button" onClick={() => setForm(f => ({...f, cooldown_min: m}))}
-                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${form.cooldown_min === m ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                          className={`py-2 rounded-xl text-sm font-medium border transition ${form.cooldown_min === m ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                           {m} min
                         </button>
                       ))}
@@ -991,7 +1049,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   <div className="flex gap-2">
                     {([["run", "f.longRun"], ["bike", "f.longBike"]] as const).map(([v, k]) => (
                       <button key={v} type="button" onClick={() => setForm(f => ({ ...f, long_run_mode: v }))}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${form.long_run_mode === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition ${form.long_run_mode === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                         {tr(k)}
                       </button>
                     ))}
@@ -1005,7 +1063,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
                     {([[0, "f.exp0"], [1, "f.exp1"], [2, "f.exp2"], [4, "f.exp4"], [8, "f.exp8"], [12, "f.exp12"]] as const).map(([v, k]) => (
                       <button key={v} type="button" onClick={() => setForm(f => ({ ...f, running_years: v }))}
-                        className={`py-2 rounded-xl text-sm font-medium border transition-all ${form.running_years === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        className={`py-2 rounded-xl text-sm font-medium border transition ${form.running_years === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                         {tr(k)}
                       </button>
                     ))}
@@ -1013,13 +1071,29 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   <p className="text-[11px] text-zinc-500 mt-1.5">{tr("f.expHint")}</p>
                 </div>
 
+                {/* Débutant complet ? « Pas encore » = programme marche-course (lib/coach/marcheCourse). */}
+                {(form.running_years === 0 || form.peut_courir_30min === false) && (
+                  <div className="col-span-2">
+                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("f.q30")}</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {([[true, "f.q30Oui"], [false, "f.q30Non"]] as const).map(([v, k]) => (
+                        <button key={k} type="button" onClick={() => setForm(f => ({ ...f, peut_courir_30min: v }))}
+                          className={`py-2 rounded-xl text-sm font-medium border transition ${form.peut_courir_30min === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                          {tr(k)}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-zinc-500 mt-1.5">{tr("f.q30Hint")}</p>
+                  </div>
+                )}
+
                 {/* Disponibilités — le plan n'a de valeur que s'il est tenable. */}
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("f.dpw")}</label>
                   <div className="grid grid-cols-6 gap-1.5">
                     {[2, 3, 4, 5, 6, 7].map(n => (
                       <button key={n} type="button" onClick={() => setForm(f => ({ ...f, days_per_week: n }))}
-                        className={`py-2 rounded-xl text-sm font-medium border transition-all ${form.days_per_week === n ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        className={`py-2 rounded-xl text-sm font-medium border transition ${form.days_per_week === n ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                         {n}×
                       </button>
                     ))}
@@ -1063,7 +1137,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     doubleEtat.autorise ? (
                       <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] leading-relaxed text-emerald-900">
                         <p className="font-semibold">{tr("double.ok")}</p>
-                        {doubleEtat.doubleSeuil === false && (doubleEtat.manqueSeuil ?? []).length > 0 && (
+                        {!form.double_seuil && doubleEtat.doubleSeuil === false && (doubleEtat.manqueSeuil ?? []).length > 0 && (
                           <p className="mt-1 text-emerald-800/80">{tr("double.noThreshold")} {doubleEtat.manqueSeuil!.join(" · ")}</p>
                         )}
                       </div>
@@ -1077,6 +1151,30 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       </div>
                     )
                   )}
+
+                  {/* MÉTHODE NORVÉGIENNE — une option à part : poser deux séances au seuil le
+                      même jour change toute la semaine, on ne l'impose à personne. */}
+                  {form.double_sessions && (
+                    <div className="mt-3 border-t border-zinc-200 pt-3">
+                      <Toggle enabled={form.double_seuil} onToggle={async () => {
+                        const actif = !form.double_seuil;
+                        setForm(f => ({ ...f, double_seuil: actif }));
+                        if (!actif || doubleEtat) return;
+                        setDoubleCheck(true);
+                        try {
+                          const r = await fetch("/api/coach/doubles");
+                          setDoubleEtat(r.ok ? await r.json() : { error: "x" });
+                        } catch { setDoubleEtat({ error: "x" }); }
+                        finally { setDoubleCheck(false); }
+                      }} label={tr("double.seuilTitle")} />
+                      <p className="text-[11px] text-zinc-500 mt-1.5">{tr("double.seuilHint")}</p>
+                      {form.double_seuil && !doubleCheck && doubleEtat && !doubleEtat.error && (
+                        doubleEtat.doubleSeuil
+                          ? <p className="mt-2 text-[12px] leading-relaxed text-emerald-800">{tr("double.seuilOk")}</p>
+                          : <p className="mt-2 text-[12px] leading-relaxed text-amber-800">{tr("double.noThreshold")} {(doubleEtat.manqueSeuil ?? []).join(" · ")}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="col-span-2">
@@ -1087,7 +1185,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       return (
                         <button key={d} type="button"
                           onClick={() => setForm(f => ({ ...f, available_days: on ? f.available_days.filter(x => x !== d) : [...f.available_days, d] }))}
-                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-400 border-zinc-200 hover:bg-zinc-50"}`}>
+                          className={`py-2 rounded-xl text-sm font-medium border transition ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-400 border-zinc-200 hover:bg-zinc-50"}`}>
                           {tr("f.dayShort").split(",")[d]}
                         </button>
                       );
@@ -1105,7 +1203,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       return (
                         <button key={t.slug} type="button"
                           onClick={() => setForm(f => ({ ...f, main_terrains: on ? f.main_terrains.filter(s => s !== t.slug) : [...f.main_terrains, t.slug] }))}
-                          className={`py-2 px-1.5 rounded-xl text-xs font-medium border transition-all ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                          className={`py-2 px-1.5 rounded-xl text-xs font-medium border transition ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                           {terrainLabel(t, lang)}
                         </button>
                       );
@@ -1120,7 +1218,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                     {([["evite", "f.elevEvite"], ["modere", "f.elevModere"], ["aime", "f.elevAime"], ["specialiste", "f.elevSpec"]] as const).map(([v, k]) => (
                       <button key={v} type="button" onClick={() => setForm(f => ({ ...f, elevation_pref: v }))}
-                        className={`py-2 rounded-xl text-xs font-medium border transition-all ${form.elevation_pref === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                        className={`py-2 rounded-xl text-xs font-medium border transition ${form.elevation_pref === v ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                         {tr(k)}
                       </button>
                     ))}
@@ -1131,7 +1229,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 {/* Santé — contraint la prescription du coach IA. « Rien » est une réponse valable. */}
                 <div className="col-span-2 rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4 space-y-4">
                   <div>
-                    <div className="text-sm font-semibold text-zinc-900">🩺 {tr("h.title")}</div>
+                    <div className="text-sm font-semibold text-zinc-900">{tr("h.title")}</div>
                     <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">{tr("h.sub")}</p>
                   </div>
                   {([["health_conditions", "h.cond", HEALTH_CONDITIONS], ["injury_zones", "h.inj", INJURY_ZONES]] as const).map(([key, titleKey, catalog]) => (
@@ -1143,7 +1241,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                           return (
                             <button key={item.slug} type="button"
                               onClick={() => setForm(f => ({ ...f, health_declared: true, [key]: on ? f[key].filter(s => s !== item.slug) : [...f[key], item.slug] }))}
-                              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition ${on ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                               {healthLabel(item, lang)}
                             </button>
                           );
@@ -1155,7 +1253,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       santé resterait indistinguable de quelqu'un qui n'a pas répondu. */}
                   <button type="button"
                     onClick={() => setForm(f => ({ ...f, health_declared: true, health_conditions: [], injury_zones: [] }))}
-                    className={`w-full px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${form.health_declared && form.health_conditions.length === 0 && form.injury_zones.length === 0 ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
+                    className={`w-full px-3 py-2.5 rounded-xl text-sm font-medium border transition ${form.health_declared && form.health_conditions.length === 0 && form.injury_zones.length === 0 ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"}`}>
                     {form.health_declared && form.health_conditions.length === 0 && form.injury_zones.length === 0 ? "✓ " : ""}{tr("h.none")}
                   </button>
                   <div>
@@ -1164,7 +1262,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       placeholder={tr("h.notesPh")} rows={2} maxLength={500}
                       className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
                   </div>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed">⚕️ {tr("h.disc")}</p>
+                  <p className="text-[11px] text-zinc-500 leading-relaxed">{tr("h.disc")}</p>
                 </div>
               </div>
               <button onClick={save} disabled={saving} className="btn-brand">
@@ -1265,11 +1363,11 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               <p className="text-sm text-zinc-500">{tr("gdpr.desc")}</p>
               <div className="flex flex-wrap gap-2">
                 <button onClick={exportData} disabled={exporting}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:border-emerald-400 hover:text-emerald-600 transition-all disabled:opacity-50">
+                  className="flex items-center gap-1.5 px-3 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:border-emerald-400 hover:text-emerald-600 transition disabled:opacity-50">
                   {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                   {exporting ? tr("gdpr.exporting") : tr("gdpr.export")}
                 </button>
-                <a href="/confidentialite" className="flex items-center gap-1.5 px-3 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:border-zinc-400 transition-all">
+                <a href="/confidentialite" className="flex items-center gap-1.5 px-3 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:border-zinc-400 transition">
                   {tr("gdpr.privacy")}
                 </a>
               </div>
@@ -1287,7 +1385,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 <p className="text-xs text-zinc-500 mt-0.5">{tr("goals.summary", { a: goals.filter(g => !g.achieved).length, b: goals.filter(g => g.achieved).length })}</p>
               </div>
               <button onClick={() => setAddingGoal(true)}
-                className="flex items-center gap-1.5 bg-zinc-900 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-zinc-700 transition-all">
+                className="flex items-center gap-1.5 bg-zinc-900 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-zinc-700 transition">
                 <Plus className="w-4 h-4" /> {tr("common.add")}
               </button>
             </div>
@@ -1307,10 +1405,10 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       <div className="flex gap-2 flex-wrap">
                         {GOAL_TYPES.map(gt => (
                           <button key={gt.value} onClick={() => setNewGoal(g => ({...g, type: gt.value}))}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                            className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
                               newGoal.type === gt.value ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-zinc-600 border-zinc-200 hover:border-emerald-300"
                             }`}>
-                            {gt.icon} {tr(gt.labelKey)}
+                            {tr(gt.labelKey)}
                           </button>
                         ))}
                       </div>
@@ -1338,7 +1436,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     )}
                   </div>
                   <div className="flex gap-2 mt-4">
-                    <button onClick={addGoal} className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-all">
+                    <button onClick={addGoal} className="flex-1 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-600 transition">
                       {tr("goals.create")}
                     </button>
                     <button onClick={() => setAddingGoal(false)} className="px-4 py-2.5 rounded-xl text-sm font-medium bg-white text-zinc-600 border border-zinc-200">
@@ -1366,7 +1464,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   const gt = GOAL_TYPES.find(g => g.value === goal.type);
                   return (
                     <motion.div key={goal.id} layout
-                      className={`bento-card flex gap-4 transition-all ${goal.achieved ? "opacity-60" : ""}`}>
+                      className={`bento-card flex gap-4 transition ${goal.achieved ? "opacity-60" : ""}`}>
                       <div className="shrink-0">
                         <ProgressRing pct={pct} size={64} stroke={6} color={goal.achieved ? "#16a34a" : "#3b82f6"} />
                       </div>
@@ -1374,7 +1472,6 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="text-base">{gt?.icon}</span>
                               <span className="font-semibold text-zinc-900 text-sm">{goal.label}</span>
                               {goal.achieved && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">{tr("goals.achieved")}</span>}
                             </div>
@@ -1389,11 +1486,11 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                           </div>
                           <div className="flex gap-1 shrink-0">
                             <button onClick={() => toggleGoalAchieved(goal)}
-                              className={`p-1.5 rounded-lg transition-all ${goal.achieved ? "bg-emerald-100 text-emerald-600" : "bg-zinc-100 text-zinc-400 hover:text-emerald-500"}`}>
+                              className={`p-1.5 rounded-lg transition ${goal.achieved ? "bg-emerald-100 text-emerald-600" : "bg-zinc-100 text-zinc-400 hover:text-emerald-500"}`}>
                               <CheckCircle className="w-4 h-4" />
                             </button>
                             <button onClick={() => deleteGoal(goal.id)}
-                              className="p-1.5 rounded-lg bg-zinc-100 text-zinc-400 hover:text-red-500 transition-all">
+                              className="p-1.5 rounded-lg bg-zinc-100 text-zinc-400 hover:text-red-500 transition">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -1416,15 +1513,15 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               <div className="text-sm font-semibold mb-3 text-zinc-300">{tr("goals.context")}</div>
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <div className="text-2xl font-black">{Math.round(stats.kmMonth)}</div>
+                  <div className="text-2xl font-semibold">{Math.round(stats.kmMonth)}</div>
                   <div className="text-xs text-zinc-500 mt-1">{tr("goals.ctxMonth")}</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-black">{Math.round(stats.kmYear)}</div>
+                  <div className="text-2xl font-semibold">{Math.round(stats.kmYear)}</div>
                   <div className="text-xs text-zinc-500 mt-1">{tr("goals.ctxYear")}</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-black">{stats.streak}</div>
+                  <div className="text-2xl font-semibold">{stats.streak}</div>
                   <div className="text-xs text-zinc-500 mt-1">{tr("goals.ctxStreak")}</div>
                 </div>
               </div>
@@ -1450,7 +1547,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     ].map(m => (
                       <div key={m.label} className={`${m.bg} rounded-2xl p-4`}>
                         <div className="flex items-center gap-1.5 text-xs text-zinc-500 mb-1">{m.icon}{m.label}</div>
-                        <div className="text-xl font-black text-zinc-900">{String(m.value)}<span className="text-xs font-medium text-zinc-500 ml-1">{m.unit}</span></div>
+                        <div className="text-xl font-semibold text-zinc-900">{String(m.value)}<span className="text-xs font-medium text-zinc-500 ml-1">{m.unit}</span></div>
                       </div>
                     ))}
                   </div>
@@ -1464,26 +1561,26 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
 
                   {/* VO2max — multi-sources (façon Garmin) + échelle de niveau visuelle */}
                   {vo2max && (
-                    <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-blue-50 p-4">
+                    <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 p-4">
                       <div className="flex items-center gap-4">
                         <div className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-violet-100">
-                          <div className="text-2xl font-black leading-none text-violet-700">{vo2max}</div>
-                          <div className="mt-0.5 text-[8px] font-semibold uppercase tracking-wider text-zinc-400">ml/kg/min</div>
+                          <div className="text-2xl font-semibold leading-none tabular-nums text-zinc-900">{vo2max}</div>
+                          <div className="mt-0.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">ml/kg/min</div>
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold text-zinc-900">{tr("perf.vo2est")}</div>
                           <div className="truncate text-xs text-zinc-500">{tr("perf.vo2from", { sources: vo2?.sources.join(" + ") ?? "" })}</div>
-                          <div className={`mt-0.5 text-xs font-bold ${vo2max >= 56 ? "text-emerald-600" : vo2max >= 46 ? "text-blue-600" : vo2max >= 36 ? "text-orange-500" : "text-zinc-500"}`}>{vo2maxLabel(vo2max)}</div>
+                          <div className={`mt-0.5 text-xs font-semibold ${vo2max >= 56 ? "text-emerald-600" : vo2max >= 46 ? "text-blue-600" : vo2max >= 36 ? "text-orange-500" : "text-zinc-500"}`}>{vo2maxLabel(vo2max)}</div>
                         </div>
                       </div>
                       {/* Position sur l'échelle 30 → 72 ml/kg/min (moyen → élite) */}
-                      <div className="relative mt-3.5 h-2 rounded-full" style={{ background: "linear-gradient(90deg,#d4d4d8,#fdba74,#93c5fd,#86efac,#8b5cf6)" }}>
+                      <div className="relative mt-3.5 h-2 rounded-full" style={{ background: "linear-gradient(90deg,#e4e4e7,#059669)" }}>
                         <div className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-zinc-900 shadow-md"
                           style={{ left: `${Math.min(100, Math.max(0, ((vo2max - 30) / 42) * 100))}%` }} />
                       </div>
                       {vo2ChartData.length > 1 && (
                         <div className="mt-4">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 mb-1">{tr("perf.vo2trend")}</div>
+                          <div className="text-[11px] font-semibold text-zinc-500 mb-1 first-letter:uppercase">{tr("perf.vo2trend")}</div>
                           <ResponsiveContainer width="100%" height={130}>
                             <LineChart data={vo2ChartData} margin={{ top: 6, right: 10, bottom: 0, left: -22 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -1510,7 +1607,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
             {/* Forme & charge (Garmin : Condition/Fatigue/Forme = CTL/ATL/TSB) */}
             {g && g.ctl != null && (
               <div className="bento-card space-y-3">
-                <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><Activity className="w-4 h-4 text-violet-500" /> {tr("perf.loadTitle")}</h3>
+                <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><Activity className="w-4 h-4 text-zinc-400" strokeWidth={1.5} /> {tr("perf.loadTitle")}</h3>
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { label: tr("perf.fitness"), value: g.ctl != null ? `${g.ctl}` : "—", color: "text-blue-600", bg: "bg-blue-50" },
@@ -1519,7 +1616,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   ].map(m => (
                     <div key={m.label} className={`${m.bg} rounded-2xl p-4 text-center`}>
                       <div className="text-xs text-zinc-500 mb-1">{m.label}</div>
-                      <div className={`text-2xl font-black ${m.color}`}>{m.value}</div>
+                      <div className={`text-2xl font-semibold ${m.color}`}>{m.value}</div>
                     </div>
                   ))}
                 </div>
@@ -1538,14 +1635,14 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-zinc-500">
                         <span className="h-2 w-2 rounded-full" style={{ background: PRED_LINES[i]?.color ?? "#71717a" }} />{p.label}
                       </div>
-                      <div className="text-xl font-black text-zinc-900 mt-1">{p.time}</div>
+                      <div className="text-xl font-semibold text-zinc-900 mt-1">{p.time}</div>
                       <div className="text-[11px] text-zinc-500 mt-0.5">{p.pace}</div>
                     </div>
                   ))}
                 </div>
                 {paceChartData.length > 1 && (
                   <div className="pt-2">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 mb-1">{tr("perf.predGraph")}</div>
+                    <div className="text-[11px] font-semibold text-zinc-500 mb-1 first-letter:uppercase">{tr("perf.predGraph")}</div>
                     <ResponsiveContainer width="100%" height={200}>
                       <LineChart data={paceChartData} margin={{ top: 6, right: 12, bottom: 0, left: -8 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -1579,7 +1676,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 <div className="space-y-3">
                   {zones.map(zone => (
                     <div key={zone.z} className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-xl ${zone.color} flex items-center justify-center text-white text-xs font-black shrink-0`}>
+                      <div className={`w-8 h-8 rounded-xl ${zone.color} flex items-center justify-center text-white text-xs font-semibold shrink-0`}>
                         {zone.z}
                       </div>
                       <div className="flex-1">
@@ -1620,13 +1717,16 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                     return (
                       <div key={label} className="bg-zinc-50 rounded-2xl p-3">
                         <div className="text-xs text-zinc-500 mb-1">{label}</div>
-                        <div className={`text-lg font-black ${color}`}>{mins}:{String(secs).padStart(2,"0")}<span className="text-xs font-normal text-zinc-500 ml-1">min/km</span></div>
+                        <div className={`text-lg font-semibold ${color}`}>{mins}:{String(secs).padStart(2,"0")}<span className="text-xs font-normal text-zinc-500 ml-1">min/km</span></div>
                       </div>
                     );
                   })}
                 </div>
               </div>
             )}
+
+            {/* Test de lactate : les seuils MESURÉS passent devant les allures estimées. */}
+            <TestLactateCard />
           </motion.div>
         )}
 
@@ -1639,7 +1739,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 <p className="text-xs text-zinc-500 mt-0.5">{tr(shoeList.length > 1 ? "shoes.countP" : "shoes.count", { n: shoeList.length })}</p>
               </div>
               <button onClick={() => setAddingShoe(true)}
-                className="flex items-center gap-1.5 bg-zinc-900 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-zinc-700 transition-all">
+                className="flex items-center gap-1.5 bg-zinc-900 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-zinc-700 transition">
                 <Plus className="w-4 h-4" /> {tr("common.add")}
               </button>
             </div>
@@ -1648,7 +1748,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
             <AnimatePresence>
               {addingShoe && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-5 shadow-sm">
+                  className="overflow-hidden rounded-2xl border border-emerald-100 bg-white p-5">
                   <div className="mb-4 flex items-center justify-between">
                     <h4 className="flex items-center gap-2 font-semibold text-zinc-900"><Footprints className="h-4 w-4 text-emerald-600" /> {tr("shoes.new")}</h4>
                     <button onClick={() => setAddingShoe(false)} className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"><X className="h-4 w-4" /></button>
@@ -1681,16 +1781,19 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                       {modelFocus && shoeModelOpts.length > 0 && (
                         <div className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-xl">
                           {shoeModelOpts.map(m => (
-                            <button key={m} type="button" onMouseDown={e => e.preventDefault()}
+                            <button key={`${m.marque}|${m.nom}`} type="button" onMouseDown={e => e.preventDefault()}
                               onClick={() => {
                                 // La durée de vie annoncée par le fabricant vaut mieux que
                                 // les 800 km par défaut, qui ne viennent d'aucune mesure.
-                                const f = trouver(catalogue, newShoe.brand, m);
-                                setNewShoe(s => ({ ...s, model: m, max_km: f?.dureeVieKm ? String(f.dureeVieKm) : s.max_km }));
+                                // Et la MARQUE suit le modèle choisi : « gel nimbus 27 »
+                                // tapé sans marque range bien la paire chez Asics.
+                                const f = trouver(catalogue, m.marque, m.nom);
+                                setNewShoe(s => ({ ...s, brand: m.marque, model: m.nom, max_km: f?.dureeVieKm ? String(f.dureeVieKm) : s.max_km }));
                                 setModelFocus(false);
                               }}
-                              className="block w-full px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-emerald-50">
-                              {m}
+                              className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-emerald-50">
+                              <span>{m.nom}</span>
+                              {compact(m.marque) !== compact(newShoe.brand) && <span className="text-xs font-normal text-zinc-400">{m.marque}</span>}
                             </button>
                           ))}
                         </div>
@@ -1707,7 +1810,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                         className="w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm transition-colors focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
                     </div>
                   </div>
-                  <p className="mt-2 text-[11px] text-zinc-500">💡 {tr("shoes.suggestHint")}</p>
+                  <p className="mt-2 text-[11px] text-zinc-500">{tr("shoes.suggestHint")}</p>
                   {(() => {
                     // Ce qui sera enregistré à partir de la fiche, annoncé AVANT l'ajout :
                     // une donnée reprise ailleurs doit se voir, pas apparaître en douce.
@@ -1770,7 +1873,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${status.badge}`}>{status.text}</span>
-                          <button onClick={() => deleteShoe(shoe.id)} className="p-1.5 rounded-lg bg-zinc-100 text-zinc-400 hover:text-red-500 transition-all">
+                          <button onClick={() => deleteShoe(shoe.id)} className="p-1.5 rounded-lg bg-zinc-100 text-zinc-400 hover:text-red-500 transition">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -1866,6 +1969,84 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               </div>
             </div>
 
+            {/* ── RÉTRACTATION : « Renoncer au contrat ici », visible pendant les 14 jours.
+                Le bloc reste affiché après l'envoi pour dire ce qui a été reçu et ce qui
+                sera remboursé : l'abonné ne doit pas se demander si son clic a compté. */}
+            {(fenetreRetr.ouverte || retr === "fait") && (() => {
+              const loc = lang === "fr" ? "fr-FR" : lang;
+              const longue = (d: Date) => d.toLocaleDateString(loc, { timeZone: "Europe/Paris", day: "numeric", month: "long", year: "numeric" });
+              const souscrit = etatAbo?.souscritLe ? longue(new Date(etatAbo.souscritLe)) : "";
+              const limite = fenetreRetr.dernierJour ? longue(new Date(`${fenetreRetr.dernierJour}T12:00:00Z`)) : "";
+              const tier = String(profile?.subscription_tier ?? "");
+              const formule = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : "";
+              const adresse = profile?.email;
+              const emailCompte = typeof adresse === "string" ? adresse : "";
+              return (
+                <div className="bento-card">
+                  <h3 className="font-semibold text-zinc-900">{tr("retr.title")}</h3>
+                  {retr === "fait" ? (
+                    <div role="status" className="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 ring-1 ring-inset ring-emerald-200">
+                      <p>{tr("retr.ok", { email: retrRes.email || emailCompte })}</p>
+                      <p className="mt-1">
+                        {retrRes.rembourseCentimes === null
+                          ? tr("retr.okManuel")
+                          : retrRes.rembourseCentimes > 0
+                            ? tr("retr.okRembourse", { m: euros(retrRes.rembourseCentimes, lang) })
+                            : tr("retr.okRien")}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-sm text-zinc-500">{tr("retr.desc", { d: souscrit, fin: limite })}</p>
+                      {retr === "ferme" ? (
+                        <button
+                          onClick={() => setRetr("formulaire")}
+                          className="mt-4 inline-flex items-center gap-2 rounded-xl border border-red-200 px-5 py-3 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50"
+                        >
+                          {tr("retr.cta")}
+                        </button>
+                      ) : (
+                        <div className="mt-4 space-y-3 rounded-2xl bg-zinc-50 p-4">
+                          <p className="text-sm font-semibold text-zinc-900">{tr("retr.formTitle")}</p>
+                          <div>
+                            <label htmlFor={`${cid}-retr-nom`} className="block text-xs font-medium text-zinc-600">{tr("retr.nom")}</label>
+                            <input
+                              id={`${cid}-retr-nom`}
+                              value={retrNom}
+                              onChange={(e) => setRetrNom(e.target.value)}
+                              autoComplete="name"
+                              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900"
+                            />
+                          </div>
+                          <p className="text-sm text-zinc-700">{tr("retr.contrat", { f: formule, d: souscrit })}</p>
+                          {emailCompte && <p className="text-xs text-zinc-500">{tr("retr.accuse", { email: emailCompte })}</p>}
+                          {retr === "erreur" && (
+                            <p className="text-sm font-medium text-red-600">{retrRes.message ?? tr("retr.err", { email: EDITEUR.email })}</p>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={renoncer}
+                              disabled={retr === "envoi" || retrNom.trim().length < 2}
+                              className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:opacity-40"
+                            >
+                              {retr === "envoi" ? tr("retr.sending") : tr("retr.confirm")}
+                            </button>
+                            <button
+                              onClick={() => setRetr("ferme")}
+                              disabled={retr === "envoi"}
+                              className="rounded-xl px-5 py-3 text-sm font-semibold text-zinc-600 transition-colors hover:bg-zinc-100"
+                            >
+                              {tr("common.cancel")}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* ⚠️ LA CONDITION PORTE SUR `stripe_customer_id`, PAS SUR LA FORMULE.
                 Quelqu'un qui a résilié garde son identifiant client Stripe : il doit
                 pouvoir rouvrir son espace pour retrouver ses anciennes factures — une
@@ -1901,30 +2082,30 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 bg-white/10 rounded-xl"><Star className="w-5 h-5 text-yellow-400 fill-yellow-400" /></div>
                   <div>
-                    <div className="font-bold text-lg">{tr("sub.goPro")}</div>
+                    <div className="font-semibold text-lg">{tr("sub.goPro")}</div>
                     <div className="text-zinc-400 text-sm">{tr("sub.unlock")}</div>
                   </div>
                 </div>
                 {/* ⚠️ Ce bloc annonçait « 10 € /mois, ou 84 €/an (-30 %) » pour un palier
                     « Pro ». TROIS chiffres dont aucun n'existait : les formules sont
-                    Starter et Premium, à 9,99 € et 14,99 €, et l'annuel vaut deux mois
-                    offerts (-17 %), pas -30 %. Les montants viennent maintenant de
+                    Starter et Premium, à 9,99 € et 14,99 €, et l'annuel offre deux mois
+                    (Starter) ou quatre (Premium), pas -30 %. Les montants viennent maintenant de
                     `lib/billing/prix`, la même source que l'accueil et /pricing. */}
                 <div className="space-y-2 mb-4">
                   {(["starter", "premium"] as const).map((f) => (
                     <div key={f} className="flex items-baseline gap-2">
                       <span className="w-20 text-sm font-semibold capitalize text-white/80">{f}</span>
-                      <span className="text-2xl font-black tabular-nums">{euros(PRIX_AFFICHES[f].mois, lang)}</span>
+                      <span className="text-2xl font-semibold tabular-nums">{euros(PRIX_AFFICHES[f].mois, lang)}</span>
                       <span className="text-zinc-400 text-sm">{tr("sub.perMonth")}</span>
                       <span className="ml-auto text-xs text-emerald-400 font-semibold tabular-nums">
                         {tr("sub.yearly")
                           .replace("{an}", euros(PRIX_AFFICHES[f].an, lang))
-                          .replace("{mois}", String(MOIS_OFFERTS))}
+                          .replace("{mois}", String(moisOfferts(f)))}
                       </span>
                     </div>
                   ))}
                 </div>
-                <a href="/pricing" className="block w-full text-center bg-emerald-500 hover:bg-emerald-400 text-white py-3 rounded-xl font-semibold transition-all">
+                <a href="/pricing" className="block w-full text-center bg-emerald-500 hover:bg-emerald-400 text-white py-3 rounded-xl font-semibold transition">
                   {tr("sub.trial").replace("{n}", String(JOURS_ESSAI))} <ChevronRight className="w-4 h-4 inline" />
                 </a>
               </div>

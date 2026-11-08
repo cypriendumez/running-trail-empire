@@ -8,7 +8,7 @@
  * renvoyait `{"calendar":0,"wordpress":0,"ffa":0}` en 5 secondes, et la dernière course
  * entrée en base datait du 10 juin.
  *
- * finishers.com, lui, autorise explicitement l'exploration : son `robots.txt` n'interdit
+ * finishers.com, lui, autorise l'exploration DANS SON robots.txt [⚠️ ses CGU l'interdisent : liste d'opposition depuis le 02/10/2026] : son `robots.txt` n'interdit
  * que `/account*`, `/book*`, `/docs*` et les pages de filtres, et le site publie son
  * propre sitemap. Ses fiches portent des données structurées schema.org — donc une date
  * lisible sans deviner quoi que ce soit dans du HTML.

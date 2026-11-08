@@ -2,72 +2,54 @@ import { jourLocal, ecartJours } from "@/lib/streak/compute";
 // ─────────────────────────────────────────────────────────────────────────────
 //  Modèle de forme : VMA, VO2max (multi-sources, façon Garmin) et prédictions de
 //  chrono par distance. Calculs purs, réutilisables (profil, onboarding, IA).
-//  Repères % VMA soutenable par distance (empirique, proche de Daniels/Riegel).
+//  Équivalences entre distances : modèle de Daniels & Gilbert (VDOT), lib/running/vdot.
 // ─────────────────────────────────────────────────────────────────────────────
 import { heatAdvice } from "@/lib/weather/openMeteo";
+import { vdotDe, vmaDeVdot, vdotDeVma, tempsPourVdot, facteurSocle, SL_PLANCHER_KM, SL_PRET_KM, type Socle } from "./vdot";
+export type { Socle } from "./vdot";
 
 export const RACE_DISTANCES: { label: string; km: number }[] = [
   { label: "5 km", km: 5 }, { label: "10 km", km: 10 }, { label: "Semi", km: 21.0975 }, { label: "Marathon", km: 42.195 },
 ];
 
-// Fraction de VMA tenable selon la distance.
-function pctVmaBrut(km: number): number {
-  if (km <= 0.4) return 1.18;
-  if (km <= 0.8) return 1.12;
-  if (km <= 1.5) return 1.06;
-  if (km <= 3.2) return 1.0;
-  if (km <= 5.5) return 0.94;
-  if (km <= 11) return 0.90;
-  // ── LONGUES DISTANCES : coefficients ramenés dans la moyenne ────────────────
-  // Ils étaient en HAUT de la fourchette de la littérature (semi 83-88 %, marathon
-  // 75-80 % de la vitesse à VO2max chez un amateur entraîné) : 85 % et 79 % décrivaient
-  // un marathonien à gros volume, pas le coureur moyen. Confronté au prédicteur Garmin
-  // (Firstbeat, largement validé) sur un compte réel, l'écart était de +2,4 min sur semi
-  // et +10,5 min sur marathon — toujours dans le sens optimiste, le plus coûteux pour
-  // quelqu'un qui cale son allure de course dessus.
-  //
-  // ⚠️ CE QUI RESTE FAUX, ET QU'IL FAUDRA CORRIGER. Ce pourcentage n'est pas une
-  // constante physiologique : il dépend du SOCLE D'ENDURANCE. Un coureur à 150 km/sem
-  // tient 80 % sur marathon, un coureur à 80 km/sem avec 21 km de plus longue sortie n'y
-  // arrive pas. Une valeur fixe est un compromis, pas une vérité — la vraie correction
-  // est de la faire dépendre du volume et de la sortie longue réels.
-  if (km <= 22) return 0.83;
-  if (km <= 30) return 0.79;
-  if (km <= 43) return 0.75;
-  return 0.74;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+//  ⚠️ PLUS DE BARÈME EN ESCALIER (02/10/2026). Le % de VMA tenable venait d'une table en
+//  marches (0,90 jusqu'à 11 km, 0,83 jusqu'à 22 km, 0,79 jusqu'à 30 km…) : 23,7 km à
+//  3'45/km donnaient 21,4 km/h de VMA à Cyprien, 10,9 km et 11,5 km différaient de 8 %,
+//  et le 5 km prédit (14'55) n'avait aucun rapport avec son record de semi (1h15).
+//  Tout passe désormais par le modèle de Daniels & Gilbert (`lib/running/vdot`), continu
+//  et validé sur les tables publiées — la VMA y est ce qu'elle est dans l'application :
+//  la vitesse tenue six minutes.
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * SOCLE D'ENDURANCE — ce qui manquait vraiment au modèle de pronostic.
- *
- * `pctVmaForDistance` traite le pourcentage tenable comme une constante physiologique.
- * Il n'en est pas une : sur marathon, un coureur à 150 km/semaine avec des sorties de
- * 32 km tient nettement plus que le même cardio à 80 km/semaine dont la plus longue
- * sortie fait 21 km. C'est exactement ce que modélise le prédicteur de Garmin, et
- * c'est pourquoi nos pronostics longue distance s'en écartaient toujours dans le même
- * sens — l'optimiste, le plus coûteux pour qui cale son allure de course dessus.
- *
- * DEUX ANCRES, PAS UN AJUSTEMENT LIBRE :
- *   · 32 km de sortie longue = référence classique de préparation marathon aboutie ;
- *   · 21 km (un semi) = plancher en dessous duquel on ne prépare pas un marathon.
- * Entre les deux, on interpole. Au-delà, on plafonne : une sortie de 40 km ne rend pas
- * le marathon plus facile que ce que la physiologie permet.
- *
- * N'intervient QUE au-delà du semi : en deçà, c'est la VMA qui décide, et nos
- * coefficients courte distance tombent déjà à 8 et 20 s des pronostics Garmin.
+ * SOCLE D'ENDURANCE — sortie longue et volume réels (détail et sources : lib/running/vdot).
+ * Deux ancres de sortie longue : 21 km (on ne prépare pas un marathon en dessous) et
+ * 32 km (préparation aboutie). N'intervient qu'AU-DELÀ du semi.
  */
-export const LONG_RUN_PRET_KM = 32;
-export const LONG_RUN_PLANCHER_KM = 21;
+export const LONG_RUN_PRET_KM = SL_PRET_KM;
+export const LONG_RUN_PLANCHER_KM = SL_PLANCHER_KM;
 
-export function pctVmaForDistance(km: number, longRunKm?: number | null): number {
-  const base = pctVmaBrut(km);
-  // Sans sortie longue connue, on ne suppose RIEN : on garde la valeur de référence.
-  if (km <= 22 || longRunKm == null || !(longRunKm > 0)) return base;
-  const pret = Math.min(1, Math.max(0, (longRunKm - LONG_RUN_PLANCHER_KM) / (LONG_RUN_PRET_KM - LONG_RUN_PLANCHER_KM)));
-  // Un athlète prêt retrouve le coefficient d'avant (marathon 79 %) ; un athlète au
-  // plancher reste sur la valeur mesurée contre Garmin (75 %).
-  const bonus = km > 30 ? 0.04 : 0.02;
-  return Math.round((base + bonus * pret) * 1000) / 1000;
+/**
+ * Un nombre seul est lu comme la plus longue sortie (forme historique de l'argument) ;
+ * un objet peut ajouter le volume hebdomadaire.
+ */
+export function socleDe(socle: number | Socle | null | undefined): Socle | null {
+  if (socle == null) return null;
+  return typeof socle === "number" ? { sortieLongueKm: socle } : socle;
+}
+
+/** VMA de référence pour lire un pourcentage hors contexte (un coureur entraîné). */
+export const VMA_REFERENCE_KMH = 17;
+
+/**
+ * Fraction de VMA tenue sur une distance, pour une VMA donnée — DÉRIVÉE du modèle, plus
+ * une constante : un coureur à 20 km/h boucle son semi plus vite, donc il le court à un
+ * pourcentage un peu plus haut qu'un coureur à 14 km/h. Sert à l'affichage et aux tests.
+ */
+export function pctVmaForDistance(km: number, socle?: number | Socle | null, vma = VMA_REFERENCE_KMH): number {
+  const sec = predictRaceSec(vma, km, socle);
+  return sec > 0 ? Math.round(((km / (sec / 3600)) / vma) * 1000) / 1000 : 0;
 }
 
 // VMA depuis un test de 6 min (demi-Cooper) : distance(m) parcourue / 100.
@@ -113,11 +95,14 @@ export function dureeEnConditionsNeutres(
 }
 
 // VMA estimée depuis une performance (course ou séance dure) : vitesse / %VMA.
+// On lit ce qui a été COURU : aucun socle d'endurance n'entre ici, il ne sert qu'à prédire.
 export function vmaFromEffort(distanceKm: number, durationSec: number): number | null {
   if (!(distanceKm > 0) || !(durationSec > 0)) return null;
   const speed = distanceKm / (durationSec / 3600); // km/h
   if (speed < 5 || speed > 30) return null; // garde-fou (données aberrantes)
-  return Math.round((speed / pctVmaForDistance(distanceKm)) * 10) / 10;
+  const vdot = vdotDe(distanceKm, durationSec);
+  const vma = vdot != null ? vmaDeVdot(vdot) : null;
+  return vma != null ? Math.round(vma * 10) / 10 : null;
 }
 
 /**
@@ -189,15 +174,17 @@ export function vo2maxEstimate(opts: { vma?: number | null; maxHr?: number | nul
 }
 
 export const vo2maxLabel = (v: number): string =>
-  v >= 65 ? "🏆 Élite" : v >= 56 ? "✅ Excellent" : v >= 46 ? "👍 Bon" : v >= 36 ? "📈 Moyen" : "🌱 En progression";
+  v >= 65 ? "Élite" : v >= 56 ? "Excellent" : v >= 46 ? "Bon" : v >= 36 ? "Moyen" : "En progression";
 
 // Temps prédit (secondes) sur une distance, depuis la VMA.
-export function predictRaceSec(vma: number, distanceKm: number, longRunKm?: number | null): number {
+export function predictRaceSec(vma: number, distanceKm: number, socle?: number | Socle | null): number {
   // Sans VMA exploitable il n'y a pas de prédiction : 0 se lit comme « pas de valeur »
   // par les appelants, là où `Infinity` se lisait « InfinityhNaN » à l'écran.
   if (!Number.isFinite(vma) || vma <= 0 || !Number.isFinite(distanceKm) || distanceKm <= 0) return 0;
-  const speed = vma * pctVmaForDistance(distanceKm, longRunKm); // km/h
-  return (distanceKm / speed) * 3600;
+  const vdot = vdotDeVma(vma);
+  if (vdot == null) return 0;
+  // L'équivalence de Daniels, puis le socle d'endurance au-delà du semi (lib/running/vdot).
+  return tempsPourVdot(vdot, distanceKm) * facteurSocle(distanceKm, socleDe(socle));
 }
 
 /**
@@ -222,9 +209,9 @@ export const fmtPaceSec = (secPerKm: number): string =>
   `${Math.floor(secPerKm / 60)}'${String(Math.round(secPerKm % 60)).padStart(2, "0")}`;
 
 // Prédictions complètes par distance depuis la VMA.
-export function racePredictions(vma: number, longRunKm?: number | null): { label: string; km: number; time: string; pace: string }[] {
+export function racePredictions(vma: number, socle?: number | Socle | null): { label: string; km: number; time: string; pace: string }[] {
   return RACE_DISTANCES.map(d => {
-    const sec = predictRaceSec(vma, d.km, longRunKm);
+    const sec = predictRaceSec(vma, d.km, socle);
     return { label: d.label, km: d.km, time: fmtTime(sec), pace: fmtPaceSec(sec / d.km) + "/km" };
   });
 }
@@ -241,8 +228,10 @@ export function raceProjection(
    *  et remplace l'hypothèse générique — laquelle promettait le même progrès à tout le
    *  monde, qu'il monte ou qu'il stagne. */
   ameliorationMesuree?: number | null,
+  /** Socle d'endurance réel (sortie longue, volume) : sans lui, la prédiction prudente. */
+  socle?: number | Socle | null,
 ): RaceProjection {
-  const nowSec = predictRaceSec(currentVma, distanceKm);
+  const nowSec = predictRaceSec(currentVma, distanceKm, socle);
   // Amélioration réaliste sur le bloc : ~0,4 %/sem de gain d'allure, plafonné à 8 %.
   const improv = typeof ameliorationMesuree === "number" && Number.isFinite(ameliorationMesuree)
     ? Math.min(0.08, Math.max(0, ameliorationMesuree))
@@ -263,30 +252,53 @@ export function raceProjection(
 // ── Risque de charge (anti-blessure proactif / déload auto) ──
 const TSS_BY_TYPE: Record<string, number> = { easy: 50, tempo: 75, interval: 90, vma: 100, long_run: 65, trail: 70, hill_repeat: 85, race: 110, recovery: 30, strength: 40 };
 export function estimateTSS(w: { duration_seconds?: number | null; type?: string | null; tss?: number | null }): number {
-  if (w.tss != null) return Number(w.tss);
-  return Math.round(((w.duration_seconds ?? 0) / 3600) * (TSS_BY_TYPE[String(w.type ?? "")] ?? 60));
+  // Un TSS ou une durée aberrants (NaN, infini, négatif) ne pèsent rien : sinon l'ACWR devenait
+  // NaN et déclenchait « Déload recommandé » à tort (crash-test au hasard, 06/11/2026).
+  const tss = Number(w.tss);
+  if (w.tss != null && Number.isFinite(tss) && tss >= 0) return tss;
+  const duree = Number(w.duration_seconds);
+  return Math.round(((Number.isFinite(duree) && duree > 0 ? duree : 0) / 3600) * (TSS_BY_TYPE[String(w.type ?? "")] ?? 60));
 }
+/**
+ * La charge (TSS mesuré, sinon estimé) de chacun des `jours` derniers jours de CALENDRIER —
+ * indice 0 = aujourd'hui. La base de l'ACWR et de la monotonie (`loadRisk`), exposée pour
+ * que la page détaillée trace exactement ce que la carte a additionné.
+ */
+export function chargesQuotidiennes(
+  workouts: { date: string; type?: string | null; duration_seconds?: number | null; tss?: number | null }[],
+  jours = 28, aujourdhui = jourLocal(),
+): number[] {
+  const out = new Array(jours).fill(0);
+  for (const w of workouts) {
+    const j = String(w.date ?? "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(j)) continue;
+    const n = ecartJours(j, aujourdhui);
+    if (Number.isFinite(n) && n >= 0 && n < jours) out[n] += estimateTSS(w);
+  }
+  return out;
+}
+
 export type LoadRisk = { acwr: number; monotony: number; deload: boolean; level: "ok" | "vigilance" | "deload"; reason: string };
-export function loadRisk(workouts: { date: string; type?: string | null; duration_seconds?: number | null; tss?: number | null }[]): LoadRisk {
+export function loadRisk(
+  workouts: { date: string; type?: string | null; duration_seconds?: number | null; tss?: number | null }[],
+  // Le jour de référence (défaut : aujourd'hui à Paris). La page détaillée passe le SIEN : sans
+  // lui, le ratio se lisait sur l'horloge et les barres sur la page — deux jours différents
+  // entre minuit à Paris et minuit UTC (test indicateurs rouge le 25/10/2026 à 00 h 30).
+  aujourdhui: string = jourLocal(),
+): LoadRisk {
   // ⚠️ JOURS DE CALENDRIER, comme partout ailleurs sur le tableau de bord. Les fenêtres
   //    étaient ancrées sur l'heure exacte de l'appel et le découpage quotidien se faisait
   //    en UTC : le ratio bougeait selon le moment de la consultation, et la journée
   //    d'entraînement d'un athlète parisien basculait à 02 h du matin. Le 0,58 affiché
   //    était juste, mais il n'était pas STABLE — et il est lu à côté d'un volume et d'une
   //    charge qui, eux, comptent en cases de calendrier.
-  const aujourdhui = jourLocal();
-  const ageDe = (w: { date: string }) => {
-    const j = String(w.date ?? "").slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(j)) return null;
-    const n = ecartJours(j, aujourdhui);
-    return Number.isFinite(n) && n >= 0 ? n : null;
-  };
-  const within = (d: number) => workouts.filter(w => { const a = ageDe(w); return a != null && a < d; });
-  const tss7 = within(7).reduce((s, w) => s + estimateTSS(w), 0);
-  const tss28 = within(28).reduce((s, w) => s + estimateTSS(w), 0);
+  // Une seule lecture jour par jour, partagée avec la page détaillée de l'ACWR
+  // (`chargesQuotidiennes`) : 7 jours et 28 jours sont des sommes de la même série.
+  const q = chargesQuotidiennes(workouts, 28, aujourdhui);
+  const tss7 = q.slice(0, 7).reduce((a, b) => a + b, 0);
+  const tss28 = q.reduce((a, b) => a + b, 0);
   const acwr = tss28 > 0 ? Math.round((tss7 / (tss28 / 4)) * 100) / 100 : 0;
-  const daily = Array.from({ length: 7 }, (_, i) =>
-    workouts.filter(w => ageDe(w) === i).reduce((s, w) => s + estimateTSS(w), 0));
+  const daily = q.slice(0, 7);
   const mean = daily.reduce((a, b) => a + b, 0) / 7;
   const sd = Math.sqrt(daily.reduce((a, b) => a + (b - mean) ** 2, 0) / 7) || 1;
   const monotony = mean > 0 ? Math.round((mean / sd) * 10) / 10 : 0;

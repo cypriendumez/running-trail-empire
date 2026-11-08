@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { simplify, encodePolyline, bboxOf, type TrackPoint } from "@/lib/segments/geo";
+import { enteteIntervals } from "@/lib/intervals/auth";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -112,7 +113,7 @@ async function fetchTrack(activityId: string, apiKey: string): Promise<TrackPoin
   for (let essai = 0; essai < 2; essai++) {
     if (essai > 0) await new Promise((res) => setTimeout(res, 1200));
     r = await fetch(`${BASE}/activity/${activityId}/streams?types=latlng,time`, {
-      headers: { Authorization: "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64") },
+      headers: { Authorization: enteteIntervals(apiKey) },
       signal: AbortSignal.timeout(20000),
     }).catch(() => null);
     if (r?.ok) break;

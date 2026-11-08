@@ -201,12 +201,16 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
   // « M'entraîner pour cette course » → ajoute la course au calendrier (objectif coach).
   const trainForRace = async (r: Race) => {
     if (planning || findPlanned(r)) return; // déjà planifiée → pas de doublon
+    // ⚠️ PLUS DE DATE INVENTÉE. Une course « date à venir » partait au calendrier — et comme
+    // objectif — dans 60 jours, une date que rien ne justifiait. On le dit, on n'invente pas.
+    if (!r.date || r.date.startsWith("2099")) { toast(d["t.sansDate"]); return; }
     setPlanning(true);
     try {
-      const date = r.date && !r.date.startsWith("2099") ? r.date : new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);
+      const date = r.date;
+      // « M'entraîner pour cette course » : une course A de la saison (lib/coach/saison).
       const res = await fetch("/api/calendar-entry", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, kind: "race", name: r.name, location: r.city || r.department || "", distanceKm: r.distance_km }),
+        body: JSON.stringify({ date, kind: "race", name: r.name, location: r.city || r.department || "", distanceKm: r.distance_km, priorite: "A" }),
       });
       const j = await res.json();
       if (j.ok) {
@@ -230,7 +234,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
       const okIds = matches.filter((_, i) => results[i]?.ok).map(p => p.id);
       if (okIds.length) {
         setPlannedList(ps => ps.filter(x => !okIds.includes(x.id)));
-        toast(d["t.cancelled"], { icon: "🗑️" });
+        toast(d["t.cancelled"], { icon: "" });
       }
       if (okIds.length < matches.length) toast.error(d["t.someFail"]);
     } catch { toast.error(d["t.cancelErr"]); }
@@ -328,14 +332,18 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
               {(loadingAll && !search && region === "Toutes" && raceType === "all" && !dateFrom && !proximite ? (totalCount ?? filtered.length) : filtered.length).toLocaleString(lang)} {filtered.length > 1 || loadingAll ? d["courses"] : d["course"]}
             </span>
             {!loadingAll && (
-              <span className="block text-[11px] text-zinc-400">
-                {evenements.length.toLocaleString(lang)} {d["events"]} · {races.filter(r => r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["toConfirm"]}
+              // ⚠️ « 14 759 courses » en haut, « 8 003 événements » en bas de page : deux
+              // nombres sans lien apparent (Cyprien, 30/09/2026 : « pourquoi il annonce
+              // 8 000 et en haut 14 700 ? »). La sous-ligne dit désormais la RELATION —
+              // « dans 8 003 événements » — et l'infobulle l'explique.
+              <span className="block text-[11px] text-zinc-400" title={d["f.explication"]}>
+                {tr("f.dansEvts", { e: evenements.length.toLocaleString(lang) })} · {races.filter(r => r.date?.startsWith("2099")).length.toLocaleString(lang)} {d["f.sansDate"]}
               </span>
             )}
           </span>
           <button
             onClick={() => setShowMap(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-sm"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition bg-zinc-900 text-white hover:bg-zinc-800"
           >
             <Map className="w-3.5 h-3.5" />
             {d["map"]}
@@ -401,7 +409,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
             <Heart className="h-4 w-4" fill={filtreFavoris ? "currentColor" : "none"} />
             {d["fav.filter"]}
             {favoris.size > 0 && (
-              <span className={`rounded-full px-1.5 text-[11px] font-bold ${filtreFavoris ? "bg-rose-200 text-rose-800" : "bg-zinc-100 text-zinc-500"}`}>
+              <span className={`rounded-full px-1.5 text-[11px] font-semibold ${filtreFavoris ? "bg-rose-200 text-rose-800" : "bg-zinc-100 text-zinc-500"}`}>
                 {favoris.size}
               </span>
             )}
@@ -445,7 +453,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.015, 0.3) }}
                 onClick={() => openRace(race)}
-                className={`bento-card cursor-pointer !p-4 !rounded-2xl transition-all hover:shadow-md ${selected?.id === race.id ? "ring-2 ring-emerald-500 bg-emerald-50/30" : ""}`}
+                className={`bento-card cursor-pointer !p-4 !rounded-2xl transition hover:shadow-md ${selected?.id === race.id ? "ring-2 ring-emerald-500 bg-emerald-50/30" : ""}`}
               >
                 <div className="flex items-start gap-3.5">
                   <div
@@ -472,7 +480,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                           <Heart className="h-4 w-4" fill={favoris.has(race.id) ? "currentColor" : "none"} />
                         </button>
                         <span
-                          className="px-2 py-0.5 rounded-lg text-xs font-bold text-white"
+                          className="px-2 py-0.5 rounded-lg text-xs font-semibold text-white"
                           style={{ backgroundColor: DIFF_COLORS[race.difficulty] || "#22c55e" }}
                         >
                           {d[`diff.${race.difficulty}`] || d["diff.green"]}
@@ -491,7 +499,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                       {(() => {
                         const dd = daysTo(race.date);
                         if (dd == null || dd < 0 || dd > 90) return null;
-                        return <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-700">{dd === 0 ? d["jourJ"] : tr("dMinus", { n: dd })}</span>;
+                        return <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-semibold text-emerald-700">{dd === 0 ? d["jourJ"] : tr("dMinus", { n: dd })}</span>;
                       })()}
                       {(race.city || race.department) && (
                         <span className="flex items-center gap-1">
@@ -564,7 +572,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                         </span>
                       )}
                       {findPlanned(race) && (
-                        <span className="flex items-center gap-1 rounded bg-emerald-600 px-1.5 py-0.5 font-bold text-white">
+                        <span className="flex items-center gap-1 rounded bg-emerald-600 px-1.5 py-0.5 font-semibold text-white">
                           <Flag className="h-3 w-3" /> {d["planned"]}
                         </span>
                       )}
@@ -592,7 +600,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                     17 027 courses : le même mot pour deux nombres, à deux endroits de
                     la même page. Une carte regroupe toutes les distances d'un même
                     week-end — c'est un événement, pas une course. */}
-                {tr("pageInfo", { p: page + 1, t: totalPages, n: evenements.length.toLocaleString(lang) })}
+                {tr("pageInfo", { p: page + 1, t: totalPages, n: evenements.length.toLocaleString(lang), c: filtered.length.toLocaleString(lang) })}
               </span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
@@ -616,7 +624,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
               // ⚠️ SUR TÉLÉPHONE, UNE PAGE ENTIÈRE (29/09/2026). En colonne de 360 px à
               // côté de la liste, la fiche écrasait la liste et débordait de 21 px sur un
               // écran de 375 (page qui glissait de côté). Au-delà de md, la colonne revient.
-              className="bento-card fixed inset-0 z-[70] overflow-auto !rounded-none pt-[calc(1rem+env(safe-area-inset-top))] md:static md:z-auto md:w-[360px] md:flex-shrink-0 md:!rounded-3xl md:pt-6"
+              className="bento-card fixed inset-0 z-[70] overflow-auto !rounded-none pt-[calc(1rem+env(safe-area-inset-top))] md:static md:z-auto md:w-[360px] md:flex-shrink-0 md:!rounded-2xl md:pt-6"
             >
               <button
                 onClick={() => setSelected(null)}
@@ -627,13 +635,13 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
 
               <div className="mb-4">
                 <div
-                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-bold text-white mb-2"
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold text-white mb-2"
                   style={{ backgroundColor: DIFF_COLORS[selected.difficulty] || "#22c55e" }}
                 >
                   {d[`rt.${correctedRaceType(selected.distance_km, selected.type, selected.name)}`] ?? selected.type}
                   {selected.is_itra_certified && ` • ITRA ${selected.itra_points}pts`}
                 </div>
-                <h2 className="text-lg font-bold text-zinc-900 leading-snug">{selected.name}</h2>
+                <h2 className="text-lg font-semibold text-zinc-900 leading-snug">{selected.name}</h2>
                 {details[selected.id]?.organization && (
                   <p className="text-xs text-zinc-400 mt-0.5">{details[selected.id]?.organization}</p>
                 )}
@@ -666,7 +674,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
 
               {Array.isArray(details[selected.id]?.time_limits) && (details[selected.id]?.time_limits?.length ?? 0) > 0 && (
                 <div className="mb-4">
-                  <div className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-2">
+                  <div className="text-xs font-semibold text-zinc-400 mb-2 first-letter:uppercase">
                     {d["timeLimits"]}
                   </div>
                   <div className="space-y-1.5">
@@ -714,7 +722,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                         dit pas « il te faut un PPS » — on dit s'il tiendra JUSQU'AU JOUR
                         DE CETTE COURSE, ce que le site de la fédération ne peut pas savoir. */}
                     <div className="w-full">
-                      <div className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-zinc-400">
+                      <div className="mb-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">
                         {(PPS_T[lang] ?? PPS_T.fr).avantInscription}
                       </div>
                       <PpsStatusCard status={pps} raceDate={selected.date ?? null} compact />
@@ -746,7 +754,7 @@ export function RacesHub({ races: initialRaces, totalCount, units = "metric", pl
                         jamais. Le dire est le minimum avant une inscription payante —
                         laisser croire que toutes les fiches se valent se paierait en
                         déplacement inutile un dimanche matin. */}
-                    {!ficheVerifiable(details[selected.id]?.registration_url) && (
+                    {!ficheVerifiable(details[selected.id]?.registration_url, details[selected.id]?.site_officiel) && (
                       <p className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800">
                         {d["unverifiable"]}
                       </p>

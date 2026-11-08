@@ -43,7 +43,7 @@ export function seancesSansRessenti(seances: readonly Seance[], ressentis: reado
   }
   const nombre = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
   return seances
-    .filter((s): s is Seance & { id: string; date: string } => typeof s?.id === "string" && typeof s?.date === "string")
+    .filter((s): s is Seance & { id: string; date: string } => typeof s?.id === "string" && typeof s?.date === "string" && /^\d{4}-\d{2}-\d{2}/.test(s.date))
     .filter((s) => s.date.slice(0, 10) >= depuis && !ids.has(s.id) && !dates.has(s.date.slice(0, 10)))
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, max)

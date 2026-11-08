@@ -1,3 +1,4 @@
+import { rapportEtranger } from "@/lib/csp/rapport";
 /**
  * LE JOURNAL D'ERREURS, LU COMME UN COACH LIT SES ALERTES — regroupé, daté, compté.
  *
@@ -63,11 +64,20 @@ export function estBruitDeDev(l: Pick<LigneErreur, "url" | "message" | "user_age
   // 2. Anciens déploiements et prévisualisations Vercel (la prod est pacevo.fr).
   try { if (/\.vercel\.app$/i.test(new URL(url).hostname)) return true; } catch { /* url non standard : voir plus bas */ }
   // 3. Scans : agent robot/curl, ou une url qui n'est même pas une adresse http.
+  //    ⚠️ SAUF un emplacement du SERVEUR (« /api/… », « lib/… ») : c'est ainsi que le serveur
+  //    signe ses propres lignes — e-mails refusés, refus d'écriture de la synchro, repli
+  //    d'enregistrement. Rangées parmi les scans (constaté le 12/10/2026), elles étaient
+  //    TOUTES masquées par défaut : ce panneau cachait ce qu'il existe pour montrer.
   if (ROBOT_UA.test(String(l.user_agent ?? ""))) return true;
-  if (url && !/^https?:\/\//i.test(url)) return true;
+  if (url && !/^https?:\/\//i.test(url) && !/^(?:\/api\/|lib\/)/.test(url)) return true;
   // 4. « Script error. » cross-origin, sans fichier : non diagnosticable.
   const fichier = (l.meta as { file?: unknown } | null)?.file;
   if (message.toLowerCase() === "script error." && !fichier) return true;
+  // 5. CSP déclenchée par une EXTENSION du visiteur (07/11/2026) : son script charge ses
+  //    propres images ou polices dans nos pages. La route ne les écrit plus (lib/csp/rapport) ;
+  //    les lignes déjà en base restent, masquées ici.
+  const extrait = (l.meta as { extrait?: unknown } | null)?.extrait;
+  if (typeof extrait === "string" && rapportEtranger(extrait)) return true;
   return false;
 }
 

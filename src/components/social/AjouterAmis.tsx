@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import qrcode from "qrcode-generator";
+import { QrSvg } from "@/components/ui/QrSvg";
 import { toast } from "sonner";
 import { Search, UserPlus, UserCheck, Users, BookUser, QrCode, Share2, ScanLine, X, Loader2 } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -119,7 +119,7 @@ function Avatar({ a, size = 40 }: { a: { full_name?: string | null; avatar_url?:
     return <img src={a.avatar_url} alt="" style={s} className="shrink-0 rounded-full object-cover" />;
   }
   return (
-    <div style={s} className="flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-xs font-bold text-white">
+    <div style={s} className="flex shrink-0 items-center justify-center rounded-full bg-emerald-700 text-xs font-semibold text-white">
       {initials(a.full_name)}
     </div>
   );
@@ -255,7 +255,7 @@ export function AjouterAmis({ moi, suivre, onFollowChange }: {
       {/* L'athlète d'un code scanné, en tête : c'est pour lui qu'on a ouvert la page. */}
       {invite && (
         <div className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2">
-          <p className="pt-1 text-xs font-bold uppercase tracking-wide text-emerald-700">{dd("suivreCarte", { nom: invite.full_name || t("club.athlete") })}</p>
+          <p className="pt-1 text-xs font-semibold text-emerald-700 first-letter:uppercase">{dd("suivreCarte", { nom: invite.full_name || t("club.athlete") })}</p>
           <Ligne a={invite} onToggle={toggleInvite} />
         </div>
       )}
@@ -274,7 +274,7 @@ export function AjouterAmis({ moi, suivre, onFollowChange }: {
       {q ? (
         /* La recherche prend la main sur l'onglet, quel qu'il soit. */
         <div className="mt-3">
-          <p className="px-1 pb-1 text-[11px] font-bold uppercase tracking-wide text-zinc-500">{d.resultats}</p>
+          <p className="px-1 pb-1 text-[11px] font-semibold text-zinc-500 first-letter:uppercase">{d.resultats}</p>
           {athletes === null ? <Squelette /> : athletes.length === 0
             ? <p className="py-8 text-center text-sm text-zinc-400">{t("club.noMatch", { q })}</p>
             : <div className="divide-y divide-zinc-100">{athletes.map((a) => <Ligne key={a.id} a={a} onToggle={toggleListe} />)}</div>}
@@ -298,7 +298,7 @@ export function AjouterAmis({ moi, suivre, onFollowChange }: {
               {athletes === null ? <Squelette /> : athletes.length === 0
                 ? <p className="py-8 text-center text-sm text-zinc-400">{t("club.noSuggestion")}</p>
                 : <>
-                    <p className="px-1 pb-1 text-[11px] font-bold uppercase tracking-wide text-zinc-500">{t("club.suggestions")}</p>
+                    <p className="px-1 pb-1 text-[11px] font-semibold text-zinc-500 first-letter:uppercase">{t("club.suggestions")}</p>
                     <div className="divide-y divide-zinc-100">{athletes.map((a) => <Ligne key={a.id} a={a} onToggle={toggleListe} />)}</div>
                   </>}
               <Invitation />
@@ -366,7 +366,7 @@ function Contacts({ d, dd, Ligne, Invitation }: {
       <p className="mt-2 px-1 text-xs leading-relaxed text-zinc-500">{d.contactsExplique}</p>
       {bilan && (
         <div className="mt-4">
-          <p className="px-1 pb-1 text-[11px] font-bold uppercase tracking-wide text-zinc-500">{dd("contactsBilan", { n: bilan.soumis, m: bilan.athletes.length })}</p>
+          <p className="px-1 pb-1 text-[11px] font-semibold text-zinc-500 first-letter:uppercase">{dd("contactsBilan", { n: bilan.soumis, m: bilan.athletes.length })}</p>
           {bilan.athletes.length === 0
             ? <p className="py-6 text-center text-sm text-zinc-400">{d.contactsAucun}</p>
             : <div className="divide-y divide-zinc-100">{bilan.athletes.map((a) => <Ligne key={a.id} a={a} onToggle={toggle} />)}</div>}
@@ -386,9 +386,9 @@ function CodeQr({ moi, d, onScan, onPartager }: { moi: { id: string; nom: string
 
   return (
     <div className="mt-4">
-      <div className="mx-auto max-w-xs rounded-3xl border border-zinc-100 bg-white p-5 text-center shadow-sm">
+      <div className="mx-auto max-w-xs rounded-2xl border border-zinc-100 bg-white p-5 text-center shadow-sm">
         {lien ? <QrSvg texte={lien} /> : <div className="mx-auto h-48 w-48 animate-pulse rounded-xl bg-zinc-100" />}
-        <p className="mt-3 text-base font-bold text-zinc-900">{moi.nom || "Pacevo"}</p>
+        <p className="mt-3 text-base font-semibold text-zinc-900">{moi.nom || "Pacevo"}</p>
         <p className="mt-1 text-xs leading-relaxed text-zinc-500">{d.qrExplique}</p>
       </div>
       <div className="mx-auto mt-4 flex max-w-xs flex-col gap-2">
@@ -403,25 +403,6 @@ function CodeQr({ moi, d, onScan, onPartager }: { moi: { id: string; nom: string
       </div>
       {scan && origine && <Scanner origine={origine} d={d} onFermer={() => setScan(false)} onTrouve={(id) => { setScan(false); onScan(id); }} />}
     </div>
-  );
-}
-
-/**
- * Le QR code, rendu en <rect> React — pas en HTML injecté. Le contenu est un lien que
- * NOUS composons ; le rendre module par module ferme quand même la porte à toute
- * injection le jour où ce composant recevrait un texte venu d'ailleurs.
- */
-function QrSvg({ texte }: { texte: string }) {
-  const qr = qrcode(0, "M");
-  qr.addData(texte);
-  qr.make();
-  const n = qr.getModuleCount();
-  const cases: string[] = [];
-  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) cases.push(`M${c} ${r}h1v1h-1z`);
-  return (
-    <svg viewBox={`0 0 ${n} ${n}`} className="mx-auto h-48 w-48" shapeRendering="crispEdges" role="img" aria-label={texte}>
-      <path d={cases.join("")} fill="#18181b" />
-    </svg>
   );
 }
 

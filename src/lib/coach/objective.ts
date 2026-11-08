@@ -11,8 +11,60 @@ import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 export type ObjectiveInput = {
   /** Heure de départ « HH:MM », saisie par l'athlète. `null` s'il ne l'a pas donnée. */
-  heureDepart?: string | null; race: string; distanceKm: number; raceDate: string; targetSeconds: number };
-export type ObjectiveData = ObjectiveInput & { targetTime: string; targetPace: string; ts: string };
+  heureDepart?: string | null; race: string; distanceKm: number; raceDate: string; targetSeconds: number;
+  /** `false` : défi personnel, pas une course officielle (`lib/coach/prochaineCourse`). */
+  officielle?: boolean };
+/** Une course passée, gardée quand un nouvel objectif la remplace. */
+export type CoursePrecedente = { race: string; raceDate: string; distanceKm: number; officielle: boolean };
+export type ObjectiveData = ObjectiveInput & { targetTime: string; targetPace: string; ts: string; precedente?: CoursePrecedente | null;
+  /** Jour (AAAA-MM-JJ) où la préparation de CET objectif a commencé : l'anneau
+   *  « préparation » du tableau de bord part de là (`avancementObjectif`). */
+  depuis?: string };
+
+/**
+ * LE JOUR OÙ LA PRÉPARATION A COMMENCÉ.
+ *
+ * L'anneau « 56 % PRÉPARATION » supposait 16 semaines de préparation faute de date
+ * (Cyprien, 30/10/2026 : sub 16 fixé le jour même, déjà « à 56 % »). Corriger le chrono ou
+ * le nom d'un objectif ne remet pas sa préparation à zéro : la date de départ ne change
+ * qu'avec la course elle-même (sa date). Un objectif enregistré avant ce champ part de sa
+ * date d'enregistrement.
+ */
+export function debutPreparation(
+  ancien: { raceDate?: unknown; depuis?: unknown; ts?: unknown } | null | undefined,
+  raceDate: string,
+  aujourdhui: string,
+): string {
+  if (!ancien || String(ancien.raceDate ?? "") !== raceDate) return aujourdhui;
+  const connu = String(ancien.depuis ?? ancien.ts ?? "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(connu) && connu <= aujourdhui ? connu : aujourdhui;
+}
+
+/**
+ * LA COURSE QU'UN NOUVEL OBJECTIF REMPLACE N'EST PAS OUBLIÉE.
+ *
+ * `race_objective` est une ligne unique, écrasée à chaque enregistrement. Cas réel (Cyprien,
+ * 30/10/2026) : cinq jours après le marathon de Lille, il fixe son prochain objectif, un sub
+ * 16 min sur 5 km. Sans cette mémoire, la récupération d'après-marathon (`lib/coach/
+ * apresCourse`) disparaissait avec la ligne — le coach remettait de l'intensité à J+6 — et
+ * l'e-mail « tes résultats sont en ligne », attendu entre J+2 et J+10, ne partait jamais.
+ *
+ * L'ancien objectif devient la course précédente s'il est PASSÉ ; s'il est encore à venir
+ * (on corrige simplement son objectif), la course précédente qu'il portait est conservée.
+ * Ses lecteurs ont leur propre fenêtre (4 semaines au plus) : une vieille course s'ignore seule.
+ */
+export function coursePrecedente(
+  ancien: { race?: unknown; raceDate?: unknown; distanceKm?: unknown; officielle?: unknown; precedente?: CoursePrecedente | null } | null | undefined,
+  aujourdhui: string,
+): CoursePrecedente | null {
+  if (!ancien) return null;
+  const date = String(ancien.raceDate ?? "").slice(0, 10);
+  const km = Number(ancien.distanceKm);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date) && date < aujourdhui && String(ancien.race ?? "").trim() && km > 0) {
+    return { race: String(ancien.race).trim(), raceDate: date, distanceKm: km, officielle: ancien.officielle !== false };
+  }
+  return ancien.precedente ?? null;
+}
 
 export const fmtObjectiveTime = (s: number) => {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.round(s % 60);
@@ -37,6 +89,7 @@ export function predictTargetSeconds(distanceKm: number, vmaKmh: number): number
 //   3) déblocage du coach auto (`auto_coach_state`),
 //   4) régénération immédiate (best-effort) → re-push montre qui remplace l'ancienne.
 export async function setRaceObjective(admin: SupabaseClient, userId: string, input: ObjectiveInput): Promise<ObjectiveData> {
+  const today = aujourdhui(FUSEAU_DEFAUT);
   const data: ObjectiveData = {
     race: input.race, distanceKm: input.distanceKm, raceDate: input.raceDate, targetSeconds: input.targetSeconds,
     targetTime: fmtObjectiveTime(input.targetSeconds),
@@ -45,6 +98,9 @@ export async function setRaceObjective(admin: SupabaseClient, userId: string, in
     // alimentent le catalogue ne la publient pas (vérifié à la source) ; elle vit donc
     // ici, dans le JSON de l'objectif, et reste absente tant qu'il ne l'a pas donnée.
     heureDepart: input.heureDepart ?? null,
+    // Écrit dans les deux cas : un champ explicite se lit sans deviner. Les objectifs
+    // enregistrés avant l'option n'en ont pas, et restent officiels (`estOfficielle`).
+    officielle: input.officielle !== false,
     ts: new Date().toISOString(),
   };
 
@@ -59,8 +115,10 @@ export async function setRaceObjective(admin: SupabaseClient, userId: string, in
    * sortir aurait été une intervention en base.
    */
   const { data: existing, error: eLecture } = await admin.from("notifications")
-    .select("id").eq("user_id", userId).eq("type", "race_objective").maybeSingle();
+    .select("id, data").eq("user_id", userId).eq("type", "race_objective").maybeSingle();
   if (eLecture) throw new Error(`objectif illisible : ${eLecture.message}`);
+  data.precedente = coursePrecedente(existing?.data as Parameters<typeof coursePrecedente>[0], today);
+  data.depuis = debutPreparation(existing?.data as Parameters<typeof debutPreparation>[0], input.raceDate, today);
 
   const row = { title: "Objectif de course", body: `${data.race} · ${data.targetTime}`, read: true, data };
   // Et l'écriture elle-même : sans ce contrôle, la fonction rendait l'objectif à
@@ -73,7 +131,6 @@ export async function setRaceObjective(admin: SupabaseClient, userId: string, in
   if (eEcriture) throw new Error(`objectif non enregistré : ${eEcriture.message}`);
 
   try {
-    const today = aujourdhui(FUSEAU_DEFAUT);
     const { data: autoSessions } = await admin.from("notifications")
       .select("id, data").eq("user_id", userId).eq("type", "coach_session");
     const staleIds = (autoSessions ?? [])

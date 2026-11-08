@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CalendarDays, ClipboardList, MapPin, ShieldCheck, Mountain, Ghost,
-  GraduationCap, Heart, MessagesSquare, Watch, UserPlus, Newspaper, Trophy, Medal, ShoppingBag,
+  GraduationCap, Heart, MessagesSquare, Watch, UserPlus, Newspaper, Activity, Medal, ShoppingBag,
 } from "lucide-react";
 
 /**
@@ -42,11 +42,14 @@ export const NAV_GROUPES: Groupe[] = [
     // on y écrit d'abord à son coach (imprévus, douleurs, objectifs).
     titleKey: "group.tracking",
     items: [
-      // Vitrine, Segments, Carte de chaleur et Survol 3D partagent UNE entrée : ce
-      // sont quatre lectures du même sujet — ce que l'athlète a parcouru. Ils se
-      // choisissent par la rangée d'onglets en haut de page (comme l'onglet Santé),
-      // au lieu d'occuper quatre lignes de menu.
-      { href: "/dashboard/trophees", icon: Trophy, tk: "nav.performances" },
+      // Activités, Vitrine et Segments partagent UNE entrée : ce sont trois lectures du
+      // même sujet — ce que l'athlète a parcouru. Ils se choisissent par la rangée
+      // d'onglets en haut de page (comme l'onglet Santé), au lieu d'occuper trois lignes.
+      // ⚠️ L'ENTRÉE OUVRE LA LISTE DES SORTIES, PAS LA VITRINE. Elle menait aux trophées :
+      // Cyprien, 23/10/2026, ne trouvait pas sa sortie vélo du matin « dans mes
+      // activités » — elle y était, un onglet plus loin. « Mes activités » promet ses
+      // sorties ; les sœurs de l'entrée sont dans `SOEURS`, plus bas.
+      { href: "/dashboard/activites", icon: Activity, tk: "nav.performances" },
       { href: "/dashboard/health", icon: Heart, tk: "nav.health" },
       { href: "/dashboard/messages", icon: MessagesSquare, tk: "nav.messaging" },
     ],
@@ -99,6 +102,16 @@ export const ONGLETS_MOBILE = ["/dashboard", "/dashboard/trail", "/dashboard/gho
 export const resteMobile = (): Destination[] =>
   NAV_GROUPES.flatMap((g) => g.items).filter((d) => !(ONGLETS_MOBILE as readonly string[]).includes(d.href));
 
+/**
+ * Pages sans entrée de menu propre, rattachées à une entrée : les onglets frères et la
+ * fiche détail d'une séance. Sans elles, ouvrir l'onglet Vitrine ou une séance éteignait
+ * « Mes activités » dans le menu, et l'athlète ne savait plus où il se trouvait.
+ */
+export const SOEURS: Record<string, string[]> = {
+  "/dashboard/activites": ["/dashboard/activite", "/dashboard/survol", "/dashboard/trophees", "/dashboard/segments"],
+};
+
 /** Une destination est-elle « active » pour ce chemin ? (le tableau de bord exige l'égalité) */
 export const estActive = (pathname: string, href: string) =>
-  pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+  pathname === href || (href !== "/dashboard"
+    && [href, ...(SOEURS[href] ?? [])].some((h) => pathname === h || pathname.startsWith(h + "/")));

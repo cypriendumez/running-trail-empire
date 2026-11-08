@@ -13,11 +13,13 @@ import type { Acces } from "@/lib/billing/access";
  * déterministes, donc Essentiel ne coûte quasiment rien à servir ; Complet ajoute l'IA
  * qui parle, seule partie dont la dépense grandit avec le nombre d'athlètes.
  *
- * Remise annuelle : DEUX MOIS OFFERTS — douze mois d'accès pour dix payés, soit
- * −16,67 % exactement. On affiche « 2 mois offerts » partout plutôt qu'un pourcentage :
- * arrondir 16,67 à « −17 % » surestime la remise sur une promesse commerciale.
- * L'ancien « −33 % » (80 € contre 120 €)
- * bradait l'abonnement sans raison.
+ * Remise annuelle : DEUX MOIS OFFERTS sur Starter (99,90 €), QUATRE sur Premium (119,90 €,
+ * décision du 30/10/2026 — voir `lib/billing/prix`). On affiche des mois offerts, jamais un
+ * pourcentage : arrondir 16,67 à « −17 % » surestime la remise sur une promesse commerciale.
+ *
+ * ⚠️ UN PRIX STRIPE NE SE MODIFIE PAS : le tarif annuel Premium doit être CRÉÉ à 119,90 €
+ * et son identifiant posé dans STRIPE_PRICE_PREMIUM_YEARLY. Le paiement relit le montant
+ * chez Stripe et refuse de débiter un autre prix que celui affiché (`api/stripe/checkout`).
  */
 export const TARIFS = {
   starter: {
@@ -28,7 +30,7 @@ export const TARIFS = {
   premium: {
     acces: "premium" as Extract<Acces, "starter" | "premium">,
     mois:  { centimes: 1499, env: "STRIPE_PRICE_PREMIUM_MONTHLY" },
-    an:    { centimes: 14990, env: "STRIPE_PRICE_PREMIUM_YEARLY" },
+    an:    { centimes: 11990, env: "STRIPE_PRICE_PREMIUM_YEARLY" },
   },
 } as const;
 

@@ -16,12 +16,14 @@ import { useState } from "react";
  */
 export function AnalyseCoach({ workoutId, textes }: {
   workoutId: string;
-  textes: { titre: string; demander: string; encours: string; verrou: string; offre: string; echec: string; memorise: string; tronquee: string };
+  textes: { titre: string; demander: string; encours: string; verrou: string; offre: string; echec: string; memorise: string; tronquee: string; essentielle: string; essentielleCta: string };
 }) {
   const [etat, setEtat] = useState<"repos" | "encours" | "faite" | "verrou" | "echec">("repos");
   const [texte, setTexte] = useState("");
   const [memorise, setMemorise] = useState(false);
   const [tronquee, setTronquee] = useState(false);
+  // Faux quand le serveur a servi l'analyse ESSENTIELLE (Starter) : on dit ce que Premium y ajoute.
+  const [complete, setComplete] = useState(true);
   const [erreur, setErreur] = useState("");
 
   async function demander() {
@@ -36,14 +38,14 @@ export function AnalyseCoach({ workoutId, textes }: {
       if (r.status === 402) { setEtat("verrou"); return; }
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j?.texte) { setErreur(String(j?.error ?? "")); setEtat("echec"); return; }
-      setTexte(String(j.texte)); setMemorise(j.memorise === true); setTronquee(j.tronquee === true);
+      setTexte(String(j.texte)); setMemorise(j.memorise === true); setTronquee(j.tronquee === true); setComplete(j.complete !== false);
       setEtat("faite");
     } catch { setEtat("echec"); }
   }
 
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">{textes.titre}</h2>
+      <h2 className="mb-3 text-sm font-semibold text-zinc-500 first-letter:uppercase">{textes.titre}</h2>
 
       {etat === "repos" && (
         <button onClick={demander}
@@ -63,6 +65,13 @@ export function AnalyseCoach({ workoutId, textes }: {
               le dit — détecter sans rien en dire ne change rien pour l'athlète. */}
           {tronquee && <p className="text-xs text-amber-600">{textes.tronquee}</p>}
           {memorise && <p className="text-xs text-zinc-400">{textes.memorise}</p>}
+          {/* L'écart Starter / Premium, au moment où il se voit : sous l'analyse elle-même. */}
+          {!complete && (
+            <p className="text-xs leading-relaxed text-zinc-500">
+              {textes.essentielle}{" "}
+              <a href="/pricing" className="font-semibold text-emerald-700 underline-offset-2 hover:underline">{textes.essentielleCta}</a>
+            </p>
+          )}
         </div>
       )}
 

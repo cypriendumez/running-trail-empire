@@ -1,5 +1,6 @@
 "use client";
 
+import { ContactUrgence } from "./ContactUrgence";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,7 +33,7 @@ type TabKey = (typeof TABS)[number]["k"];
 function Card({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
-      <h2 className="text-base font-bold text-zinc-900">{title}</h2>
+      <h2 className="text-base font-semibold text-zinc-900">{title}</h2>
       {desc && <p className="mt-0.5 text-sm text-zinc-500">{desc}</p>}
       <div className="mt-4">{children}</div>
     </section>
@@ -115,7 +116,7 @@ function ToggleRow({ label, desc, on, onToggle }: { label: string; desc?: string
         {desc && <span className="mt-0.5 block text-xs text-zinc-400">{desc}</span>}
       </span>
       <span className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${on ? "bg-emerald-500" : "bg-zinc-300"}`}>
-        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${on ? "left-[22px]" : "left-0.5"}`} />
       </span>
     </button>
   );
@@ -126,6 +127,12 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
   const sb = createClient();
   const { t, lang, setLang } = useT();
   const [tab, setTab] = useState<TabKey>("profil");
+  // « Paramètres › Sécurité » s'ouvre directement depuis un lien (`?onglet=securite`) —
+  // l'enregistrement de sortie y renvoie quand aucun contact d'urgence n'est enregistré.
+  useEffect(() => {
+    const o = new URLSearchParams(window.location.search).get("onglet");
+    if (o && TABS.some((x) => x.k === o)) setTab(o as TabKey);
+  }, []);
 
   // ── Préférences serveur (couleur, unités, début de semaine) ──
   const [color, setColor] = useState(s(settings.avatarColor) || "emerald");
@@ -240,7 +247,7 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
       else toast.error("—");
     } catch { toast.error("—"); }
   };
-  const toggleSound = () => { const v = !sound; setSound(v); try { localStorage.setItem("rte:sound", v ? "on" : "off"); } catch { /* ignore */ } toast(v ? "🔊" : "🔇"); };
+  const toggleSound = () => { const v = !sound; setSound(v); try { localStorage.setItem("rte:sound", v ? "on" : "off"); } catch { /* ignore */ } toast(v ? "" : ""); };
 
   const signOut = async () => { await sb.auth.signOut(); router.push("/login"); };
 
@@ -258,7 +265,7 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
   return (
     <div className="mx-auto max-w-5xl">
       <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{t("set.title")}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">{t("set.title")}</h1>
         <p className="mt-1 text-sm text-zinc-500">{t("set.subtitle")}</p>
       </header>
 
@@ -282,7 +289,7 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
             <>
               <Card title={t("set.photo.title")} desc={t("set.photo.desc")}>
                 <div className="flex items-center gap-5">
-                  <span className="flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-2xl font-bold ring-4 ring-zinc-50" style={{ background: ac.bg, color: ac.fg }}>
+                  <span className="flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-2xl font-semibold ring-4 ring-zinc-50" style={{ background: ac.bg, color: ac.fg }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : (fullName.charAt(0).toUpperCase() || "?")}
                   </span>
@@ -299,14 +306,14 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
 
               <Card title={t("set.color.title")} desc={t("set.color.desc")}>
                 <div className="flex items-center gap-4">
-                  <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full text-xl font-bold ring-4 ring-zinc-50" style={{ background: ac.bg, color: ac.fg }}>{(fullName.charAt(0) || "?").toUpperCase()}</span>
+                  <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full text-xl font-semibold ring-4 ring-zinc-50" style={{ background: ac.bg, color: ac.fg }}>{(fullName.charAt(0) || "?").toUpperCase()}</span>
                   <div className="flex flex-wrap gap-2.5">
                     {AVATAR_COLORS.map((cc) => {
                       const active = cc.key === color;
                       return (
                         <button key={cc.key} title={cc.label} aria-label={cc.label}
                           onClick={() => { setColor(cc.key); saveSettings({ avatarColor: cc.key }, t("toast.color")); }}
-                          className={`flex h-9 w-9 items-center justify-center rounded-full transition-transform hover:scale-110 ${active ? "ring-2 ring-zinc-900 ring-offset-2" : ""}`}
+                          className={`flex h-9 w-9 items-center justify-center rounded-full transition-transform ${active ? "ring-2 ring-zinc-900 ring-offset-2" : ""}`}
                           style={{ background: cc.bg }}>
                           {active && <Check className="h-4 w-4" style={{ color: cc.fg }} />}
                         </button>
@@ -347,6 +354,10 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
                 </div>
               </Card>
 
+              {/* Le contact d'urgence a quitté Santé › Sécurité (30/09/2026) : il sert à
+                  l'enregistrement de sortie, sa place est avec la sécurité du compte. */}
+              <ContactUrgence initial={{ nom: s(settings.contactUrgenceNom), tel: s(settings.contactUrgenceTel) }} />
+
               <Card title={t("set.session")}>
                 <button onClick={signOut} className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-red-50 hover:text-red-600"><LogOut className="h-4 w-4" /> {t("set.logout")}</button>
               </Card>
@@ -384,7 +395,7 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
                     <span className={`flex h-10 w-10 items-center justify-center rounded-full ${sound ? "bg-emerald-100 text-emerald-600" : "bg-zinc-200 text-zinc-400"}`}>{sound ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</span>
                     <span className="text-sm font-semibold text-zinc-800">{t("set.sound.label")}</span>
                   </span>
-                  <span className={`relative h-6 w-11 rounded-full transition-colors ${sound ? "bg-emerald-500" : "bg-zinc-300"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${sound ? "left-[22px]" : "left-0.5"}`} /></span>
+                  <span className={`relative h-6 w-11 rounded-full transition-colors ${sound ? "bg-emerald-500" : "bg-zinc-300"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${sound ? "left-[22px]" : "left-0.5"}`} /></span>
                 </button>
               </Card>
             </>
@@ -441,7 +452,7 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
                 <div className="flex items-center gap-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-900 text-white"><Watch className="h-5 w-5" /></span>
                   <div>
-                    <div className="text-sm font-bold text-zinc-900">intervals.icu / Garmin</div>
+                    <div className="text-sm font-semibold text-zinc-900">intervals.icu / Garmin</div>
                     <div className={`text-xs font-semibold ${intervalsOn ? "text-emerald-600" : "text-zinc-400"}`}>{intervalsOn ? `● ${t("set.conn.connected")}` : `○ ${t("set.conn.disconnected")}`}</div>
                   </div>
                 </div>
@@ -453,10 +464,10 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
           {tab === "compte" && (
             <>
               <Card title={t("set.sub.title")}>
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 p-4 ring-1 ring-emerald-100">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
                   <div>
-                    <div className="text-xs font-bold uppercase tracking-wide text-emerald-700">{t("set.sub.current")}</div>
-                    <div className="text-lg font-bold capitalize text-zinc-900">{tier === "free" ? t("set.sub.free") : tier}</div>
+                    <div className="text-xs font-semibold text-emerald-700 first-letter:uppercase">{t("set.sub.current")}</div>
+                    <div className="text-lg font-semibold capitalize text-zinc-900">{tier === "free" ? t("set.sub.free") : tier}</div>
                   </div>
                   <CreditCard className="h-7 w-7 text-emerald-400" />
                 </div>
@@ -468,7 +479,7 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
                     <div className="flex-1">
-                      <div className="text-sm font-bold text-red-800">{t("set.danger.delete")}</div>
+                      <div className="text-sm font-semibold text-red-800">{t("set.danger.delete")}</div>
                       <p className="mt-0.5 text-xs text-red-600"><b>SUPPRIMER</b> {t("set.danger.confirm")}</p>
                       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                         <input value={delText} onChange={(e) => setDelText(e.target.value)} placeholder="SUPPRIMER" className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 sm:w-48" />

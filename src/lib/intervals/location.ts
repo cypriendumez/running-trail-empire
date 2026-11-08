@@ -6,6 +6,7 @@
 //  `data2` les longitudes (et non des paires [lat, lon] comme on s'y attendrait).
 // ─────────────────────────────────────────────────────────────────────────────
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { enteteIntervals } from "@/lib/intervals/auth";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -15,7 +16,7 @@ export async function activityStartPoint(
 ): Promise<{ lat: number; lon: number } | null> {
   try {
     const r = await fetch(`${BASE}/activity/${activityId}/streams?types=latlng`, {
-      headers: { Authorization: "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64") },
+      headers: { Authorization: enteteIntervals(apiKey) },
       signal: AbortSignal.timeout(15000),
     });
     if (!r.ok) return null;

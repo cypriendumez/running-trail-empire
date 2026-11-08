@@ -8,12 +8,17 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
+import { createClient } from "@supabase/supabase-js";
 import { TACHES, constater, pire, type Execution } from "../src/lib/cron/supervision";
 import { estErreurTransitoire } from "../src/lib/cron/transitoire";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
   try { fn(); passed++; console.log(`  OK ${nom}`); }
+  catch (e) { fails.push(`${nom} — ${(e as Error).message}`); console.log(`  ✗ ${nom}`); }
+}
+async function atest(nom: string, fn: () => Promise<void>) {
+  try { await fn(); passed++; console.log(`  OK ${nom}`); }
   catch (e) { fails.push(`${nom} — ${(e as Error).message}`); console.log(`  ✗ ${nom}`); }
 }
 
@@ -162,7 +167,8 @@ test("un workflow qui exécute du code installe ses dépendances", () => {
 test("un incident d'infra passager n'est pas confondu avec un refus de la base", () => {
   // Ces messages-là DISPARAISSENT au prochain essai : ils ne doivent pas faire rougir un cron.
   for (const m of ["Gateway Timeout", "fetch failed", "upstream request timeout",
-    "503 Service Unavailable", "504", "Bad Gateway", "Too Many Requests", "ETIMEDOUT", "network error"]) {
+    "503 Service Unavailable", "504", "Bad Gateway", "Too Many Requests", "ETIMEDOUT", "network error",
+    "502 Bad Gateway", "HTTP 503", "TypeError: fetch failed"]) {
     assert.ok(estErreurTransitoire(m), `« ${m} » devrait être vu comme passager`);
   }
   // Ceux-là PERSISTENT tant que le code n'est pas corrigé : ce sont de vrais refus, à signaler.
@@ -170,6 +176,46 @@ test("un incident d'infra passager n'est pas confondu avec un refus de la base",
     "duplicate key value violates unique constraint", "null value in column violates not-null", ""]) {
     assert.ok(!estErreurTransitoire(m), `« ${m} » ne doit PAS être classé passager (vrai refus masqué)`);
   }
+});
+
+test("un refus dont le texte CONTIENT 502, 503 ou 504 reste un refus", () => {
+  // ⚠️ MESURÉ LE 12/10/2026 : on cherchait « 502|503|504 » sans bornes de mot. La violation
+  // de NOT NULL s'écrit 23502, une valeur refusée peut s'écrire 1502.5 : les trois messages
+  // passaient pour une passerelle en panne, et la tâche restait verte sur un vrai refus.
+  for (const m of [
+    '23502 null value in column "hrv_ms" of relation "hrv_data" violates not-null constraint',
+    'invalid input syntax for type smallint: "1502.5"',
+    '22P02 invalid input syntax for type smallint: "1502.5"',
+  ]) {
+    assert.equal(estErreurTransitoire(m), false, `« ${m} » pris pour un incident passager`);
+  }
+});
+
+test("le statut HTTP et le code, quand l'appelant les a, tranchent avant le texte", () => {
+  // Un statut qui dit « réessaie » suffit, même quand le corps de la réponse est vide.
+  for (const s of [408, 429, 502, 503, 504]) {
+    assert.equal(estErreurTransitoire({ message: "" }, s), true, `un ${s} au corps vide doit être passager`);
+  }
+  // CONTRE-POIDS : sans quoi « tout statut est passager » passerait au vert. Une requête
+  // refusée (4xx) le sera encore au prochain essai ; un 500 sans code ne dit rien de plus.
+  for (const s of [400, 401, 404, 409, 500]) {
+    assert.equal(estErreurTransitoire({ message: "" }, s), false, `un ${s} pris pour un incident passager`);
+  }
+  // Le code de la base tranche : Postgres cite la valeur refusée entre guillemets, et
+  // « "503" » ressemble à un statut — c'est la limite assumée du texte seul.
+  assert.equal(estErreurTransitoire({ code: "22P02", message: 'invalid input value for enum race_type: "503"' }, 400), false,
+    "un refus de la base qui cite « \"503\" » pris pour un incident");
+  for (const code of ["P0001", "XX000", "HV00B", "F0000"]) {
+    assert.equal(estErreurTransitoire({ code, message: "too many races for this event" }), false,
+      `${code} n'est pas reconnu comme un code de la base : son texte a décidé`);
+  }
+  // Mais un statut passager passe avant le code : PostgREST rend PGRST003 (file d'attente
+  // du pool) en 504, une panne d'infrastructure, pas un refus.
+  assert.equal(estErreurTransitoire({ code: "PGRST003", message: "Timed out acquiring connection from connection pool." }, 504), true,
+    "PGRST003 en 504 pris pour un refus : le code a été lu avant le statut");
+  // Cinq majuscules ne font pas un code de la base, ni un code vide (coupure réseau).
+  assert.equal(estErreurTransitoire({ code: "EPIPE", message: "TypeError: fetch failed" }), true, "EPIPE pris pour un code SQL");
+  assert.equal(estErreurTransitoire({ code: "", message: "TypeError: fetch failed" }, 0), true, "une coupure réseau prise pour un refus");
 });
 
 test("races-types ne rougit que sur un VRAI refus, jamais sur un hoquet d'infra", () => {
@@ -180,8 +226,15 @@ test("races-types ne rougit que sur un VRAI refus, jamais sur un hoquet d'infra"
     .replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
   assert.ok(/estErreurTransitoire\(/.test(src), "la route ne distingue pas les erreurs passagères des vrais refus");
   // Un incident passager incrémente `transitoires`, pas `refusees` (qui seul pilote `ok`).
-  assert.ok(/estErreurTransitoire\(e\.message\)\)\s*\{\s*transitoires\+\+/.test(src),
+  assert.ok(/estErreurTransitoire\(e, statut\)\)\s*\{\s*transitoires\+\+/.test(src),
     "un incident passager doit compter dans `transitoires`, pas dans `refusees`");
+  // ⚠️ LE CLASSEMENT SE FAIT SUR L'ERREUR (son code) ET LE STATUT, JAMAIS SUR LE TEXTE SEUL :
+  // un refus qui cite « "503" » passerait pour un hoquet (12/10/2026).
+  assert.ok(/if \(e && estErreurTransitoire\(e, statut\)\)/.test(src), "le réessai se décide encore sur le texte seul");
+  assert.ok(!/estErreurTransitoire\([^)]*\.message/.test(src), "un appel classe encore l'erreur sur son seul message");
+  // Après le réessai, le statut doit suivre l'erreur : un 504 resté du premier essai ferait
+  // passer pour passager le refus rendu par le second.
+  assert.ok(/e = reessai\.error;\s*statut = reessai\.status;/.test(src), "le statut du premier essai survit au réessai");
   assert.ok(/ok:\s*refusees === 0/.test(src), "`ok` doit dépendre des refus réels (refusees), pas des incidents passagers");
   // Et on réessaie une fois avant d'abandonner une ligne sur un incident passager.
   assert.ok(/setTimeout\([^)]*\)[\s\S]{0,80}?insert\(ligneRace\)/.test(src),
@@ -220,5 +273,37 @@ test("le plan de la semaine : un skip PAR ATHLÈTE ne fait pas rougir le cron", 
   assert.ok(!wf.includes(`grep -q '"skipped"'`), "le workflow grepe encore le \"skipped\" générique — faux positif garanti");
 });
 
-console.log(`\n${passed} test(s) de supervision passé(s), ${fails.length} échec(s)`);
-if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }
+// Pas de `await` au sommet du fichier (tsx compile ce test en CJS) : le résumé attend la fin
+// des tests asynchrones, sans quoi il s'afficherait avant eux et leur échec ne compterait pas.
+void (async () => {
+  await atest("le vrai supabase-js rend le statut et le code là où on les lit", async () => {
+    // ⚠️ LE CLASSEMENT DÉPEND DE LA FORME QUE supabase-js DONNE À SES ÉCHECS : refus de
+    // PostgREST → code SQLSTATE et statut 400 ; passerelle → statut 50x sans code ; coupure
+    // réseau → statut 0 et code vide. Une mise à jour qui changerait cette forme fausserait
+    // le classement sans bruit : on la vérifie avec la vraie bibliothèque, réponse par réponse.
+    const classer = async (repondre: () => Response) => {
+      const sb = createClient("https://exemple.supabase.co", "cle-factice", {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { fetch: async () => repondre() },
+      });
+      const r = await sb.from("races").insert({ name: "Essai" });
+      assert.ok(r.error, "la réponse simulée aurait dû échouer");
+      return estErreurTransitoire(r.error, r.status);
+    };
+    const json = (status: number, corps: object) =>
+      new Response(JSON.stringify(corps), { status, headers: { "content-type": "application/json" } });
+    assert.equal(await classer(() => json(400, { code: "22P02", message: 'invalid input value for enum race_type: "503"', details: null, hint: null })),
+      false, "un refus de PostgREST qui cite « \"503\" » pris pour un incident");
+    assert.equal(await classer(() => json(400, { code: "23502", message: 'null value in column "name" of relation "races" violates not-null constraint', details: null, hint: null })),
+      false, "une violation de NOT NULL prise pour un incident");
+    assert.equal(await classer(() => json(502, { message: "An invalid response was received from the upstream server" })),
+      true, "un 502 de la passerelle, sans mot-clé dans le corps, pris pour un refus");
+    assert.equal(await classer(() => new Response("", { status: 503 })), true, "un 503 au corps vide pris pour un refus");
+    assert.equal(await classer(() => json(504, { code: "PGRST003", message: "Timed out acquiring connection from connection pool.", details: null, hint: null })),
+      true, "PGRST003 (504) pris pour un refus");
+    assert.equal(await classer(() => { throw new TypeError("fetch failed"); }), true, "une coupure réseau prise pour un refus");
+  });
+})().then(() => {
+  console.log(`\n${passed} test(s) de supervision passé(s), ${fails.length} échec(s)`);
+  if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }
+});

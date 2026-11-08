@@ -5,8 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Undo2, Redo2, Trash2, Download, Save, Loader2,
   ChevronDown, X, MapPin, Mountain, Search, Layers, Bookmark, Heart,
-  SlidersHorizontal, Gauge, Navigation, Share2
+  SlidersHorizontal, Gauge, Navigation, Share2, Lock
 } from "lucide-react";
+import Link from "next/link";
 import { IconeSport } from "@/components/parcours/IconeSport";
 import { chargerProfil, profilOsrm, type Profil } from "@/lib/trail/altitude";
 import { toast } from "sonner";
@@ -45,7 +46,7 @@ const FRANCE_BOUNDS: [[number, number], [number, number]] = [
 
 const LAYERS = {
   outdoor: {
-    label: "🌲 Plein air",
+    label: "Plein air",
     url: `https://api.maptiler.com/maps/outdoor-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
     attribution: "© MapTiler © OpenStreetMap",
     maxZoom: 20,
@@ -53,28 +54,28 @@ const LAYERS = {
     subdomains: false,
   },
   paths: {
-    label: "🥾 Chemins",
+    label: "Chemins",
     url: "https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png",
     attribution: "© CyclOSM · OpenStreetMap",
     maxZoom: 20,
     maxNativeZoom: 20,
   },
   topo: {
-    label: "🗺️ Topo",
+    label: "Topo",
     url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
     attribution: "© OpenTopoMap",
     maxZoom: 19,
     maxNativeZoom: 17,
   },
   street: {
-    label: "🏙️ Plan",
+    label: "Plan",
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: "© OpenStreetMap",
     maxZoom: 19,
     maxNativeZoom: 19,
   },
   satellite: {
-    label: "🛰️ Satellite",
+    label: "Satellite",
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     attribution: "© Esri World Imagery",
     maxZoom: 20,
@@ -102,22 +103,22 @@ interface FamousRoute {
   elevation: string;
 }
 const FAMOUS_ROUTES: FamousRoute[] = [
-  { name: "Tour du Mont-Blanc", region: "Chamonix · Alpes", emoji: "🏔", lat: 45.923, lng: 6.869, zoom: 11, distance: "170 km", elevation: "+10 000 m" },
-  { name: "GR20 Corse", region: "Calenzana → Conca", emoji: "🌲", lat: 42.300, lng: 9.050, zoom: 9, distance: "180 km", elevation: "+12 000 m" },
-  { name: "GR10 Pyrénées", region: "Hendaye → Banyuls", emoji: "⛰", lat: 42.800, lng: 0.700, zoom: 8, distance: "920 km", elevation: "+48 000 m" },
-  { name: "GR34 Sentier des Douaniers", region: "Côte de Bretagne", emoji: "🌊", lat: 48.600, lng: -3.900, zoom: 9, distance: "2 000 km", elevation: "vallonné" },
-  { name: "Calanques de Marseille", region: "Marseille → Cassis", emoji: "🏖", lat: 43.215, lng: 5.460, zoom: 13, distance: "20 km", elevation: "+900 m" },
-  { name: "Gorges du Verdon (GR4)", region: "Verdon · Provence", emoji: "🏞", lat: 43.750, lng: 6.330, zoom: 12, distance: "15 km", elevation: "+700 m" },
-  { name: "Mont Ventoux", region: "Bédoin · Vaucluse", emoji: "🚵", lat: 44.174, lng: 5.278, zoom: 12, distance: "21 km", elevation: "+1 600 m" },
-  { name: "Sentier du Littoral", region: "Côte d'Azur", emoji: "🌅", lat: 43.530, lng: 7.130, zoom: 12, distance: "variable", elevation: "plat" },
+  { name: "Tour du Mont-Blanc", region: "Chamonix · Alpes", emoji: "", lat: 45.923, lng: 6.869, zoom: 11, distance: "170 km", elevation: "+10 000 m" },
+  { name: "GR20 Corse", region: "Calenzana → Conca", emoji: "", lat: 42.300, lng: 9.050, zoom: 9, distance: "180 km", elevation: "+12 000 m" },
+  { name: "GR10 Pyrénées", region: "Hendaye → Banyuls", emoji: "", lat: 42.800, lng: 0.700, zoom: 8, distance: "920 km", elevation: "+48 000 m" },
+  { name: "GR34 Sentier des Douaniers", region: "Côte de Bretagne", emoji: "", lat: 48.600, lng: -3.900, zoom: 9, distance: "2 000 km", elevation: "vallonné" },
+  { name: "Calanques de Marseille", region: "Marseille → Cassis", emoji: "", lat: 43.215, lng: 5.460, zoom: 13, distance: "20 km", elevation: "+900 m" },
+  { name: "Gorges du Verdon (GR4)", region: "Verdon · Provence", emoji: "", lat: 43.750, lng: 6.330, zoom: 12, distance: "15 km", elevation: "+700 m" },
+  { name: "Mont Ventoux", region: "Bédoin · Vaucluse", emoji: "", lat: 44.174, lng: 5.278, zoom: 12, distance: "21 km", elevation: "+1 600 m" },
+  { name: "Sentier du Littoral", region: "Côte d'Azur", emoji: "", lat: 43.530, lng: 7.130, zoom: 12, distance: "variable", elevation: "plat" },
 ];
 
 // ─── Activity profiles (flat speed km/h + climb penalty min per +100 m) ───────
 const ACTIVITIES = {
-  course: { label: "Course", emoji: "🏃", flat: 11,  climb: 6,  primary: "pace"  },
-  marche: { label: "Marche", emoji: "🚶", flat: 4.8, climb: 10, primary: "speed" },
-  trail:  { label: "Trail",  emoji: "🥾", flat: 8.5, climb: 9,  primary: "pace"  },
-  velo:   { label: "Vélo",   emoji: "🚴", flat: 19,  climb: 3,  primary: "speed" },
+  course: { label: "Course", emoji: "", flat: 11,  climb: 6,  primary: "pace"  },
+  marche: { label: "Marche", emoji: "", flat: 4.8, climb: 10, primary: "speed" },
+  trail:  { label: "Trail",  emoji: "", flat: 8.5, climb: 9,  primary: "pace"  },
+  velo:   { label: "Vélo",   emoji: "", flat: 19,  climb: 3,  primary: "speed" },
 } as const;
 type ActivityKey = keyof typeof ACTIVITIES;
 
@@ -210,10 +211,13 @@ function speedRange(activity: ActivityKey): { min: number; max: number; step: nu
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 // ─── Component ───────────────────────────────────────────────────────────────
-export function TrailBuilder({ centre, onTrace }: {
+export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   centre?: { lat: number; lon: number } | null;
   /** Remonte la trace construite, pour que la vue relief l'affiche telle quelle. */
   onTrace?: (points: { lat: number; lon: number }[]) => void;
+  /** Droit d'exporter en GPX (formules payantes). FAUX par défaut : un oubli de
+   *  propriété ferme le bouton, il ne l'offre pas. */
+  exportGpx?: boolean;
 } = {}) {
   const { lang } = useT();
   const d = TB[lang] ?? TB.fr;
@@ -592,6 +596,7 @@ export function TrailBuilder({ centre, onTrace }: {
 
   // ── GPX export ────────────────────────────────────────────────────────────
   const handleExportGPX = useCallback(() => {
+    if (!exportGpx) return;
     if (!allPoints.length) { toast.error(d["t.drawFirst"]); return; }
     const name = routeName || d["defaultRouteName"];
     const gpx = buildGPX(name, allPoints, elevations);
@@ -603,7 +608,7 @@ export function TrailBuilder({ centre, onTrace }: {
     a.click();
     URL.revokeObjectURL(url);
     toast.success(d["t.gpxOk"]);
-  }, [allPoints, elevations, routeName, d]);
+  }, [allPoints, elevations, routeName, d, exportGpx]);
 
   // ── Save route ─────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
@@ -794,7 +799,7 @@ export function TrailBuilder({ centre, onTrace }: {
         map?.flyTo([lat, lng], zoom, { duration: 1.4 });
       });
       setShowTrails(true); // révèle les sentiers balisés autour du point
-      if (name) toast.success(`📍 ${name}`, { description: d["t.focusHint"] });
+      if (name) toast.success(`${name}`, { description: d["t.focusHint"] });
     }
   }, [mounted, handleLoadRoute]);
 
@@ -946,7 +951,7 @@ export function TrailBuilder({ centre, onTrace }: {
           (barre d'outils z-1000, Leaflet z-1000) passaient PAR-DESSUS le menu Profil et le
           panneau de notifications de l'entête (z-30/50) — vu sur téléphone le 21/09/2026.
           Isolées, elles ne se comparent plus qu'entre elles, à l'intérieur de la carte. */}
-      <div className="flex-1 relative isolate overflow-hidden border-y border-zinc-200 shadow-sm min-h-0 sm:rounded-3xl sm:border">
+      <div className="flex-1 relative isolate overflow-hidden border-y border-zinc-200 shadow-sm min-h-0 sm:rounded-2xl sm:border">
         <div
           ref={mapContainer}
           className="w-full h-full"
@@ -1004,7 +1009,7 @@ export function TrailBuilder({ centre, onTrace }: {
                     exit={{ opacity: 0, y: -6 }}
                     className="absolute top-full left-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-zinc-100 p-1.5 z-[1001]"
                   >
-                    <li className="px-2.5 py-1.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">
+                    <li className="px-2.5 py-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">
                       {d["selectType"]}
                     </li>
                     {(Object.entries(ACTIVITIES) as [ActivityKey, typeof ACTIVITIES[ActivityKey]][]).map(([key, cfg]) => (
@@ -1028,16 +1033,30 @@ export function TrailBuilder({ centre, onTrace }: {
 
             <span className="w-px h-6 bg-zinc-200" />
 
-            <button
-              type="button"
-              onClick={handleExportGPX}
-              disabled={!hasRoute}
-              aria-label={d["exportGpx"]}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-            >
-              <Download className="w-4 h-4" />
-              {d["exportGpx"]}
-            </button>
+            {/* Export GPX : formules payantes. Sans le droit, le bouton mène aux formules
+                au lieu de disparaître — l'athlète doit savoir que la fonction existe. */}
+            {exportGpx ? (
+              <button
+                type="button"
+                onClick={handleExportGPX}
+                disabled={!hasRoute}
+                aria-label={d["exportGpx"]}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              >
+                <Download className="w-4 h-4" />
+                {d["exportGpx"]}
+              </button>
+            ) : (
+              <Link
+                href="/pricing"
+                title={d["gpxVerrou"]}
+                aria-label={d["gpxVerrou"]}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-zinc-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              >
+                <Lock className="w-4 h-4" />
+                {d["exportGpx"]}
+              </Link>
+            )}
           </div>
 
           {/* Tools (la recherche de ville a été retirée — la recherche globale du haut s'en charge) */}
@@ -1062,7 +1081,7 @@ export function TrailBuilder({ centre, onTrace }: {
                   initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
                   className="w-full bg-white rounded-2xl shadow-xl border border-zinc-100 p-1.5"
                 >
-                  <div className="px-2 py-1.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">{d["tool.layers"]}</div>
+                  <div className="px-2 py-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["tool.layers"]}</div>
                   {(Object.entries(LAYERS) as [keyof typeof LAYERS, typeof LAYERS[keyof typeof LAYERS]][])
                     .filter(([key]) => key !== "outdoor" || MAPTILER_KEY)
                     .map(([key, cfg]) => (
@@ -1089,7 +1108,7 @@ export function TrailBuilder({ centre, onTrace }: {
                   initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
                   className="w-full bg-white rounded-2xl shadow-xl border border-zinc-100 p-2 max-h-[320px] overflow-auto"
                 >
-                  <div className="px-2 py-1.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">{d["famousTitle"]}</div>
+                  <div className="px-2 py-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["famousTitle"]}</div>
                   <div className="space-y-1">
                     {FAMOUS_ROUTES.map((r) => (
                       <button
@@ -1119,7 +1138,7 @@ export function TrailBuilder({ centre, onTrace }: {
                   initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
                   className="w-full bg-white rounded-2xl shadow-xl border border-zinc-100 p-3 max-h-[400px] overflow-auto"
                 >
-                  <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide mb-2">{d["save"]}</div>
+                  <div className="text-[11px] font-semibold text-zinc-400 mb-2 first-letter:uppercase">{d["save"]}</div>
                   <input
                     value={routeName}
                     onChange={e => setRouteName(e.target.value)}
@@ -1137,16 +1156,27 @@ export function TrailBuilder({ centre, onTrace }: {
                       {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                       {d["save"]}
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleExportGPX}
-                      disabled={!hasRoute}
-                      className="flex items-center justify-center gap-1.5 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-xs font-medium text-zinc-600 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                    >
-                      <Download className="w-3.5 h-3.5" /> GPX
-                    </button>
+                    {exportGpx ? (
+                      <button
+                        type="button"
+                        onClick={handleExportGPX}
+                        disabled={!hasRoute}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-xs font-medium text-zinc-600 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                      >
+                        <Download className="w-3.5 h-3.5" /> GPX
+                      </button>
+                    ) : (
+                      <Link
+                        href="/pricing"
+                        title={d["gpxVerrou"]}
+                        aria-label={d["gpxVerrou"]}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-xs font-medium text-zinc-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                      >
+                        <Lock className="w-3.5 h-3.5" /> GPX
+                      </Link>
+                    )}
                   </div>
-                  <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">{tb("myRoutes", { n: savedRoutes.length })}</div>
+                  <div className="text-[11px] font-semibold text-zinc-400 mb-1.5 first-letter:uppercase">{tb("myRoutes", { n: savedRoutes.length })}</div>
                   {loadingRoutes ? (
                     <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-zinc-400" /></div>
                   ) : savedRoutes.length === 0 ? (
@@ -1168,13 +1198,13 @@ export function TrailBuilder({ centre, onTrace }: {
                           <button type="button" onClick={() => handleToggleFavorite(r)}
                             aria-label={tb(r.is_favorite ? "unfavRoute" : "favRoute", { name: r.name })}
                             aria-pressed={!!r.is_favorite}
-                            className={`p-1 transition-all focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                            className={`p-1 transition focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                               r.is_favorite
                                 ? "text-rose-500 opacity-100"
                                 : "text-zinc-300 hover:text-rose-400 opacity-0 group-hover:opacity-100"}`}>
                             <Heart className="w-3.5 h-3.5" fill={r.is_favorite ? "currentColor" : "none"} />
                           </button>
-                          <button type="button" onClick={() => handleDeleteRoute(r.id)} aria-label={tb("delRoute", { name: r.name })} className="p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+                          <button type="button" onClick={() => handleDeleteRoute(r.id)} aria-label={tb("delRoute", { name: r.name })} className="p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -1228,7 +1258,7 @@ export function TrailBuilder({ centre, onTrace }: {
                     className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-white rounded-2xl shadow-xl border border-zinc-100 p-4"
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">
+                      <span className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">
                         {speedCfg.mode === "pace" ? d["paceTarget"] : d["speedTarget"]}
                       </span>
                       <button
@@ -1241,7 +1271,7 @@ export function TrailBuilder({ centre, onTrace }: {
                       </button>
                     </div>
                     <div className="text-center mb-2">
-                      <div className="text-3xl font-bold text-zinc-900 tabular-nums">
+                      <div className="text-3xl font-semibold text-zinc-900 tabular-nums">
                         {speedCfg.mode === "pace"
                           ? <>{formatPace(paceMinPerKm)}<span className="text-base font-semibold text-zinc-400"> /km</span></>
                           : <>{fmtNombre(speedKmh, lang, 1)}<span className="text-base font-semibold text-zinc-400"> km/h</span></>}
@@ -1316,7 +1346,7 @@ export function TrailBuilder({ centre, onTrace }: {
                 </span>
                 {navRemainingKm != null && (
                   <span className="text-sm text-zinc-700">
-                    <span className="font-bold">{fmtKm(navRemainingKm, lang, 1)}</span> {d["remaining"]}
+                    <span className="font-semibold">{fmtKm(navRemainingKm, lang, 1)}</span> {d["remaining"]}
                   </span>
                 )}
                 {navAccuracy != null && <span className="text-[11px] text-zinc-400">±{Math.round(navAccuracy)} m</span>}
@@ -1371,21 +1401,21 @@ export function TrailBuilder({ centre, onTrace }: {
             <div className="flex items-center gap-2">
               <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
                 <div className="min-w-0">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">{d["st.distance"]}</div>
-                  <div className="text-[15px] font-bold tabular-nums text-zinc-900">{fmtKm(distance, lang, 2)}</div>
+                  <div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">{d["st.distance"]}</div>
+                  <div className="text-[15px] font-semibold tabular-nums text-zinc-900">{fmtKm(distance, lang, 2)}</div>
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">D+</div>
+                  <div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">D+</div>
                   {/* ⚠️ « — » ET PAS « 0 m » quand l'altitude n'a pas pu être lue : un
                       parcours de montagne annoncé plat ferait partir quelqu'un sans
                       s'attendre à 800 m de dénivelé. */}
-                  <div className={`text-[15px] font-bold tabular-nums ${altitudeIndispo ? "text-amber-600" : "text-zinc-900"}`}>
+                  <div className={`text-[15px] font-semibold tabular-nums ${altitudeIndispo ? "text-amber-600" : "text-zinc-900"}`}>
                     {altitudeIndispo ? "—" : `${elevGain} m`}
                   </div>
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">{d["st.time"]}</div>
-                  <div className="text-[15px] font-bold tabular-nums text-zinc-900">{formatDuration(durationMin)}</div>
+                  <div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">{d["st.time"]}</div>
+                  <div className="text-[15px] font-semibold tabular-nums text-zinc-900">{formatDuration(durationMin)}</div>
                 </div>
               </div>
               <button type="button" onClick={handleUndo} disabled={!hasRoute} aria-label={d["undo"]}
@@ -1414,7 +1444,7 @@ export function TrailBuilder({ centre, onTrace }: {
             <div className="absolute inset-0 bg-zinc-900/40" onClick={() => setReglagesOuverts(false)} />
             <div className="absolute inset-x-0 bottom-0 max-h-[80%] overflow-y-auto rounded-t-3xl bg-white p-4 pb-6">
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-bold text-zinc-900">{d["reglages"]}</span>
+                <span className="text-sm font-semibold text-zinc-900">{d["reglages"]}</span>
                 <button type="button" onClick={() => setReglagesOuverts(false)} aria-label={d["fermer"]}
                   className="rounded-full p-1.5 text-zinc-500 active:bg-zinc-100"><X className="h-5 w-5" /></button>
               </div>
@@ -1424,7 +1454,7 @@ export function TrailBuilder({ centre, onTrace }: {
                 <LigneReglage label={d["tg.elev"]}><Toggle id="tg-elev-m" checked={showElevation} onChange={setShowElevation} label="" /></LigneReglage>
               </div>
               <div className="mt-4">
-                <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-400">{d["activite"]}</div>
+                <div className="mb-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["activite"]}</div>
                 <div className="grid grid-cols-4 gap-2">
                   {(Object.keys(ACTIVITIES) as ActivityKey[]).map((k) => (
                     <button key={k} type="button" onClick={() => setActivity(k)}
@@ -1470,7 +1500,7 @@ export function TrailBuilder({ centre, onTrace }: {
 function PillStat({ value, label, icon, manual }: { value: string; label: string; icon?: React.ReactNode; manual?: boolean }) {
   return (
     <div className="px-3 text-center min-w-[58px]">
-      <div className={`flex items-center justify-center gap-1 font-bold text-sm leading-tight whitespace-nowrap ${manual ? "text-emerald-600" : "text-zinc-900"}`}>
+      <div className={`flex items-center justify-center gap-1 font-semibold text-sm leading-tight whitespace-nowrap ${manual ? "text-emerald-600" : "text-zinc-900"}`}>
         {value}{icon && <span className="inline-flex">{icon}</span>}
       </div>
       <div className="text-[10px] text-zinc-400">{label}</div>
@@ -1509,7 +1539,7 @@ function ToolChip({ active, onClick, label, children }: { active: boolean; onCli
       aria-label={label}
       aria-pressed={active}
       title={label}
-      className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+      className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
         active ? "bg-zinc-900 text-white border-zinc-900" : "bg-white/95 text-zinc-700 border-zinc-100 hover:bg-zinc-100"
       }`}
     >
@@ -1527,7 +1557,7 @@ function EditBtn({ onClick, disabled, icon, label, danger }: { onClick: () => vo
       disabled={disabled}
       aria-label={label}
       title={label}
-      className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl text-[11px] font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+      className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl text-[11px] font-medium transition disabled:opacity-30 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
         danger ? "text-red-500 hover:bg-red-50" : "text-zinc-600 hover:bg-zinc-100"
       }`}
     >
@@ -1575,11 +1605,11 @@ function ElevationProfile({
   const label = d[`diff.${difficulty}`] ?? d["diff.black"];
 
   return (
-    <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm px-4 pt-3 pb-1">
+    <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-4 pt-3 pb-1">
       <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-zinc-800">{d["elevProfile"]}</span>
-          <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold text-white" style={{ backgroundColor: difficultyColor(difficulty) }}>{label}</span>
+          <span className="px-2 py-0.5 rounded-lg text-[11px] font-semibold text-white" style={{ backgroundColor: difficultyColor(difficulty) }}>{label}</span>
         </div>
         <div className="flex items-center gap-3 text-xs">
           <span className="font-semibold text-emerald-600">D+ {Math.round(gain)} m</span>

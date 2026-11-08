@@ -23,7 +23,7 @@ export async function GET() {
 
   const { data, error } = await sb
     .from("notifications")
-    .select("id, type, title, body, read, created_at")
+    .select("id, type, title, body, read, created_at, date:data->>date")
     .eq("user_id", user.id)
     // ⚠️ LISTE BLANCHE : la table est un fourre-tout (séances, ressenti, état du
     // coach, quotas…). Seules les NOUVELLES pour la personne passent. 60 lignes,

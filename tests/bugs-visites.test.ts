@@ -21,6 +21,7 @@ import {
 } from "../src/lib/visites/empreinte";
 import { agregerVisites, joursEntre, type LigneVisite } from "../src/lib/visites/agreger";
 import { appelSurveille, reponseAnormale } from "../src/components/ErrorReporter";
+import { erreurReseau } from "../src/lib/erreurs/reseau";
 import { INTERDITES } from "../src/lib/sauvegarde/tables";
 
 let passed = 0; const fails: string[] = [];
@@ -54,7 +55,8 @@ test("toute table écrite depuis le navigateur a une politique RLS dans les migr
   // Sentinelle de vivacité : `profiles` est écrit à l'inscription (plusieurs `.update`).
   // Si le motif ne le trouve plus, c'est lui qui est cassé, pas le code.
   assert.ok(ecrites.has("profiles"), "l'inscription n'écrit plus le profil depuis le navigateur : le test ne surveille plus le bon endroit");
-  assert.ok(ecrites.size >= 5, `seulement ${ecrites.size} table(s) écrite(s) trouvée(s) : le motif ne trouve plus le code`);
+  // 4 depuis le 30/09/2026 : le Smart Journal (seul écrivain de `journal_entries`) a été retiré.
+  assert.ok(ecrites.size >= 4, `seulement ${ecrites.size} table(s) écrite(s) trouvée(s) : le motif ne trouve plus le code`);
   // ⚠️ ET LA VMA NE DOIT PLUS S'ÉCRIRE DEPUIS LE NAVIGATEUR. Le test 6 min se mesure via
   // /api/vma (client de service, hors périmètre RLS) ; réintroduire une insertion
   // `performance_baselines` dans l'inscription ferait revenir le 42501 de 100 % des inscrits.
@@ -121,8 +123,40 @@ test("le bruit technique est masqué par défaut, jamais perdu — et un vrai bu
   // ⚠️ Une VRAIE erreur de prod avec un fichier n'est PAS du bruit — même si c'est « Script error. »
   //    ailleurs : c'est l'absence de fichier (cross-origin) qui la rend opaque, pas le message.
   assert.equal(estBruitDeDev({ url: "https://pacevo.fr/dashboard", message: "Script error.", meta: { file: "app.js", line: 12 } }), false, "une Script error AVEC fichier reste actionnable");
+  // 07/11/2026 : une violation CSP signée par une extension du visiteur n'est pas un défaut de Pacevo.
+  const ext = JSON.stringify({ "csp-report": { "document-uri": "https://pacevo.fr/courses/x", "blocked-uri": "https://joko.s3.amazonaws.com/a.png", "source-file": "safari-web-extension://1F/c.js" } });
+  assert.equal(estBruitDeDev({ url: "https://pacevo.fr/courses/x", message: "CSP report-only — img-src ← https://joko.s3.amazonaws.com/a.png", meta: { extrait: ext } }), true, "une extension du visiteur compte de nouveau comme un défaut");
+  const notre = JSON.stringify({ "csp-report": { "document-uri": "https://pacevo.fr/dashboard/actualite", "blocked-uri": "https://icons.duckduckgo.com/a.ico", "source-file": "https://pacevo.fr/_next/static/chunks/a.js" } });
+  assert.equal(estBruitDeDev({ url: "https://pacevo.fr/dashboard/actualite", message: "CSP report-only — img-src ← x", meta: { extrait: notre } }), false, "une violation de NOTRE code est masquée");
   assert.equal(estBruitDeDev({ url: "https://pacevo.fr/dashboard", message: "TypeError: x is not a function" }), false, "un vrai bug de prod ne doit pas être masqué");
   assert.equal(normaliserMessage("Minified React error #418; visit https://react.dev/errors/418?args[]=text"), "Minified React error #<n>; visit <url>");
+});
+
+test("une ligne écrite par le SERVEUR n'est pas un scan : le panneau la montre", () => {
+  // ⚠️ CONSTATÉ LE 12/10/2026. « Une url qui n'est pas une adresse http est un scan » rangeait
+  // dans le bruit TOUT ce que le serveur journalise sous le nom de sa route ou de son module :
+  // e-mails refusés (« /api/auth/confirmation », « lib/notify/planReady »), repli
+  // d'enregistrement (« /api/workouts/log »), refus d'écriture de la synchro. Masqué par
+  // défaut — précisément ce que ce panneau existe pour montrer.
+  for (const url of ["/api/webhooks/intervals", "/api/cron/sync-all", "/api/auth/confirmation", "/api/workouts/log", "lib/notify/planReady"]) {
+    assert.equal(estBruitDeDev({ url, message: "Écriture refusée à la synchro (VFC) : 23502 null value", user_agent: null, meta: null }), false,
+      `${url} : une ligne du serveur est masquée comme un scan`);
+  }
+  // CONTRE-POIDS : le scan reste du bruit — avec son agent, et sans agent du tout.
+  assert.equal(estBruitDeDev({ url: "u", message: "x", user_agent: "curl/8.6.0", meta: null }), true, "le scan au curl n'est plus masqué");
+  assert.equal(estBruitDeDev({ url: "u", message: "x", user_agent: null, meta: null }), true, "une url quelconque sans agent n'est plus masquée");
+  assert.equal(estBruitDeDev({ url: "api/x", message: "x", user_agent: null, meta: null }), true, "« api/… » sans barre initiale n'est pas une route");
+
+  // Deux passages, deux jours, deux canaux, UNE cause : un seul défaut, ses deux routes listées.
+  const synchro = (p: Partial<LigneErreur>) => ligne({ source: "synchro", user_id: "u1",
+    message: "Écriture refusée à la synchro (VFC) : 23502 null value in column \"hrv_ms\" of relation \"hrv_data\" violates not-null constraint", ...p });
+  const g = regrouperErreurs([
+    synchro({ url: "/api/cron/sync-all", created_at: "2026-10-11T07:37:00Z", meta: { refus: ["VFC du 2026-10-10 : 23502 …"] } }),
+    synchro({ url: "/api/webhooks/intervals", created_at: "2026-10-12T18:40:00Z", meta: { refus: ["VFC du 2026-10-11 : 23502 …"] } }),
+  ]);
+  assert.equal(g.length, 1, "la même cause, deux jours différents, doit faire UN défaut");
+  assert.equal(g[0].occurrences, 2);
+  assert.deepEqual(g[0].pages.map((p) => p.url).sort(), ["/api/cron/sync-all", "/api/webhooks/intervals"]);
 });
 
 test("le faux positif intervals/sync est corrigé : « pas de montre » n'est plus un 503", () => {
@@ -174,6 +208,9 @@ test("les chemins sont repliés sur leur gabarit, et chaque route dynamique en a
   assert.equal(normaliserChemin("/_next/static/x.js"), null);
   assert.equal(normaliserChemin("sans-slash"), null);
   assert.equal(normaliserChemin("/x/a3793412-17b7-4af3-821f-230b36e8c4a4"), "/x/[id]");
+  // Les neuf fiches d'indicateurs gardent chacune leur ligne : savoir QUELLE carte on ouvre.
+  assert.equal(normaliserChemin("/dashboard/indicateurs/acwr"), "/dashboard/indicateurs/acwr");
+  assert.equal(normaliserChemin("/dashboard/indicateurs/zones?x=1"), "/dashboard/indicateurs/zones");
   // Chaque dossier `[param]` de src/app (hors API) doit être couvert : sinon 17 000 courses
   // feraient 17 000 lignes distinctes dans « pages les plus vues ».
   const dynamiques = fichiers("src/app", /^page\.tsx$/)
@@ -260,6 +297,35 @@ test("seuls les appels qui révèlent un bug sont journalisés — jamais les ba
   assert.equal(reponseAnormale("api", 500), true);
   assert.equal(reponseAnormale("supabase", 403), true, "le 42501 de l'inscription arrive en 403 : c'est LE cas à voir");
   assert.equal(reponseAnormale("supabase", 201), false);
+  // 07/11/2026 : une route introuvable ou une requête mal formée par NOTRE page est un bug.
+  for (const st of [400, 404, 405, 413, 415]) assert.equal(reponseAnormale("api", st), true, `une ${st} de nos routes n'est pas journalisée`);
+  for (const st of [401, 402, 403, 409, 422, 429]) assert.equal(reponseAnormale("api", st), false, `une ${st} est une réponse attendue`);
+});
+
+test("un bouton qui échoue remonte dans Bugs : message d'erreur affiché, bouton cliqué, sans rien changer à l'affichage", () => {
+  const src = codeNu("src/components/ErrorReporter.tsx");
+  assert.match(src, /toast\.error = toastEnveloppe/, "les messages d'erreur affichés ne remontent plus dans l'onglet Bugs");
+  assert.match(src, /return \(toastErreur as [\s\S]{0,80}?\)\(message, data\);/, "l'enveloppe n'affiche plus le message d'origine");
+  assert.match(src, /if \(toast\.error === toastEnveloppe\) toast\.error = toastErreur/, "l'enveloppe des messages ne se retire plus");
+  assert.match(src, /meta: \{ \.\.\.meta, clic: clicRecent\(\) \}/, "le bouton cliqué n'accompagne plus les rapports");
+  assert.match(src, /closest\?\.\('button, \[role="button"\], input\[type="submit"\], input\[type="button"\]'\)/, "le libellé est de nouveau lu sur les liens (noms de séance, de personne)");
+  const panel = codeNu("src/components/admin/BugsPanel.tsx");
+  assert.match(panel, /"bouton": "clic en échec"/);
+  assert.match(panel, /"reseau": "coupure réseau"/);
+  assert.match(panel, /Bouton cliqué/);
+});
+
+test("une coupure réseau n'est pas un écran planté : rangée à part, et la page se relève seule", () => {
+  for (const m of ["network error", "Failed to fetch", "Load failed", "NetworkError when attempting to fetch resource.", "Loading chunk 123 failed.", "fetch failed"])
+    assert.equal(erreurReseau(new TypeError(m)), true, m);
+  assert.equal(erreurReseau({ name: "ChunkLoadError", message: "x" }), true);
+  for (const m of ["hrvDansNorme is not defined", "Cannot read properties of undefined (reading 'node')", "Minified React error #418"])
+    assert.equal(erreurReseau(new Error(m)), false, m);
+  assert.equal(erreurReseau(null), false);
+  const ecran = codeNu("src/app/dashboard/error.tsx");
+  assert.match(ecran, /source: reseau \? "reseau" : "client-render"/, "une coupure réseau est de nouveau classée « écran planté »");
+  assert.match(ecran, /window\.addEventListener\("online", auRetour\)/, "la page ne se relève plus au retour du réseau");
+  assert.match(ecran, /router\.refresh\(\); reset\(\);/, "« Réessayer » ne redemande plus la page au serveur");
 });
 
 test("ErrorReporter enveloppe fetch, n'envoie jamais le corps de la requête, et se retire", () => {
@@ -275,6 +341,25 @@ test("l'inscription journalise ses échecs d'enregistrement, avec la source « o
   const src = codeNu("src/app/onboarding/page.tsx");
   assert.ok(/if \(profileError \|\| echecs\.length\) \{[\s\S]{0,900}fetch\("\/api\/log-error"[\s\S]{0,400}source: "onboarding"/.test(src),
     "l'échec de sauvegarde n'est plus envoyé au journal (ou plus avec la source onboarding)");
+});
+
+test("l'inscription ENREGISTRE par les deux chemins, et aucune écriture n'est muette (11/10/2026)", () => {
+  // ⚠️ Relevé le 11/10/2026 : après « connecter ma montre », le dernier bouton appelait
+  // `next` — écran « Terminé » sans AUCUNE écriture (profil, santé, jours, onboarding non
+  // terminé) : l'athlète perdait toutes ses réponses et retombait sur le questionnaire.
+  const src = codeNu("src/app/onboarding/page.tsx");
+  const appels = src.match(/onClick=\{handleFinish\}/g) ?? [];
+  assert.ok(appels.length >= 2, `handleFinish n'est appelé que par ${appels.length} bouton(s) : le chemin « montre » ne sauvegarde plus`);
+  assert.ok(!/onClick=\{next\}[^<]*>\s*\{[^}]*w3Configure/.test(src), "le bouton final du chemin montre repasse par `next` (aucune sauvegarde)");
+  // La 2ᵉ écriture (ancienneté, dénivelé, santé) n'est plus muette.
+  assert.ok(/const \{ error: eContexte \} = await supabase\.from\("profiles"\)\.update\(\{\s*warmup_min/.test(src), "l'écriture du contexte et de la santé n'est plus lue");
+  assert.ok(/noter\(eContexte, /.test(src), "l'échec de l'écriture du contexte n'entre pas dans les échecs signalés");
+  // Les FC facultatives : un échec va au journal, pas seulement à la console.
+  assert.ok(/if \(eFc\) \{[\s\S]{0,500}fetch\("\/api\/log-error"/.test(src), "l'échec des FC déclarées ne va plus au journal");
+  // « Retour » à CHAQUE étape après la première, dont l'étape Montre (refonte du 11/10/2026 :
+  // il vit dans la barre d'actions fixe, commune aux quatre étapes).
+  assert.ok(/\{stepIdx > 0 \? \([\s\S]{0,160}onClick=\{prev\}/.test(src), "la barre d'actions n'a plus de bouton Retour");
+  assert.ok(!/step !== "watch" && stepIdx > 0/.test(src), "le bouton Retour est retiré de l'étape Montre");
 });
 
 // ── 6. La mesure d'audience : ce qui entre en base, et ce qui n'y entre jamais ──

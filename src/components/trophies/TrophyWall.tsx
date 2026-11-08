@@ -46,15 +46,15 @@ function Card({ t }: { t: Trophy }) {
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <Icon className={`h-4 w-4 shrink-0 ${style?.icone ?? "text-emerald-600"}`} strokeWidth={2.2} aria-hidden="true" />
-            <span className="truncate text-xs font-semibold uppercase tracking-wide text-zinc-600">{t.label}</span>
+            <span className="truncate text-xs font-semibold text-zinc-600 first-letter:uppercase">{t.label}</span>
           </div>
           {t.tier && (
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${style?.puce}`}>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${style?.puce} first-letter:uppercase`}>
               {t.tier}
             </span>
           )}
         </div>
-        <div className="mt-2 text-2xl font-black leading-none tracking-tight text-zinc-900">{t.value}</div>
+        <div className="mt-2 text-2xl font-semibold leading-none tracking-tight text-zinc-900">{t.value}</div>
         {/* La preuve. Sans elle, le chiffre au-dessus n'est qu'une affirmation — et en
             zinc-400 elle n'était pas lisible, ce qui revenait à ne pas l'afficher. */}
         {t.detail && <div className="mt-1.5 text-xs text-zinc-500">{t.detail}</div>}
@@ -84,7 +84,7 @@ export function TrophyWall({ trophies, textes }: { trophies: Trophy[]; textes: T
         return (
           <section key={s.titre}>
             <div className="mb-3 flex items-baseline gap-3 border-b border-zinc-200 pb-2">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-900">{s.titre}</h2>
+              <h2 className="text-sm font-semibold text-zinc-900 first-letter:uppercase">{s.titre}</h2>
               <p className="truncate text-xs text-zinc-500">{s.sous}</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

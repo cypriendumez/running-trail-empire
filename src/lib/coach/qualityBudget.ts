@@ -83,6 +83,13 @@ export type QualityBudgetInput = {
   hasObjective: boolean;
   daysToRace: number | null;
   isShortGoal: boolean;
+  /** Récupération après une course courue (`lib/coach/apresCourse`), ou `null` : le motif,
+   *  en français, et si la reprise tombe dans les sept jours du plan. Sans reprise dans la
+   *  semaine, aucune qualité ; avec, une seule au plus. */
+  apresCourse?: { motif: string; reprise: boolean } | null;
+  /** Programme marche-course en cours (`lib/coach/marcheCourse`) : aucune qualité, quel que
+   *  soit le plancher. Son motif s'affiche à part — c'est un cadre, pas un allègement. */
+  marcheCourse?: boolean;
 };
 
 export type QualityBudget = {
@@ -235,6 +242,19 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   // Un athlète en obésité de classe II avec un objectif chrono déclencherait sinon le
   // plancher : du fractionné sur des articulations qui encaissent près de 300 kg par appui.
   if (i.weightLossMaxQuality != null) qBudget = Math.min(qBudget, i.weightLossMaxQuality);
+
+  // APRÈS UNE COURSE : aucune intensité avant la reprise, puis UNE séance au plus jusqu'à la
+  // fin de la récupération, quel que soit le plancher. Placé en DERNIER pour la même raison
+  // que le plafond ci-dessus — un athlète frais à J+5 de son marathon déclencherait sinon
+  // le plancher « jamais zéro qualité » et repartirait au fractionné. La reprise ne relève
+  // rien : un budget déjà à zéro (VFC, douleur) y reste.
+  if (i.apresCourse) {
+    qBudget = i.apresCourse.reprise ? Math.min(qBudget, 1) : 0;
+    easeReasons.push(i.apresCourse.motif);
+  }
+  // MARCHE-COURSE : qui ne court pas encore 30 minutes d'affilée n'a rien à faire d'une
+  // séance de VMA ou de seuil. En dernier, comme la récupération : aucun plancher ne la relève.
+  if (i.marcheCourse) qBudget = 0;
 
   return {
     // Le français sort du MÊME gabarit que les autres langues : les deux ne peuvent

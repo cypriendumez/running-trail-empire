@@ -42,17 +42,17 @@ export function CoursFlashcards({ ui }: { ui: CoursUI["flash"] }) {
   const reset = () => { save([]); setRevealed(false); };
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-50"><Layers className="h-5 w-5 text-violet-600" /></span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200/80 bg-white"><Layers className="h-[18px] w-[18px] text-zinc-500" strokeWidth={1.5} /></span>
           <div>
-            <h3 className="font-bold leading-tight text-zinc-900">{ui.title}</h3>
+            <h3 className="font-semibold leading-tight text-zinc-900">{ui.title}</h3>
             <p className="text-[13px] text-zinc-500">{ui.sub}</p>
           </div>
         </div>
         {deck.length > 0 && (
-          <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold tabular-nums text-violet-700">{fill(ui.remaining, { n: deck.length })}</span>
+          <span className="px-1 text-xs tabular-nums text-zinc-500">{fill(ui.remaining, { n: deck.length })}</span>
         )}
       </div>
 
@@ -62,13 +62,13 @@ export function CoursFlashcards({ ui }: { ui: CoursUI["flash"] }) {
         ) : (
           <>
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-400">
-                <a href={`#${card.anchor}`} className="hover:text-violet-600">{card.chapitre}</a>
+              <p className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">
+                <a href={`#${card.anchor}`} className="hover:text-zinc-900">{card.chapitre}</a>
               </p>
               <p className="mt-1.5 font-semibold text-zinc-900">{card.q}</p>
               {revealed && (
-                <div className="mt-3 rounded-xl bg-white p-4 ring-1 ring-violet-100">
-                  <p className="font-semibold text-violet-800">{card.a}</p>
+                <div className="mt-3 rounded-xl bg-white p-4 ring-1 ring-zinc-200">
+                  <p className="font-semibold text-zinc-900">{card.a}</p>
                   <p className="mt-1 text-sm leading-relaxed text-zinc-600">{card.explain}</p>
                 </div>
               )}

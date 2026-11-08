@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { UA_PACEVOBOT } from "@/lib/races/robot";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { denyIfNotAdmin } from "@/lib/api/adminGuard";
@@ -17,7 +18,7 @@ async function nominatim(city: string, dept: string): Promise<{ lat: number; lon
     try {
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=fr`;
       const resp = await fetch(url, {
-        headers: { "User-Agent": "RunningTrailEmpire/1.0 contact@running-empire.fr" },
+        headers: { "User-Agent": UA_PACEVOBOT },
         signal: AbortSignal.timeout(8000),
       });
       if (!resp.ok) continue;

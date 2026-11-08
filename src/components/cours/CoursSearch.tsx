@@ -31,7 +31,7 @@ export function CoursSearch({ items, placeholder, emptyText }: { items: SearchIt
 
   return (
     <div ref={boxRef} className="relative">
-      <div className="flex items-center gap-2.5 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm transition-all focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-100">
+      <div className="flex items-center gap-2.5 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-100">
         <Search className="h-4 w-4 flex-shrink-0 text-zinc-400" />
         <input
           value={q}

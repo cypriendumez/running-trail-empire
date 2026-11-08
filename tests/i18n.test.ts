@@ -115,6 +115,10 @@ function chainesVisibles(code: string): string[] {
  * assumé, et à pousser un jour quelqu'un à « corriger » une mention légale.
  */
 const HORS_TRADUCTION: Record<string, string> = {
+  // Le libellé d'une ligne du JOURNAL d'erreurs (ErrorReporter → onglet Bugs de /admin, lu par
+  // Cyprien en français). Il n'est jamais affiché à l'athlète : le message qu'il voit, lui,
+  // est celui du `toast.error` d'origine, déjà traduit, que l'enveloppe laisse intact.
+  "Échec affiché :": "libellé du journal d'erreurs (onglet Bugs de l'admin), jamais affiché à l'athlète",
   // L'image de partage social : une seule image, statique, déclarée locale fr_FR dans les
   // métadonnées. Ses chaînes suivent le slogan de la landing et changent avec lui — c'est
   // normal qu'il faille les mettre à jour ici quand le slogan bouge, et c'est même le but :

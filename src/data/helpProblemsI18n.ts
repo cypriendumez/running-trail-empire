@@ -19,6 +19,7 @@
  */
 export const PROBLEM_KEYS: Record<string, string[]> = {
   "Mes séances n'arrivent pas sur ma montre": ["montre", "garmin", "watch", "uhr", "reloj", "relogio", "envoi", "recoit", "pousse", "synchro", "synchronisation", "synchroniser", "sync", "bluetooth", "connect", "arrivent", "recu"],
+  "Ma séance Apple Watch n'arrive pas dans l'app": ["apple", "iphone", "companion", "sante", "health", "healthkit", "raccourcis", "raccourci", "automatisation", "automatiser", "shortcuts", "automation", "kurzbefehle", "atajos", "atalhos"],
   "Mes activités n'apparaissent pas dans l'app": ["activites", "apparait", "apparaissent", "import", "importer", "synchro", "synchronisation", "synchroniser", "sync", "marche", "fonctionne", "intervals", "icu", "activities", "aktivitaten", "actividades", "atividades", "remontent"],
   "Le coach ne me donne aucune séance de fractionné": ["fractionne", "intervalles", "qualite", "intensite", "vma", "seuil", "intervals", "tempo", "series", "dur", "dure", "einheiten", "facile", "molles"],
   "Mon kilométrage me semble faux": ["kilometrage", "volume", "randonnee", "rando", "marche", "velo", "faux", "compte", "mileage", "hiking", "wandern", "senderismo", "caminhada", "totaux", "errone"],
@@ -38,11 +39,17 @@ export const PROBLEM_T: Record<string, Record<string, string>> = {
     es: "Tres causas posibles: (1) la sincronización Garmin pasa por el Bluetooth de tu teléfono — abre Garmin Connect con el reloj cerca; (2) solo se envían los 5 primeros días del plan; (3) tus credenciales de intervals.icu faltan o han caducado — revísalas en Sincronizar reloj.",
     pt: "Três causas possíveis: (1) a sincronização Garmin passa pelo Bluetooth do telemóvel — abre o Garmin Connect com o relógio por perto; (2) só os 5 primeiros dias do plano são enviados; (3) as tuas credenciais intervals.icu faltam ou expiraram — verifica em Sincronizar relógio.",
   },
+  "Ma séance Apple Watch n'arrive pas dans l'app": {
+    en: "It goes through the Intervals.icu Companion iPhone app, which can only read Health on an unlocked iPhone: open the app after your session, that's when it sends it. To stop thinking about it: Shortcuts app › Automation › + › “Apple Watch Workout” › “End” › “Run Immediately”, then the “Open App” action › Intervals.icu Companion. Also check, in the app's Apple Health tab, that sending workouts is turned on.",
+    de: "Sie läuft über die iPhone-App Intervals.icu Companion, die Health nur auf einem entsperrten iPhone lesen kann: Öffne die App nach deiner Einheit, dann schickt sie sie. Damit du nicht mehr daran denken musst: App Kurzbefehle › Automation › + › „Apple Watch-Training“ › „Ende“ › „Sofort ausführen“, dann die Aktion „App öffnen“ › Intervals.icu Companion. Prüfe auch im Tab Apple Health der App, dass das Senden der Trainings eingeschaltet ist.",
+    es: "Pasa por la app de iPhone Intervals.icu Companion, que solo puede leer Salud con el iPhone desbloqueado: abre la app después de la sesión, es entonces cuando la envía. Para no tener que acordarte: app Atajos › Automatización › + › «Entreno con el Apple Watch» › «Fin» › «Ejecutar inmediatamente», y luego la acción «Abrir app» › Intervals.icu Companion. Comprueba también, en la pestaña Apple Health de la app, que el envío de entrenamientos esté activado.",
+    pt: "Passa pela app de iPhone Intervals.icu Companion, que só consegue ler a app Saúde com o iPhone desbloqueado: abre a app depois da sessão, é nesse momento que a envia. Para não teres de te lembrar: app Atalhos › Automatização › + › «Treino com o Apple Watch» › «Fim» › «Executar imediatamente», e depois a ação «Abrir app» › Intervals.icu Companion. Verifica também, no separador Apple Health da app, que o envio de treinos está ativado.",
+  },
   "Mes activités n'apparaissent pas dans l'app": {
-    en: "Imports go through intervals.icu. In Watch Sync, check that your athlete ID and API key are filled in and still valid. If you regenerated the key on intervals.icu, you must re-enter it here.",
-    de: "Der Import läuft über intervals.icu. Prüfe unter Uhr-Sync, ob Athleten-ID und API-Schlüssel eingetragen und noch gültig sind. Wenn du den Schlüssel neu erzeugt hast, musst du ihn hier erneut eingeben.",
-    es: "La importación pasa por intervals.icu. Comprueba en Sincronizar reloj que tu identificador de atleta y tu clave API estén rellenados y sigan siendo válidos. Si regeneraste la clave, vuelve a introducirla aquí.",
-    pt: "A importação passa pelo intervals.icu. Verifica em Sincronizar relógio que o teu ID de atleta e a chave API estão preenchidos e válidos. Se regeraste a chave, tens de a introduzir novamente aqui.",
+    en: "Imports go through intervals.icu. In Watch Sync, check that your API key is filled in and still valid. If you regenerated the key on intervals.icu, you must re-enter it here.",
+    de: "Der Import läuft über intervals.icu. Prüfe unter Uhr-Sync, ob dein API-Schlüssel eingetragen und noch gültig ist. Wenn du den Schlüssel neu erzeugt hast, musst du ihn hier erneut eingeben.",
+    es: "La importación pasa por intervals.icu. Comprueba en Sincronizar reloj que tu clave API esté rellenada y siga siendo válida. Si regeneraste la clave, vuelve a introducirla aquí.",
+    pt: "A importação passa pelo intervals.icu. Verifica em Sincronizar relógio que a tua chave API está preenchida e válida. Se regeraste a chave, tens de a introduzir novamente aqui.",
   },
   "Le coach ne me donne aucune séance de fractionné": {
     en: "It is almost always intentional. The Calendar shows a « why this plan » banner with the exact reason: fatigue (high acute:chronic ratio, very negative TSB, low HRV, poor sleep), reported pain, or a cap tied to your running history. Intensity comes back on its own once the signal drops.",

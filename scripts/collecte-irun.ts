@@ -23,6 +23,8 @@
  * la même paire chez plusieurs marchands le jour où un flux d'affiliation existera —
  * `product_offers.ean` l'attend déjà.
  */
+import { UA_PACEVOBOT } from "../src/lib/races/robot";
+import { lirePoliment } from "./acces-poli";
 import fs from "node:fs";
 import path from "node:path";
 import { MODELES_A_COLLECTER } from "./modeles-a-collecter";
@@ -31,14 +33,17 @@ import { prendreVerrou } from "../src/lib/shop/verrou";
 
 const BASE = "https://www.i-run.fr";
 const SORTIE = path.join(process.cwd(), "src/data/gear/chaussures.json");
+// ⚠️ PLUS DE DÉGUISEMENT EN NAVIGATEUR (01/10/2026) : ce script se présentait comme Chrome.
+// Il s'identifie désormais (PacevoBot) et passe par l'accès poli : robots.txt relu et
+// respecté automatiquement, liste d'opposition (scripts/acces-poli).
 const UA = {
-  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+  "User-Agent": UA_PACEVOBOT,
   "Accept-Language": "fr-FR,fr;q=0.9",
 };
 
 /** ⚠️ Les pages sont en windows-1252 : décodées en UTF-8, les accents deviennent illisibles. */
 async function page(url: string): Promise<string | null> {
-  const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(25000) }).catch(() => null);
+  const r = await lirePoliment(url, { headers: UA, signal: AbortSignal.timeout(25000) }).catch(() => null);
   if (!r?.ok) return null;
   return new TextDecoder("windows-1252").decode(await r.arrayBuffer());
 }

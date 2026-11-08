@@ -212,9 +212,9 @@ export const FALLBACK_MISS: Record<string, string> = {
 /** Bandeau ajouté devant une réponse de repli : l'utilisateur doit savoir qu'il lit une
  *  fiche de la base, pas une réponse adaptée à son compte. */
 export const FALLBACK_PREFIX: Record<string, string> = {
-  fr: "⚡ Réponse rapide (assistant intelligent momentanément indisponible) :\n\n",
-  en: "⚡ Quick answer (smart assistant temporarily unavailable):\n\n",
-  de: "⚡ Schnelle Antwort (intelligenter Assistent vorübergehend nicht verfügbar):\n\n",
-  es: "⚡ Respuesta rápida (asistente inteligente no disponible por ahora):\n\n",
-  pt: "⚡ Resposta rápida (assistente inteligente indisponível de momento):\n\n",
+  fr: "Réponse rapide (assistant intelligent momentanément indisponible) :\n\n",
+  en: "Quick answer (smart assistant temporarily unavailable):\n\n",
+  de: "Schnelle Antwort (intelligenter Assistent vorübergehend nicht verfügbar):\n\n",
+  es: "Respuesta rápida (asistente inteligente no disponible por ahora):\n\n",
+  pt: "Resposta rápida (assistente inteligente indisponível de momento):\n\n",
 };

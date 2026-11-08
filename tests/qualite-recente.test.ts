@@ -182,10 +182,15 @@ test("coachContext : la phase s'applique au menu APRÈS le facteur limitant, AVA
   const src = codeNu("src/lib/ai/coachContext.ts");
   const limiteur = src.indexOf("if (limiter) {");
   const phase = src.indexOf("menu = specifiqueEnTete(menu, phaseSemaine)");
-  const budget = src.indexOf("const chosen = menu.slice(0, qBudget)");
+  // Depuis le 05/11/2026, le budget s'applique au menu OU aux journées de double seuil :
+  // le repère est l'application du budget au menu.
+  const budget = src.indexOf("menu.slice(0, qBudget)");
   assert.ok(limiteur > 0 && phase > 0 && budget > 0, "un des trois repères a disparu");
   assert.ok(limiteur < phase && phase < budget, "la phase doit passer après le facteur limitant et avant le budget");
-  assert.match(src, /const ph = phaseDeSemaine\(wkUntil\)/, "la feuille de route n'utilise plus la même définition de phase que le plan");
+  // Depuis le 05/11/2026, la phase dépend aussi de la distance (affûtage d'une semaine pour
+  // un 5 km, trois pour un marathon) : les DEUX appels doivent la recevoir.
+  assert.match(src, /const ph = phaseDeSemaine\(wkUntil, objective\?\.distanceKm\)/, "la feuille de route n'utilise plus la même définition de phase que le plan");
+  assert.match(src, /phaseDeSemaine\(weeksToRace, objective\.distanceKm\)/, "le plan de la semaine n'utilise plus la même définition de phase que la feuille de route");
 });
 
 test("coachContext : le plan reçoit les jours de qualité, séances dures courues comprises", () => {

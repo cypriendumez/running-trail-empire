@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  estPubliable, estPubliableSansDate, aUneDate, motsUrl, slugCourse, idDepuisSlug, bornesId,
+  estPubliable, estPubliableSansDate, aUneDate, motsUrl, slugCourse, idDepuisSlug, bornesId, basculeALaLecture,
   titrePage, descriptionPage,
   dateEnClair, DATE_INCONNUE,
 } from "../src/lib/races/publique";
@@ -409,8 +409,9 @@ test("aucune donnée structurée d'événement sans date", () => {
   // invalide ; en inventer une serait pire, car un moteur affiche cette date dans ses
   // résultats comme un fait vérifié.
   const page = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
-  assert.ok(/!aUneDate\(c\) \? null :/.test(page),
-    "les données structurées d'événement sont émises même sans date");
+  // Ni avec une date seulement ESTIMÉE (30/09/2026) : « ≈ » n'est pas un fait vérifié.
+  assert.ok(/!aUneDate\(c\) \|\| c\.date_confirmee === false \? null :/.test(page),
+    "les données structurées d'événement sont émises même sans date (ou avec une date estimée)");
   assert.ok(/\{jsonLd && <script/.test(page), "le bloc est rendu même quand il vaut null");
   // Et la page doit DIRE que la date manque, au lieu de laisser un blanc.
   assert.ok(/sansDate\.titre/.test(page) && /sansDate\.texte/.test(page),
@@ -520,6 +521,111 @@ test("la région part en clair dans les données structurées", () => {
   const page = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
   assert.ok(/addressRegion: c\.region \? nomRegion\(c\.region\) : undefined/.test(page),
     "l'identifiant technique de la région repart vers les moteurs");
+});
+
+test("une adresse non canonique redirige au lieu de servir un double", () => {
+  // ⚠️ ALERTE SEARCH CONSOLE DU 24/10/2026 : « Autre page avec balise canonique
+  // correcte ». Seul l'identifiant désigne la course, donc `/courses/<n'importe quoi>-<id>`
+  // répondait 200 avec une canonique vers la vraie adresse : chaque correction de nom, de
+  // ville ou de distance laissait chez Google une adresse en double. Même chose pour une
+  // région écrite autrement (« provence-alpes-cote-azur »).
+  const nu = (f: string) => readFileSync(f, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+
+  const fiche = nu("src/app/courses/[slug]/page.tsx");
+  assert.ok(/const canonique = slugCourse\(c\);/.test(fiche), "la fiche ne calcule plus son adresse canonique");
+  assert.ok(/if \(demande !== canonique\) permanentRedirect\(`\/courses\/\$\{canonique\}`\)/.test(fiche),
+    "une ancienne adresse de course répond de nouveau 200 en double de la vraie");
+  const region = nu("src/app/courses/region/[slug]/page.tsx");
+  assert.ok(/if \(demande !== slug\) permanentRedirect\(`\/courses\/region\/\$\{slug\}`\)/.test(region),
+    "une écriture non canonique de région répond de nouveau 200 en double");
+
+  // ⚠️ ET AUCUNE BOUCLE : l'adresse canonique doit se reconnaître elle-même, sinon la
+  // redirection renverrait indéfiniment vers elle-même.
+  const s = slugCourse(base);
+  assert.equal(idDepuisSlug(s), base.id.replace(/-/g, "").slice(0, 8));
+  assert.ok(/^[a-z0-9-]+$/.test(s), `adresse canonique hors ASCII : ${s}`);
+  for (const [canon, ecritures] of Object.entries(ECRITURES_REGION)) {
+    assert.equal(regionCanonique(canon), canon, `la région « ${canon} » se redirigerait vers une autre`);
+    for (const e of ecritures) assert.equal(regionCanonique(e), canon, `« ${e} » ne mène pas à « ${canon} »`);
+  }
+});
+
+test("le lendemain de course, la page reste en ligne au lieu de répondre 404", () => {
+  // ⚠️ SEARCH CONSOLE, RAPPORT DU 16/10/2026 : quatre fiches en 404, toutes revenues en
+  // 200 depuis. Les Boucles Roses (Besançon), courues le dimanche 04/10 : dès minuit la
+  // date est passée, donc plus « publiable », et la page répondait 404 jusqu'à ce que la
+  // maintenance (cron GitHub étranglé, passé à 11 h 22 UTC) la bascule sur 2027.
+  const course = { ...base, name: "Les Boucles Roses", city: "Besançon", date: "2026-10-04", date_confirmee: true };
+  const LENDEMAIN = "2026-10-05";
+  assert.equal(estPubliable(course, LENDEMAIN), false, "prémisse : la date brute n'est plus publiable le lendemain");
+
+  const lue = basculeALaLecture(course, LENDEMAIN);
+  assert.equal(lue.date, "2027-10-03", "la page n'annonce pas l'édition suivante estimée");
+  assert.equal(lue.date_confirmee, false, "l'estimation partirait à Google comme une date sûre");
+  assert.equal(estPubliable(lue, LENDEMAIN), true, "le lendemain de course, la page répond encore 404");
+
+  // Une course de semaine n'est jamais devinée : elle passe en « date à venir », qui a
+  // aussi sa page — et son drapeau reste tel quel, comme dans la maintenance.
+  const semaine = basculeALaLecture({ ...course, date: "2026-10-07" }, "2026-10-08");
+  assert.equal(semaine.date, DATE_INCONNUE);
+  assert.equal(semaine.date_confirmee, true);
+  assert.equal(estPubliableSansDate(semaine), true, "une course de semaine passée répond 404");
+
+  // Rien ne bouge pour une course à venir, ni le jour même, ni pour « date à venir ».
+  assert.equal(basculeALaLecture(course, "2026-10-04"), course, "la course du jour est déjà basculée");
+  const inconnue = { ...course, date: DATE_INCONNUE };
+  assert.equal(basculeALaLecture(inconnue, LENDEMAIN), inconnue);
+
+  // Et c'est bien ce que la page lit — dans `lire`, donc aussi pour ses métadonnées.
+  const page = readFileSync("src/app/courses/[slug]/page.tsx", "utf8");
+  assert.ok(/return basculeALaLecture\(data\[0\] as CoursePublique, jourFrance\(\)\);/.test(page),
+    "la page relit la date brute : 404 chaque lundi matin pour les courses du week-end");
+});
+
+test("une course effacée par le dédoublonnage renvoie vers sa jumelle (308), jamais une suppression bloquée", () => {
+  // ⚠️ SEARCH CONSOLE, 29/10/2026 : dix fiches en 404 (Trail du Buis 21 km, Volvic 17 km…),
+  // toutes effacées par le rafraîchissement du mardi parce qu'en double. La jumelle
+  // conservée existait sous un autre identifiant ; l'adresse connue de Google était perdue.
+  const nu = (f: string) => readFileSync(f, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+  const page = nu("src/app/courses/[slug]/page.tsx");
+  const renvoi = page.indexOf("if (jumelle) permanentRedirect(`/courses/${jumelle}`);");
+  assert.ok(/if \(!c\) \{\s*const jumelle = await jumelleDe\(demande\);/.test(page) && renvoi > 0,
+    "une course effacée répond de nouveau 404 au lieu de renvoyer vers sa jumelle");
+  assert.ok(renvoi < page.indexOf("if (!c || !publiable(c)) notFound();"), "le 404 tombe avant la recherche de la jumelle");
+  assert.ok(/from\("races_redirections"\)\s*\.select\("nouvel_id"\)\.eq\("ancien_court", court\)/.test(page),
+    "la jumelle n'est plus cherchée par le préfixe que porte l'adresse");
+  assert.ok(/return c && publiable\(c\) \? slugCourse\(c\) : null;/.test(page),
+    "on renverrait vers une jumelle qui n'a pas de page (redirection vers un 404)");
+
+  const sql = readFileSync("supabase/migrations/039_races_redirections.sql", "utf8")
+    .split("\n").filter((l) => !l.trim().startsWith("--")).map((l) => l.replace(/--.*$/, "")).join("\n");
+  assert.ok(/create table if not exists public\.races_redirections \(\s*ancien_court text primary key/.test(sql), "table de redirection absente");
+  assert.ok(/alter table races_redirections enable row level security/.test(sql), "la table serait lisible par n'importe qui");
+  assert.ok(/security definer set search_path = public/.test(sql), "fonction sans search_path figé (voir migration 038)");
+  assert.ok(/after delete on public\.races\s+for each row execute function public\.races_noter_jumelle\(\)/.test(sql),
+    "plus aucun déclencheur à la suppression : seuls les scripts qui y penseraient noteraient la jumelle");
+  // Le préfixe calculé en base doit être celui de l'adresse (`slugCourse`).
+  assert.ok(/left\(replace\(old\.id::text, '-', ''\), 8\)/.test(sql), "le préfixe noté n'est plus celui que porte l'adresse");
+  assert.ok(/r\.id <> old\.id/.test(sql), "la ligne effacée pourrait se désigner elle-même");
+  assert.ok(/exception when others then/.test(sql), "une erreur du déclencheur bloquerait le dédoublonnage");
+  assert.ok(/update races_redirections set nouvel_id = jumelle where nouvel_id = old\.id/.test(sql),
+    "une jumelle effacée à son tour laisserait ses anciennes adresses sans destination");
+  // ⚠️ UNE SEULE TOLÉRANCE : celle qui apparie les formats décide aussi de la jumelle.
+  assert.ok(/greatest\(0\.25, old\.distance_km \* 0\.025\)/.test(sql), "la tolérance de distance du déclencheur a changé");
+  assert.ok(/const tolere = \(km: number\) => Math\.max\(0\.25, km \* 0\.025\);/.test(readFileSync("src/lib/races/majFinishers.ts", "utf8")),
+    "la tolérance d'appariement a changé : la reporter dans le déclencheur (migration 039)");
+
+  // Le rattrapage : dix adresses, chacune vers une AUTRE course, au bon format.
+  const rattrapage = [...sql.matchAll(/\('([0-9a-f]+)', '([0-9a-f-]+)'\)/g)];
+  assert.equal(rattrapage.length, 10, "le rattrapage ne couvre plus les dix adresses relevées");
+  for (const [, court, id] of rattrapage) {
+    assert.ok(/^[0-9a-f]{8}$/.test(court) && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(id), `ligne mal formée : ${court} → ${id}`);
+    assert.notEqual(id.replace(/-/g, "").slice(0, 8), court, `${court} renverrait vers lui-même`);
+  }
 });
 
 console.log(`\n${passed} test(s) des courses publiques passé(s), ${fails.length} échec(s)`);

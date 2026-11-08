@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import { meilleursEfforts, chrono, allure, DISTANCES } from "../src/lib/activities/efforts";
 import type { TrackPoint } from "../src/lib/segments/geo";
 import { cap, flechesLeLongDe, BASE_CAP_M } from "../src/lib/activities/fleches";
+import { seLitEnVitesse, vitesseKmh, kmhDepuisAllure, chiffreKmh, fmtKmh } from "../src/lib/activities/vitesse";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -255,6 +256,32 @@ test("la carte montre le sens de parcours et se laisse manipuler", () => {
   assert.doesNotMatch(src, /dragging=\{false\}/, "la carte est de nouveau figée");
 });
 
+test("une tuile refusée ne laisse plus un carré gris pour toujours", () => {
+  // Cyprien, 30/10/2026 : « il y a des bugs de carte ». Reproduit sur banc d'essai : une
+  // seule demande de tuile qui échoue, et la vignette reste grise, le tracé dessiné
+  // par-dessus — Leaflet ne redemande jamais une tuile. Et il en demandait 2,3 fois trop.
+  const src = codeOf("src/components/segments/SegmentMap.tsx");
+  assert.match(src, /eventHandlers=\{\{ tileerror: reessayerTuile \}\}/, "plus aucune relance : une tuile refusée reste grise");
+  assert.match(src, /if \(n > ESSAIS_MAX\) return;/, "la relance n'est plus bornée : une panne durable relancerait sans fin");
+  assert.match(src, /\(e\.target as L\.TileLayer\)\.getTileUrl\(e\.coords\)/, "la relance recopie l'adresse qui a échoué");
+  // Les tuiles MapTiler font 512 px : déclarées en 256, chacune était réduite de moitié.
+  assert.match(src, /outdoor-v2\/\{z\}\/\{x\}\/\{y\}\.webp\?key=\$\{MAPTILER\}`, attribution: "© MapTiler © OpenStreetMap", tileSize: 512, zoomOffset: -1/,
+    "les tuiles MapTiler sont de nouveau déclarées en 256 px (ou servies en PNG, 29 % plus lourd)");
+  assert.match(src, /tileSize=\{TUILES\.tileSize\} zoomOffset=\{TUILES\.zoomOffset\}/, "la taille des tuiles n'est plus transmise à la couche");
+});
+
+test("la vignette n'est plus mangée par ses boutons ni par son crédit — qui reste affiché", () => {
+  const src = codeOf("src/components/segments/SegmentMap.tsx");
+  assert.match(src, /zoomControl=\{height >= HAUTEUR_VIGNETTE\}/, "les boutons +/− couvrent de nouveau la moitié d'une vignette de 120 px");
+  // Le crédit est obligatoire (licences OSM et MapTiler), sa taille ne l'est pas.
+  assert.match(src, /\[&_\.leaflet-control-attribution\]:!text-\[8px\]/, "le crédit a retrouvé sa taille d'origine");
+  assert.doesNotMatch(src, /attributionControl \/>|<AttributionControl[^>]*hidden/, "le crédit a disparu");
+  // L'attente occupe la hauteur de la vraie carte : 180 px fixes faisaient sauter la liste.
+  const lazy = codeOf("src/components/segments/SegmentMapLazy.tsx");
+  assert.doesNotMatch(lazy, /h-\[180px\]/, "l'attente a de nouveau une hauteur fixe qui fait sauter la liste");
+  assert.match(lazy, /return <div style=\{\{ height \}\}><SegmentMap/, "l'attente n'a plus la hauteur de la carte");
+});
+
 test("le survol 3D s'atteint par la FLÈCHE, plus par un onglet", () => {
   const src = codeOf("src/components/segments/PerfTabs.tsx");
   assert.doesNotMatch(src, /dashboard\/survol/, "l'onglet Survol 3D est revenu : la flèche le rend inutile");
@@ -262,6 +289,46 @@ test("le survol 3D s'atteint par la FLÈCHE, plus par un onglet", () => {
   assert.match(codeOf("src/components/activity/StravaBlocks.tsx"), /survolHref/, "plus aucun chemin vers le survol");
   assert.doesNotMatch(readFileSync("src/data/helpKb.ts", "utf8"), /Barre latérale gauche › Survol 3D/,
     "l'aide envoie encore vers un onglet supprimé");
+});
+
+test("le vélo se lit en km/h, la course en allure — dans le fil ET dans la fiche", () => {
+  // Sortie vélo réelle, Lambersart, 23/10/2026 : 8,973 km en 1 679 s. Le fil affichait
+  // « 3:07 /km » ; un cycliste lit 19,2 km/h.
+  assert.equal(vitesseKmh(8.973, 1679)?.toFixed(1), "19.2");
+  assert.equal(seLitEnVitesse("bike"), true, "le vélo ne se lit plus en km/h");
+  for (const s of ["run", "hike", "walk", null]) assert.equal(seLitEnVitesse(s), false, `${s} se lit en km/h`);
+  // Une mesure absente ne devient pas une vitesse.
+  assert.equal(vitesseKmh(null, 1679), null);
+  assert.equal(vitesseKmh(8.973, 0), null);
+  // Le SITE D'APPEL, pas l'import : chaque écran choisit vraiment selon le sport.
+  const fil = codeOf("src/app/dashboard/activites/page.tsx");
+  assert.match(fil, /seLitEnVitesse\(s\.sport \?\? s\.type\)[\s\S]{0,40}\? \{ label: d\["feed\.speed"\]/, "le fil n'affiche plus la vitesse du vélo");
+  const fiche = codeOf("src/app/dashboard/activite/page.tsx");
+  assert.match(fiche, /enVitesse = seLitEnVitesse\(wk\.sport[^)]*\);/, "la fiche ne choisit plus selon le sport");
+  assert.match(fiche, /if \(kmh != null && enVitesse\) chiffres\.push\(\{ label: "Vitesse moyenne"/, "la fiche n'affiche plus la vitesse du vélo");
+  assert.match(fiche, /"id, title, sport,/, "la fiche ne lit plus le sport : tout se lirait en allure");
+});
+
+test("à vélo, les meilleurs efforts et le découpage au kilomètre se lisent aussi en km/h", () => {
+  // Cyprien, 24/10/2026 : « oui passe en kilomètre/heure ». La moyenne était passée en km/h,
+  // mais les meilleurs efforts et le découpage de la même fiche restaient en min/km.
+  assert.equal(kmhDepuisAllure(187)?.toFixed(1), "19.3", "3:07 /km ne donne plus 19,3 km/h");
+  assert.equal(kmhDepuisAllure(0), null, "une allure nulle devient une vitesse infinie");
+  assert.equal(chiffreKmh(19.25), "19,3");
+  assert.equal(fmtKmh(19.24), "19,2 km/h");
+  const fiche = codeOf("src/app/dashboard/activite/page.tsx");
+  assert.match(fiche, /allure: kmhEffort != null \? fmtKmh\(kmhEffort\) : fmtAllure\(e\.allureSecKm\)/,
+    "les meilleurs efforts à vélo sont revenus en allure");
+  assert.match(fiche, /const kmhEffort = enVitesse \? kmhDepuisAllure\(e\.allureSecKm\) : null/, "les meilleurs efforts ne suivent plus le sport");
+  // « Semi-marathon » ne se dit pas à vélo : la distance est nommée.
+  assert.match(fiche, /LIBELLE_VELO[^=]*= \{ semi: "21,1 km", marathon: "42,2 km" \}/);
+  assert.match(fiche, /label: \(enVitesse && LIBELLE_VELO\[e\.cle\]\)/, "le vélo affiche encore « Semi-marathon »");
+  assert.match(fiche, /<StravaBlocks[\s\S]{0,200}enVitesse=\{enVitesse\}/, "la fiche ne transmet plus le sport au découpage");
+  const blocs = codeOf("src/components/activity/StravaBlocks.tsx");
+  assert.match(blocs, /const kmh = enVitesse && pace \? kmhDepuisAllure\(pace\) : null;/, "le découpage ne calcule plus la vitesse");
+  assert.match(blocs, /\{kmh != null \? chiffreKmh\(kmh\) : pace \? paceLabel\(pace\) : "—"\}/, "le découpage à vélo est revenu en allure");
+  assert.match(blocs, /\{enVitesse \? "km\/h" : t\("feed\.pace"\)\}/, "l'en-tête du découpage ne dit plus « km/h » à vélo");
+  assert.match(blocs, /t\(enVitesse \? "act\.splitsNoteKmh" : "act\.splitsNote"\)/, "la note du découpage parle encore d'allure à vélo");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

@@ -30,7 +30,7 @@ export function SurvolChoix({ sorties, choisie, polyline, altitudes, paces, stat
       )}
 
       <div>
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">{t("fly.pick")}</div>
+        <div className="mb-2 text-xs font-semibold text-zinc-400 first-letter:uppercase">{t("fly.pick")}</div>
         <div className="flex gap-2 overflow-x-auto pb-2">
           {sorties.map((s) => {
             const active = s.id === choisie;

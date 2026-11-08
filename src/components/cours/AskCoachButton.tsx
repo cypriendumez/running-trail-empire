@@ -19,7 +19,7 @@ export function AskCoachButton({ question, label }: { question: string; label: s
     <button
       onClick={ask}
       title={t("cours.deepenTitle")}
-      className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 shadow-sm transition-all hover:border-emerald-300 hover:text-emerald-700"
+      className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 shadow-sm transition hover:border-emerald-300 hover:text-emerald-700"
     >
       <MessageCircleQuestion className="h-3.5 w-3.5" />
       {label}

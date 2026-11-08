@@ -61,7 +61,7 @@ function MedaillePalier({ cle, taille }: { cle: string; taille: "s" | "m" }) {
   const t = TIER_CONFIG[cle] ?? TIER_CONFIG.bronze;
   const I = ICONE_PALIER[cle] ?? Award;
   return (
-    <div className={`flex shrink-0 items-center justify-center bg-gradient-to-br ${t.gradient} text-white shadow-sm ring-2 ring-white ${taille === "m" ? "h-14 w-14 rounded-2xl md:h-20 md:w-20 md:rounded-3xl" : "h-10 w-10 rounded-xl"}`}>
+    <div className={`flex shrink-0 items-center justify-center bg-gradient-to-br ${t.gradient} text-white shadow-sm ring-2 ring-white ${taille === "m" ? "h-14 w-14 rounded-2xl md:h-20 md:w-20 md:rounded-2xl" : "h-10 w-10 rounded-xl"}`}>
       <I className={taille === "m" ? "h-7 w-7 md:h-10 md:w-10" : "h-5 w-5"} strokeWidth={1.75} />
     </div>
   );
@@ -75,9 +75,9 @@ const RARETE_MEDAILLE: Record<string, string> = {
 
 const RARITY_CONFIG = {
   common:    { bg: "bg-zinc-50",     border: "border-zinc-200",   text: "text-zinc-500",    glow: "" },
-  rare:      { bg: "bg-blue-50",     border: "border-blue-200",   text: "text-blue-600",    glow: "shadow-blue-100" },
-  epic:      { bg: "bg-amber-50",    border: "border-amber-200",  text: "text-amber-600",   glow: "shadow-amber-100" },
-  legendary: { bg: "bg-violet-50",   border: "border-violet-200", text: "text-violet-600",  glow: "shadow-violet-100" },
+  rare:      { bg: "bg-blue-50",     border: "border-blue-200",   text: "text-blue-600",    glow: "" },
+  epic:      { bg: "bg-amber-50",    border: "border-amber-200",  text: "text-amber-600",   glow: "" },
+  legendary: { bg: "bg-violet-50",   border: "border-violet-200", text: "text-violet-600",  glow: "" },
 };
 
 function fillT(s: string, p: Record<string, string | number>): string {
@@ -86,13 +86,13 @@ function fillT(s: string, p: Record<string, string | number>): string {
 
 // ── Helper: user initials avatar ───────────────────────────────────────────────
 function Avatar({ name, url, size = 8 }: { name: string; url?: string; size?: number }) {
-  const cls = `w-${size} h-${size} rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden`;
+  const cls = `w-${size} h-${size} rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0 overflow-hidden`;
   if (url) return (
     // eslint-disable-next-line @next/next/no-img-element
     <div className={cls}><img src={url} alt={name} className="w-full h-full object-cover" /></div>
   );
   return (
-    <div className={`${cls} bg-gradient-to-br from-emerald-400 to-emerald-600`}>
+    <div className={`${cls} bg-emerald-700`}>
       {name.charAt(0).toUpperCase()}
     </div>
   );
@@ -187,12 +187,13 @@ export function LeaguesHub({
           ] as { label: string; value: number | string; unit: string; icon: React.ReactNode; grad: string; ic: string; num: string }[]
         ).map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05, duration: 0.3 }}
-            className={`rounded-2xl border bg-gradient-to-br p-4 transition-transform hover:-translate-y-0.5 ${s.grad}`}>
-            <div className="mb-2 flex items-center gap-2">
-              <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${s.ic}`}>{s.icon}</span>
-              <span className="text-xs font-medium text-zinc-500">{s.label}</span>
+            className="rounded-2xl border border-zinc-200/80 bg-white p-4">
+            {/* Une carte de chiffre = un libellé et un nombre, sans couleur propre (passe « unslop »). */}
+            <div className="mb-2 flex items-center gap-2 text-zinc-400">
+              {s.icon}
+              <span className="text-[13px] text-zinc-500">{s.label}</span>
             </div>
-            <div className={`text-2xl font-black tabular-nums ${s.num}`}>{s.value}<span className="ml-1 text-sm font-normal text-zinc-400">{s.unit}</span></div>
+            <div className="text-2xl font-semibold tracking-tight tabular-nums text-zinc-900">{s.value}<span className="ml-1 text-sm font-normal text-zinc-400">{s.unit}</span></div>
           </motion.div>
         ))}
       </div>
@@ -230,7 +231,7 @@ export function LeaguesHub({
               <div className="mb-3 flex items-center gap-3 md:mb-5 md:flex-col md:gap-3">
                 <MedaillePalier cle={tierKey} taille="m" />
               <div className="md:text-center">
-                <div className={`text-xl font-black md:text-2xl ${tier.textColor}`}>{d[`tier.${tierKey}`]}</div>
+                <div className={`text-xl font-semibold md:text-2xl ${tier.textColor}`}>{d[`tier.${tierKey}`]}</div>
                 {leagues ? (
                   <>
                     <div className="text-sm text-zinc-600 font-medium mt-0.5">{String(leagues.name ?? "")}</div>
@@ -289,12 +290,12 @@ export function LeaguesHub({
                     return (
                       <motion.div key={m.user_id}
                         initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
-                        className={`flex items-center gap-3 p-3 rounded-2xl transition-all ${
+                        className={`flex items-center gap-3 p-3 rounded-2xl transition ${
                           isMe ? "bg-emerald-50 border border-emerald-200 ring-1 ring-emerald-200" : i === 0 ? "bg-yellow-50" : "hover:bg-zinc-50"
                         }`}
                       >
                         {/* Rank */}
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${
                           i === 0 ? "bg-yellow-100 text-yellow-700" :
                           i === 1 ? "bg-slate-100 text-slate-600" :
                           i === 2 ? "bg-orange-100 text-orange-600" :
@@ -318,7 +319,7 @@ export function LeaguesHub({
                               initial={{ width: 0 }} animate={{ width: `${(m.score / maxScore) * 100}%` }}
                               transition={{ duration: 0.8, delay: i * 0.04 }} />
                           </div>
-                          <span className="text-sm font-bold text-zinc-900 w-10 text-right">{Number(m.score).toFixed(0)}</span>
+                          <span className="text-sm font-semibold text-zinc-900 w-10 text-right">{Number(m.score).toFixed(0)}</span>
                         </div>
                       </motion.div>
                     );
@@ -339,10 +340,10 @@ export function LeaguesHub({
                 {Object.entries(TIER_CONFIG).map(([key, t]) => {
                   const isCurrent = key === currentTierKey;
                   return (
-                    <div key={key} className={`relative flex flex-col items-center rounded-2xl border px-1 py-2.5 text-center transition-all sm:p-3 ${isCurrent ? "border-transparent ring-2 ring-emerald-400 shadow-md bg-emerald-50/40" : "border-zinc-200 bg-white opacity-70"}`}>
+                    <div key={key} className={`relative flex flex-col items-center rounded-2xl border px-1 py-2.5 text-center transition sm:p-3 ${isCurrent ? "border-transparent ring-2 ring-emerald-400 shadow-md bg-emerald-50/40" : "border-zinc-200 bg-white opacity-70"}`}>
                       <div className="mb-1.5"><MedaillePalier cle={key} taille="s" /></div>
-                      <div className={`text-[11px] sm:text-sm font-bold ${t.textColor}`}>{d[`tier.${key}`]}</div>
-                      {isCurrent && <span className="mt-1 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{d["youChip"]}</span>}
+                      <div className={`text-[11px] sm:text-sm font-semibold ${t.textColor}`}>{d[`tier.${key}`]}</div>
+                      {isCurrent && <span className="mt-1 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{d["youChip"]}</span>}
                     </div>
                   );
                 })}
@@ -366,7 +367,7 @@ export function LeaguesHub({
                 ] as { icon: React.ReactNode; label: string; value: number | string; unit: string; color: string }[]).map((r) => (
                   <div key={r.label} className="rounded-2xl border border-zinc-100 bg-zinc-50/60 px-3 py-2.5 sm:p-3">
                     <div className={`flex items-center gap-1.5 text-xs font-medium mb-1 ${r.color}`}>{r.icon}{r.label}</div>
-                    <div className="text-xl font-black text-zinc-900 tabular-nums">{r.value}<span className="text-xs font-normal text-zinc-400 ml-1">{r.unit}</span></div>
+                    <div className="text-xl font-semibold text-zinc-900 tabular-nums">{r.value}<span className="text-xs font-normal text-zinc-400 ml-1">{r.unit}</span></div>
                   </div>
                 ))}
               </div>
@@ -374,7 +375,7 @@ export function LeaguesHub({
 
             {/* Comment grimper */}
             <div className="col-span-12 bento-card bg-gradient-to-br from-zinc-900 to-zinc-800 text-white">
-              <h3 className="font-bold mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-400" /> {d["climb.title"]}</h3>
+              <h3 className="font-semibold mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-400" /> {d["climb.title"]}</h3>
               <div className="grid sm:grid-cols-3 gap-3 text-sm">
                 {[
                   { I: Footprints, t: d["climb.1t"], d: d["climb.1d"] },
@@ -402,7 +403,7 @@ export function LeaguesHub({
             {/* Progress summary */}
             <div className="bento-card bg-gradient-to-br from-zinc-900 to-zinc-800 text-white flex items-center gap-6">
               <div className="text-center shrink-0">
-                <div className="text-4xl font-black">{unlocked.length}</div>
+                <div className="text-4xl font-semibold">{unlocked.length}</div>
                 <div className="text-xs text-zinc-500 mt-0.5">/ {computedBadges.length}</div>
               </div>
               <div className="flex-1">
@@ -411,7 +412,7 @@ export function LeaguesHub({
                   <span className="text-sm text-zinc-400">{Math.round(unlocked.length / computedBadges.length * 100)}%</span>
                 </div>
                 <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
-                  <motion.div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full"
+                  <motion.div className="h-full bg-emerald-600 rounded-full"
                     initial={{ width: 0 }} animate={{ width: `${(unlocked.length / computedBadges.length) * 100}%` }}
                     transition={{ duration: 1, ease: "easeOut" }} />
                 </div>
@@ -430,7 +431,7 @@ export function LeaguesHub({
             <div className="flex gap-2">
               {(["all", "unlocked", "locked"] as const).map(f => (
                 <button key={f} onClick={() => setBadgeFilter(f)}
-                  className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition ${
                     badgeFilter === f ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
                   }`}>
                   {f === "all" ? d["f.all"] : f === "unlocked" ? fillT(d["f.unlocked"], { n: unlocked.length }) : fillT(d["f.locked"], { n: computedBadges.length - unlocked.length })}
@@ -446,7 +447,7 @@ export function LeaguesHub({
                 return (
                   <motion.div key={badge.id}
                     initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: Math.min(i, 12) * 0.02 }}
-                    className={`relative px-3 py-3.5 rounded-3xl border shadow-sm transition-all sm:p-4 ${
+                    className={`relative px-3 py-3.5 rounded-2xl border shadow-sm transition sm:p-4 ${
                       badge.unlocked
                         ? `${rc.bg} ${rc.border} ${rc.glow}`
                         : "bg-zinc-50 border-zinc-100 grayscale opacity-50"
@@ -465,7 +466,7 @@ export function LeaguesHub({
                     <div className={`mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br shadow-sm ring-4 ring-white ${RARETE_MEDAILLE[badge.rarity]}`}>
                       <Icone className="h-6 w-6" strokeWidth={1.75} />
                     </div>
-                    <div className="text-xs font-bold text-zinc-900 text-center leading-tight mb-1">{bT(badge)[0]}</div>
+                    <div className="text-xs font-semibold text-zinc-900 text-center leading-tight mb-1">{bT(badge)[0]}</div>
                     <div className={`text-xs text-center font-semibold mb-2 ${rc.text}`}>{d[`rar.${badge.rarity}`]}</div>
                     <div className="text-xs text-zinc-400 text-center leading-tight mb-2">{bT(badge)[1]}</div>
                     {/* Progress bar */}
@@ -504,7 +505,7 @@ export function LeaguesHub({
                   return (
                     <motion.div key={c.id}
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                      className={`rounded-3xl border p-4 transition-all ${done ? "border-emerald-200 bg-emerald-50/60" : "border-zinc-200 bg-white hover:border-zinc-300"}`}>
+                      className={`rounded-2xl border p-4 transition ${done ? "border-emerald-200 bg-emerald-50/60" : "border-zinc-200 bg-white hover:border-zinc-300"}`}>
                       <div className="flex items-start gap-3">
                         {(() => { const I = iconeDefi(c.id); return (
                           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${done ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-600"}`}><I className="h-5 w-5" strokeWidth={1.9} /></div>
@@ -512,7 +513,7 @@ export function LeaguesHub({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-zinc-900 text-sm truncate">{cT(c)[0]}</span>
-                            {done && <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700"><CheckCircle className="w-3 h-3" /> {d["ch.doneChip"]}</span>}
+                            {done && <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700"><CheckCircle className="w-3 h-3" /> {d["ch.doneChip"]}</span>}
                           </div>
                           <p className="text-xs text-zinc-400 mt-0.5">{cT(c)[1]}</p>
                         </div>
@@ -521,7 +522,7 @@ export function LeaguesHub({
                       <div className="mt-3">
                         <div className="h-2.5 bg-zinc-100 rounded-full overflow-hidden">
                           <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, delay: i * 0.05 }}
-                            className={`h-full rounded-full ${done ? "bg-gradient-to-r from-emerald-500 to-emerald-400" : "bg-gradient-to-r from-zinc-400 to-zinc-500"}`} />
+                            className={`h-full rounded-full ${done ? "bg-emerald-600" : "bg-zinc-400"}`} />
                         </div>
                         <div className="flex justify-between text-xs mt-1">
                           <span className={`font-semibold ${done ? "text-emerald-600" : "text-zinc-700"}`}>{c.current.toLocaleString(lang)} / {c.target.toLocaleString(lang)} {uT(c.unit)}</span>
@@ -573,7 +574,7 @@ export function LeaguesHub({
                         <div className="h-3 bg-zinc-100 rounded-full overflow-hidden">
                           <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(pct, 100)}%` }}
                             transition={{ duration: 1 }}
-                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" />
+                            className="h-full bg-emerald-600 rounded-full" />
                         </div>
                         <div className="text-right text-xs text-zinc-400 mt-1">{Math.round(pct)}%</div>
                       </div>
@@ -604,7 +605,7 @@ export function LeaguesHub({
                     ? Math.ceil((new Date(ch.end_date).getTime() - Date.now()) / 86400000)
                     : null;
                   return (
-                    <div key={ch.id} className="bento-card hover:border-zinc-300 transition-all">
+                    <div key={ch.id} className="bento-card hover:border-zinc-300 transition">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
                           <div className="font-semibold text-zinc-900 text-sm">{ch.name}</div>
@@ -627,7 +628,7 @@ export function LeaguesHub({
                           <button
                             onClick={() => joinChallenge(ch.id)}
                             disabled={joiningChallenge === ch.id}
-                            className="flex items-center gap-1 text-xs font-semibold bg-zinc-900 text-white px-3 py-1.5 rounded-xl hover:bg-zinc-700 transition-all disabled:opacity-50 shrink-0"
+                            className="flex items-center gap-1 text-xs font-semibold bg-zinc-900 text-white px-3 py-1.5 rounded-xl hover:bg-zinc-700 transition disabled:opacity-50 shrink-0"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             {joiningChallenge === ch.id ? "…" : d["ch.join"]}
@@ -652,7 +653,7 @@ export function LeaguesHub({
             <div className="bento-card bg-gradient-to-br from-zinc-900 to-zinc-800 text-white">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2 bg-white/10 rounded-xl"><Medal className="w-5 h-5 text-yellow-400" /></div>
-                <div className="font-bold">{d["teaser.title"]}</div>
+                <div className="font-semibold">{d["teaser.title"]}</div>
               </div>
               <p className="text-sm text-zinc-400 mb-4">
                 {d["teaser.desc"]}

@@ -1,4 +1,5 @@
 import { generateContent } from "@/lib/ai/gemini";
+import { UA_PACEVOBOT } from "@/lib/races/robot";
 import { pageAutorisee } from "@/lib/news/robots";
 
 /**
@@ -135,7 +136,7 @@ export async function texteArticle(url: string): Promise<string | null> {
   if (!(await pageAutorisee(url))) return null;
   try {
     const r = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; PacevoNewsletter/1.0)" },
+      headers: { "User-Agent": UA_PACEVOBOT },
       signal: AbortSignal.timeout(9000),
       redirect: "follow",
     });

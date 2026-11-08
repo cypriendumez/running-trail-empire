@@ -27,8 +27,10 @@ import { JOURS_ESSAI } from "../src/lib/billing/access";
 import { ARTICLES } from "../src/app/blog/articles";
 import { ARTICLES_I18N } from "../src/app/blog/articlesI18n";
 import { LEGAL } from "../src/app/legalI18n";
-import { accesDe, peut, JOURS_APERCU } from "../src/lib/billing/access";
-import { PRIX_AFFICHES } from "../src/lib/billing/prix";
+import { accesDe, peut } from "../src/lib/billing/access";
+import { PRIX_AFFICHES, REMISE_ETUDIANTE_PCT } from "../src/lib/billing/prix";
+import { LANDING } from "../src/components/landing/landingI18n";
+import { PLAFOND_JOUR } from "../src/lib/billing/aiQuota";
 import { ATTRIBUTION_GARMIN, PAGES_ATTRIBUTION } from "../src/components/legal/attributionI18n";
 import { liensStore } from "../src/lib/brand/stores";
 import { estAdmin, adminsAutorises, emailEditeur, ADMIN_PAR_DEFAUT } from "../src/lib/admin/acces";
@@ -1116,48 +1118,115 @@ test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
   // qui vend : promettre une fonction dans une formule qui ne l'ouvre pas, ou la
   // fermer dans une formule qui la facture. Ce test relie les deux là où c'est
   // vérifiable — les capacités, pas la prose.
+  //
+  // ⚠️ DÉCOUPAGE DU 22/10/2026 (Cyprien). Le gratuit reçoit ses séances vers son
+  // objectif, sans analyse de ses données ; le GPX et le kiné sont dans LES DEUX formules
+  // payantes ; Premium garde le coach avancé et le triple d'IA. Depuis le 30/10/2026,
+  // Starter LIT L'ESSENTIEL et Premium TOUT (`analyse_complete`).
   assert.ok(!peut("gratuit", "ia"), "le gratuit ne doit RIEN consommer en IA");
-  assert.ok(!peut("gratuit", "plan"), "le gratuit ne doit pas avoir le plan complet");
+  assert.ok(!peut("gratuit", "plan"), "le gratuit ne doit pas avoir le plan adaptatif");
   assert.ok(!peut("gratuit", "gpx"), "le gratuit ne doit pas avoir l'export GPX");
-  assert.ok(peut("gratuit", "apercu"), "le gratuit doit voir un aperçu, sinon il ne peut pas juger le produit");
+  assert.ok(peut("gratuit", "plan_objectif"), "le gratuit doit recevoir ses séances vers son objectif");
   assert.ok(peut("gratuit", "lecture"), "l'historique reste ouvert : on ne prend personne en otage");
-
-  assert.ok(peut("starter", "plan") && peut("starter", "ia"), "Starter, c'est le coach complet");
-
-  // ⚠️ TROIS PROMESSES « PREMIUM » N'ÉTAIENT VERROUILLÉES NULLE PART. La page réservait
-  // les plans IA à la demande, le Smart Journal et les analyses détaillées à Premium
-  // dans les cinq langues ; les routes n'exigeaient que `ia`, que Starter possède aussi.
-  // Un client à 14,99 € recevait donc ce qu'un client à 9,99 € avait déjà, et la seule
-  // différence réelle était le volume d'appels. Une formule qui ne verrouille rien n'est
-  // pas une formule — et c'est le genre d'écart qu'un acheteur vérifie ligne à ligne.
-  for (const c of ["plan_ia", "journal", "analyse_longue"] as const) {
-    assert.ok(!peut("starter", c), `« ${c} » est annoncé Premium mais ouvert à Starter`);
-    assert.ok(peut("premium", c), `« ${c} » est annoncé Premium mais fermé à Premium`);
-    assert.ok(peut("essai", c), `l'essai doit montrer « ${c} », sinon il fait choisir par méconnaissance`);
+  for (const c of ["plan_ia", "analyse_complete", "bilan", "jour_j"] as const) {
     assert.ok(!peut("gratuit", c), `« ${c} » est ouvert au palier gratuit`);
   }
-  // ⚠️ CE QUI SÉPARE LES DEUX FORMULES PAYANTES. Si Starter gagnait le GPX, Premium ne
-  // se distinguerait plus que par un volume d'IA — trop peu pour justifier 5 € de plus.
-  assert.ok(!peut("starter", "gpx"), "le GPX doit rester à Premium");
-  assert.ok(peut("premium", "gpx") && peut("premium", "plan") && peut("premium", "ia"));
-  // L'essai doit montrer le niveau le PLUS HAUT, sinon il fait choisir par méconnaissance.
-  for (const c of ["apercu", "plan", "ia", "gpx"] as const) {
-    assert.ok(peut("essai", c), `l'essai doit ouvrir « ${c} »`);
+
+  // Ce que les DEUX formules payantes annoncent, et l'essai qui doit le montrer.
+  for (const e of ["starter", "premium", "essai"] as const) {
+    for (const c of ["plan_objectif", "plan", "ia", "gpx"] as const) {
+      assert.ok(peut(e, c), `${e} : « ${c} » est annoncé dans les formules payantes mais fermé`);
+    }
+  }
+  // ⚠️ CE QUI SÉPARE ENCORE LES DEUX FORMULES PAYANTES. Si Starter gagnait le coach
+  // avancé, Premium ne se distinguerait plus que par un volume d'IA.
+  assert.ok(!peut("starter", "plan_ia"), "le coach avancé est annoncé Premium mais ouvert à Starter");
+  assert.ok(peut("premium", "plan_ia"), "le coach avancé est annoncé Premium mais fermé à Premium");
+  assert.ok(peut("essai", "plan_ia"), "l'essai doit montrer le coach avancé, sinon il fait choisir par méconnaissance");
+  // Le BILAN DE LA SEMAINE (30/10/2026) : plusieurs séances lues ensemble, l'écart Premium qui agit.
+  assert.ok(!peut("starter", "bilan"), "le bilan de la semaine est annoncé Premium mais ouvert à Starter");
+  assert.ok(peut("premium", "bilan") && peut("essai", "bilan"), "le bilan de la semaine est fermé à Premium ou à l'essai");
+  // STARTER LIT L'ESSENTIEL, PREMIUM TOUT (30/10/2026) : la VFC, la dérive cardiaque et la
+  // foulée, dans le plan comme dans l'analyse d'une séance.
+  assert.ok(!peut("starter", "analyse_complete"), "l'analyse complète est annoncée Premium mais ouverte à Starter");
+  assert.ok(peut("premium", "analyse_complete") && peut("essai", "analyse_complete"), "l'analyse complète est fermée à Premium ou à l'essai");
+  // Le PACK JOUR J (30/10/2026) : réservé à Premium, montré par l'essai.
+  assert.ok(!peut("starter", "jour_j"), "le pack jour J est annoncé Premium mais ouvert à Starter");
+  assert.ok(peut("premium", "jour_j") && peut("essai", "jour_j"), "le pack jour J est fermé à Premium ou à l'essai");
+
+  // Les cartes, dans les CINQ langues.
+  const tarifs = sansCommentaires(readFileSync(join(ROOT, "src/components/landing/landingI18n.ts"), "utf8"));
+  const cartes = (cle: string) => [...tarifs.matchAll(new RegExp(`cle: "${cle}"[^}]*?features: \\[([^\\]]*)\\]`, "g"))].map((m) => m[1]);
+  assert.equal(cartes("gratuit").length, 5, "les cartes gratuites sont illisibles");
+  for (const f of cartes("gratuit")) {
+    assert.ok(!/GPX|Trail Builder/i.test(f), `le gratuit annonce le GPX : ${f.slice(0, 70)}`);
+    assert.ok(!/Kin[ée]|Physio|Fisio/i.test(f), `le gratuit annonce le kiné IA : ${f.slice(0, 70)}`);
+  }
+  const avec = (cle: string, motif: RegExp) => cartes(cle).filter((f) => motif.test(f)).length;
+  assert.equal(avec("starter", /GPX/), 5, "le GPX n'est pas annoncé dans Starter dans les 5 langues");
+  assert.equal(avec("starter", /Kin[ée]|Physio|Fisio/i), 5, "le kiné IA n'est pas annoncé dans Starter dans les 5 langues");
+  // ⚠️ L'ÉCRAN DU SMART JOURNAL A ÉTÉ RETIRÉ LE 30/09/2026 et la page le vendait encore
+  // dans Premium, et dans la grille de l'accueil, trois semaines plus tard.
+  assert.ok(!/Smart Journal/i.test(tarifs), "la vitrine vend le Smart Journal, dont l'écran n'existe plus");
+
+  // L'EXCLUSIVITÉ PREMIUM (23/10/2026) : « Un avis sur ma semaine », verrouillé par
+  // `plan_ia` dans `ai/ajustement`. Annoncée dans Premium, jamais dans Starter qui la refuse.
+  const AVIS = /avis du coach|view on your week|Einschätzung des KI-Coachs|opinión del coach|opinião do coach/i;
+  assert.equal(avec("premium", AVIS), 5, "l'avis sur la semaine n'est pas annoncé dans Premium dans les 5 langues");
+  assert.equal(avec("starter", AVIS), 0, "Starter annonce l'avis sur la semaine, que sa formule refuse");
+  assert.match(sansCommentaires(readFileSync(join(ROOT, "src/app/api/ai/ajustement/route.ts"), "utf8")),
+    /exigeAcces\(supabase, user\.id, "plan_ia"\)/, "l'avis sur la semaine n'est plus réservé à Premium");
+  // « Appliqué en un geste jusqu'à ta montre » : la route qui l'applique existe et est réservée à Premium.
+  assert.match(sansCommentaires(readFileSync(join(ROOT, "src/app/api/ai/ajustement/appliquer/route.ts"), "utf8")),
+    /exigeAcces\(supabase, user\.id, "plan_ia"\)/, "l'avis « appliqué en un geste » n'est plus réservé à Premium");
+  const BILAN = /Bilan de la semaine|Weekly review|Wochenbilanz|Balance de la semana|Balanço da semana/;
+  assert.equal(avec("premium", BILAN), 5, "le bilan de la semaine n'est pas annoncé dans Premium dans les 5 langues");
+  assert.equal(avec("starter", BILAN), 0, "Starter annonce le bilan de la semaine, que sa formule refuse");
+  assert.match(sansCommentaires(readFileSync(join(ROOT, "src/app/api/ai/bilan/route.ts"), "utf8")),
+    /exigeAcces\(supabase, user\.id, "bilan"\)/, "le bilan de la semaine n'est plus réservé à Premium");
+  const JOURJ = /Pack jour J|Race-day pack|Wettkampf-Paket|Pack día D|Pack dia D/;
+  assert.equal(avec("premium", JOURJ), 5, "le pack jour J n'est pas annoncé dans Premium dans les 5 langues");
+  assert.equal(avec("starter", JOURJ), 0, "Starter annonce le pack jour J, que sa formule refuse");
+  assert.match(sansCommentaires(readFileSync(join(ROOT, "src/app/dashboard/jour-j/page.tsx"), "utf8")),
+    /peut\(accesDe\([^)]*\)\.etat, "jour_j"\)\) return <VerrouJourJ/, "le pack jour J n'est plus réservé à Premium");
+
+  // CE QUE PREMIUM LIT EN PLUS — la VFC, la dérive, la foulée : annoncé dans Premium, et
+  // Starter, qui ne les lit plus, ne doit plus annoncer la VFC.
+  const VFC = /VFC|HRV/;
+  const FOULEE = /foulée|stride|Laufdynamik|zancada|passada/i;
+  assert.equal(avec("premium", VFC), 5, "Premium n'annonce pas la lecture de la VFC dans les 5 langues");
+  assert.equal(avec("premium", FOULEE), 5, "Premium n'annonce pas la lecture de la foulée dans les 5 langues");
+  assert.equal(avec("starter", VFC), 0, "Starter annonce la VFC, que son plan ne lit plus");
+  assert.equal(avec("starter", /complète|Full AI|Vollständige|completo|completa/i), 0, "Starter annonce une analyse complète, réservée à Premium");
+  // LES ÉCHANGES AFFICHÉS SONT CEUX QUE LE CODE ACCORDE : 10 en Starter, 30 en Premium.
+  for (const [cle, n] of [["starter", PLAFOND_JOUR.starter], ["premium", PLAFOND_JOUR.premium]] as const) {
+    assert.equal(avec(cle, new RegExp(`\\b${n} (échanges|AI exchanges|KI-Dialoge|intercambios|trocas)`)), 5, `${cle} n'annonce pas ses ${n} échanges par jour dans les 5 langues`);
   }
 
-  // L'aperçu doit rester un aperçu : sept jours, et il n'y a plus rien à vendre.
-  assert.ok(JOURS_APERCU >= 1 && JOURS_APERCU <= 3, `aperçu de ${JOURS_APERCU} jours — trop généreux ou vide`);
+  // LE TARIF ÉTUDIANT (30/10/2026) : −20 %, par un code demandé et saisi au paiement Stripe.
+  assert.equal(REMISE_ETUDIANTE_PCT, 20, "le tarif étudiant n'est plus de −20 %");
+  for (const [l, d] of Object.entries(LANDING)) {
+    assert.ok(d.pricing.etudiant.includes("{pct}"), `${l} : le pourcentage étudiant est écrit en dur`);
+    assert.ok(!/\b20\b/.test(d.pricing.etudiant), `${l} : « 20 » recopié dans le texte étudiant`);
+  }
+  for (const f of ["src/app/page.tsx", "src/app/pricing/page.tsx"]) {
+    assert.match(sansCommentaires(readFileSync(join(ROOT, f), "utf8")), /<OffreEtudiante texte=/, `${f} n'affiche plus le tarif étudiant`);
+  }
+  const offre = sansCommentaires(readFileSync(join(ROOT, "src/components/landing/OffreEtudiante.tsx"), "utf8"));
+  assert.match(offre, /replace\("\{pct\}", String\(REMISE_ETUDIANTE_PCT\)\)/, "l'offre étudiante n'affiche plus la constante");
+  assert.match(offre, /mailto:\$\{EDITEUR\.email\}/, "la demande de code ne part plus vers l'adresse de l'éditeur");
+  // Sans le champ de code au paiement, le code étudiant ne peut être saisi nulle part.
+  assert.match(sansCommentaires(readFileSync(join(ROOT, "src/app/api/stripe/checkout/route.ts"), "utf8")), /allow_promotion_codes: true/,
+    "le paiement n'accepte plus de code : le tarif étudiant est annoncé mais impossible");
 
-  // Et la page ne doit pas annoncer le GPX dans le gratuit, dans AUCUNE langue.
-  const tarifs = readFileSync(join(ROOT, "src/components/landing/landingI18n.ts"), "utf8");
-  for (const m of tarifs.matchAll(/cle: "gratuit"[^}]*?features: \[([^\]]*)\]/g)) {
-    assert.ok(!/GPX|Trail Builder/i.test(m[1]), `le gratuit annonce le GPX : ${m[1].slice(0, 70)}`);
+  // ⚠️ AUCUN BADGE DE POPULARITÉ. « Le plus demandé » s'affichait sur Premium alors
+  // qu'aucun abonnement n'avait été vendu : un fait inventé, comme les faux avis.
+  const badges = [...tarifs.matchAll(/badge: "([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(badges.length, 5, "les badges sont illisibles");
+  for (const b of badges) {
+    assert.ok(!/demand|popular|beliebt|elegid|escolhid|choisi|favori|vendu|best ?sell/i.test(b),
+      `badge de popularité sans aucune vente pour le prouver : « ${b} »`);
   }
-  let premiumAvecGpx = 0;
-  for (const m of tarifs.matchAll(/cle: "premium"[^}]*?features: \[([^\]]*)\]/g)) {
-    if (/GPX/i.test(m[1])) premiumAvecGpx++;
-  }
-  assert.equal(premiumAvecGpx, 5, `le GPX n'est annoncé dans Premium que pour ${premiumAvecGpx} langue(s) sur 5`);
 });
 
 test("le détail d'une séance nomme l'appareil, jamais le canal de synchro", () => {
@@ -1233,11 +1302,19 @@ test("aucun bouton de connexion ne mène à un fournisseur éteint", () => {
   assert.deepEqual(fournisseursActifs("github"), [], "un fournisseur non géré ne doit rien afficher");
   assert.deepEqual(fournisseursActifs("google,github"), ["google"]);
 
-  // La page doit VRAIMENT s'en servir : exposer la fonction sans la brancher ne vaut rien.
-  const page = sansCommentaires(readFileSync(join(ROOT, "src/app/(auth)/login/page.tsx"), "utf8"));
-  assert.match(page, /fournisseursActifs\(/, "la page de connexion n'utilise pas le filtre");
-  assert.match(page, /oauth\.includes\("google"\)/, "le bouton Google n'est pas conditionné");
-  assert.match(page, /oauth\.includes\("apple"\)/, "le bouton Apple n'est pas conditionné");
+  // Les boutons doivent VRAIMENT s'en servir : exposer la fonction sans la brancher ne vaut
+  // rien. Depuis le 11/10/2026, ils vivent dans UN composant partagé par la connexion ET
+  // l'inscription (`BoutonsOAuth`) : c'est lui qui filtre, et aucune page ne doit appeler
+  // OAuth en direct — elle contournerait le filtre.
+  const boutons = sansCommentaires(readFileSync(join(ROOT, "src/components/auth/BoutonsOAuth.tsx"), "utf8"));
+  assert.match(boutons, /fournisseursActifs\(/, "les boutons OAuth n'utilisent pas le filtre");
+  assert.match(boutons, /actifs\.includes\("google"\)/, "le bouton Google n'est pas conditionné");
+  assert.match(boutons, /actifs\.includes\("apple"\)/, "le bouton Apple n'est pas conditionné");
+  for (const f of ["src/app/(auth)/login/page.tsx", "src/app/(auth)/signup/page.tsx"]) {
+    const page = sansCommentaires(readFileSync(join(ROOT, f), "utf8"));
+    assert.match(page, /<BoutonsOAuth/, `${f} n'affiche pas les boutons partagés`);
+    assert.doesNotMatch(page, /signInWithOAuth\(/, `${f} appelle OAuth en direct, hors du filtre`);
+  }
 });
 
 test("l'espace coach est atteignable, et par les seules adresses autorisées", () => {
@@ -1431,7 +1508,10 @@ test("les alertes suivent l'éditeur, elles ne restent pas chez l'ancien", () =>
     // Et l'envoi doit être CONDITIONNÉ au destinataire : appeler emailEditeur() puis
     // écrire à une chaîne vide ne vaut rien.
     if (!/emailEditeur\(\)/.test(src)) sansGarde.push(`${r} (n'utilise pas la source unique)`);
-    else if (!/&&\s*COACH_EMAIL|\|\|\s*!DEST/.test(src)) sansGarde.push(`${r} (envoie sans destinataire vérifié)`);
+    // ⚠️ `if (COACH_EMAIL)` SEUL EST UNE GARDE VALABLE (30/09/2026) : la messagerie ne
+    // conditionne plus l'envoi à la clé Resend, pour que la porte unique journalise une
+    // clé absente au lieu de la sauter en silence. Le destinataire, lui, reste vérifié.
+    else if (!/&&\s*COACH_EMAIL|\|\|\s*!DEST|if\s*\(\s*COACH_EMAIL\s*\)/.test(src)) sansGarde.push(`${r} (envoie sans destinataire vérifié)`);
   }
   assert.deepEqual(replis, [], `repli en dur vers une adresse : ${replis.join(", ")}`);
   assert.deepEqual(sansGarde, [], `envoi non conditionné : ${sansGarde.join(", ")}`);

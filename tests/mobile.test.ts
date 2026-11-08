@@ -13,7 +13,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { NAV_GROUPES, ONGLETS_MOBILE, resteMobile } from "../src/components/layout/navigation";
+import { NAV_GROUPES, ONGLETS_MOBILE, resteMobile, estActive } from "../src/components/layout/navigation";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -99,7 +99,7 @@ test("« Plus » range ses rubriques en LISTES, sans trou — et le comparateur 
   // Le comparateur d'équipement n'a rien de social ; « Mes activités » est du suivi.
   const groupe = (href: string) => NAV_GROUPES.find((g) => g.items.some((it) => it.href === href))?.titleKey;
   assert.equal(groupe("/dashboard/shop"), "group.gear", "le comparateur d'équipement est rangé ailleurs que dans « Équipement »");
-  assert.equal(groupe("/dashboard/trophees"), "group.tracking", "« Mes activités » n'est pas rangé dans « Suivi »");
+  assert.equal(groupe("/dashboard/activites"), "group.tracking", "« Mes activités » n'est pas rangé dans « Suivi »");
   assert.equal(groupe("/dashboard/messages"), "group.tracking", "la messagerie n'est pas rangée dans « Suivi »");
   // Les libellés de rubrique existent dans les cinq dictionnaires.
   const dico = readFileSync("src/lib/i18n/translations.ts", "utf8");
@@ -114,7 +114,7 @@ test("le menu va du PLUS UTILISÉ au MOINS UTILE", () => {
   // consulte pour préparer, le social, et l'équipement qu'on règle une fois.
   assert.deepEqual(NAV_GROUPES.map((g) => g.titleKey), [null, "group.training", "group.tracking", "group.prep", "group.club", "group.gear"]);
   const ordre = NAV_GROUPES.flatMap((g) => g.items.map((d) => d.href));
-  assert.deepEqual(ordre.slice(0, 4), ["/dashboard", "/dashboard/calendrier", "/dashboard/ghost-runner", "/dashboard/trophees"],
+  assert.deepEqual(ordre.slice(0, 4), ["/dashboard", "/dashboard/calendrier", "/dashboard/ghost-runner", "/dashboard/activites"],
     "l'accueil, la séance du jour, enregistrer, puis relire ce qu'on a couru");
   assert.equal(ordre.at(-1), "/dashboard/shop", "le comparateur (une paire par saison) ferme la marche");
   const groupe = (href: string) => NAV_GROUPES.find((g) => g.items.some((it) => it.href === href))?.titleKey;
@@ -144,8 +144,10 @@ test("la barre réserve sa place : le pied de page ne finit pas derrière elle",
 test("sur mobile, l'assistant vit dans « Plus », pas en bulle flottante — et il s'ouvre vraiment", () => {
   // Cyprien, 21/09/2026 : la bulle recouvrait le contenu et l'onglet « Plus ».
   const bulle = codeNu("src/components/support/SupportBubble.tsx");
-  assert.ok(/fixed bottom-5 right-5 z-50 hidden [^"]*md:flex/.test(bulle),
+  assert.ok(/fixed bottom-3 right-3 z-50 hidden [^"`]*md:flex/.test(bulle),
     "la bulle flottante s'affiche encore sur téléphone (ou a disparu du bureau)");
+  // Cyprien, 30/09/2026 : « le bouton en bas à droite cache des données, mets-le plus petit ».
+  assert.ok(/fixed bottom-3 right-3 z-50 hidden h-10 w-10 /.test(bulle) && !/h-14 w-14/.test(bulle), "la bulle d'aide a regrossi");
   // Le panneau, lui, doit se poser AU-DESSUS de la barre d'onglets (4 rem), pas dessous.
   assert.ok(/fixed bottom-20 right-5 z-50 flex w-\[min\(420px/.test(bulle),
     "le panneau d'aide ne se place plus au-dessus de la barre d'onglets sur mobile");
@@ -187,15 +189,39 @@ test("sur mobile, l'avertissement médical part dans « Plus » — mais la lign
   assert.ok(cache > debutMain && cache < finMain, "l'avertissement médical est de nouveau fixé sous l'écran");
 });
 
-test("sur téléphone, la séance du jour vient en deuxième, juste sous « Bonjour »", () => {
-  // Cyprien, 21/09/2026 : « c'est ce qui est très important sur mon application ».
-  // Trois variantes rendent la séance (bannière sans coach, carte compacte, carte
-  // complète) : chacune porte `order-first` sous lg, et la colonne est une pile flex.
+test("la séance du jour vient en deuxième, juste sous « Bonjour », sur téléphone ET sur ordinateur", () => {
+  // Cyprien, 21/09/2026 : « c'est ce qui est très important sur mon application » (téléphone) ;
+  // 07/11/2026 : « avoir la séance juste en dessous de l'onglet Bonjour Cyprien » (ordinateur).
+  // Trois variantes rendent la séance (bannière sans coach, carte compacte, carte complète) :
+  // chacune porte `order-first`, SANS `lg:order-none`, et la colonne est une pile flex partout.
   const src = codeNu("src/components/dashboard/BentoDashboard.tsx");
-  assert.ok(/<div className="flex min-w-0 flex-col lg:block">/.test(src),
-    "la colonne principale n'est plus une pile flex sur mobile : `order-first` n'aurait aucun effet");
-  const variantes = [...src.matchAll(/order-first[^"]*lg:order-none/g)].length;
-  assert.equal(variantes, 3, `${variantes} variante(s) de la séance passent en tête, 3 attendues`);
+  assert.ok(/<div className="flex min-w-0 flex-col">/.test(src),
+    "la colonne principale n'est plus une pile flex : `order-first` n'aurait aucun effet");
+  const variantes = [...src.matchAll(/className="order-first [^"]*"/g)].map((m) => m[0]);
+  assert.equal(variantes.length, 3, `${variantes.length} variante(s) de la séance passent en tête, 3 attendues`);
+  for (const v of variantes) assert.ok(!/lg:order-none/.test(v), `la séance redescend sous la série sur ordinateur : ${v.slice(0, 80)}`);
+});
+
+test("les modules du tableau de bord vont du plus important au moins important", () => {
+  // 07/11/2026 (Cyprien : « du plus important au moins »). Colonne : séance, série, puis
+  // « Aujourd'hui » (forme, VFC, vitesse), l'objectif, « Activité », enfin « Charge & forme ».
+  // Rail : analyse de la dernière séance, la semaine, la discipline, les records, puis bilan
+  // Premium, badges et communauté.
+  const src = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  const ordre = (reperes: string[], ou: string) => {
+    const pos = reperes.map((r) => src.indexOf(r));
+    pos.forEach((p, i) => assert.ok(p > 0, `${ou} : repère introuvable ${reperes[i]}`));
+    for (let i = 1; i < pos.length; i++) assert.ok(pos[i - 1] < pos[i], `${ou} : « ${reperes[i - 1]} » doit précéder « ${reperes[i]} »`);
+  };
+  ordre(['<ProfileCompletionBanner', '<StreakCard', 't("dash.sec.today")', '<ObjectiveCard', 't("dash.sec.activity")', 't("dash.sec.load")'], "colonne");
+  // La bannière de profil est une invitation : DANS la colonne, sous la séance, plus au-dessus de « Bonjour ».
+  assert.ok(src.indexOf("<ProfileCompletionBanner") > src.indexOf('className="flex min-w-0 flex-col"'), "la bannière de profil repasse au-dessus de « Bonjour » et repousse la séance");
+  const rail = src.slice(src.indexOf("<aside"), src.indexOf("</aside>"));
+  const r = (x: string) => rail.indexOf(x);
+  const reperes = ["{analyse && (", 'dash.summary.title', 'disc.hasData', "{rl.records}", "<BilanSemaine", "plusLongueConnue > 0", "rl.community"];
+  const absents = reperes.filter((x) => r(x) < 0);
+  assert.deepEqual(absents, [], `rail : repères introuvables ${absents.join(", ")}`);
+  for (let i = 1; i < reperes.length; i++) assert.ok(r(reperes[i - 1]) < r(reperes[i]), `rail : « ${reperes[i - 1]} » doit précéder « ${reperes[i]} »`);
 });
 
 test("sur téléphone, le calendrier s'ouvre en vue Agenda (verticale), décidé côté serveur", () => {
@@ -281,13 +307,17 @@ test("l'accueil s'ouvre sur la séance du jour, pas sur une demande d'avis", () 
   // ⚠️ VISER LA BONNE CARTE : `coachKey.subtitle` existe dans DEUX variantes (compacte et
   // complète). Une assertion sur le fichier entier se satisfait de l'autre — mutation
   // passée au vert le 23/09/2026.
-  const iVerte = b.indexOf('order-first relative mb-5 overflow-hidden rounded-3xl p-5');
+  const iVerte = b.indexOf('order-first relative mb-5 overflow-hidden rounded-2xl p-5');
   assert.ok(iVerte > 0, "la carte complète de la séance du jour a disparu");
   const carte = b.slice(iVerte, b.indexOf("</motion.div>", iVerte));
-  assert.match(carte, /\{coachKey\.subtitle\}/, "la prescription a disparu de la carte — c'est elle qu'on vient lire");
+  assert.match(carte, /etapesSeance\(coachKey\.subtitle\)/, "la prescription n'est plus découpée en étapes");
+  assert.match(carte, /\{coachKey\.subtitle\}<\/p>/, "la prescription d'un seul tenant a disparu de la carte — c'est elle qu'on vient lire");
+  assert.match(carte, /\{e\.texte\}/, "les étapes de la prescription ne s'affichent plus");
   assert.match(carte, /<details className="group mt-4/, "le repli n'est plus dans la carte complète");
   // Le badge ne se coupe pas en deux sur un écran étroit.
-  assert.match(b, /whitespace-nowrap text-\[11px\] font-bold uppercase[^"]*">\{t\("dash\.coach\.badge"\)\}/, "le badge de la séance se coupe de nouveau sur deux lignes");
+  // 06/11/2026 : `badgeCoach` (« Séance du jour », ou « Prochaine séance · 7 nov. » quand ce
+  // n'est pas celle du jour) — sur une ligne, et tronqué plutôt que de déborder.
+  assert.match(b, /whitespace-nowrap [^"]*truncate[^"]*">\{badgeCoach\}/, "le badge de la séance se coupe de nouveau sur deux lignes");
   const n = [...readFileSync("src/lib/i18n/translations.ts", "utf8").matchAll(/"dash\.coach\.pourquoi":/g)].length;
   assert.equal(n, 5, `« dash.coach.pourquoi » présent ${n} fois, attendu 5`);
 });
@@ -305,8 +335,8 @@ test("l'objectif de l'entête tient sur une rangée — et reste UN seul lien", 
   assert.ok(!/pointer-events-none/.test(bloc), "`pointer-events-none` est revenu sur la rangée : il éteint aussi ce qu'elle contient");
   assert.match(bloc, /<span className="mt-2\.5 hidden items-center[^"]*sm:inline-flex/, "le bouton « Voir mon plan » n'est plus un habillage réservé au bureau");
   // Sur téléphone : pas de libellé « Objectif », un chevron à la place du bouton.
-  assert.match(bloc, /className="hidden text-\[10px\] font-semibold uppercase[^"]*sm:block">\{hl\.goal\}/, "le libellé « Objectif » est revenu sur téléphone, où le J‑32 le dit déjà");
-  assert.match(bloc, /<ChevronRight className="h-5 w-5 flex-shrink-0 text-\[#8aa6a6\] sm:hidden"/, "le chevron qui signale que la rangée est cliquable a disparu");
+  assert.match(bloc, /className="hidden [^"]*sm:block">\{hl\.goal\}/, "le libellé « Objectif » est revenu sur téléphone, où le J‑32 le dit déjà");
+  assert.match(bloc, /<ChevronRight className="h-5 w-5 flex-shrink-0 text-zinc-400 sm:hidden"/, "le chevron qui signale que la rangée est cliquable a disparu");
 });
 
 test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les réglages en dessous", () => {
@@ -352,7 +382,7 @@ test("sur téléphone, les plans d'entraînement se lisent en petites cartes et 
   // une LISTE à vignettes (photo 112 px à gauche, texte à droite) : 4 plans par écran à
   // 375 px, autant que les deux colonnes de petites cartes d'avant, et lisibles.
   assert.match(src, /grid grid-cols-1 gap-2\.5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3/, "la grille des plans a changé sur téléphone");
-  assert.match(src, /group relative flex overflow-hidden rounded-2xl [^"]*sm:flex-col sm:rounded-3xl/, "la carte n'est plus une ligne compacte sur téléphone");
+  assert.match(src, /group relative flex overflow-hidden rounded-2xl [^"]*sm:flex-col sm:rounded-2xl/, "la carte n'est plus une ligne compacte sur téléphone");
   assert.match(src, /relative h-auto w-28 flex-shrink-0 [^"]*sm:aspect-\[4\/3\] sm:w-full/, "la vignette photo n'est plus compacte sur téléphone");
   assert.match(src, /flex min-w-0 flex-1 flex-col p-3\.5 sm:p-4/, "les cartes de plans ont repris un grand rembourrage sur téléphone");
   // Le tableau des semaines (7 colonnes) ne tient pas en 375 px : une liste empilée le remplace.
@@ -376,6 +406,25 @@ test("le service worker ne s'installe pas en développement", () => {
   assert.ok(i > 0, "l'enregistrement du service worker a disparu");
   assert.ok(/process\.env\.NODE_ENV !== "production"/.test(src.slice(Math.max(0, i - 400), i)),
     "le service worker s'enregistre aussi en développement : le cache resservira du CSS périmé");
+});
+
+test("« Mes activités » ouvre la LISTE DES SORTIES, et reste allumé sur ses onglets", () => {
+  // Cyprien, 23/10/2026 : « je viens de faire une sortie vélo et je ne la vois pas dans mes
+  // activités ». Elle était synchronisée depuis 11 h 53 — mais l'entrée « Mes activités »
+  // ouvrait la Vitrine (trophées), qui n'affiche aucune sortie.
+  const entree = NAV_GROUPES.flatMap((g) => g.items).find((d) => d.tk === "nav.performances");
+  assert.equal(entree?.href, "/dashboard/activites", "« Mes activités » n'ouvre plus la liste des sorties");
+  // Les onglets frères et la fiche d'une séance gardent l'entrée allumée : sans cela, on
+  // ne sait plus où l'on est dès qu'on change d'onglet.
+  for (const p of ["/dashboard/activites", "/dashboard/trophees", "/dashboard/segments", "/dashboard/activite", "/dashboard/survol"]) {
+    assert.ok(estActive(p, "/dashboard/activites"), `« Mes activités » s'éteint sur ${p}`);
+  }
+  assert.ok(!estActive("/dashboard/health", "/dashboard/activites"), "« Mes activités » s'allume hors de son sujet");
+  // Une seule entrée allumée à la fois, quelle que soit la page.
+  for (const p of ["/dashboard/trophees", "/dashboard/activite", "/dashboard/health", "/dashboard/calendrier"]) {
+    const allumees = NAV_GROUPES.flatMap((g) => g.items).filter((d) => estActive(p, d.href)).map((d) => d.href);
+    assert.equal(allumees.length, 1, `${p} allume ${allumees.length} entrées : ${allumees.join(", ")}`);
+  }
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

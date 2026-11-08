@@ -254,7 +254,6 @@ test("plus aucun écran ni route de l'athlète ne date en UTC", () => {
     "src/lib/intervals/syncUser.ts": "borne « newest » d'une requête intervals.icu",
     "src/app/api/intervals/sync/route.ts": "borne « newest » d'une requête intervals.icu",
     "src/app/api/intervals/debug/route.ts": "borne d'une requête de diagnostic",
-    "src/app/api/intervals/credentials/route.ts": "borne d'une requête de validation de clé",
     "src/app/api/admin/generate-plan/route.ts": "borne « newest » d'une requête intervals.icu",
   };
   const fichiers: string[] = [];

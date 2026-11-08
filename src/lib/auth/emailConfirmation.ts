@@ -131,6 +131,59 @@ const R: Record<string, Bloc> = {
   },
 };
 
+/**
+ * LE PREMIER MOT DE PASSE d'un compte ouvert avec Google — même lien que la réinitialisation,
+ * autres mots. Ajouté le 11/10/2026, quand l'écran de connexion s'est mis à proposer « Je
+ * préfère un mot de passe » aux comptes Google (voir `components/auth/AideCompte`).
+ */
+const P: Record<string, Bloc> = {
+  fr: {
+    objet: "Choisis ton mot de passe — Pacevo",
+    titre: "Ton mot de passe",
+    p1: "Ton compte Pacevo s'ouvre avec {fournisseur}. Choisis un mot de passe pour pouvoir aussi te connecter avec ton adresse e-mail ; {fournisseur} continuera de marcher.",
+    bouton: "Choisir mon mot de passe",
+    p2: "Ce lien expire dans une heure et ne sert qu'une fois.",
+    secours: "Si le bouton ne fonctionne pas, copie cette adresse dans ton navigateur :",
+    pied: "Tu reçois ce message parce qu'un mot de passe a été demandé pour cette adresse. Si ce n'est pas toi, ignore-le : ton compte n'a pas changé.",
+  },
+  en: {
+    objet: "Choose your password — Pacevo",
+    titre: "Your password",
+    p1: "Your Pacevo account opens with {fournisseur}. Choose a password so you can also log in with your email address; {fournisseur} will keep working.",
+    bouton: "Choose my password",
+    p2: "This link expires in one hour and works once.",
+    secours: "If the button doesn't work, copy this address into your browser:",
+    pied: "You're getting this because a password was requested for this address. If it wasn't you, ignore it: your account hasn't changed.",
+  },
+  de: {
+    objet: "Wähle dein Passwort — Pacevo",
+    titre: "Dein Passwort",
+    p1: "Dein Pacevo-Konto öffnet sich mit {fournisseur}. Wähle ein Passwort, um dich auch mit deiner E-Mail-Adresse anzumelden; {fournisseur} funktioniert weiterhin.",
+    bouton: "Mein Passwort wählen",
+    p2: "Dieser Link läuft in einer Stunde ab und funktioniert einmal.",
+    secours: "Wenn der Button nicht funktioniert, kopiere diese Adresse in deinen Browser:",
+    pied: "Du erhältst diese Nachricht, weil für diese Adresse ein Passwort angefordert wurde. Warst du das nicht, ignoriere sie: Dein Konto ist unverändert.",
+  },
+  es: {
+    objet: "Elige tu contraseña — Pacevo",
+    titre: "Tu contraseña",
+    p1: "Tu cuenta Pacevo se abre con {fournisseur}. Elige una contraseña para entrar también con tu dirección de correo; {fournisseur} seguirá funcionando.",
+    bouton: "Elegir mi contraseña",
+    p2: "Este enlace caduca en una hora y sirve una sola vez.",
+    secours: "Si el botón no funciona, copia esta dirección en tu navegador:",
+    pied: "Recibes este mensaje porque se pidió una contraseña para esta dirección. Si no has sido tú, ignóralo: tu cuenta no ha cambiado.",
+  },
+  pt: {
+    objet: "Escolhe a tua palavra-passe — Pacevo",
+    titre: "A tua palavra-passe",
+    p1: "A tua conta Pacevo abre-se com {fournisseur}. Escolhe uma palavra-passe para entrares também com o teu endereço de e-mail; o {fournisseur} continua a funcionar.",
+    bouton: "Escolher a minha palavra-passe",
+    p2: "Esta ligação expira numa hora e serve uma única vez.",
+    secours: "Se o botão não funcionar, copia este endereço para o teu navegador:",
+    pied: "Recebes esta mensagem porque foi pedida uma palavra-passe para este endereço. Se não foste tu, ignora-a: a tua conta não mudou.",
+  },
+};
+
 /** Rendu commun aux deux e-mails d'authentification : un bouton, un lien de secours. */
 function rendreEmailLien(t: Bloc, base: string, lien: string): { objet: string; html: string; texte: string } {
   const corps = `
@@ -156,6 +209,16 @@ export function emailInscription(lang: string, base: string, lien: string): { ob
   return rendreEmailLien(T[lang] ?? T.fr, base, lien);
 }
 
-export function emailReinitialisation(lang: string, base: string, lien: string): { objet: string; html: string; texte: string } {
-  return rendreEmailLien(R[lang] ?? R.fr, base, lien);
+/**
+ * Réinitialisation — ou PREMIER mot de passe d'un compte ouvert avec Google/Apple
+ * (`premier`) : le même lien `recovery` sert aux deux (GoTrue v2.197 : `addingFirstPassword`),
+ * mais « réinitialise ton mot de passe » serait faux pour qui n'en a jamais eu.
+ */
+export function emailReinitialisation(
+  lang: string, base: string, lien: string, premier: "google" | "apple" | null = null,
+): { objet: string; html: string; texte: string } {
+  if (!premier) return rendreEmailLien(R[lang] ?? R.fr, base, lien);
+  const t = P[lang] ?? P.fr;
+  const nom = premier === "apple" ? "Apple" : "Google";
+  return rendreEmailLien({ ...t, p1: t.p1.replaceAll("{fournisseur}", nom) }, base, lien);
 }

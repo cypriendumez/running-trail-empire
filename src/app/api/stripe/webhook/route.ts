@@ -104,6 +104,16 @@ export async function POST(req: Request) {
     return typeof t === "number" && t > 0 ? new Date(t * 1000).toISOString().slice(0, 10) : null;
   };
 
+  /** L'instant de la souscription : il ouvre les 14 jours de rétractation. */
+  const souscriptionDe = (sub: Stripe.Subscription): string | null =>
+    typeof sub.created === "number" && sub.created > 0 ? new Date(sub.created * 1000).toISOString() : null;
+
+  /** Mensuel ou annuel : seul l'annuel doit être annoncé avant sa reconduction. */
+  const intervalleDe = (sub: Stripe.Subscription): "mois" | "an" | null => {
+    const i = sub.items?.data?.[0]?.price?.recurring?.interval;
+    return i === "year" ? "an" : i === "month" ? "mois" : null;
+  };
+
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated": {
@@ -132,6 +142,8 @@ export async function POST(req: Request) {
         // Un abonnement redevenu actif efface l'échec précédent : Stripe ne repasse pas
         // en `active` tant que le paiement n'est pas passé.
         echecPaiement: sub.status === "past_due" || sub.status === "unpaid",
+        souscritLe: souscriptionDe(sub),
+        intervalle: intervalleDe(sub),
       });
       break;
     }
@@ -145,7 +157,10 @@ export async function POST(req: Request) {
       }).eq("id", userId);
       // Son échec laisse un accès payant à quelqu'un qui ne paie plus.
       if (eFin) echecs.push(`fin d'accès de ${userId} : ${eFin.message}`);
-      await memoriserEtat(userId, { statut: "canceled", periodeFin: null, annuleALaFin: false, echecPaiement: false });
+      await memoriserEtat(userId, {
+        statut: "canceled", periodeFin: null, annuleALaFin: false, echecPaiement: false,
+        souscritLe: null, intervalle: null,
+      });
       break;
     }
     /**
@@ -175,6 +190,9 @@ export async function POST(req: Request) {
         periodeFin: typeof precedent.periodeFin === "string" ? precedent.periodeFin : null,
         annuleALaFin: precedent.annuleALaFin === true,
         echecPaiement: true,
+        // Un échec de carte ne change ni la date de souscription ni la périodicité.
+        souscritLe: typeof precedent.souscritLe === "string" ? precedent.souscritLe : null,
+        intervalle: precedent.intervalle === "mois" || precedent.intervalle === "an" ? precedent.intervalle : null,
       });
       break;
     }

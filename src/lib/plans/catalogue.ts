@@ -1,4 +1,5 @@
 import { longRunPeakKm, longRunShare, type RaceGoal } from "@/lib/running/volume";
+import { niveauDeVma as niveauMesure, type NiveauCoureur } from "@/lib/running/niveau";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  LES PLANS TOUT CONSTRUITS — EN PLUS DU COACH, JAMAIS À SA PLACE.
@@ -23,15 +24,13 @@ import { longRunPeakKm, longRunShare, type RaceGoal } from "@/lib/running/volume
 //  à quelqu'un qui en court 20 serait une invitation à la blessure.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Niveau, déduit de la VMA — MÊMES bornes que `libLevel` dans coachContext (une seule échelle). */
-export type Niveau = "debutant" | "intermediaire" | "confirme" | "elite";
+/** Niveau d'un PLAN : l'échelle unique de `lib/running/niveau`, celle du coach et de
+ *  l'étiquette affichée. Sans VMA, un plan part prudent — débutant —, là où l'étiquette,
+ *  elle, dit « à évaluer » : on choisit un plan sans mesure, on n'affiche pas un niveau inventé. */
+export type Niveau = NiveauCoureur;
 
 export function niveauDeVma(vma: number | null | undefined): Niveau {
-  const v = Number(vma);
-  if (!Number.isFinite(v) || v < 13) return "debutant";
-  if (v < 16) return "intermediaire";
-  if (v < 19) return "confirme";
-  return "elite";
+  return niveauMesure(vma) ?? "debutant";
 }
 
 export type CleProgramme = "km5" | "km10" | "semi" | "marathon" | "trail" | "debutant" | "vitesse" | "blessure" | "poids";

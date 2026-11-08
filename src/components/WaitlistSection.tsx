@@ -28,20 +28,18 @@ export function WaitlistSection() {
     // IA ». Le vert relie la section au hero (piste + pelouse) et au bouton de l'app.
     <section id="liste-attente" className="relative overflow-hidden bg-gradient-to-b from-emerald-600 via-emerald-700 to-emerald-800 py-20 text-white sm:py-24 scroll-mt-16">
       {/* Deux lueurs douces + un voile de grain : de la profondeur, pour ne pas faire aplat. */}
-      <div className="pointer-events-none absolute -left-24 top-0 h-72 w-72 rounded-full bg-emerald-400/25 blur-3xl" />
-      <div className="pointer-events-none absolute -right-16 bottom-0 h-72 w-72 rounded-full bg-teal-300/20 blur-3xl" />
       {/* Fondu du bas vers le blanc : la section suivante (partenaires montres) est blanche.
           Sans ça, le vert se coupait net contre le blanc — une « bande » dure en bas. */}
       <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-24 bg-gradient-to-b from-transparent to-white" />
 
       <div className="relative mx-auto max-w-xl px-6 text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">{L.eyebrow}</p>
-        <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">{L.title}</h2>
+        <p className="text-xs font-semibold text-emerald-100 first-letter:uppercase">{L.eyebrow}</p>
+        <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{L.title}</h2>
         <p className="mt-4 text-emerald-50/90">{L.subtitle}</p>
 
         {/* Le formulaire dans un PANNEAU BLANC net posé sur le vert : lisible, « produit »,
             à l'opposé de la carte sombre translucide qu'on avait. */}
-        <div className="mx-auto mt-8 max-w-md rounded-3xl bg-white p-6 text-left shadow-2xl shadow-emerald-900/30 sm:p-7">
+        <div className="mx-auto mt-8 max-w-md rounded-2xl bg-white p-6 text-left shadow-[0_8px_24px_rgba(0,0,0,0.10)] sm:p-7">
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center text-sm font-medium text-emerald-800">
             {injecte(L.offer)}
           </div>

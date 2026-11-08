@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { reseauGenereux, DUREE_MIN_MS, DUREE_MAX_MS } from "../src/components/layout/EcranLancement";
-import { CLE_SESSION_LANCEMENT } from "../src/lib/ui/lancement";
+import { CLE_SESSION_LANCEMENT, SLOGAN_LANCEMENT } from "../src/lib/ui/lancement";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -26,12 +26,18 @@ console.log("\n=== ÉCRAN DE LANCEMENT ===\n");
 
 test("il est rendu par le serveur, AVANT la page, et masqué d'office s'il a déjà été vu", () => {
   const layout = codeNu("src/app/dashboard/layout.tsx");
-  const decor = layout.indexOf('id="lancement"');
+  const decor = layout.indexOf("<DecorLancement langue={langue} />");
   const script = layout.indexOf("sessionStorage.getItem(${JSON.stringify(CLE_SESSION_LANCEMENT)})");
   const page = layout.indexOf("{children}");
   assert.ok(decor > 0 && script > decor && page > script, "le décor et son script doivent précéder la page");
-  assert.match(layout, /id="lancement" aria-hidden="true" suppressHydrationWarning/);
   assert.match(layout, /<EcranLancement \/>/);
+  // Le décor est un composant SERVEUR (refait le 02/10/2026) : sans « use client », il est
+  // dans le HTML de la première réponse — rien n'attend le JavaScript.
+  const decorSrc = codeNu("src/components/layout/DecorLancement.tsx");
+  assert.doesNotMatch(decorSrc, /"use client"/);
+  assert.match(decorSrc, /id="lancement" aria-hidden="true" suppressHydrationWarning/);
+  assert.match(decorSrc, /\{SLOGAN_LANCEMENT\[langue\]\}/);
+  for (const l of ["fr", "en", "de", "es", "pt"] as const) assert.ok(SLOGAN_LANCEMENT[l]?.trim(), `slogan ${l}`);
 });
 
 test("la clé de session vit dans un module neutre, pas dans le composant client", () => {
@@ -60,8 +66,18 @@ test("le préchauffage respecte l'économie de données et les réseaux lents", 
 });
 
 test("l'animation s'efface pour qui a demandé moins de mouvement", () => {
-  assert.match(CSS, /@media \(prefers-reduced-motion: reduce\) \{\s*\.lancement-logo, \.lancement-nom, \.lancement-barre > span \{ animation: none; \}/);
+  // CHAQUE classe animée de l'écran doit figurer dans la règle « moins de mouvement » :
+  // une animation ajoutée sans y être continuerait de tourner pour qui l'a refusée.
+  const regle = CSS.match(/@media \(prefers-reduced-motion: reduce\) \{\s*([^{]*)\{ animation: none; \}\s*#lancement, \.lancement-contenu \{ transition: none; \}/);
+  assert.ok(regle, "la règle « moins de mouvement » de l'écran de lancement a disparu");
+  const figees = new Set(regle![1].split(",").map((x) => x.trim()));
+  const animees = [...CSS.matchAll(/^(\.lancement-[\w-]+) \{[^}]*animation:/gm)].map((m) => m[1]);
+  assert.ok(animees.length >= 6, `${animees.length} classes animées trouvées`);
+  for (const c of animees) assert.ok(figees.has(c), `${c} s'anime encore pour qui a demandé moins de mouvement`);
   assert.match(CSS, /#lancement\[data-vu\] \{ display: none; \}/);
+  // Le démarrage natif de l'application installée prend le vert de l'écran : pas de flash.
+  const fondNatif = JSON.parse(readFileSync("public/manifest.json", "utf8")).background_color.toLowerCase();
+  assert.match(CSS.match(/\.lancement-fond \{[\s\S]*?\n\}/)![0].toLowerCase(), new RegExp(fondNatif), "le démarrage natif et l'écran de lancement n'ont plus le même vert");
   assert.match(CSS, /#lancement\[data-sortie\] \{ opacity: 0; visibility: hidden; pointer-events: none; \}/, "l'écran qui s'efface ne doit plus capter les clics");
 });
 

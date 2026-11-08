@@ -88,7 +88,9 @@ test("la page d'accueil n'emploie plus de gris illisible sur fond clair", () => 
 test("le surtitre partagé garde la couleur lisible", () => {
   // `Container` porte ce surtitre sur quatre écrans : la régression y serait multipliée.
   const src = readFileSync("src/components/ui/Container.tsx", "utf8");
-  assert.ok(/tracking-\[0\.18em\] text-\[#047857\]/.test(src),
+  // 06/11/2026 (passe « unslop ») : le surtitre est en casse de phrase, sans espacement ;
+  // c'est sa COULEUR que ce test garde.
+  assert.ok(/<p className="[^"]*text-\[#047857\][^"]*">\{eyebrow\}/.test(src),
     "le surtitre de Container est repassé à une couleur sous le seuil");
 });
 

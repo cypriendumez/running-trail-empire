@@ -15,9 +15,10 @@ import { Play } from "lucide-react";
 import { splitPace, type Split } from "@/lib/segments/splits";
 import { SegmentMapLazy } from "@/components/segments/SegmentMapLazy";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { kmhDepuisAllure, chiffreKmh } from "@/lib/activities/vitesse";
 
 export type Chiffre = { label: string; value: string };
-/** Un meilleur effort, déjà mis en forme côté serveur (chrono + allure). */
+/** Un meilleur effort, déjà mis en forme côté serveur (chrono + allure, ou vitesse à vélo). */
 export type EffortVu = { cle: string; label: string; chrono: string; allure: string };
 
 const paceLabel = (secParKm: number) => {
@@ -30,7 +31,7 @@ const paceLabel = (secParKm: number) => {
  *  « écran inachevé » alors qu'il ne manque aucune donnée. */
 const combler = (n: number, colonnes = 4) => Array.from({ length: (colonnes - (n % colonnes)) % colonnes });
 
-export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [], forme = [], survolHref = null }: {
+export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [], forme = [], survolHref = null, enVitesse = false }: {
   polyline: string | null;
   chiffres: Chiffre[];
   splits: Split[];
@@ -40,6 +41,8 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
   forme?: Chiffre[];
   /** Lien vers le survol 3D DE CETTE sortie. Absent quand la trace ne le permet pas. */
   survolHref?: string | null;
+  /** Vélo : le découpage se lit en km/h, pas en allure (lib/activities/vitesse). */
+  enVitesse?: boolean;
 }) {
   const { t } = useT();
   // Barres proportionnelles à l'allure : la plus rapide occupe toute la largeur.
@@ -72,8 +75,8 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
         <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-4">
           {chiffres.map((c) => (
             <div key={c.label} className="bg-white p-4">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{c.label}</div>
-              <div className="mt-1 text-2xl font-black tracking-tight text-zinc-900">{c.value}</div>
+              <div className="text-[11px] font-semibold text-zinc-500 first-letter:uppercase">{c.label}</div>
+              <div className="mt-1 text-2xl font-semibold tracking-tight text-zinc-900">{c.value}</div>
             </div>
           ))}
           {combler(chiffres.length).map((_, i) => <div key={`vide-${i}`} className="hidden bg-white sm:block" />)}
@@ -83,7 +86,7 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
       {efforts.length > 0 && (
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
           <div className="border-b border-zinc-100 px-4 py-3">
-            <h2 className="text-sm font-bold text-zinc-900">{t("eff.titre")}</h2>
+            <h2 className="text-sm font-semibold text-zinc-900">{t("eff.titre")}</h2>
             {/* La nuance compte : ce n'est PAS le premier kilomètre, c'est le plus rapide. */}
             <p className="mt-0.5 text-xs text-zinc-500">{t("eff.sous")}</p>
           </div>
@@ -91,7 +94,7 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
             {efforts.map((e) => (
               <li key={e.cle} className="flex items-baseline gap-3 px-4 py-2.5">
                 <span className="w-28 shrink-0 text-sm font-semibold text-zinc-700">{e.label}</span>
-                <span className="text-lg font-black tabular-nums tracking-tight text-zinc-900">{e.chrono}</span>
+                <span className="text-lg font-semibold tabular-nums tracking-tight text-zinc-900">{e.chrono}</span>
                 <span className="ml-auto text-sm font-medium tabular-nums text-zinc-500">{e.allure}</span>
               </li>
             ))}
@@ -102,14 +105,14 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
       {forme.length > 0 && (
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
           <div className="border-b border-zinc-100 px-4 py-3">
-            <h2 className="text-sm font-bold text-zinc-900">{t("act.forme")}</h2>
+            <h2 className="text-sm font-semibold text-zinc-900">{t("act.forme")}</h2>
             <p className="mt-0.5 text-xs text-zinc-500">{t("act.formeSous")}</p>
           </div>
           <div className="grid grid-cols-2 gap-px bg-zinc-100 sm:grid-cols-4">
             {forme.map((c) => (
               <div key={c.label} className="bg-white px-4 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{c.label}</div>
-                <div className="mt-0.5 text-xl font-black tracking-tight text-zinc-900">{c.value}</div>
+                <div className="text-[11px] font-semibold text-zinc-500 first-letter:uppercase">{c.label}</div>
+                <div className="mt-0.5 text-xl font-semibold tracking-tight text-zinc-900">{c.value}</div>
               </div>
             ))}
             {combler(forme.length).map((_, i) => <div key={`vide-${i}`} className="hidden bg-white sm:block" />)}
@@ -121,13 +124,14 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
 
       {splits.length > 0 && (
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-          <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-bold text-zinc-900">{t("act.splits")}</h2>
-          <div className="grid grid-cols-[2.5rem_3.5rem_1fr_3rem] gap-2 border-b border-zinc-100 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-            <span>Km</span><span>Allure</span><span /><span className="text-right">{t("act.elev")}</span>
+          <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-900">{t("act.splits")}</h2>
+          <div className="grid grid-cols-[2.5rem_3.5rem_1fr_3rem] gap-2 border-b border-zinc-100 px-4 py-2 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">
+            <span>Km</span><span>{enVitesse ? "km/h" : t("feed.pace")}</span><span /><span className="text-right">{t("act.elev")}</span>
           </div>
           <div className="divide-y divide-zinc-50">
             {splits.map((s) => {
               const pace = splitPace(s);
+              const kmh = enVitesse && pace ? kmhDepuisAllure(pace) : null;
               // Largeur relative : la plus rapide remplit, la plus lente garde 45 %.
               const largeur = pace && pire > meilleure
                 ? 45 + 55 * (1 - (pace - meilleure) / (pire - meilleure))
@@ -135,12 +139,12 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
               return (
                 <div key={s.km} className="grid grid-cols-[2.5rem_3.5rem_1fr_3rem] items-center gap-2 px-4 py-1.5 text-sm">
                   <span className="font-semibold text-zinc-700">{s.km}</span>
-                  <span className="tabular-nums text-zinc-900">{pace ? paceLabel(pace) : "—"}</span>
+                  <span className="tabular-nums text-zinc-900">{kmh != null ? chiffreKmh(kmh) : pace ? paceLabel(pace) : "—"}</span>
                   <span className="flex items-center gap-2">
                     <span className="h-4 rounded-sm bg-emerald-500" style={{ width: `${largeur}%` }} />
                     {/* Le tronçon incomplet est ÉTIQUETÉ, jamais présenté comme un km plein. */}
                     {s.partial && (
-                      <span className="shrink-0 text-[10px] text-zinc-400">
+                      <span className="shrink-0 text-[11px] text-zinc-400">
                         {s.distanceKm.toFixed(2).replace(".", ",")} km
                       </span>
                     )}
@@ -149,7 +153,7 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
                         comprendrait pas pourquoi son chrono total ne colle pas à la
                         somme des allures. */}
                     {s.stoppedSeconds > 30 && (
-                      <span className="shrink-0 text-[10px] text-amber-600">
+                      <span className="shrink-0 text-[11px] text-amber-600">
                         {t("act.stopped", { n: Math.floor(s.stoppedSeconds / 60) })}
                       </span>
                     )}
@@ -163,8 +167,7 @@ export function StravaBlocks({ polyline, chiffres, splits, profil, efforts = [],
             })}
           </div>
           <p className="border-t border-zinc-100 px-4 py-2 text-[11px] text-zinc-400">
-            Allures calculées sur le temps en mouvement, à partir de la trace GPS.
-            Les arrêts de plus de 30 s sont signalés et exclus de l&apos;allure.
+            {t(enVitesse ? "act.splitsNoteKmh" : "act.splitsNote")}
           </p>
         </section>
       )}
@@ -188,14 +191,14 @@ function ProfilAltitude({ points }: { points: { d: number; alt: number }[] }) {
   return (
     <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4">
       <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-sm font-bold text-zinc-900">Altitude</h2>
+        <h2 className="text-sm font-semibold text-zinc-900">Altitude</h2>
         <span className="text-xs text-zinc-400">{Math.round(min)} – {Math.round(max)} m</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-32 w-full">
         <path d={`${chemin} L ${W} ${H} L 0 ${H} Z`} fill="#d4d4d8" />
         <path d={chemin} fill="none" stroke="#71717a" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />
       </svg>
-      <div className="mt-1 flex justify-between text-[10px] text-zinc-400">
+      <div className="mt-1 flex justify-between text-[11px] text-zinc-400">
         <span>0 km</span><span>{dMax.toFixed(1).replace(".", ",")} km</span>
       </div>
     </section>

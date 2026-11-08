@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { estAdmin } from "@/lib/admin/acces";
+import { serieVfc } from "@/lib/health/vfc";
+import { enteteIntervals } from "@/lib/intervals/auth";
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 // gemini-2.5-flash = free tier, gemini-2.5-flash = requires billing
@@ -12,7 +14,7 @@ const GEMINI_URL = (model: string = "gemini-2.5-flash") =>
 const ICU_BASE = "https://intervals.icu/api/v1";
 
 function icuAuth(apiKey: string) {
-  return "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64");
+  return enteteIntervals(apiKey);
 }
 
 export async function POST(req: NextRequest) {
@@ -95,8 +97,8 @@ export async function POST(req: NextRequest) {
         hrv_sdnn: w.hrvSDNN ?? null,
         sleep_hours: w.sleepSecs ? +(w.sleepSecs / 3600).toFixed(1) : null,
         sleep_score: w.sleepScore ?? null,
-        body_battery: w.bb ?? null,
-        spo2: w.avgSpo2 ?? null,
+        // Noms du modèle `Wellness` de l'API : ni `avgSpo2` ni Body Battery n'y existent (12/10/2026).
+        spo2: w.spO2 ?? null,
         resting_hr: w.restingHR ?? null,
         form: w.form ?? null,
         fatigue: w.atl ?? null,
@@ -123,7 +125,9 @@ export async function POST(req: NextRequest) {
       elevation_m: w.elevation_gain_m,
       avg_hr: w.avg_hr, tss: w.tss,
     }));
-    fallbackHrv = (hRes.data ?? []).map((h: any) => ({ date: h.date, hrv: h.hrv_ms, state: h.physiological_state }));
+    // UNE mesure de VFC, état face à SA base (lib/health/vfc) — jamais `hrv_ms` brut.
+    const serie = serieVfc((hRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
+    fallbackHrv = serie.lignes.map((h) => ({ date: h.date, hrv: h.hrv_ms, mesure: serie.metrique, state: h.physiological_state }));
     fallbackSleep = (sRes.data ?? []).map((s: any) => ({ date: s.date, sleep_hours: s.total_sleep_min ? +(s.total_sleep_min / 60).toFixed(1) : null, score: s.sleep_score, body_battery: s.body_battery_end }));
   }
 

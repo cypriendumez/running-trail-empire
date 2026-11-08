@@ -788,7 +788,7 @@ function FilterSection({ title, children, defaultOpen = true }: {
     <div className="border-b border-zinc-100 last:border-0 pb-4 mb-4 last:mb-0 last:pb-0">
       <button onClick={() => setOpen(o => !o)}
         className="flex items-center justify-between w-full text-left mb-3 group">
-        <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest group-hover:text-zinc-800 transition-colors">{title}</span>
+        <span className="text-xs font-semibold text-zinc-500 group-hover:text-zinc-800 transition-colors first-letter:uppercase">{title}</span>
         {open ? <ChevronUp className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />}
       </button>
       {open && children}
@@ -897,7 +897,7 @@ export function ShoppingHub() {
       <div className="pb-10">
         {/* Hero search */}
         <div className="max-w-2xl mx-auto py-10 px-4 text-center">
-          <h1 className="text-3xl font-black text-zinc-900 mb-2">{d["title"]}</h1>
+          <h1 className="text-3xl font-semibold text-zinc-900 mb-2">{d["title"]}</h1>
           <p className="text-zinc-400 text-sm mb-8">{d["subtitle"]}</p>
 
           <div ref={searchRef} className="relative">
@@ -941,12 +941,12 @@ export function ShoppingHub() {
           {CATEGORIES.map(c => (
             <button key={c.key} onClick={() => setCategory(c.key)}
               className="flex flex-col items-center gap-2 group">
-              <div className="w-full aspect-square rounded-2xl overflow-hidden border-2 border-zinc-100 group-hover:border-zinc-900 transition-all shadow-sm">
+              <div className="w-full aspect-square rounded-2xl overflow-hidden border-2 border-zinc-100 group-hover:border-zinc-900 transition shadow-sm">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`https://images.unsplash.com/${c.img}?w=200&h=200&fit=crop&q=75`}
                   alt={d[`cat.${c.key}`] ?? c.label}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover transition-transform duration-300"
                 />
               </div>
               <span className="text-xs font-semibold text-zinc-600 group-hover:text-zinc-900 text-center leading-tight transition-colors">{d[`cat.${c.key}`] ?? c.label}</span>
@@ -956,11 +956,11 @@ export function ShoppingHub() {
 
         {/* Popular searches */}
         <div className="max-w-2xl mx-auto px-4 mt-10">
-          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-3">{d["popular"]}</p>
+          <p className="text-xs font-semibold text-zinc-400 mb-3 first-letter:uppercase">{d["popular"]}</p>
           <div className="flex flex-wrap gap-2">
             {["Nike Vaporfly", "Hoka Speedgoat", "Garmin Fenix 7", "Salomon Speedcross", "Adidas Adizero", "Trail shoes", "GPS watch", "Hydration vest"].map(q => (
               <button key={q} onMouseDown={() => submitSearch(q)}
-                className="px-4 py-2 bg-zinc-100 hover:bg-zinc-900 hover:text-white text-zinc-600 text-xs font-medium rounded-full transition-all">
+                className="px-4 py-2 bg-zinc-100 hover:bg-zinc-900 hover:text-white text-zinc-600 text-xs font-medium rounded-full transition">
                 {q}
               </button>
             ))}
@@ -1053,7 +1053,7 @@ export function ShoppingHub() {
         <aside className="hidden lg:block w-52 shrink-0 space-y-0">
           <div className="sticky top-4 bg-white border border-zinc-200 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-bold text-zinc-900 flex items-center gap-2">
+              <span className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
                 <SlidersHorizontal className="w-4 h-4" /> {d["filters"]}
               </span>
               {activeFilterCount > 0 && (
@@ -1069,7 +1069,7 @@ export function ShoppingHub() {
               <div className="space-y-1.5">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <div onClick={() => setCategory("all")}
-                    className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${category === "all" ? "bg-zinc-900 border-zinc-900" : "border-zinc-300"}`}>
+                    className={`w-4 h-4 rounded border transition flex items-center justify-center ${category === "all" ? "bg-zinc-900 border-zinc-900" : "border-zinc-300"}`}>
                     {category === "all" && <Check className="w-3 h-3 text-white" />}
                   </div>
                   <span className="text-sm text-zinc-700">{d["all"]} ({PRODUCTS.length})</span>
@@ -1079,7 +1079,7 @@ export function ShoppingHub() {
                   return (
                     <label key={c.key} className="flex items-center gap-2 cursor-pointer">
                       <div onClick={() => setCategory(category === c.key ? "all" : c.key)}
-                        className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${category === c.key ? "bg-zinc-900 border-zinc-900" : "border-zinc-300 hover:border-zinc-500"}`}>
+                        className={`w-4 h-4 rounded border transition flex items-center justify-center ${category === c.key ? "bg-zinc-900 border-zinc-900" : "border-zinc-300 hover:border-zinc-500"}`}>
                         {category === c.key && <Check className="w-3 h-3 text-white" />}
                       </div>
                       <span className="text-sm text-zinc-700">{c.emoji} {d[`cat.${c.key}`] ?? c.label} <span className="text-zinc-400">({cnt})</span></span>
@@ -1098,7 +1098,7 @@ export function ShoppingHub() {
                   return (
                     <label key={b} className="flex items-center gap-2 cursor-pointer group">
                       <div onClick={() => toggleBrand(b)}
-                        className={`w-4 h-4 rounded border transition-all flex items-center justify-center shrink-0 ${selectedBrands.has(b) ? "bg-zinc-900 border-zinc-900" : "border-zinc-300 group-hover:border-zinc-500"}`}>
+                        className={`w-4 h-4 rounded border transition flex items-center justify-center shrink-0 ${selectedBrands.has(b) ? "bg-zinc-900 border-zinc-900" : "border-zinc-300 group-hover:border-zinc-500"}`}>
                         {selectedBrands.has(b) && <Check className="w-3 h-3 text-white" />}
                       </div>
                       <span className="text-sm text-zinc-700 flex-1">{b}</span>
@@ -1124,7 +1124,7 @@ export function ShoppingHub() {
                 <div className="flex gap-1.5 flex-wrap">
                   {[[0,100],[0,200],[0,350],[0,600]].map(([a,b]) => (
                     <button key={`${a}-${b}`} onClick={() => setPriceRange([a,b])}
-                      className={`text-xs px-2 py-1 rounded-lg border transition-all ${priceRange[0]===a && priceRange[1]===b ? "bg-zinc-900 text-white border-zinc-900" : "border-zinc-200 text-zinc-500 hover:border-zinc-400"}`}>
+                      className={`text-xs px-2 py-1 rounded-lg border transition ${priceRange[0]===a && priceRange[1]===b ? "bg-zinc-900 text-white border-zinc-900" : "border-zinc-200 text-zinc-500 hover:border-zinc-400"}`}>
                       &lt;{b}€
                     </button>
                   ))}
@@ -1136,7 +1136,7 @@ export function ShoppingHub() {
             <FilterSection title={d["f.score"]}>
               <div className="space-y-2">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-black text-zinc-900">{minScore || d["all"]}</span>
+                  <span className="text-xl font-semibold text-zinc-900">{minScore || d["all"]}</span>
                   {minScore > 0 && <span className="text-xs text-zinc-400">/100</span>}
                 </div>
                 <input aria-label={d["a.noteMin"]} type="range" min={0} max={95} step={5} value={minScore}
@@ -1145,7 +1145,7 @@ export function ShoppingHub() {
                 <div className="flex gap-1">
                   {[0,75,85,90].map(v => (
                     <button key={v} onClick={() => setMinScore(v)}
-                      className={`text-xs px-2 py-1 rounded-lg border transition-all ${minScore===v ? "bg-zinc-900 text-white border-zinc-900" : "border-zinc-200 text-zinc-500 hover:border-zinc-400"}`}>
+                      className={`text-xs px-2 py-1 rounded-lg border transition ${minScore===v ? "bg-zinc-900 text-white border-zinc-900" : "border-zinc-200 text-zinc-500 hover:border-zinc-400"}`}>
                       {v===0 ? d["all"] : `≥${v}`}
                     </button>
                   ))}
@@ -1159,7 +1159,7 @@ export function ShoppingHub() {
                 <span className="text-sm text-zinc-700">{d["inStockOnly"]}</span>
                 <button onClick={() => setInStockOnly(s => !s)}
                   className={`relative w-10 h-5 rounded-full transition-colors ${inStockOnly ? "bg-zinc-900" : "bg-zinc-200"}`}>
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${inStockOnly ? "left-5" : "left-0.5"}`} />
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition ${inStockOnly ? "left-5" : "left-0.5"}`} />
                 </button>
               </label>
             </FilterSection>
@@ -1171,7 +1171,7 @@ export function ShoppingHub() {
           {/* Results header */}
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div>
-              <p className="font-bold text-zinc-900 text-sm">
+              <p className="font-semibold text-zinc-900 text-sm">
                 {search && <>{fillS(d["searchOf"], { q: search })} · </>}
                 <span className="text-zinc-500 font-normal">{filtered.length} {filtered.length > 1 ? d["products"] : d["product"]}</span>
               </p>
@@ -1186,10 +1186,10 @@ export function ShoppingHub() {
                 <option value="weight">{d["sort.weight"]}</option>
               </select>
               <div className="flex gap-0.5 p-1 bg-zinc-100 rounded-xl">
-                <button onClick={() => setViewMode("grid")} className={`p-1.5 rounded-lg transition-all ${viewMode==="grid" ? "bg-white shadow-sm text-zinc-900" : "text-zinc-400"}`}>
+                <button onClick={() => setViewMode("grid")} className={`p-1.5 rounded-lg transition ${viewMode==="grid" ? "bg-white shadow-sm text-zinc-900" : "text-zinc-400"}`}>
                   <LayoutGrid className="w-4 h-4" />
                 </button>
-                <button onClick={() => setViewMode("list")} className={`p-1.5 rounded-lg transition-all ${viewMode==="list" ? "bg-white shadow-sm text-zinc-900" : "text-zinc-400"}`}>
+                <button onClick={() => setViewMode("list")} className={`p-1.5 rounded-lg transition ${viewMode==="list" ? "bg-white shadow-sm text-zinc-900" : "text-zinc-400"}`}>
                   <List className="w-4 h-4" />
                 </button>
               </div>
@@ -1242,7 +1242,7 @@ export function ShoppingHub() {
               {hasMore && (
                 <div className="mt-8 text-center">
                   <button onClick={() => setPage(p => p + 1)}
-                    className="inline-flex items-center gap-2 px-8 py-3 border-2 border-zinc-900 text-zinc-900 rounded-xl text-sm font-bold hover:bg-zinc-900 hover:text-white transition-all">
+                    className="inline-flex items-center gap-2 px-8 py-3 border-2 border-zinc-900 text-zinc-900 rounded-xl text-sm font-semibold hover:bg-zinc-900 hover:text-white transition">
                     {fillS(d["loadN"], { n: Math.min(PAGE_SIZE, filtered.length - displayed.length) })}
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -1264,7 +1264,7 @@ export function ShoppingHub() {
               {hasMore && (
                 <div className="mt-8 text-center">
                   <button onClick={() => setPage(p => p + 1)}
-                    className="inline-flex items-center gap-2 px-8 py-3 border-2 border-zinc-900 text-zinc-900 rounded-xl text-sm font-bold hover:bg-zinc-900 hover:text-white transition-all">
+                    className="inline-flex items-center gap-2 px-8 py-3 border-2 border-zinc-900 text-zinc-900 rounded-xl text-sm font-semibold hover:bg-zinc-900 hover:text-white transition">
                     {d["loadMore"]} <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -1282,7 +1282,7 @@ export function ShoppingHub() {
             onClick={() => setSelected(null)}>
             <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
               onClick={e => e.stopPropagation()}
-              className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
+              className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
               <div className="relative h-56 bg-zinc-100">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={selected.image} alt={`${selected.brand} ${selected.model}`}
@@ -1294,14 +1294,14 @@ export function ShoppingHub() {
                   <X className="w-4 h-4" />
                 </button>
                 <div className="absolute top-3 left-3 flex gap-1.5">
-                  <span className="bg-zinc-900/80 backdrop-blur text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                  <span className="bg-zinc-900/80 backdrop-blur text-white text-xs font-semibold px-2.5 py-1 rounded-full">
                     ⭐ {selected.compatibility_score}/100
                   </span>
-                  {!selected.in_stock && <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">{d["oos"]}</span>}
+                  {!selected.in_stock && <span className="bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full">{d["oos"]}</span>}
                 </div>
                 <div className="absolute bottom-4 left-5">
-                  <p className="text-xs text-white/70 font-semibold uppercase tracking-wider">{selected.brand}</p>
-                  <p className="text-xl font-black text-white leading-tight">{selected.model}</p>
+                  <p className="text-xs text-white/70 font-semibold first-letter:uppercase">{selected.brand}</p>
+                  <p className="text-xl font-semibold text-white leading-tight">{selected.model}</p>
                   <p className="text-sm text-white/60">{selected.version}</p>
                 </div>
               </div>
@@ -1312,7 +1312,7 @@ export function ShoppingHub() {
                     {selected.specs.map(s => (
                       <div key={s.label} className="bg-zinc-50 rounded-xl px-3 py-2 text-center">
                         <div className="text-xs text-zinc-400">{d[`spec.${s.label}`] ?? s.label}</div>
-                        <div className="text-sm font-bold text-zinc-800">{s.value === "Oui" ? d["yes"] : s.value === "Non" ? d["no"] : s.value}</div>
+                        <div className="text-sm font-semibold text-zinc-800">{s.value === "Oui" ? d["yes"] : s.value === "Non" ? d["no"] : s.value}</div>
                       </div>
                     ))}
                   </div>
@@ -1326,7 +1326,7 @@ export function ShoppingHub() {
                 </div>
                 <div className="flex items-center justify-between pt-3 border-t border-zinc-100">
                   <div>
-                    <div className="text-2xl font-black text-zinc-900">{selected.price.toFixed(2)}€</div>
+                    <div className="text-2xl font-semibold text-zinc-900">{selected.price.toFixed(2)}€</div>
                     {fakeOriginalPrice(selected.price, selected.id) && (
                       <div className="text-sm text-zinc-400 line-through">{fakeOriginalPrice(selected.price, selected.id)}€</div>
                     )}
@@ -1335,7 +1335,7 @@ export function ShoppingHub() {
                     </div>
                   </div>
                   <a href={selected.url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-5 py-3 bg-zinc-900 hover:bg-zinc-700 text-white rounded-2xl text-sm font-bold transition-all">
+                    className="flex items-center gap-2 px-5 py-3 bg-zinc-900 hover:bg-zinc-700 text-white rounded-2xl text-sm font-semibold transition">
                     <ExternalLink className="w-4 h-4" /> {d["viewOffer"]}
                   </a>
                 </div>
@@ -1361,7 +1361,7 @@ function ProductCard({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.015, 0.4) }}
-      className={`bg-white rounded-2xl border cursor-pointer flex flex-col transition-all overflow-hidden group ${
+      className={`bg-white rounded-2xl border cursor-pointer flex flex-col transition overflow-hidden group ${
         isSelected ? "ring-2 ring-zinc-900 border-zinc-900 shadow-lg" : "border-zinc-200 hover:border-zinc-300 hover:shadow-md"
       }`}
       onClick={onSelect}>
@@ -1370,7 +1370,7 @@ function ProductCard({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
         style={{ backgroundColor: p.color_accent + "18" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={p.image} alt={`${p.brand} ${p.model}`}
-          className="w-full h-full object-contain p-5 group-hover:scale-105 transition-transform duration-500"
+          className="w-full h-full object-contain p-5 transition-transform duration-500"
           onError={(e) => { (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' fill='%23f4f4f5'%3E%3C/svg%3E"; }} />
 
         {/* Bande couleur en bas (signature colorway) */}
@@ -1380,19 +1380,19 @@ function ProductCard({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
         {/* Badges top-left */}
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           {discountPct && (
-            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-md">-{discountPct}%</span>
+            <span className="bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-md">-{discountPct}%</span>
           )}
-          {p.new && <span className="bg-zinc-900 text-white text-xs font-bold px-2 py-0.5 rounded-md">NEW</span>}
-          {!p.in_stock && <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-md">{d["oos"]}</span>}
+          {p.new && <span className="bg-zinc-900 text-white text-xs font-semibold px-2 py-0.5 rounded-md">NEW</span>}
+          {!p.in_stock && <span className="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-md">{d["oos"]}</span>}
         </div>
 
         {/* Score + wishlist top-right */}
         <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
-          <span className="bg-white/90 backdrop-blur text-zinc-900 text-xs font-black px-2 py-0.5 rounded-md shadow-sm">
+          <span className="bg-white/90 backdrop-blur text-zinc-900 text-xs font-semibold px-2 py-0.5 rounded-md shadow-sm">
             ★ {p.compatibility_score}
           </span>
           <button onClick={onWishlist}
-            className="w-7 h-7 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-sm hover:scale-110 transition-transform">
+            className="w-7 h-7 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-sm transition-transform">
             <Heart className={`w-3.5 h-3.5 ${isWishlisted ? "fill-red-500 text-red-500" : "text-zinc-400"}`} />
           </button>
         </div>
@@ -1400,8 +1400,8 @@ function ProductCard({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
 
       {/* Info */}
       <div className="p-3 flex flex-col gap-1 flex-1">
-        <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{p.brand}</p>
-        <p className="text-sm font-bold text-zinc-900 leading-snug line-clamp-2">{p.model}</p>
+        <p className="text-xs font-semibold text-zinc-400 first-letter:uppercase">{p.brand}</p>
+        <p className="text-sm font-semibold text-zinc-900 leading-snug line-clamp-2">{p.model}</p>
         {/* Colorway dot + label */}
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-full border border-white shadow-sm flex-shrink-0"
@@ -1410,7 +1410,7 @@ function ProductCard({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
         </div>
         <StarRating stars={stars} count={reviewCount} />
         <div className="flex items-baseline gap-2 mt-auto pt-1">
-          <span className="text-base font-black text-zinc-900">{p.price.toFixed(0)}€</span>
+          <span className="text-base font-semibold text-zinc-900">{p.price.toFixed(0)}€</span>
           {origPrice && <span className="text-xs text-zinc-400 line-through">{origPrice}€</span>}
         </div>
         <div className="text-xs font-semibold" style={{ color: RETAILERS[p.retailer]?.color }}>
@@ -1434,7 +1434,7 @@ function ProductRow({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
 
   return (
     <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(i * 0.01, 0.3) }}
-      className={`bg-white rounded-2xl border cursor-pointer flex gap-4 p-3 transition-all ${
+      className={`bg-white rounded-2xl border cursor-pointer flex gap-4 p-3 transition ${
         isSelected ? "ring-2 ring-zinc-900 border-zinc-900" : "border-zinc-200 hover:border-zinc-300 hover:shadow-sm"
       }`}
       onClick={onSelect}>
@@ -1443,13 +1443,13 @@ function ProductRow({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={p.image} alt={`${p.brand} ${p.model}`} className="w-full h-full object-cover" />
         {discountPct && (
-          <span className="absolute top-1 left-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-md">-{discountPct}%</span>
+          <span className="absolute top-1 left-1 bg-red-500 text-white text-xs font-semibold px-1.5 py-0.5 rounded-md">-{discountPct}%</span>
         )}
       </div>
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{p.brand}</p>
-        <p className="text-sm font-bold text-zinc-900">{p.model} <span className="font-normal text-zinc-400">{p.version}</span></p>
+        <p className="text-xs font-semibold text-zinc-400 first-letter:uppercase">{p.brand}</p>
+        <p className="text-sm font-semibold text-zinc-900">{p.model} <span className="font-normal text-zinc-400">{p.version}</span></p>
         <StarRating stars={stars} count={reviewCount} />
         <div className="flex flex-wrap gap-1 mt-1.5">
           {p.specs.slice(0,2).map(s => (
@@ -1460,11 +1460,11 @@ function ProductRow({ p, i, isWishlisted, isSelected, onSelect, onWishlist }: {
       </div>
       {/* Price + action */}
       <div className="flex flex-col items-end gap-1 shrink-0">
-        <button onClick={onWishlist} className="p-1.5 hover:scale-110 transition-transform">
+        <button onClick={onWishlist} className="p-1.5 transition-transform">
           <Heart className={`w-4 h-4 ${isWishlisted ? "fill-red-500 text-red-500" : "text-zinc-300"}`} />
         </button>
         <div className="text-right">
-          <div className="text-lg font-black text-zinc-900">{p.price.toFixed(0)}€</div>
+          <div className="text-lg font-semibold text-zinc-900">{p.price.toFixed(0)}€</div>
           {origPrice && <div className="text-xs text-zinc-400 line-through">{origPrice}€</div>}
         </div>
         <div className="text-xs font-semibold" style={{ color: RETAILERS[p.retailer]?.color }}>{RETAILERS[p.retailer]?.name}</div>

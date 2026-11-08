@@ -10,6 +10,8 @@ const TON_SOURCE: Record<string, string> = {
   "client": "bg-zinc-100 text-zinc-700",
   "client-render": "bg-red-50 text-red-700",
   "client-reseau": "bg-amber-50 text-amber-800",
+  "reseau": "bg-sky-50 text-sky-700",
+  "bouton": "bg-orange-50 text-orange-700",
   "onboarding": "bg-rose-50 text-rose-700",
   "server": "bg-violet-50 text-violet-700",
 };
@@ -17,6 +19,10 @@ const LIBELLE_SOURCE: Record<string, string> = {
   "client": "erreur JS",
   "client-render": "écran planté",
   "client-reseau": "appel refusé",
+  // Coupure du réseau de l'athlète pendant un chargement (lib/erreurs/reseau) : pas un bug du code.
+  "reseau": "coupure réseau",
+  // Un message d'erreur montré à l'utilisateur, souvent juste après un clic (ErrorReporter).
+  "bouton": "clic en échec",
   "onboarding": "inscription",
   "server": "serveur",
 };
@@ -63,7 +69,7 @@ export function BugsPanel() {
     <div className="mx-auto w-full max-w-6xl p-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="flex items-center gap-2 text-lg font-bold text-zinc-900"><Bug className="h-5 w-5 text-rose-500" /> Bugs rencontrés</h2>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900"><Bug className="h-5 w-5 text-rose-500" /> Bugs rencontrés</h2>
           <p className="mt-1 text-xs text-zinc-500">
             Le journal d&apos;erreurs de production, regroupé par défaut. Erreurs JS, écrans plantés, appels refusés, échecs d&apos;inscription.
           </p>
@@ -72,7 +78,7 @@ export function BugsPanel() {
           <div className="flex items-center gap-1 rounded-xl bg-zinc-100 p-1">
             {([7, 30, 90] as const).map((j) => (
               <button key={j} onClick={() => setJours(j)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${jours === j ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${jours === j ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}>
                 {j} j
               </button>
             ))}
@@ -95,7 +101,7 @@ export function BugsPanel() {
           { label: "Actifs ces 24 h", value: recents, note: recents ? "à regarder" : "rien de neuf", alerte: recents > 0 },
         ].map((k) => (
           <div key={k.label} className={`rounded-2xl border bg-white p-5 shadow-sm ${k.alerte ? "border-amber-200" : "border-zinc-100"}`}>
-            <div className={`text-2xl font-bold tabular-nums ${k.alerte ? "text-amber-700" : "text-zinc-900"}`}>{chargement && !rep ? "…" : k.value}</div>
+            <div className={`text-2xl font-semibold tabular-nums ${k.alerte ? "text-amber-700" : "text-zinc-900"}`}>{chargement && !rep ? "…" : k.value}</div>
             <div className="mt-0.5 text-xs font-medium text-zinc-600">{k.label}</div>
             <div className="text-[11px] text-zinc-400">{k.note}</div>
           </div>
@@ -132,15 +138,19 @@ export function BugsPanel() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         {g.sources.map((s) => (
-                          <span key={s} className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${TON_SOURCE[s] ?? "bg-zinc-100 text-zinc-600"}`}>{LIBELLE_SOURCE[s] ?? s}</span>
+                          <span key={s} className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${TON_SOURCE[s] ?? "bg-zinc-100 text-zinc-600"}`}>{LIBELLE_SOURCE[s] ?? s}</span>
                         ))}
-                        {recent && <span className="flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700"><AlertTriangle className="h-3 w-3" /> 24 h</span>}
+                        {recent && <span className="flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"><AlertTriangle className="h-3 w-3" /> 24 h</span>}
                         <span className="text-[11px] text-zinc-400">{g.pages[0]?.url}{g.pages.length > 1 ? ` +${g.pages.length - 1}` : ""}</span>
                       </div>
                       <div className="mt-1 truncate font-mono text-[13px] text-zinc-800">{g.message}</div>
+                      {/* Le bouton cliqué juste avant l'échec (ErrorReporter, 15 s) : c'est lui qu'on cherche. */}
+                      {typeof (g.exemple.meta as { clic?: unknown } | null)?.clic === "string" && (
+                        <div className="mt-0.5 truncate text-[11px] text-zinc-500">Bouton cliqué : <span className="font-semibold text-zinc-700">« {(g.exemple.meta as { clic: string }).clic} »</span></div>
+                      )}
                     </div>
                     <div className="flex-shrink-0 text-right text-[11px] text-zinc-500">
-                      <div className="text-sm font-bold tabular-nums text-zinc-900">{g.occurrences}×</div>
+                      <div className="text-sm font-semibold tabular-nums text-zinc-900">{g.occurrences}×</div>
                       <div className="flex items-center justify-end gap-1"><Users className="h-3 w-3" /> {g.comptes}{g.anonymes ? ` +${g.anonymes} anon.` : ""}</div>
                       <div>{quand(g.dernier)}</div>
                     </div>
@@ -148,25 +158,25 @@ export function BugsPanel() {
                   {open && (
                     <div className="space-y-3 border-t border-zinc-50 bg-zinc-50/60 px-5 py-4 text-xs">
                       <div className="grid gap-3 sm:grid-cols-3">
-                        <div><div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Première fois</div><div className="text-zinc-700">{dateFr(g.premier)}</div></div>
-                        <div><div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Dernière fois</div><div className="text-zinc-700">{dateFr(g.dernier)}</div></div>
-                        <div><div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Navigateur (dernier)</div><div className="truncate text-zinc-700" title={g.exemple.user_agent ?? ""}>{g.exemple.user_agent ?? "—"}</div></div>
+                        <div><div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">Première fois</div><div className="text-zinc-700">{dateFr(g.premier)}</div></div>
+                        <div><div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">Dernière fois</div><div className="text-zinc-700">{dateFr(g.dernier)}</div></div>
+                        <div><div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">Navigateur (dernier)</div><div className="truncate text-zinc-700" title={g.exemple.user_agent ?? ""}>{g.exemple.user_agent ?? "—"}</div></div>
                       </div>
                       <div>
-                        <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Pages</div>
+                        <div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">Pages</div>
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {g.pages.map((p) => <span key={p.url} className="rounded-md bg-white px-2 py-0.5 font-mono text-[11px] text-zinc-700 ring-1 ring-zinc-200">{p.url} <span className="text-zinc-400">×{p.n}</span></span>)}
                         </div>
                       </div>
                       {g.exemple.meta != null && (
                         <div>
-                          <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Détails</div>
+                          <div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">Détails</div>
                           <pre className="mt-1 max-h-40 overflow-auto rounded-lg bg-white p-3 font-mono text-[11px] text-zinc-700 ring-1 ring-zinc-200">{JSON.stringify(g.exemple.meta, null, 2)}</pre>
                         </div>
                       )}
                       {g.exemple.stack && (
                         <div>
-                          <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Pile (dernière occurrence)</div>
+                          <div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">Pile (dernière occurrence)</div>
                           <pre className="mt-1 max-h-56 overflow-auto rounded-lg bg-white p-3 font-mono text-[11px] text-zinc-600 ring-1 ring-zinc-200">{g.exemple.stack}</pre>
                         </div>
                       )}

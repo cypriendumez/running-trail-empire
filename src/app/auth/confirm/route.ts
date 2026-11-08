@@ -43,6 +43,17 @@ export async function GET(request: Request) {
           // d'entrer dans l'application qu'il vient de confirmer.
           void alerterInscription(supabase, user.id, origin);
 
+          // ── INSCRIPTION CONTESTÉE : celui qui clique choisit le mot de passe ─────
+          // L'adresse a été réinscrite avant d'être confirmée (ou un lien redemandé sans
+          // connaître le mot de passe) : la route d'inscription a rendu le mot de passe
+          // ALÉATOIRE pour que personne — un éventuel intrus compris — ne le connaisse.
+          // Le titulaire de la boîte, qui vient de cliquer, choisit le sien. Sans ce
+          // passage, il entrerait sans mot de passe connu ; « oublié » resterait possible.
+          if (user.app_metadata?.mdp_a_choisir) {
+            const lien = await lienChoixMotDePasse(user.id, String(user.email ?? ""), origin);
+            if (lien) return NextResponse.redirect(lien);
+          }
+
           // Nouveaux comptes → onboarding tant qu'il n'est pas terminé
           const { data: profile } = await supabase
             .from("profiles")
@@ -60,6 +71,24 @@ export async function GET(request: Request) {
   return NextResponse.redirect(`${origin}/login?error=confirm`);
 }
 
+
+/**
+ * Lien `recovery` (le même mécanisme que « mot de passe oublié ») vers `/reset-password`,
+ * pour choisir le mot de passe d'un compte contesté. Efface la marque une fois le lien prêt.
+ * `null` si quelque chose échoue : la personne continue, « mot de passe oublié » reste là.
+ */
+async function lienChoixMotDePasse(id: string, email: string, origin: string): Promise<string | null> {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.auth.admin.generateLink({ type: "recovery", email } as Parameters<typeof admin.auth.admin.generateLink>[0]);
+    const jeton = (data as { properties?: { hashed_token?: string } } | null)?.properties?.hashed_token;
+    if (error || !jeton) return null;
+    await admin.auth.admin.updateUserById(id, { app_metadata: { mdp_a_choisir: null } });
+    return `${origin}/auth/confirm?token_hash=${encodeURIComponent(jeton)}&type=recovery&next=${encodeURIComponent("/reset-password?apres=inscription")}`;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Envoie l'alerte « nouvel inscrit » à l'éditeur. Ne lève jamais.

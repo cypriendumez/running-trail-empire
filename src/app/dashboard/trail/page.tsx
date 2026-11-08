@@ -4,7 +4,6 @@ import { texteRelief } from "@/components/trail/relief3dI18n";
 import { ParcoursBrowser } from "@/components/parcours/ParcoursBrowser";
 import { createClient } from "@/lib/supabase/server";
 import { COLONNES_ACCES, profilPeut } from "@/lib/billing/access";
-import { PorteFermee } from "@/components/billing/PorteFermee";
 import { getAccountLang } from "@/lib/i18n/serverLang";
 
 /** Le seul libellé qui n'appartient pas à la vue relief : le mode « construire ». */
@@ -19,9 +18,8 @@ export const metadata = { title: "Carte" };
 export default async function TrailPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;
 
-  // ⚠️ LE CONTRÔLE EST FAIT ICI, CÔTÉ SERVEUR. Masquer le bouton d'export dans le
-  // composant laisserait la fonction accessible à qui sait ouvrir l'inspecteur — et
-  // « Trail Builder et export GPX » est ce qui sépare Premium de Starter.
+  // Le droit d'export est lu ICI, côté serveur, et descend en propriété : le composant
+  // client n'a pas à relire la formule.
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   const { data: profil } = user
@@ -68,22 +66,22 @@ export default async function TrailPage({ searchParams }: { searchParams: Promis
         })()
       : null;
 
-  // ⚠️ La RECHERCHE de parcours reste ouverte à tous : elle ne coûte rien, elle donne
-  // envie, et la fermer transformerait une vitrine en mur. Seule la CONSTRUCTION de
-  // trace et son export sont réservés.
-  if (!profilPeut(profil as Parameters<typeof profilPeut>[0], "gpx")) {
-    return (
-      <div className="space-y-6">
-        <PorteFermee capacite="gpx" />
-        <ParcoursBrowser initialSearch={q ?? ""} />
-      </div>
-    );
-  }
+  // ⚠️ LA CARTE EST OUVERTE À TOUS DEPUIS LE 22/10/2026 (Cyprien : l'export GPX « dans
+  // les abonnements payants, mais pas la map en général et l'accès à tous les parcours »).
+  // Construire une boucle, la voir en relief, chercher un parcours : gratuit. Seul
+  // l'EXPORT GPX — la trace qui part vers la montre — est réservé aux formules payantes.
+  // Avant, un compte gratuit ne voyait qu'une porte fermée à la place du constructeur.
+  //
+  // ⚠️ CE VERROU EST D'INTERFACE, ET IL FAUT LE SAVOIR : le GPX est fabriqué dans le
+  // navigateur à partir de coordonnées que la carte affiche déjà. Aucune route ne le
+  // sert, il n'y a donc aucun appel à refuser — on retire le bouton, on ne protège pas
+  // une dépense. C'est accepté : l'export ne coûte rien, il sert à décider quelqu'un.
+  const exportGpx = profilPeut(profil as Parameters<typeof profilPeut>[0], "gpx");
 
   return (
     <div className="space-y-6">
-      <TrailModes centre={centre} textes={{ ...texteRelief(langue), "mode.construire": MODE_CONSTRUIRE[langue] ?? MODE_CONSTRUIRE.fr }} />
-      <ParcoursBrowser initialSearch={q ?? ""} />
+      <TrailModes centre={centre} exportGpx={exportGpx} textes={{ ...texteRelief(langue), "mode.construire": MODE_CONSTRUIRE[langue] ?? MODE_CONSTRUIRE.fr }} />
+      <ParcoursBrowser initialSearch={q ?? ""} exportGpx={exportGpx} />
     </div>
   );
 }

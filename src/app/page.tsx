@@ -5,7 +5,7 @@ import { JOURS_ESSAI } from "@/lib/billing/access";
 import { useEffect, useState } from "react";
 import {
   ArrowRight, ChevronRight, Check, Menu, X,
-  Bot, Heart, Map, Trophy, Ghost, Moon, CloudRain, ShoppingBag, BookOpen, Shield, Activity, Zap, Flag, Flame, Scale,
+  Bot, Heart, Trophy, Ghost, ShoppingBag, Zap, Watch, Mountain, MapPin, ClipboardList, GraduationCap, Medal,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
@@ -20,8 +20,9 @@ import { LANDING, CATEGORY_CODES } from "@/components/landing/landingI18n";
 import { CHIFFRES_LANDING } from "@/lib/brand/stats";
 // Les montants et le formatage viennent de `lib/billing/prix` — ils étaient
 // recopiés ici, dans /pricing, et une TROISIÈME fois (faux) dans les réglages.
-import { PRIX_AFFICHES as PRIX, euros } from "@/lib/billing/prix";
+import { PRIX_AFFICHES as PRIX, euros, moisOfferts, MOIS_OFFERTS_MAX } from "@/lib/billing/prix";
 import { StoreBadges } from "@/components/layout/StoreBadges";
+import { OffreEtudiante } from "@/components/landing/OffreEtudiante";
 import { WaitlistSection } from "@/components/WaitlistSection";
 import { PHOTOS_PROGRAMMES } from "@/lib/brand/photosProgrammes";
 
@@ -57,7 +58,13 @@ const LARGEURS_CARTE = [400, 600, 900];
 // menthe arrondie : c'est le motif le plus reconnaissable des pages « générées », et
 // c'est lui qui faisait amateur bien plus que les textes.
 const PILLAR_ICONS: LucideIcon[] = [Bot, Ghost, Zap];
-const FEATURE_ICONS: LucideIcon[] = [Heart, Activity, CloudRain, Map, BookOpen, Flag, Flame, Scale, Trophy];
+// ⚠️ LA GRILLE SUIT LES ONGLETS DE L'APPLICATION (Cyprien, 22/10/2026 : « voici les
+// principaux onglets de mon application, je pense que ça sera plus pertinent »), avec les
+// MÊMES icônes que le menu (`components/layout/navigation.ts`) : ce qu'on voit ici, on le
+// retrouve tel quel une fois connecté. « Météo réelle » et « Trail Builder » en sont sortis
+// à sa demande ; « Smart Journal vocal » aussi, parce que l'écran n'existe plus depuis le
+// 30/09/2026 — on ne vend pas ce qu'on a retiré.
+const FEATURE_ICONS: LucideIcon[] = [Watch, Heart, Mountain, MapPin, ClipboardList, Trophy, GraduationCap, ShoppingBag, Medal];
 
 // ── CHIFFRES DU BANDEAU — chacun est VÉRIFIABLE, aucun n'est décoratif ──────
 //  « 10k+ coureurs actifs », « 4,9 ★ de note moyenne » et « 98 % de satisfaction »
@@ -71,8 +78,9 @@ const FEATURE_ICONS: LucideIcon[] = [Heart, Activity, CloudRain, Map, BookOpen, 
 //   · buildWeekPlan pose 7 jours de plan glissant ;
 //   · .github/workflows/sync-coach.yml demande deux passages par heure — et c'est bien
 //     une DEMANDE : mesuré le 02/09/2026, GitHub n'en exécutait qu'un toutes les ~100
-//     minutes alors que le fichier en réclamait six. La réactivité réelle vient du
-//     webhook de synchronisation instantanée, pas de ce cron.
+//     minutes alors que le fichier en réclamait six. La réactivité réelle vient des
+//     alertes d'intervals.icu (athlètes reliés par OAuth ; la route ne lisait pas leur
+//     format avant le 16/10/2026) et du sondage de l'onglet ouvert, pas de ce cron.
 // Les valeurs vivent dans `lib/brand/stats` — elles étaient recopiées ici ET dans le
 // panneau des pages d'auth, qui affichait encore trois chiffres INVENTÉS longtemps
 // après leur retrait d'ici. Une seule source, importée des deux côtés.
@@ -222,7 +230,7 @@ export default function LandingPage() {
           essayé pour séparer le texte des silhouettes : il réglait la collision, mais posait
           un bandeau brun en travers du haut de l'image — le remède se voyait plus que le
           mal. Le décalage de « Connexion » ci-dessous suffit. */}
-      {/* ⚠️ `transition-all` sur une barre FIXE animée AU DÉFILEMENT anime aussi la
+      {/* ⚠️ `transition` sur une barre FIXE animée AU DÉFILEMENT anime aussi la
           position et la taille : le navigateur recalcule à chaque image, pendant que
           l'utilisateur fait défiler. Seules la couleur de fond et la bordure changent
           ici — on ne déclare qu'elles, et le défilement redevient franc. */}
@@ -314,7 +322,7 @@ export default function LandingPage() {
               // `whitespace-nowrap` : sur 375 px, la colonne de droite se resserrait
               // assez pour couper « Essai gratuit » en deux lignes, ce qui gonflait la
               // barre à 80 px de haut et écrasait tout le reste.
-              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-300 sm:px-4 sm:py-2 sm:text-[13px] ${
+              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition duration-300 sm:px-4 sm:py-2 sm:text-[13px] ${
                 solidNav
                   ? "bg-zinc-900 text-white hover:bg-zinc-800"
                   : "border border-white/55 bg-white/15 text-white backdrop-blur-md hover:border-white/80 hover:bg-white/25"
@@ -530,7 +538,7 @@ export default function LandingPage() {
                 l'image (demandé) et garder du contraste sont contradictoires tant qu'on
                 traite le fond. L'ombre agit là où il faut — sous les lettres — et laisse la
                 piste lumineuse partout ailleurs. */}
-            <h1 className="text-[2.9rem] font-bold leading-[1.03] tracking-tight text-white [text-shadow:0_2px_22px_rgba(0,0,0,0.72)] sm:text-6xl md:text-7xl lg:text-[5.25rem]">
+            <h1 className="text-[2.9rem] font-semibold leading-[1.03] tracking-tight text-white [text-shadow:0_2px_22px_rgba(0,0,0,0.72)] sm:text-6xl md:text-7xl lg:text-[5.25rem]">
               {L.hero.titleA}<br />{L.hero.titleB}
               {/* Le mot accentué porte la seconde moitié du nom (« Evo ») : on lui donne
                   le vert du wordmark et une ombre portée, sans quoi l'émeraude sur une
@@ -613,14 +621,14 @@ export default function LandingPage() {
           logo, c'est promettre une intégration, et promettre l'envoi d'une séance à une
           plateforme qui ne peut pas la recevoir est le pire des deux mensonges. */}
       <Container className="pt-14 sm:pt-16">
-        <p className="text-center text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+        <p className="text-center text-[11px] font-semibold text-zinc-500 first-letter:uppercase">
           {L.sync.title}
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
           {SYNC.filter((m) => !m.appli).map((m) => (
             <span
               key={m.nom}
-              className="inline-flex h-14 items-center justify-center rounded-2xl border border-zinc-200 bg-white px-5 text-sm font-bold uppercase tracking-wide text-zinc-700 shadow-sm transition-colors hover:border-zinc-300"
+              className="inline-flex h-14 items-center justify-center rounded-2xl border border-zinc-200 bg-white px-5 text-sm font-semibold text-zinc-700 shadow-sm transition-colors hover:border-zinc-300 first-letter:uppercase"
             >
               {m.logo
                 // eslint-disable-next-line @next/next/no-img-element
@@ -686,7 +694,7 @@ export default function LandingPage() {
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-4">
           {stats.map((label, i) => (
             <div key={label} className="bg-white px-6 py-7 text-center">
-              <div className="text-3xl font-bold tracking-tight">{STAT_VALUES[i]}</div>
+              <div className="text-3xl font-semibold tracking-tight">{STAT_VALUES[i]}</div>
               <div className="mt-1 text-sm text-zinc-500">{label}</div>
             </div>
           ))}
@@ -713,7 +721,7 @@ export default function LandingPage() {
               <button
                 key={code}
                 onClick={() => setActiveCategory(code)}
-                className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                className={`rounded-full px-4 py-2 text-xs font-semiboldr transition ${
                   activeCategory === code ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                 }`}
               >
@@ -732,14 +740,14 @@ export default function LandingPage() {
                     srcSet={LARGEURS_CARTE.map((w) => `${photoCarte(p.photo, w)} ${w}w`).join(", ")}
                     sizes="(min-width:1024px) 32vw, (min-width:640px) 48vw, 92vw"
                     alt={it.title} loading="lazy" decoding="async"
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    className="h-full w-full object-cover transition-transform duration-700"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 p-6">
-                    <h3 className="text-2xl font-bold uppercase leading-tight text-white">{it.title}</h3>
-                    <p className="mt-1 text-xs font-medium uppercase tracking-wider text-white/60">{it.subtitle}</p>
+                    <h3 className="text-2xl font-semibold leading-tight text-white">{it.title}</h3>
+                    <p className="mt-1 text-xs font-medium text-white/60 first-letter:uppercase">{it.subtitle}</p>
                   </div>
-                  <span className="absolute right-4 top-4 flex h-8 w-8 translate-y-1 items-center justify-center rounded-full bg-white opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
+                  <span className="absolute right-4 top-4 flex h-8 w-8 translate-y-1 items-center justify-center rounded-full bg-white opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">
                     <ArrowRight className="h-4 w-4 text-zinc-900" />
                   </span>
                 </Link>
@@ -779,8 +787,8 @@ export default function LandingPage() {
                 <div key={p.title}
                   className={`rounded-2xl border p-7 ${sombre ? "surface-brand border-transparent" : "border-zinc-200 bg-white"}`}>
                   <Icon className={sombre ? "h-5 w-5 text-[#34d399]" : "h-5 w-5 text-[#059669]"} strokeWidth={1.6} />
-                  <div className="mt-7 text-[1.75rem] font-bold leading-none tracking-tight">{p.metric}</div>
-                  <div className={`mt-2 text-[10px] font-semibold uppercase tracking-[0.16em] ${sombre ? "text-white/45" : "text-zinc-500"}`}>
+                  <div className="mt-7 text-[1.75rem] font-semibold leading-none tracking-tight">{p.metric}</div>
+                  <div className={`mt-2 text-[11px] font-semibold ${sombre ? "text-white/45" : "text-zinc-500"}`}>
                     {p.metricLabel}
                   </div>
                   <h3 className="mt-6 text-[17px] font-semibold tracking-tight">{p.title}</h3>
@@ -839,7 +847,7 @@ export default function LandingPage() {
                   className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
                     periode === p ? "bg-zinc-900 text-white" : "text-zinc-500 hover:text-zinc-900"}`}>
                   {p === "mois" ? L.pricing.mois : L.pricing.an}
-                  {p === "an" && <span className={`ml-2 text-[11px] font-bold ${periode === "an" ? "text-[#34d399]" : "text-[#047857]"}`}>{L.pricing.economie}</span>}
+                  {p === "an" && <span className={`ml-2 text-[11px] font-semibold ${periode === "an" ? "text-[#34d399]" : "text-[#047857]"}`}>{L.pricing.economie.replace("{n}", String(MOIS_OFFERTS_MAX))}</span>}
                 </button>
               ))}
             </div>
@@ -857,19 +865,19 @@ export default function LandingPage() {
               const vedette = plan.cle === "premium";
               return (
                 <div key={plan.cle}
-                  className={`relative flex flex-col rounded-3xl p-8 ${vedette ? "surface-brand ring-2 ring-[#059669]" : "bg-white ring-1 ring-inset ring-zinc-200"}`}>
+                  className={`relative flex flex-col rounded-2xl p-8 ${vedette ? "surface-brand ring-2 ring-[#059669]" : "bg-white ring-1 ring-inset ring-zinc-200"}`}>
                   {plan.badge && (
-                    <span className="absolute -top-3 left-8 rounded-full bg-[#10b981] px-3 py-1 text-[11px] font-bold text-[#04120c]">
+                    <span className="absolute -top-3 left-8 rounded-full bg-[#10b981] px-3 py-1 text-[11px] font-semibold text-[#04120c]">
                       {plan.badge}
                     </span>
                   )}
                   <div className={`text-sm font-semibold ${vedette ? "text-white/50" : "text-zinc-500"}`}>{plan.name}</div>
                   <div className="mt-2 flex items-baseline gap-1">
-                    <span className="text-5xl font-bold tracking-tight">{plan.cle === "gratuit" ? euros(0, lang) : euros(grand, lang)}</span>
+                    <span className="text-5xl font-semibold tracking-tight">{plan.cle === "gratuit" ? euros(0, lang) : euros(grand, lang)}</span>
                     <span className={`text-sm ${vedette ? "text-white/40" : "text-zinc-500"}`}>{plan.cle === "gratuit" ? "" : L.pricing.parMois}</span>
                   </div>
                   <div className={`mt-1 h-5 text-xs ${vedette ? "text-white/40" : "text-zinc-500"}`}>
-                    {plan.cle === "gratuit" ? L.pricing.gratuitNote : periode === "an" ? `${euros(centimes, lang)} / ${L.pricing.an.toLowerCase()}` : ""}
+                    {plan.cle === "gratuit" ? L.pricing.gratuitNote : periode === "an" ? `${euros(centimes, lang)} / ${L.pricing.an.toLowerCase()} · ${L.pricing.moisOfferts.replace("{n}", String(moisOfferts(plan.cle as "starter" | "premium")))}` : ""}
                   </div>
                   <p className={`mt-4 text-sm ${vedette ? "text-white/70" : "text-zinc-500"}`}>{plan.pitch}</p>
                   <ul className="mt-6 flex-1 space-y-3">
@@ -889,6 +897,8 @@ export default function LandingPage() {
             })}
           </div>
 
+          <OffreEtudiante texte={L.pricing.etudiant} cta={L.pricing.etudiantCta} sujet={L.pricing.etudiantSujet} />
+
           {/* Ce qui se passe APRÈS l'essai, écrit noir sur blanc. Une app qui coupe tout
               sans prévenir se fait désinstaller ; le dire à l'avance rassure, et c'est vrai. */}
           <p className="mx-auto mt-8 max-w-2xl text-center text-sm leading-relaxed text-zinc-500">
@@ -900,10 +910,10 @@ export default function LandingPage() {
       {/* ── CTA FINAL ── */}
       <Section>
         <Container>
-          <div className="surface-brand relative overflow-hidden rounded-3xl px-8 py-20 text-center sm:py-24">
+          <div className="surface-brand relative overflow-hidden rounded-2xl px-8 py-20 text-center sm:py-24">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_120%_at_50%_0%,rgba(16,185,129,.16),transparent_60%)]" />
             <div className="relative">
-              <h2 className="mx-auto max-w-2xl text-4xl sm:text-5xl font-bold leading-[1.05] tracking-tight text-white">
+              <h2 className="mx-auto max-w-2xl text-4xl sm:text-5xl font-semibold leading-[1.05] tracking-tight text-white">
                 {L.cta.title}
               </h2>
               <p className="mx-auto mt-4 max-w-md text-lg text-white/55">

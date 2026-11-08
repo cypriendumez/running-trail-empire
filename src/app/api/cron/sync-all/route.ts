@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncAndCoachForUser, shardForPass } from "@/lib/intervals/syncAndCoach";
+import { envoyerRappelsReconduction } from "@/lib/billing/reconduction";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // 60s timeout (Vercel hobby = 10s, pro = 60s)
@@ -26,8 +27,11 @@ const EVERY_MINUTES = 10;  // cadence du déclencheur externe — sert au décou
 const PER_PASS = 25;       // athlètes traités par passage (intervals.icu : ~200 requêtes)
 
 export async function GET(req: Request) {
+  // ⚠️ `!attendu` d'abord : sans la variable, `undefined !== undefined` laissait passer une
+  // requête SANS en-tête (audit du 24/10/2026). Secret absent = porte fermée.
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (secret !== process.env.CRON_SECRET) {
+  const attendu = process.env.CRON_SECRET;
+  if (!attendu || secret !== attendu) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -52,7 +56,7 @@ export async function GET(req: Request) {
   const { batch, shard, shards } = shardForPass(eligible, { perPass: PER_PASS, everyMinutes: EVERY_MINUTES });
 
   const days = 1; // 24 h suffisent pour un balayage fréquent ; le filet de nuit ratisse plus large
-  const results: { userId: string; ok: boolean; workouts?: number; coached?: boolean; skipped?: string | null; error?: string }[] = [];
+  const results: { userId: string; ok: boolean; workouts?: number; coached?: boolean; skipped?: string | null; refus?: number; passagers?: number; error?: string }[] = [];
 
   for (const profile of batch) {
     try {
@@ -65,7 +69,9 @@ export async function GET(req: Request) {
         apiKey: profile.intervals_api_key as string,
         days,
       });
-      results.push({ userId: profile.id, ok: !r.error, workouts: r.fresh, coached: r.replanned, skipped: r.skipped, error: r.error });
+      // `refus` : écritures refusées par la base, déjà journalisées dans `error_logs` par la
+      // chaîne. Répétées ici pour qu'on les lise aussi dans le compte rendu de l'exécution.
+      results.push({ userId: profile.id, ok: !r.error, workouts: r.fresh, coached: r.replanned, skipped: r.skipped, refus: r.refus, passagers: r.passagers, error: r.error });
     } catch (err) {
       results.push({ userId: profile.id, ok: false, error: String(err) });
     }
@@ -73,10 +79,17 @@ export async function GET(req: Request) {
 
   const total = results.reduce((a, r) => a + (r.workouts ?? 0), 0);
   const coached = results.filter((r) => r.coached).length;
-  console.log(`[cron/sync-all] tranche ${shard + 1}/${shards} · ${results.length} athlète(s) · ${total} séance(s) inédite(s) · ${coached} replanification(s)`);
+  const refus = results.reduce((a, r) => a + (r.refus ?? 0), 0);
+  console.log(`[cron/sync-all] tranche ${shard + 1}/${shards} · ${results.length} athlète(s) · ${total} séance(s) inédite(s) · ${coached} replanification(s) · ${refus} refus d'écriture`);
+
+  // Le rappel légal avant reconduction des abonnements ANNUELS (art. L215-1) se greffe ici :
+  // c'est la seule tâche qui tourne chaque jour, et le rappel est idempotent (une échéance
+  // n'est annoncée qu'une fois, cf. `lib/billing/reconduction`). Il ne lève jamais.
+  const reconduction = await envoyerRappelsReconduction(admin);
+
   return NextResponse.json({
     ok: true, shard: shard + 1, shards, eligible: eligible.length,
-    users: results.length, total_activities: total, replanned: coached, results,
+    users: results.length, total_activities: total, replanned: coached, refus, results, reconduction,
   });
 }
 

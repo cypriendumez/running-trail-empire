@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, X, MapPin, Mountain, Loader2, ChevronLeft, ChevronRight,
-  SlidersHorizontal, Flame, Download, Route as RouteIcon, LocateFixed, Timer,
+  SlidersHorizontal, Flame, Download, Route as RouteIcon, LocateFixed, Timer, Lock,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   SPORTS, DIFFICULTES, TYPES, SPORT_META, DIFF_META, SPORT_ACTIVITY, coordFor,
@@ -32,7 +33,12 @@ interface ApiResponse {
 }
 
 // ─── Composant ───────────────────────────────────────────────────────────────────
-export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string } = {}) {
+/**
+ * `exportGpx` : droit de télécharger le tracé (formules payantes). FAUX par défaut — un
+ * appelant qui oublie la propriété ferme le bouton, il ne l'offre pas. La recherche, la
+ * carte et le tracé affiché restent ouverts à tous.
+ */
+export function ParcoursBrowser({ initialSearch = "", exportGpx = false }: { initialSearch?: string; exportGpx?: boolean } = {}) {
   const { lang } = useT();
   const L = PX[lang] ?? PX.fr;
   const pr = (k: string, p?: Record<string, string | number>) => fillP(L[k] ?? k, p);
@@ -142,11 +148,11 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
   const totalPages = data?.totalPages ?? 1;
 
   return (
-    <section className="bg-white rounded-3xl border border-zinc-200 shadow-sm p-5 sm:p-6">
+    <section className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 sm:p-6">
       {/* ── En-tête ───────────────────────────────────────────── */}
       <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
         <div>
-          <h2 className="flex items-center gap-2 text-xl font-bold text-zinc-900">
+          <h2 className="flex items-center gap-2 text-xl font-semibold text-zinc-900">
             <RouteIcon className="w-5 h-5 text-emerald-600" />
             {L["title"]}
           </h2>
@@ -191,7 +197,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
           disabled={locating}
           aria-pressed={sort === "proche"}
           title={L["nearTitle"]}
-          className={`flex items-center gap-2 px-3.5 py-3 rounded-2xl text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-60 ${
+          className={`flex items-center gap-2 px-3.5 py-3 rounded-2xl text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-60 ${
             sort === "proche"
               ? "bg-emerald-600 text-white shadow-sm"
               : "bg-zinc-50 text-zinc-700 border border-zinc-200 hover:bg-zinc-100"
@@ -219,7 +225,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
           return (
             <button
               key={t.key} type="button" onClick={() => setSport(t.key)} aria-pressed={active}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                 active ? "bg-zinc-900 text-white shadow-sm" : "bg-zinc-50 text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
               }`}
             >
@@ -239,14 +245,14 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
           >
             <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-4 mb-4 flex flex-wrap items-end gap-x-5 gap-y-4">
               <div>
-                <span className="block text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">{L["f.diff"]}</span>
+                <span className="block text-xs font-semibold text-zinc-400 mb-1.5 first-letter:uppercase">{L["f.diff"]}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {(["all", ...DIFFICULTES] as const).map((d) => {
                     const active = difficulte === d;
                     return (
                       <button
                         key={d} type="button" onClick={() => setDifficulte(d)} aria-pressed={active}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition ${
                           active ? "bg-zinc-900 text-white" : "bg-white text-zinc-500 border border-zinc-200 hover:bg-zinc-100"
                         }`}
                       >
@@ -259,14 +265,14 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
               </div>
 
               <div>
-                <span className="block text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">{L["f.type"]}</span>
+                <span className="block text-xs font-semibold text-zinc-400 mb-1.5 first-letter:uppercase">{L["f.type"]}</span>
                 <div className="flex gap-1.5">
                   {(["all", ...TYPES] as const).map((t) => {
                     const active = type === t;
                     return (
                       <button
                         key={t} type="button" onClick={() => setType(t)} aria-pressed={active}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
                           active ? "bg-zinc-900 text-white" : "bg-white text-zinc-500 border border-zinc-200 hover:bg-zinc-100"
                         }`}
                       >
@@ -278,7 +284,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
               </div>
 
               <div>
-                <label htmlFor="pb-region" className="block text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">{L["f.region"]}</label>
+                <label htmlFor="pb-region" className="block text-xs font-semibold text-zinc-400 mb-1.5 first-letter:uppercase">{L["f.region"]}</label>
                 <select
                   id="pb-region" value={region} onChange={(e) => setRegion(e.target.value)}
                   className="px-3 py-2 rounded-xl bg-white border border-zinc-200 text-sm font-medium text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer max-w-[220px]"
@@ -289,7 +295,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
               </div>
 
               <div>
-                <label htmlFor="pb-dept" className="block text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">{L["f.dept"]}</label>
+                <label htmlFor="pb-dept" className="block text-xs font-semibold text-zinc-400 mb-1.5 first-letter:uppercase">{L["f.dept"]}</label>
                 <select
                   id="pb-dept" value={departement} onChange={(e) => setDepartement(e.target.value)} disabled={region === "all"}
                   className="px-3 py-2 rounded-xl bg-white border border-zinc-200 text-sm font-medium text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed max-w-[200px]"
@@ -300,7 +306,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
               </div>
 
               <div className="min-w-[170px]">
-                <label htmlFor="pb-dist" className="block text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">
+                <label htmlFor="pb-dist" className="block text-xs font-semibold text-zinc-400 mb-1.5 first-letter:uppercase">
                   {L["f.dist"]} <span className="text-zinc-700">{distMax >= 100 ? L["distAll"] : pr("distMax", { n: distMax })}</span>
                 </label>
                 <input
@@ -335,7 +341,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
       ) : loading && !data ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {Array.from({ length: 8 }, (_, i) => (
-            <div key={i} className="rounded-3xl border border-zinc-200 overflow-hidden bg-white">
+            <div key={i} className="rounded-2xl border border-zinc-200 overflow-hidden bg-white">
               <div className="h-36 bg-zinc-100 animate-pulse" />
               <div className="p-4 space-y-2.5">
                 <div className="h-4 w-3/4 rounded bg-zinc-100 animate-pulse" />
@@ -354,7 +360,7 @@ export function ParcoursBrowser({ initialSearch = "" }: { initialSearch?: string
       ) : (
         <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 transition-opacity ${loading ? "opacity-60" : ""}`}>
           {data?.items.map((p) => (
-            <ParcoursCard key={p.id} p={p} near={sort === "proche" ? near : null} loading={loadingId === p.id} disabled={loadingId !== null && loadingId !== p.id} onLoad={() => loadOnMap(p)} />
+            <ParcoursCard key={p.id} p={p} near={sort === "proche" ? near : null} loading={loadingId === p.id} disabled={loadingId !== null && loadingId !== p.id} onLoad={() => loadOnMap(p)} exportGpx={exportGpx} />
           ))}
         </div>
       )}
@@ -403,7 +409,7 @@ ${seg}
 }
 
 // ─── Carte parcours ──────────────────────────────────────────────────────────────
-function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; near?: { lat: number; lng: number } | null; loading: boolean; disabled: boolean; onLoad: () => void }) {
+function ParcoursCard({ p, near, loading, disabled, onLoad, exportGpx }: { p: ParcoursHdf; near?: { lat: number; lng: number } | null; loading: boolean; disabled: boolean; onLoad: () => void; exportGpx: boolean }) {
   const { lang } = useT();
   const L = PX[lang] ?? PX.fr;
   const pr = (k: string, pp?: Record<string, string | number>) => fillP(L[k] ?? k, pp);
@@ -422,7 +428,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
 
   const downloadGpx = useCallback(async (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
-    if (dl) return;
+    if (dl || !exportGpx) return;
     setDl(true);
     const tid = toast.loading(L["t.gpxPrep"]);
     try {
@@ -446,30 +452,30 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
     } finally {
       setDl(false);
     }
-  }, [dl, p, L]);
+  }, [dl, p, L, exportGpx]);
 
   return (
     <div className="relative group">
     <button
       type="button" onClick={onLoad} disabled={disabled}
-      className="block w-full text-left bg-white rounded-3xl border border-zinc-200 overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="block w-full text-left bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm hover:shadow-md transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <div className="relative h-36 overflow-hidden bg-zinc-100">
         <img
           src={tileUrl(c.lat, c.lng, thumbZoomFor(p.distance_km || 10))}
           alt="" loading="lazy"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          className="w-full h-full object-cover transition-transform duration-500"
         />
         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/40 to-transparent" />
         {/* (pastille centrale supprimée : elle masquait le cœur de la mini-carte) */}
-        <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold ${meta.chip}`}><IconeSport sport={p.sport} className="mr-1 inline h-3 w-3 align-[-1px]" />{pr(`sport.${p.sport}`)}</span>
-        <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-bold text-white shadow" style={{ backgroundColor: diff.color }}>{pr(`diff.${p.difficulte}`)}</span>
+        <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-semibold ${meta.chip}`}><IconeSport sport={p.sport} className="mr-1 inline h-3 w-3 align-[-1px]" />{pr(`sport.${p.sport}`)}</span>
+        <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white shadow" style={{ backgroundColor: diff.color }}>{pr(`diff.${p.difficulte}`)}</span>
         {kmAway != null && (
-          <span className="absolute bottom-2.5 left-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/90 backdrop-blur text-[10px] font-bold text-white shadow">
+          <span className="absolute bottom-2.5 left-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/90 backdrop-blur text-[11px] font-semibold text-white shadow">
             <LocateFixed className="w-3 h-3" /> {pr("kmAway", { n: kmAway })}
           </span>
         )}
-        <span className="absolute bottom-2.5 right-3 px-2 py-0.5 rounded-full bg-black/45 backdrop-blur text-[10px] font-medium text-white">{pr(`type.${p.type_parcours}`)}</span>
+        <span className="absolute bottom-2.5 right-3 px-2 py-0.5 rounded-full bg-black/45 backdrop-blur text-[11px] font-medium text-white">{pr(`type.${p.type_parcours}`)}</span>
         {loading && (
           <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center">
             <span className="flex items-center gap-2 text-sm font-semibold text-zinc-700">
@@ -480,7 +486,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
       </div>
 
       <div className="p-4">
-        <h3 className="font-bold text-zinc-900 leading-snug line-clamp-2 min-h-[2.6em]">{p.nom}</h3>
+        <h3 className="font-semibold text-zinc-900 leading-snug line-clamp-2 min-h-[2.6em]">{p.nom}</h3>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[13px] text-zinc-700 font-semibold">
           {p.distance_km > 0 ? (
             <>
@@ -506,15 +512,27 @@ function ParcoursCard({ p, near, loading, disabled, onLoad }: { p: ParcoursHdf; 
       </div>
     </button>
 
-      {/* Bouton GPX — télécharge le vrai tracé (montre / téléphone / appli GPS) */}
-      <button
-        type="button" onClick={downloadGpx} disabled={dl}
-        aria-label={pr("gpxAria", { name: p.nom })}
-        title={L["gpxTitle"]}
-        className="absolute bottom-3.5 right-3.5 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-white bg-zinc-900/90 backdrop-blur hover:bg-emerald-600 shadow-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-      >
-        {dl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} GPX
-      </button>
+      {/* Bouton GPX — télécharge le vrai tracé (montre / téléphone / appli GPS). Formules
+          payantes : sans le droit, il mène aux formules au lieu de disparaître. */}
+      {exportGpx ? (
+        <button
+          type="button" onClick={downloadGpx} disabled={dl}
+          aria-label={pr("gpxAria", { name: p.nom })}
+          title={L["gpxTitle"]}
+          className="absolute bottom-3.5 right-3.5 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold text-white bg-zinc-900/90 backdrop-blur hover:bg-emerald-600 shadow-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+        >
+          {dl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} GPX
+        </button>
+      ) : (
+        <Link
+          href="/pricing"
+          aria-label={L["gpxVerrou"]}
+          title={L["gpxVerrou"]}
+          className="absolute bottom-3.5 right-3.5 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold text-white bg-zinc-900/90 backdrop-blur hover:bg-zinc-700 shadow-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+        >
+          <Lock className="w-3.5 h-3.5" /> GPX
+        </Link>
+      )}
     </div>
   );
 }

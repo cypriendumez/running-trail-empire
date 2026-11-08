@@ -5,13 +5,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildWorkoutRow, makeMatcher } from "./workoutRow";
+import { ligneSommeil, ligneVfc, type IcuWellness } from "./wellnessRow";
 import { roleOf } from "./sport";
+import { enteteIntervals } from "@/lib/intervals/auth";
+import { temperaturesAir, positionHabituelle, enInterieur } from "@/lib/weather/temperatureSeances";
 
 const BASE = "https://intervals.icu/api/v1";
 
 function authHeader(apiKey: string) {
   return {
-    Authorization: "Basic " + Buffer.from(`API_KEY:${apiKey}`).toString("base64"),
+    Authorization: enteteIntervals(apiKey),
     "Content-Type": "application/json",
   };
 }
@@ -20,14 +23,19 @@ function authHeader(apiKey: string) {
 export async function syncIntervalsForUser(
   admin: SupabaseClient,
   opts: { userId: string; athleteId: string; apiKey: string; days?: number },
-): Promise<{ synced: number; error?: string; failures?: string[] }> {
+): Promise<{ synced: number; error?: string; status?: number; failures?: string[] }> {
   const { userId, athleteId, apiKey } = opts;
   const days = opts.days ?? 7;
   const profile = { id: userId, intervals_api_key: apiKey };
 
   // Sync last 7 days to catch the new activity
   const oldest = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const newest = new Date().toISOString().split("T")[0];
+  // ⚠️ `newest` est un jour LOCAL pour intervals.icu, et ce serveur compte en UTC. Une sortie
+  // courue à 0 h 30 à Paris (22 h 30 UTC la veille) porte le jour suivant : elle tombait hors
+  // de la fenêtre jusqu'à 2 h du matin. L'alerte d'intervals.icu arrive, elle, dans la minute :
+  // sans ce jour de marge, elle ne rapportait rien. Aucune activité n'étant datée dans le
+  // futur, demander jusqu'au lendemain UTC ne coûte rien.
+  const newest = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   const [activitiesRes, wellnessRes] = await Promise.all([
     fetch(`${BASE}/athlete/${athleteId}/activities?oldest=${oldest}&newest=${newest}`, {
@@ -39,7 +47,9 @@ export async function syncIntervalsForUser(
   ]);
 
   if (!activitiesRes.ok) {
-    return { synced: 0, error: `Intervals.icu ${activitiesRes.status}` };
+    // Le statut accompagne l'erreur : c'est lui qui dit si réessayer a un sens (429, 503…)
+    // ou non (401, 403 : autorisation retirée), pas le texte.
+    return { synced: 0, error: `Intervals.icu ${activitiesRes.status}`, status: activitiesRes.status };
   }
 
   const [activities, wellness]: [IntervalsActivity[], IntervalsWellness[]] = await Promise.all([
@@ -82,6 +92,14 @@ export async function syncIntervalsForUser(
   const probe = await admin.from("workouts").select("sport, external_id, vertical_ratio_pct, hrr_bpm").limit(1);
   const hasNewCols = probe.error?.code !== "42703";
 
+  // La VRAIE température de l'air de chaque séance, là où l'athlète court (jamais le capteur
+  // de la montre) : une requête Open-Meteo par lieu, pas une par séance.
+  const position = await positionHabituelle(admin, userId);
+  const tempsAir = position ? await temperaturesAir(activities
+    .filter((a) => a.start_date_local && !enInterieur(a.type))
+    .map((a) => ({ cle: String(a.id), lat: position.lat, lon: position.lon, debutLocal: String(a.start_date_local), dureeSec: a.moving_time ?? a.elapsed_time ?? null })))
+    : new Map<string, number>();
+
   for (const act of activities) {
     if (!act.type || !act.start_date_local) continue;
     const workoutType = roleOf(act.type);
@@ -90,12 +108,24 @@ export async function syncIntervalsForUser(
     // Construction PARTAGÉE avec l'autre chemin de synchronisation, et testée contre des
     // activités réelles : c'est ici que se logeaient l'arrondi manquant et les noms de
     // champs inexistants.
-    const payload = buildWorkoutRow(act, { userId, type: workoutType, hasNewCols });
+    const payload = buildWorkoutRow(act, { userId, type: workoutType, hasNewCols, tempAir: tempsAir.get(String(act.id)) ?? null });
 
     const id = match({ id: act.id, date, title });
-    const { error } = id
+    const { error: eEcriture } = id
       ? await admin.from("workouts").update(payload).eq("id", id)
       : await admin.from("workouts").insert(payload);
+    let error = eEcriture;
+    // ⚠️ 23505 : la séance EXISTE déjà — index unique (user_id, external_id). Deux cas réels :
+    // un autre passage vient de l'écrire (l'alerte d'intervals.icu et le sondage du navigateur
+    // se croisent), ou elle a changé de JOUR (heure corrigée autour de minuit) et la lecture,
+    // bornée aux jours de la fenêtre, ne l'a pas vue. On met donc à jour la ligne existante :
+    // ce n'est ni une nouveauté (pas de replanification), ni un refus (rien au journal).
+    if (error?.code === "23505" && !id && payload.external_id) {
+      const { error: eDejaLa } = await admin.from("workouts").update(payload)
+        .eq("user_id", userId).eq("external_id", String(payload.external_id));
+      if (!eDejaLa) continue;
+      error = eDejaLa;
+    }
     // Ne JAMAIS avaler une erreur d'écriture : c'est précisément ce qui a masqué
     // pendant des mois le fait que ce chemin n'enregistrait rien du tout.
     if (error) { failures.push(`${date} « ${title} » : ${error.code ?? "?"} ${error.message}`); continue; }
@@ -103,41 +133,23 @@ export async function syncIntervalsForUser(
     if (!id) synced++;
   }
 
+  // VFC et sommeil : lignes construites par `lib/intervals/wellnessRow`, PARTAGÉ avec la
+  // route du navigateur. Un jour SANS mesure arrive avec `hrv: null` (pas sans champ) et
+  // ne produit plus de ligne ; un jour avec la SEULE SDNN (Apple Watch) n'est plus jeté.
   for (const day of wellness) {
-    if (!day.id) continue;
-    if (day.hrv !== undefined) {
-      const state = day.hrv < 50 ? "recovery" : day.hrv > 80 ? "competition" : "optimal";
-      // ⚠️ MÊME RÈGLE QUE POUR LES SÉANCES, dix lignes plus haut : ne jamais avaler une
-      // erreur d'écriture. Elle ne s'appliquait pourtant qu'aux séances. Un refus sur la
-      // VFC ou le sommeil laissait le coach raisonner sur une fenêtre de bien-être vide
-      // — et « pas de VFC » se lit comme « aucune mesure », jamais comme « écriture
-      // refusée ». L'athlète voit un graphique troué sans explication possible.
-      const { error: eHrv } = await admin.from("hrv_data").upsert(
-        { user_id: profile.id, date: day.id, hrv_ms: day.hrv, rmssd: day.hrv, sdnn: day.hrvSDNN ?? null, physiological_state: state },
-        { onConflict: "user_id,date" }
-      );
-      if (eHrv) failures.push(`VFC du ${day.id} : ${eHrv.code ?? "?"} ${eHrv.message}`);
+    const vfc = ligneVfc(profile.id, day);
+    if (vfc) {
+      // ⚠️ MÊME RÈGLE QUE POUR LES SÉANCES, plus haut : ne jamais avaler une erreur
+      // d'écriture. Un refus sur la VFC ou le sommeil laissait le coach raisonner sur une
+      // fenêtre de bien-être vide — et « pas de VFC » se lit comme « aucune mesure »,
+      // jamais comme « écriture refusée ».
+      const { error: eHrv } = await admin.from("hrv_data").upsert(vfc, { onConflict: "user_id,date" });
+      if (eHrv) failures.push(`VFC du ${vfc.date} : ${eHrv.code ?? "?"} ${eHrv.message}`);
     }
-    if (day.sleepSecs !== undefined) {
-      const { error: eSommeil } = await admin.from("sleep_data").upsert(
-        {
-          user_id: profile.id, date: day.id,
-          total_sleep_min: Math.round(day.sleepSecs / 60),
-          // Ces champs sont ABSENTS de l'API wellness d'intervals.icu pour la plupart des
-          // comptes. Les forcer à 0 fabriquait de la donnée : le coach lisait « 0 % de
-          // sommeil profond » et y voyait une nuit catastrophique, alors qu'il s'agissait
-          // simplement d'une mesure indisponible. Absent doit rester NULL.
-          deep_sleep_min: day.deepSleepSecs != null ? Math.round(day.deepSleepSecs / 60) : null,
-          light_sleep_min: day.lightSleepSecs != null ? Math.round(day.lightSleepSecs / 60) : null,
-          rem_sleep_min: day.remSleepSecs != null ? Math.round(day.remSleepSecs / 60) : null,
-          sleep_score: day.sleepScore ?? null,
-          body_battery_end: day.bb ?? null,
-          spo2_avg: day.avgSpo2 ?? null,
-          source: "intervals_icu",
-        },
-        { onConflict: "user_id,date" }
-      );
-      if (eSommeil) failures.push(`sommeil du ${day.id} : ${eSommeil.code ?? "?"} ${eSommeil.message}`);
+    const nuit = ligneSommeil(profile.id, day);
+    if (nuit) {
+      const { error: eSommeil } = await admin.from("sleep_data").upsert(nuit, { onConflict: "user_id,date" });
+      if (eSommeil) failures.push(`sommeil du ${nuit.date} : ${eSommeil.code ?? "?"} ${eSommeil.message}`);
     }
   }
 
@@ -156,6 +168,9 @@ export async function syncIntervalsForUser(
     vo2max: latestVo2,
     restingHR: wLatest("restingHR"),
     lthr: Number(lastRunAct?.lthr) || null,
+    // La FC max de course appliquée à la séance (réglage intervals.icu, porté par chaque séance
+    // Garmin) : la « FC max de la montre » que le coach préfère au pic historique (fcCible).
+    maxHR: Number(lastRunAct?.athlete_max_hr) || null,
     thresholdPaceSecPerKm: tpMps > 0 ? Math.round(1000 / tpMps) : null,
     ctl: ctlV != null ? Math.round(ctlV) : null,
     atl: atlV != null ? Math.round(atlV) : null,
@@ -225,9 +240,8 @@ interface IntervalsActivity {
   average_temp?: number; gap?: number; icu_hr_zone_times?: number[]; icu_intensity?: number;
   icu_training_load?: number;
 }
-interface IntervalsWellness {
-  id: string; hrv?: number; hrvSDNN?: number; sleepSecs?: number;
-  deepSleepSecs?: number; lightSleepSecs?: number; remSleepSecs?: number;
-  sleepScore?: number; bb?: number; avgSpo2?: number; vo2max?: number;
-  restingHR?: number; ctl?: number; atl?: number; rampRate?: number;
-}
+// `| null` : un jour sans mesure arrive avec le champ À null, pas sans champ.
+type IntervalsWellness = IcuWellness & {
+  id: string; vo2max?: number | null;
+  restingHR?: number | null; ctl?: number | null; atl?: number | null; rampRate?: number | null;
+};

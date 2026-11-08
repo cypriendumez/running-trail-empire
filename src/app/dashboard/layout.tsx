@@ -3,6 +3,8 @@ import { stripProfileSecrets } from "@/lib/profile/safe";
 import { T, normLang } from "@/lib/i18n/translations";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
+import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
+import { niveauDeVma } from "@/lib/running/niveau";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import { FileAttenteCourses } from "@/components/courses/FileAttenteCourses";
 import { MedicalDisclaimer } from "@/components/layout/MedicalDisclaimer";
@@ -16,15 +18,19 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AttributionGarmin } from "@/components/legal/AttributionGarmin";
 import { estAdmin } from "@/lib/admin/acces";
-import { Logo } from "@/components/brand/Logo";
 import { EcranLancement } from "@/components/layout/EcranLancement";
 import { MiseAJour } from "@/components/layout/MiseAJour";
 import { CLE_SESSION_LANCEMENT } from "@/lib/ui/lancement";
+import { DecorLancement } from "@/components/layout/DecorLancement";
+import { aConsenti } from "@/lib/auth/consentement";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  // Pas de tableau de bord sans accord ENREGISTRÉ aux données de santé (RGPD art. 9) :
+  // compte ouvert avec Google depuis la connexion, ou créé avant le 11/10/2026.
+  if (!aConsenti(user.app_metadata)) redirect("/consentement");
 
   // ⚠️ LE FUSEAU EST LU ICI, CÔTÉ SERVEUR, ET DESCENDU DANS L'ARBRE. C'est la seule
   // façon que le serveur et le navigateur écrivent le MÊME texte : le serveur tourne à
@@ -33,14 +39,25 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // deux machines ne sont pas le même jour.
   const fuseau = decodeURIComponent((await cookies()).get("pacevo_tz")?.value ?? "");
 
-  const [{ data: profile }, { count: unreadMessages }, { data: settingsRow }] = await Promise.all([
+  const [{ data: profile }, { count: unreadMessages }, { data: settingsRow }, { data: seancesVma }, { data: testVma }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("notifications").select("id", { count: "exact", head: true })
       // La pastille compte AUSSI les messages d'athlètes : un message qu'on ne voit pas
       // arriver est un message auquel on ne répond pas.
       .eq("user_id", user.id).in("type", ["coach_message", "athlete_message"]).eq("read", false),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle(),
+    // Le NIVEAU affiché sous le nom se déduit de la VMA effective (lib/running/niveau) :
+    // les mêmes séances et le même calcul que la carte VMA du tableau de bord.
+    supabase.from("workouts").select("date,type,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c")
+      .eq("user_id", user.id).order("date", { ascending: false }).limit(40),
+    supabase.from("performance_baselines").select("vma_kmh,tested_at").eq("user_id", user.id)
+      .order("tested_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
+  const niveau = niveauDeVma(vmaAffichee({
+    seances: (seancesVma ?? []) as Parameters<typeof vmaAffichee>[0]["seances"],
+    baseline: testVma,
+    profil: profile as Parameters<typeof vmaAffichee>[0]["profil"],
+  }).vma);
   const avatarColor = String(((settingsRow?.data ?? {}) as Record<string, unknown>).avatarColor ?? "emerald");
   const brutMasquees = ((settingsRow?.data ?? {}) as Record<string, unknown>).notifsMasquees;
   const notifsMasquees = Array.isArray(brutMasquees) ? brutMasquees.filter((x): x is string => typeof x === "string") : [];
@@ -57,12 +74,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           peinture s'il a déjà été vu dans cette session — sans quoi il flasherait à
           chaque rechargement. `suppressHydrationWarning` : ce script modifie l'élément
           avant l'hydratation, c'est voulu. */}
-      <div id="lancement" aria-hidden="true" suppressHydrationWarning
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#FAFAFA]">
-        <div className="lancement-logo"><Logo size={76} /></div>
-        <div className="lancement-nom mt-4 text-[22px] font-bold tracking-tight text-zinc-900">Pacevo</div>
-        <div className="lancement-barre mt-6 h-[3px] w-28 overflow-hidden rounded-full bg-zinc-200"><span /></div>
-      </div>
+      <DecorLancement langue={langue} />
       <script dangerouslySetInnerHTML={{ __html: `try{if(sessionStorage.getItem(${JSON.stringify(CLE_SESSION_LANCEMENT)}))document.getElementById("lancement").setAttribute("data-vu","")}catch(e){}` }} />
       <EcranLancement />
       <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
@@ -74,7 +86,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <FileAttenteCourses />
         <Sidebar profile={stripProfileSecrets(profile)} unreadMessages={unreadMessages ?? 0} estEditeur={estAdmin(user.email)} />
         <div className="flex-1 flex flex-col min-w-0">
-          <TopBar profile={stripProfileSecrets(profile)} avatarColor={avatarColor} notifsMasquees={notifsMasquees} />
+          <TopBar profile={stripProfileSecrets(profile)} avatarColor={avatarColor} notifsMasquees={notifsMasquees} niveau={niveau} />
           <main className="flex-1 overflow-auto p-3 md:p-6">
             {children}
             {/* ⚠️ EN FIN DE CONTENU, PLUS FIXÉ SOUS L'ÉCRAN (30/09/2026). Cyprien : « ce qu'il y
@@ -84,7 +96,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 obligation (conditions d'API d'intervals.icu, art. 1.1) — mais au bout du
                 contenu, là où l'on arrive en défilant, sans prendre de place au travail. */}
             <div className="mt-8 border-t border-zinc-100 pt-2">
-              <AttributionGarmin className="px-2 py-1 text-[10px] leading-tight text-zinc-400 md:text-[11px] md:leading-relaxed" />
+              <AttributionGarmin className="px-2 py-1 text-[11px] leading-tight text-zinc-400 md:text-[11px] md:leading-relaxed" />
               <div className="hidden md:block">
                 <MedicalDisclaimer lang={langue} />
               </div>

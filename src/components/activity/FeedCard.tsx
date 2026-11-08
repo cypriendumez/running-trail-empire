@@ -90,7 +90,7 @@ export function FeedCard({ ligne, sansTrace }: { ligne: LigneFil; sansTrace: str
       href={ligne.href}
       className="group block rounded-2xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-300 hover:shadow-md"
     >
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{ligne.dateLisible}</p>
+      <p className="text-xs font-semibold text-zinc-500 first-letter:uppercase">{ligne.dateLisible}</p>
       <div className="mt-1 flex items-center gap-2">
         {/* Toutes les sorties de la montre s'appellent « Rouen Course à pied » : sans
             l'icône, quinze cartes portent le même titre et rien ne les distingue. */}
@@ -99,14 +99,14 @@ export function FeedCard({ ligne, sansTrace }: { ligne: LigneFil; sansTrace: str
           {(() => { const I = ICONE_SPORT[ligne.sport] ?? Activity; return <I className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />; })()}
           <span className="sr-only">{ligne.sportLisible}</span>
         </span>
-        <h2 className="truncate text-lg font-bold text-zinc-900 group-hover:text-emerald-700">{ligne.titre}</h2>
+        <h2 className="truncate text-lg font-semibold text-zinc-900 group-hover:text-emerald-700">{ligne.titre}</h2>
       </div>
 
       <dl className={`mt-3 grid gap-x-3 gap-y-2.5 ${COLONNES[ligne.chiffres.length] ?? COLONNES[3]}`}>
         {ligne.chiffres.map((c) => (
           <div key={c.label}>
-            <dt className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{c.label}</dt>
-            <dd className="mt-0.5 text-lg font-bold leading-tight text-zinc-900">{c.valeur}</dd>
+            <dt className="text-[11px] font-semibold text-zinc-500 first-letter:uppercase">{c.label}</dt>
+            <dd className="mt-0.5 text-lg font-semibold leading-tight text-zinc-900">{c.valeur}</dd>
           </div>
         ))}
       </dl>

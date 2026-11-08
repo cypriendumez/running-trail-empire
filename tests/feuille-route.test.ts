@@ -10,6 +10,7 @@
  *   npx tsx tests/feuille-route.test.ts
  */
 import assert from "node:assert/strict";
+import { partAffutage } from "../src/lib/coach/phase";
 import { readFileSync } from "node:fs";
 import { longRunForWeek } from "../src/lib/running/volume";
 import { lireUsage } from "../src/lib/ai/gemini";
@@ -28,12 +29,15 @@ test("la feuille de route compte la semaine de course, et l'affûtage descend ju
   const src = codeNu("src/lib/ai/coachContext.ts");
   assert.match(src, /const semainesAvecCourse = Math\.floor\(daysToRace \/ 7\) \+ 1;/);
   assert.match(src, /const W = Math\.min\(semainesAvecCourse, 26\);/);
-  assert.match(src, /if \(daysToRace == null \|\| daysToRace < 0 \|\| !vma\) return \[\];/, "la semaine de course (0 à 6 jours) n'aurait pas de feuille de route");
-  const f = (re: RegExp) => Number(src.match(re)?.[1]);
-  const course = f(/if \(wkUntil <= 0\) factor = ([\d.]+);/);
-  const j13 = f(/else if \(wkUntil === 1\) factor = ([\d.]+);/);
-  const j20 = f(/else if \(wkUntil === 2\) factor = ([\d.]+);/);
-  assert.ok(course < j13 && j13 < j20, `affûtage non décroissant : ${j20} → ${j13} → ${course}`);
+  // Depuis le 05/11/2026, la marche-course n'a pas de feuille de route (le programme en tient lieu).
+  assert.match(src, /if \(daysToRace == null \|\| daysToRace < 0 \|\| !vma \|\| marcheCourse\) return \[\];/, "la semaine de course (0 à 6 jours) n'aurait pas de feuille de route");
+  // Les parts d'affûtage vivent dans `lib/coach/phase` depuis qu'elles dépendent de la distance
+  // (05/11/2026) : la feuille de route doit les lire là, et elles doivent descendre jusqu'au bout.
+  assert.match(src, /const partTaper = partAffutage\(wkUntil, objective\?\.distanceKm\);/, "la feuille de route ne lit plus les parts d'affûtage");
+  for (const d of [42.2, 21.1, 5]) {
+    const parts = [2, 1, 0].map((s) => partAffutage(s, d)).filter((x): x is number => x != null);
+    assert.ok(parts.length >= 1 && parts.every((x, i) => i === 0 || x < parts[i - 1]), `affûtage non décroissant pour ${d} km : ${parts.join(" → ")}`);
+  }
 });
 
 test("l'affûtage garde une sortie longue en DÉCRUE depuis la plus longue du bloc (Lille : 26 → 20 → 14)", () => {
@@ -48,7 +52,7 @@ test("l'affûtage garde une sortie longue en DÉCRUE depuis la plus longue du bl
 
 test("la feuille de route transmet la référence d'affûtage et ne pose rien en semaine de course", () => {
   const src = codeNu("src/lib/ai/coachContext.ts");
-  assert.match(src, /const longRunKm = wkUntil <= 0 \? 0 : longRunForWeek\(/);
+  assert.match(src, /const longRunPrevuSemaine = wkUntil <= 0 \? 0 : longRunForWeek\(/);
   assert.match(src, /semainesAvantCourse: wkUntil, reference: Math\.max\(lrCurrent, longueDuBloc\)/);
   assert.match(src, /if \(ph !== "Affûtage"\) longueDuBloc = Math\.max\(longueDuBloc, longRunKm\);/);
 });

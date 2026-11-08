@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 
 export async function GET(req: Request) {
   const supabase = await createClient();
@@ -49,16 +50,20 @@ export async function GET(req: Request) {
 
   if (type === "wellness") {
     const [hrvRes, sleepRes] = await Promise.all([
-      supabase.from("hrv_data").select("date, hrv_ms, sdnn, physiological_state").eq("user_id", user.id).gte("date", since).order("date", { ascending: false }).limit(Math.min(days, 2000)),
+      supabase.from("hrv_data").select(COLONNES_VFC).eq("user_id", user.id).gte("date", since).order("date", { ascending: false }).limit(Math.min(days, 2000)),
       supabase.from("sleep_data").select("date, total_sleep_min, sleep_score, body_battery_end, spo2_avg").eq("user_id", user.id).gte("date", since).order("date", { ascending: false }).limit(Math.min(days, 2000)),
     ]);
 
-    // Merge by date
+    // UNE seule mesure de VFC (rMSSD, ou SDNN d'Apple Watch) : la colonne montre la valeur
+    // et l'état DANS cette mesure, face à la base de l'athlète (lib/health/vfc). Un jour
+    // qui ne porte que l'autre mesure garde sa ligne, sans VFC — jamais convertie.
+    const serie = serieVfc((hrvRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
+    const vfcParDate = new Map(serie.lignes.map((l) => [l.date, l]));
     const sleepByDate = Object.fromEntries((sleepRes.data ?? []).map(s => [s.date, s]));
     const allDates = new Set([...(hrvRes.data ?? []).map(h => h.date), ...(sleepRes.data ?? []).map(s => s.date)]);
 
     const wellness = [...allDates].sort((a, b) => b.localeCompare(a)).map(date => {
-      const hrv = (hrvRes.data ?? []).find(h => h.date === date);
+      const hrv = vfcParDate.get(date);
       const sleep = sleepByDate[date];
       return {
         date,
@@ -71,7 +76,7 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json({ wellness });
+    return NextResponse.json({ wellness, metriqueVfc: serie.metrique });
   }
 
   return NextResponse.json({ error: "Unknown type" }, { status: 400 });

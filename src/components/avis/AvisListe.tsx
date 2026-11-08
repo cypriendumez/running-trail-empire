@@ -104,13 +104,13 @@ export function AvisListe({ avis }: { avis: AvisPublie[] }) {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <h2 className="text-2xl font-bold tracking-tight text-zinc-900">{t.titre}</h2>
+      <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">{t.titre}</h2>
 
       {/* ── SYNTHÈSE : la note, puis sa répartition ──────────────────────────────── */}
       <div className="mt-6 grid gap-8 border-b border-zinc-200 pb-8 sm:grid-cols-[auto_1fr] sm:gap-12">
         <div>
           <div className="flex items-end gap-2">
-            <span className="text-6xl font-bold leading-none tracking-tight text-zinc-900 tabular-nums">{nLoc(moyenne, lang, 1)}</span>
+            <span className="text-6xl font-semibold leading-none tracking-tight text-zinc-900 tabular-nums">{nLoc(moyenne, lang, 1)}</span>
             <span className="pb-1.5 text-sm font-medium text-zinc-500">{t.sur5}</span>
           </div>
           <div className="mt-3"><Etoiles note={Math.round(moyenne)} taille="h-5 w-5" /></div>
@@ -145,7 +145,7 @@ export function AvisListe({ avis }: { avis: AvisPublie[] }) {
                 </span>
                 <span className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
                   <span
-                    className={`block h-full rounded-full transition-all ${actif ? "bg-emerald-500" : "bg-zinc-400"}`}
+                    className={`block h-full rounded-full transition ${actif ? "bg-emerald-500" : "bg-zinc-400"}`}
                     style={{ width: `${pct}%` }}
                   />
                 </span>

@@ -91,3 +91,33 @@ export function joursAvant(course: CourseAVenir, aujourdhui: string): number {
   if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
   return Math.round((b - a) / 86400000);
 }
+
+/**
+ * L'objectif DÉCLARÉ tant qu'il est devant l'athlète, `null` à partir du lendemain.
+ *
+ * ⚠️ `race_objective` EST UNE LIGNE UNIQUE QUE RIEN N'EFFACE APRÈS LA COURSE. Cas réel
+ * (Cyprien, marathon de Lille couru le 25/10/2026) : cinq jours plus tard, le tableau de
+ * bord lui proposait encore de « Modifier mon objectif » prérempli avec Lille, 2 h 40 et
+ * le 25/10, la carte de forme jugeait sa vitesse contre ce chrono, et le coach se croyait
+ * en affûtage. Chaque lecteur qui sert le PRÉSENT passe donc par ici ; ceux qui regardent
+ * en arrière exprès (l'e-mail « tes résultats sont en ligne ») lisent la ligne brute.
+ *
+ * Un objectif sans date n'expire jamais. Le jour même, la course reste l'objectif.
+ */
+export function objectifEnCours<T extends { raceDate?: unknown }>(objectif: T | null | undefined, aujourdhui: string): T | null {
+  if (!objectif) return null;
+  const date = jour(objectif.raceDate);
+  return date && date < aujourdhui ? null : objectif;
+}
+
+/**
+ * Une course OFFICIELLE : dossard, classement publié, Pass Prévention Santé, règlement
+ * fédéral des distances par âge. Un défi personnel (« sub 16 min sur 5 km, mi-décembre »,
+ * Cyprien, 30/10/2026) n'a rien de tout ça : pas de classement à envoyer, pas d'heure de
+ * départ à chercher chez un organisateur, pas de pass à présenter.
+ *
+ * Tout objectif enregistré avant l'option l'est sans le champ : il reste officiel.
+ */
+export function estOfficielle(objectif: { officielle?: unknown } | null | undefined): boolean {
+  return objectif?.officielle !== false;
+}

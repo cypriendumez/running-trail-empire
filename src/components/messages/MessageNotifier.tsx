@@ -6,11 +6,11 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 
 // ── i18n local (5 langues) — textes des alertes nouveau message. ───────────
 const N: Record<string, { coach: string; client: string; desc: string; open: string }> = {
-  fr: { coach: "💬 Nouveau message d'un client", client: "💬 Ton coach t'a répondu", desc: "Clique pour ouvrir ta messagerie.", open: "Ouvrir" },
-  en: { coach: "💬 New message from a client", client: "💬 Your coach replied", desc: "Click to open your inbox.", open: "Open" },
-  de: { coach: "💬 Neue Nachricht von einem Kunden", client: "💬 Dein Coach hat dir geantwortet", desc: "Klicke, um deine Nachrichten zu öffnen.", open: "Öffnen" },
-  es: { coach: "💬 Nuevo mensaje de un cliente", client: "💬 Tu coach te ha respondido", desc: "Haz clic para abrir tu mensajería.", open: "Abrir" },
-  pt: { coach: "💬 Nova mensagem de um cliente", client: "💬 O teu coach respondeu-te", desc: "Clica para abrir as tuas mensagens.", open: "Abrir" },
+  fr: { coach: "Nouveau message d'un client", client: "Ton coach t'a répondu", desc: "Clique pour ouvrir ta messagerie.", open: "Ouvrir" },
+  en: { coach: "New message from a client", client: "Your coach replied", desc: "Click to open your inbox.", open: "Open" },
+  de: { coach: "Neue Nachricht von einem Kunden", client: "Dein Coach hat dir geantwortet", desc: "Klicke, um deine Nachrichten zu öffnen.", open: "Öffnen" },
+  es: { coach: "Nuevo mensaje de un cliente", client: "Tu coach te ha respondido", desc: "Haz clic para abrir tu mensajería.", open: "Abrir" },
+  pt: { coach: "Nova mensagem de um cliente", client: "O teu coach respondeu-te", desc: "Clica para abrir as tuas mensagens.", open: "Abrir" },
 };
 
 // Sonne + notifie quand un nouveau message arrive (coach ou client). Monté dans les layouts.

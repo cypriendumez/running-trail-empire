@@ -90,6 +90,19 @@ export function evenementCourse(r: Record<string, string>, aujourdhui: string): 
   };
 }
 
+/**
+ * Un événement SPORTIF de DATAtourisme réduit à son nom, sa commune et son site — sans aucun
+ * filtre de date ni de distance : il ne sert qu'à PROPOSER un site officiel à une course
+ * déjà au catalogue (lib/races/sitesOfficiels), qui sera ensuite lu et jugé.
+ */
+export function evenementOuvert(r: Record<string, string>): { nom: string; commune: string; site: string } | null {
+  if (!/SportsEvent/.test(r.Categories_de_POI ?? "")) return null;
+  const nom = String(r.Nom_du_POI ?? "").trim();
+  const commune = String(r.Code_postal_et_commune ?? "").split("|")[0].split("#")[1]?.trim() ?? "";
+  const site = String(r.Contacts_du_POI ?? "").match(/https?:\/\/[^\s#|<>"]+/)?.[0] ?? null;
+  return nom && commune && site ? { nom, commune, site } : null;
+}
+
 /** Les lignes à insérer — une par distance — marquées comme venant de DATAtourisme. */
 export function lignesDT(e: EvenementDT, maintenant: string): Record<string, unknown>[] {
   const trail = /trail|nature|cross|montagne|sky|vertical/.test(forme(e.nom));

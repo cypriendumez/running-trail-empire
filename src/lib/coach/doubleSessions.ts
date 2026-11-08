@@ -57,6 +57,9 @@ export type EtatDouble = {
   doubleSeuil: boolean;
   /** Pourquoi le double seuil n'est pas proposé, s'il ne l'est pas. */
   manqueSeuil: string[];
+  /** Envisageable ET demandé : le plan pose des journées de double seuil (sauf fatigue,
+   *  récupération ou affûtage, que le contexte du coach tranche encore). */
+  seuilActif: boolean;
 };
 
 export function etatDouble(i: {
@@ -69,10 +72,15 @@ export function etatDouble(i: {
   pains: string[];
   /** Semaine d'affûtage : on ne multiplie pas les séances quand on cherche la fraîcheur. */
   taper: boolean;
+  /** Récupération après une course courue (nom de la course), sinon `null` : le volume se
+   *  reconstruit, il ne se double pas (`lib/coach/apresCourse`). */
+  recuperation?: string | null;
   /** Langue de l'athlète. Ces motifs s'affichent dans son profil à la seconde où il
    *  coche la case : les lui servir en français quand son écran est en allemand
    *  reviendrait à traduire l'étiquette et pas la réponse. */
   lang?: Lang;
+  /** L'athlète a coché « méthode norvégienne : double seuil » (`profiles.double_seuil`). */
+  optInSeuil?: boolean;
 }): EtatDouble {
   const T = DOUBLE_T[i.lang && DOUBLE_T[i.lang] ? i.lang : "fr"];
   const manque: string[] = [];
@@ -80,6 +88,7 @@ export function etatDouble(i: {
   if (i.pains.length) manque.push(T.douleur(i.pains.map((x) => traduireDouleur(x, i.lang && DOUBLE_T[i.lang] ? i.lang : "fr")).join(", ")));
   if (i.readiness === "rouge") manque.push(T.rouge);
   if (i.taper) manque.push(T.affutage);
+  if (i.recuperation) manque.push(T.recuperation(i.recuperation));
   if (!(i.weeklyKm >= VOLUME_MINI_DOUBLE_KM)) {
     manque.push(T.volume(Math.round(i.weeklyKm), VOLUME_MINI_DOUBLE_KM));
   }
@@ -96,7 +105,8 @@ export function etatDouble(i: {
   }
   // Le lactate n'est pas une condition qu'on peut vérifier : c'est un AVERTISSEMENT
   // qu'on doit donner même à celui qui remplit tout le reste.
-  return { autorise, manque, doubleSeuil: manqueSeuil.length === 0, manqueSeuil };
+  const doubleSeuil = manqueSeuil.length === 0;
+  return { autorise, manque, doubleSeuil, manqueSeuil, seuilActif: doubleSeuil && i.optInSeuil === true };
 }
 
 export type Moment = "matin" | "soir";
@@ -131,17 +141,46 @@ export function seanceMatinFacile(km: number, allure: string | null, lang: Lang 
 }
 
 /**
- * Description d'une journée de DOUBLE SEUIL, conforme à la méthode norvégienne.
+ * DOSE D'UNE JOURNÉE DE DOUBLE SEUIL, selon le volume hebdomadaire.
+ *
+ * Les Norvégiens accumulent environ 20 % de leur volume au seuil, en deux journées. À
+ * 90 km : 4 × 6 min le matin et 5 × 1000 m le soir, ~10 km de travail par journée ; à
+ * 120 km : 5 × 6 min et 7 × 1000 m. Bornes : 3 à 6 répétitions le matin, 4 à 10 le soir.
+ */
+export function doseDoubleSeuil(weeklyKm: number): { matin: number; soir: number } {
+  const v = Number.isFinite(weeklyKm) && weeklyKm > 0 ? weeklyKm : 0;
+  return {
+    matin: Math.min(6, Math.max(3, Math.round(v / 22))),
+    soir: Math.min(10, Math.max(4, Math.round(v / 18))),
+  };
+}
+
+/** Écarts à l'allure seuil (s/km) : le matin franchement dessous, le soir juste dessous. */
+export const ECART_MATIN_SEC = 10;
+export const ECART_SOIR_SEC = 3;
+
+/**
+ * Description d'une séance de DOUBLE SEUIL, conforme à la méthode norvégienne.
  *
  * Matin : intervalles longs, bas de la zone. Soir : intervalles courts, légèrement plus
  * haut. Les DEUX restent SOUS le seuil — c'est tout le principe, et c'est aussi ce qui
  * est le plus difficile à respecter sans lactatemètre.
+ *
+ * ⚠️ LE MATIN ÉTAIT ÉCRIT « à ton allure seuil MOINS 5 à 8 s/km » : plus VITE que le seuil,
+ * l'inverse du principe annoncé deux lignes plus bas. Les allures sont désormais calculées
+ * et écrites : seuil + 10 s/km le matin, seuil + 3 s/km le soir.
+ *
+ * `lang` par défaut = français, version CANONIQUE lue par la montre.
  */
-export function seanceDoubleSeuil(moment: Moment, allureSeuil: string | null): string {
-  const seuil = allureSeuil ? `${allureSeuil}/km` : "ton allure seuil";
+export function seanceDoubleSeuil(moment: Moment, allureSeuil: string, lang: Lang = "fr", reps?: number): string {
+  const T = DOUBLE_T[lang] ?? DOUBLE_T.fr;
+  const m = String(allureSeuil).match(/(\d+)['’:](\d{2})/);
+  const base = m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  const allure = (ecart: number) => (base == null ? String(allureSeuil)
+    : `${Math.floor((base + ecart) / 60)}'${String((base + ecart) % 60).padStart(2, "0")}`);
   return moment === "matin"
-    ? `Seuil du matin — intervalles LONGS : 5 × 6 min à ${seuil} MOINS 5 à 8 s/km, récupération 1 min trottinée. Tu dois finir en te disant que tu aurais pu en faire deux de plus. Si ce n'est pas le cas, c'était trop vite : la séance du soir sera gâchée.`
-    : `Seuil du soir — intervalles COURTS : 10 à 12 × 1 min à ${seuil}, récupération 30 s trottinée. Légèrement plus rapide que ce matin, mais toujours SOUS le seuil : c'est le cumul de la journée qui fait le travail, pas l'intensité d'une répétition.`;
+    ? T.seuilMatin(reps ?? 5, allure(ECART_MATIN_SEC))
+    : T.seuilSoir(reps ?? 8, allure(ECART_SOIR_SEC));
 }
 
 /** L'avertissement qui doit accompagner TOUTE prescription de double seuil. */

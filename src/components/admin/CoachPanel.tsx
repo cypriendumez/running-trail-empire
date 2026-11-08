@@ -9,6 +9,8 @@ export type CoachClient = {
   lastRun: { title: string; date: string; km: number } | null;
   weekKm: number; sleepScore: number | null; load14: number | null;
   hrv: number | null; state: string | null;
+  /** La mesure de `hrv` : la SDNN (Apple Watch par défaut) n'a pas l'échelle d'une rMSSD. */
+  hrvMetrique?: "rmssd" | "sdnn" | null;
   flags: { icon: string; label: string; sev: number }[]; priority: number;
 };
 
@@ -29,6 +31,7 @@ type Detail = {
   profile: { full_name?: string; age?: number; weight_kg?: number; height_cm?: number; gender?: string; subscription_tier?: string } | null;
   workouts: { title?: string; type?: string; date: string; distance_km?: number; elevation_gain_m?: number; duration_seconds?: number; avg_hr?: number; avg_cadence_spm?: number; calories?: number }[];
   hrv: { date: string; hrv_ms: number; physiological_state?: string }[];
+  hrvMetrique?: "rmssd" | "sdnn" | null;
   sleep: { date: string; total_sleep_min?: number; sleep_score?: number; body_battery_end?: number }[];
   baseline: { vma_kmh?: number; ftp_watts?: number; max_hr?: number; resting_hr?: number } | null;
   plan: { race_date?: string; goal?: string } | null;
@@ -57,13 +60,13 @@ export function CoachPanel({ clients, unread = 0 }: { clients: CoachClient[]; un
     <div className="min-h-screen bg-zinc-50 p-4 sm:p-6">
       <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2"><Users className="w-6 h-6 text-emerald-600" /> Espace Coach</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900 flex items-center gap-2"><Users className="w-6 h-6 text-emerald-600" /> Espace Coach</h1>
           <p className="text-sm text-zinc-500 mt-1">Tes <b>{clients.length}</b> clients · données en temps réel · analyse IA + envoi de la séance du jour.</p>
         </div>
         <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
           <Link href="/admin/messages" className="relative inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50">
             <MessagesSquare className="h-4 w-4 text-emerald-600" /> Messages
-            {unread > 0 && <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[11px] font-bold text-white shadow-sm">{unread > 99 ? "99+" : unread}</span>}
+            {unread > 0 && <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[11px] font-semibold text-white shadow-sm">{unread > 99 ? "99+" : unread}</span>}
           </Link>
           <Link href="/admin/entrainements" className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
             <Library className="h-4 w-4" /> Bibliothèque
@@ -76,7 +79,7 @@ export function CoachPanel({ clients, unread = 0 }: { clients: CoachClient[]; un
         <div className="mb-5 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="mb-3 flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-base">🎯</span>
-            <h2 className="font-bold text-zinc-900">Aujourd&apos;hui — <span className="text-amber-600">{attention.length}</span> à suivre</h2>
+            <h2 className="font-semibold text-zinc-900">Aujourd&apos;hui — <span className="text-amber-600">{attention.length}</span> à suivre</h2>
           </div>
           <div className="space-y-1.5">
             {attention.slice(0, 8).map((c) => {
@@ -145,13 +148,13 @@ export function CoachPanel({ clients, unread = 0 }: { clients: CoachClient[]; un
               <div className="bg-white rounded-2xl border border-zinc-200 p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-lg font-bold text-zinc-900">{sel.name}</h2>
+                    <h2 className="text-lg font-semibold text-zinc-900">{sel.name}</h2>
                     <p className="text-xs text-zinc-400">{sel.email}</p>
                   </div>
                   {sel.state && STATE[sel.state] && <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATE[sel.state].c}`}>{STATE[sel.state].l}</span>}
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <Stat icon={<HeartPulse className="w-4 h-4 text-red-400" />} label="VFC" value={sel.hrv != null ? `${sel.hrv} ms` : "—"} />
+                  <Stat icon={<HeartPulse className="w-4 h-4 text-red-400" />} label="VFC" value={sel.hrv != null ? `${sel.hrv} ms${sel.hrvMetrique === "sdnn" ? " (SDNN)" : ""}` : "—"} />
                   <Stat icon={<Moon className="w-4 h-4 text-indigo-400" />} label="Sommeil" value={sel.sleepScore != null ? `${sel.sleepScore}/100` : "—"} />
                   <Stat icon={<Activity className="w-4 h-4 text-emerald-500" />} label="Volume 7j" value={`${sel.weekKm} km`} />
                   <Stat icon={<span className="text-sm">📊</span>} label="Charge 14j" value={sel.load14 != null ? `${sel.load14} TSS` : "—"} />
@@ -182,7 +185,7 @@ export function CoachPanel({ clients, unread = 0 }: { clients: CoachClient[]; un
                     {detail?.plan?.goal && <div className="text-xs text-zinc-500 mb-3">🎯 Objectif : {detail.plan.goal}{detail.plan.race_date ? ` · course le ${fmtDate(detail.plan.race_date)}` : ""}</div>}
 
                     <div className="flex items-center justify-between mb-2">
-                      <div className="text-[11px] font-bold uppercase tracking-wide text-zinc-400">Séances · 60 derniers jours ({detail?.workouts?.length ?? 0})</div>
+                      <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">Séances · 60 derniers jours ({detail?.workouts?.length ?? 0})</div>
                       <div className="text-[10px] text-zinc-300">clique une séance → page complète</div>
                     </div>
                     {detail && detail.workouts.length > 0 ? (
@@ -205,11 +208,11 @@ export function CoachPanel({ clients, unread = 0 }: { clients: CoachClient[]; un
 
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <div>
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-zinc-400 mb-1">VFC — 7 derniers j</div>
-                        {detail && detail.hrv.length ? <div className="text-sm text-zinc-600">{detail.hrv.slice(0, 7).map((h) => h.hrv_ms).join(" · ")} ms</div> : <p className="text-sm text-zinc-400">non synchronisée</p>}
+                        <div className="text-[11px] font-semibold text-zinc-400 mb-1 first-letter:uppercase">VFC — 7 derniers j</div>
+                        {detail && detail.hrv.length ? <div className="text-sm text-zinc-600">{detail.hrv.slice(0, 7).map((h) => h.hrv_ms).join(" · ")} ms{detail.hrvMetrique === "sdnn" ? " (SDNN)" : ""}</div> : <p className="text-sm text-zinc-400">non synchronisée</p>}
                       </div>
                       <div>
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-zinc-400 mb-1">Sommeil — 7 dernières nuits</div>
+                        <div className="text-[11px] font-semibold text-zinc-400 mb-1 first-letter:uppercase">Sommeil — 7 dernières nuits</div>
                         {detail && detail.sleep.length ? <div className="text-sm text-zinc-600">{detail.sleep.slice(0, 7).map((s) => s.sleep_score ?? "?").join(" · ")}/100</div> : <p className="text-sm text-zinc-400">non synchronisé</p>}
                       </div>
                     </div>
@@ -233,7 +236,7 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
   return (
     <div className="bg-zinc-50 rounded-xl p-3">
       <div className="flex items-center gap-1.5 text-xs text-zinc-400">{icon}{label}</div>
-      <div className="text-lg font-bold text-zinc-900 mt-0.5">{value}</div>
+      <div className="text-lg font-semibold text-zinc-900 mt-0.5">{value}</div>
     </div>
   );
 }

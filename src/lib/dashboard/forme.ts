@@ -1,6 +1,6 @@
 import { isRun } from "@/lib/intervals/sport";
 import { longRunPeakKm, demonstratedWeeklyKm, type RaceGoal } from "@/lib/running/volume";
-import { raceProjection } from "@/lib/running/fitness";
+import { raceProjection, type Socle } from "@/lib/running/fitness";
 import { dansFenetre } from "./fenetre";
 
 /**
@@ -31,13 +31,24 @@ export type Forme = {
   total: number;
   endurance: number;
   speed: number;
-  recovery: number;
-  regularity: number;
+  /** `null` : aucune mesure récente (sommeil, VFC) — absente, pas zéro. */
+  recovery: number | null;
+  /** `null` : aucune journée prescrite à juger sur 14 jours. */
+  regularity: number | null;
   hasData: boolean;
   /** Sur quoi les échelles sont calées — affiché à l'athlète. */
   reference: "objectif" | "general";
   cibleLongueKm: number | null;
   cibleVolumeKm: number | null;
+  /**
+   * Les valeurs INTERMÉDIAIRES — lues par la page détaillée (/dashboard/indicateurs/forme)
+   * pour montrer le calcul avec les vrais chiffres de l'athlète, pas une formule abstraite.
+   */
+  details: {
+    plusLongueKm: number; volumeMoyenKm: number; refLongueKm: number; refVolumeKm: number;
+    /** « objectif » : chrono visé ÷ chrono prédit ; « vma » : VMA ramenée sur 8–20 km/h. */
+    modeVitesse: "objectif" | "vma"; chronoPreditSec: number | null;
+  };
 };
 
 type Seance = { date: string; sport?: string | null; distance_km?: number | null };
@@ -48,6 +59,12 @@ const LONGUE_GENERIQUE = 30;
 const VOLUME_GENERIQUE = 50;
 const VMA_PLANCHER = 8;
 const VMA_ETENDUE = 12;
+
+/** La distance d'une séance, ou 0 si elle est aberrante (négative, NaN, infinie). */
+const km = (w: { distance_km?: number | null }): number => {
+  const d = Number(w.distance_km);
+  return Number.isFinite(d) && d > 0 ? d : 0;
+};
 
 const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, Number.isFinite(n) ? n : 0));
 
@@ -61,24 +78,48 @@ export function butDe(distanceKm: number | null): RaceGoal {
   return "5k";
 }
 
+/**
+ * LE SOCLE D'ENDURANCE RÉEL, depuis les séances : la plus longue sortie des 6 dernières
+ * semaines et le volume DÉMONTRÉ (médiane des 4 meilleures semaines). C'est ce que le
+ * modèle de prédiction (lib/running/vdot) lit pour ajuster tout ce qui dépasse le semi —
+ * le même pour la carte « Vitesse & prédictions » et pour le score de forme.
+ */
+export function socleDesSeances(workouts: Seance[], aujourdhui?: string): Socle {
+  const courses = workouts.filter((w) => isRun(w.sport));
+  const recentes = courses.filter((w) => dansFenetre(w.date, 42, aujourdhui));
+  const plusLongue = Math.max(0, ...recentes.map(km));
+  return {
+    sortieLongueKm: plusLongue > 0 ? plusLongue : null,
+    volumeHebdoKm: demonstratedWeeklyKm(courses.map((w) => ({ date: w.date, distance_km: km(w) }))),
+  };
+}
+
 export function computeForme(
   workouts: Seance[],
   currentVma: number,
-  recovery: number,
-  regularity: number,
+  recovery: number | null,
+  regularity: number | null,
   objectif: ObjectifForme = null,
+  /**
+   * Jour de référence (AAAA-MM-JJ, jour local) ; par défaut, aujourd'hui. Pour les tests à date
+   * figée : sans lui, les séances d'un test daté du 02/09 sortaient de la fenêtre de 42 jours au
+   * fil du calendrier, et le test rougissait seul le 15/10/2026 sans qu'une ligne ait changé.
+   */
+  aujourdhui?: string,
 ): Forme {
-  const recent = workouts.filter((w) => isRun(w.sport) && dansFenetre(w.date, 42));
+  const recent = workouts.filter((w) => isRun(w.sport) && dansFenetre(w.date, 42, aujourdhui));
   const hasData = workouts.length > 0;
-  const longest = Math.max(0, ...recent.map((w) => w.distance_km ?? 0));
-  const weeklyKm = recent.reduce((s, w) => s + (w.distance_km ?? 0), 0) / 6;
+  const longest = Math.max(0, ...recent.map(km));
+  const weeklyKm = recent.reduce((s, w) => s + km(w), 0) / 6;
 
   const raceKm = objectif?.distanceKm && objectif.distanceKm > 0 ? objectif.distanceKm : null;
   const cibleLongueKm = longRunPeakKm(butDe(raceKm), raceKm);
   // La capacité DÉMONTRÉE, pas une cible tombée du ciel : c'est le volume que
   // l'athlète a réellement tenu. `null` tant qu'il n'a pas 4 semaines courues.
   const cibleVolumeKm = demonstratedWeeklyKm(
-    workouts.filter((w) => isRun(w.sport)).map((w) => ({ date: w.date, distance_km: w.distance_km ?? 0 })),
+    workouts.filter((w) => isRun(w.sport)).map((w) => ({ date: w.date, distance_km: km(w) })),
+    // Midi local : `demonstratedWeeklyKm` relit ce jour-là en jour LOCAL, sans glisser d'un cran.
+    aujourdhui ? Date.parse(`${aujourdhui}T12:00:00`) : undefined,
   );
 
   const refLongue = cibleLongueKm ?? LONGUE_GENERIQUE;
@@ -89,9 +130,13 @@ export function computeForme(
   // seule échelle qui ait un sens pour lui — une VMA de 17 est excellente pour un
   // coureur de 10 km et juste pour un objectif marathon ambitieux.
   let speed: number;
+  let chronoPreditSec: number | null = null;
+  const modeVitesse: Forme["details"]["modeVitesse"] = currentVma > 0 && raceKm && objectif?.targetSeconds && objectif.targetSeconds > 0 ? "objectif" : "vma";
   if (currentVma > 0 && raceKm && objectif?.targetSeconds && objectif.targetSeconds > 0) {
-    const { nowSec } = raceProjection(currentVma, raceKm, objectif.targetSeconds, null);
+    // Le même socle que la carte de prédictions : les deux chiffres sont lus côte à côte.
+    const { nowSec } = raceProjection(currentVma, raceKm, objectif.targetSeconds, null, null, { sortieLongueKm: longest || null, volumeHebdoKm: cibleVolumeKm });
     speed = nowSec > 0 ? clamp(Math.round((objectif.targetSeconds / nowSec) * 100)) : 0;
+    chronoPreditSec = nowSec > 0 ? nowSec : null;
   } else {
     speed = currentVma > 0 ? clamp(Math.round(((currentVma - VMA_PLANCHER) / VMA_ETENDUE) * 100)) : 0;
   }
@@ -101,9 +146,15 @@ export function computeForme(
   //    cercle et la carte aurait annoncé « 113 / 100 ». En production ces deux valeurs
   //    sont bornées à la source, mais un calcul ne doit pas dépendre de la prudence de
   //    son appelant — surtout quand il alimente un tracé. Trouvé par crash-test.
-  const rec = clamp(recovery);
-  const reg = clamp(regularity);
-  const total = clamp(Math.round((endurance + speed + rec + reg) / 4));
+  // ⚠️ ABSENTE N'EST PAS ZÉRO (06/11/2026) : sans mesure récente, la récupération valait
+  // 85 inventés par le score discipline. Une composante `null` est écartée de la moyenne.
+  const rec = recovery == null ? null : clamp(recovery);
+  const reg = regularity == null ? null : clamp(regularity);
+  const axes = [endurance, speed, rec, reg].filter((v): v is number => v != null);
+  const total = clamp(Math.round(axes.reduce((a, b) => a + b, 0) / axes.length));
   const reference: Forme["reference"] = cibleLongueKm != null ? "objectif" : "general";
-  return { total, endurance, speed, recovery: rec, regularity: reg, hasData, reference, cibleLongueKm, cibleVolumeKm };
+  return {
+    total, endurance, speed, recovery: rec, regularity: reg, hasData, reference, cibleLongueKm, cibleVolumeKm,
+    details: { plusLongueKm: longest, volumeMoyenKm: weeklyKm, refLongueKm: refLongue, refVolumeKm: refVolume, modeVitesse, chronoPreditSec },
+  };
 }

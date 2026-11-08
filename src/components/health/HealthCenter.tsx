@@ -1,15 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback , useId } from "react";
-import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from "framer-motion";
-import {
-  Shield, Heart, Utensils, Stethoscope, AlertTriangle,
-  Phone, CheckCircle2, Zap, Droplets, BookOpen, Send, Loader2, Sparkles, Scale, Camera, X, Activity,
-  MapPin, ListChecks, ClipboardList, CalendarPlus, RotateCcw, ChevronDown,
-} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Heart, Utensils, Stethoscope, AlertTriangle, Phone, Send, Loader2, Scale, Camera, X, Activity, ClipboardList, CalendarPlus, RotateCcw, ChevronDown, Lock, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { SmartJournal } from "@/components/journal/SmartJournal";
+import { NutritionCourse } from "@/components/health/NutritionCourse";
+import type { CourseNutri } from "@/lib/health/coursesNutrition";
 import { WeightMode } from "@/components/health/WeightMode";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { RichText } from "@/components/ui/RichText";
@@ -23,8 +20,8 @@ function fill(s: string, p?: Record<string, string | number>) {
 }
 const H: Record<string, Record<string, string>> = {
   fr: {
-    "h.enPanne": "Tes douleurs déclarées n'ont pas pu être chargées. Cet historique paraît vide, mais rien n'est perdu — réessaie dans un instant.", "h.title": "Santé & Performance", "h.subtitle": "Votre kiné IA, votre journal, votre sécurité et votre nutrition — au même endroit.",
-    "tab.kine": "Kiné IA", "tab.journal": "Journal", "tab.guardian": "Sécurité", "tab.nutrition": "Nutrition", "tab.poids": "Poids",
+    "h.enPanne": "Tes douleurs déclarées n'ont pas pu être chargées. Cet historique paraît vide, mais rien n'est perdu — réessaie dans un instant.", "h.title": "Santé et performance", "h.subtitle": "Ton kiné IA, ta nutrition de course et ton poids — au même endroit.",
+    "tab.kine": "Kiné IA", "tab.nutrition": "Nutrition", "tab.poids": "Poids",
     "k.where": "Où as-tu mal ?", "view.face": "Face", "view.dos": "Dos",
     "k.hint": "Touche une zone sur le corps ou dans la liste, ajuste la douleur, puis demande au kiné.",
     "k.pain": "Douleur", "k.painLight": "Gêne légère", "k.painHard": "Très douloureux",
@@ -32,26 +29,18 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Protocole express", "k.protoWait": "Protocole d'attente — pour un plan précis, décris ta douleur au kiné IA ci-contre.",
     "k.suivi": "Suivi de tes douleurs", "k.suiviNone": "Aucune douleur déclarée ces 60 derniers jours.", "k.suiviSince": "depuis {n} j", "k.suiviToday": "aujourd'hui", "k.suiviAgo": "il y a {n} j", "trend.amelioration": "en amélioration", "trend.aggravation": "en aggravation", "trend.stable": "stable", "trend.inconnue": "1re déclaration", "chat.starters": "Pour démarrer", "chat.s1": "J'ai une douleur qui revient à chaque sortie longue.", "chat.s2": "Comment adapter ma semaine avec cette douleur ?", "chat.s3": "Quels exercices de prévention pour mes tendons ?",
     "chat.title": "Kiné IA", "chat.sub": "Réponses personnalisées selon ta charge & ta récup",
-    "chat.seed": "Bonjour ! Je suis votre kiné du sport. Décrivez-moi ce que vous ressentez — zone, depuis quand, à l'effort ou au repos — ou cliquez une zone sur le schéma, et je vous aide.",
+    "chat.seed": "Bonjour, je suis votre kiné du sport. Décrivez-moi ce que vous ressentez — zone, depuis quand, à l'effort ou au repos — ou cliquez une zone sur le schéma, et je vous aide.",
     "chat.thinking": "Le kiné réfléchit…", "chat.placeholder": "Ex : douleur au genou après mes sorties longues…", "chat.photoAdd": "Ajouter une photo", "chat.photoRemove": "Retirer la photo", "chat.photoReady": "Photo prête. Elle est analysée puis oubliée : rien n'est enregistré. Cadre serré sur la zone, en pleine lumière.", "chat.photoBadType": "Image illisible. Formats acceptés : JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Peux-tu regarder cette photo ?",
-    "chat.disclaimer": "⚕️ Conseils informatifs — ne remplacent pas un avis médical. Douleur forte / persistante → consultez.",
+    "chat.disclaimer": "Conseils informatifs — ne remplacent pas un avis médical. Douleur forte / persistante → consultez.",
     "chat.errNoReply": "Je n'ai pas pu répondre, réessayez.", "chat.errConn": "Connexion impossible au kiné IA. Réessayez.",
+    "chat.verrou": "Le kiné IA fait partie des formules Starter et Premium.", "chat.verrouCta": "Voir les formules", "chat.quota": "Tu as utilisé tes échanges avec l'IA pour aujourd'hui : ils reviennent demain.",
     "k.askPrompt": "J'ai une douleur au niveau : {zone} (intensité {n}/10). Qu'est-ce que ça peut être, et que dois-je faire concrètement ?",
-    "sec.title": "Sécurité en course", "sec.sub": "Ce que Pacevo fait vraiment pour ta sécurité — et ce qui reste entre tes mains.",
-    "sec.live": "Partage ta position en direct", "sec.liveDesc": "Depuis la Carte, un lien de suivi envoie ta position en temps réel à un proche — sans compte ni installation de son côté.", "sec.liveBtn": "Ouvrir la Carte",
-    "sec.contact": "Contact d'urgence", "sec.contactDesc": "Enregistré dans tes réglages et affiché ici. Pacevo n'appelle et n'écrit à personne : en cas de problème, c'est toi — ou un témoin — qui appelle.",
-    "gd.name": "Prénom Nom", "gd.namePh": "Jean Dupont", "gd.phone": "Téléphone", "gd.saveContact": "Enregistrer le contact", "gd.savedContact": "Contact enregistré.", "sec.saveFail": "Contact non enregistré — réessaie.", "sec.call": "Appeler",
-    "sec.honest": "Pacevo ne détecte pas les chutes et n'alerte personne automatiquement : aucune application ne le fait sans le matériel dédié. La détection d'incident de ta montre (Garmin, Apple, Coros…) reste la référence — active-la là-bas.",
-    "sec.kit": "Avant une sortie en montagne", "sec.k1": "Dis à quelqu'un où tu vas et quand tu rentres.", "sec.k2": "Téléphone chargé, sifflet, couverture de survie, veste imperméable.", "sec.k3": "Eau et sel sur les longues sorties par chaleur ; boire à la soif.", "sec.k4": "Numéros d'urgence : 112 (Europe), 15 SAMU, 18 pompiers.", "sec.k5": "Lampe et vêtement réfléchissant dès la pénombre.",
     "k.annuler": "Annuler", "k.etatQ": "{z} — où en es-tu ?", "k.mieux": "Ça va mieux", "k.pire": "Ça empire", "k.passe": "C'est passé", "k.etatOk": "C'est noté — ton coach en tient compte.", "k.etatPasse": "Noté : cette douleur ne bride plus ton plan.", "k.etatErr": "Mise à jour impossible. Réessaie.",
     "chat.new": "Nouvelle consultation", "chat.newConfirm": "Effacer la conversation ? Tes douleurs déclarées restent dans ton suivi.", "chat.resumed": "Consultation précédente reprise — le kiné se souvient de vos échanges.", "chat.newFail": "Effacement impossible, réessaie.",
     "k.mapOpen": "Où as-tu mal ? Montrer le schéma", "k.mapClose": "Masquer le schéma", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Bilan de la consultation", "bilan.hyp": "Hypothèses", "bilan.urgent": "Drapeau rouge : consulte rapidement un médecin. Le kiné IA ne remplace pas un avis médical.", "bilan.exos": "Exercices", "bilan.charge": "Charge", "bilan.reprise": "Reprise",
     "bilan.plan": "Programmer 2 semaines dans mon calendrier", "bilan.planned": "{n} séances ajoutées au calendrier (un jour sur deux).", "bilan.planFail": "Le calendrier n'a pas pu être écrit.", "bilan.voirCal": "Voir le calendrier",
     "bilan.proba.haute": "probable", "bilan.proba.moyenne": "possible", "bilan.proba.faible": "peu probable",
-    "n.title": "Nutrition Lab — Stratégie de course", "n.duration": "Durée de l'épreuve (heures)", "n.temp": "Température prévue (°C)",
-    "n.carbs": "g glucides/h", "n.water": "ml eau/h", "n.sodium": "mg sodium/h", "n.caffeine": "mg caféine total", "n.plan": "Plan de ravitaillement", "n.total": "Total course",
-    "n.food1": "Gel énergétique + eau", "n.food2": "Barre + compote + eau", "n.food3": "Gel + eau + électrolytes",
     "grp.upper": "Haut du corps", "grp.trunk": "Tronc", "grp.pelvis": "Bassin", "grp.thighs": "Cuisses", "grp.knees": "Genoux", "grp.legs": "Jambes", "grp.feet": "Pieds",
     "zf.head": "Tête", "zf.neck": "Cou / cervicales", "zf.shoulderL": "Épaule gauche", "zf.shoulderR": "Épaule droite", "zf.armL": "Bras gauche", "zf.armR": "Bras droit", "zf.chest": "Poitrine", "zf.abs": "Abdominaux / core", "zf.hipL": "Hanche / aine gauche", "zf.hipR": "Hanche / aine droite", "zf.thighL": "Quadriceps gauche", "zf.thighR": "Quadriceps droit", "zf.kneeL": "Genou gauche", "zf.kneeR": "Genou droit", "zf.shinL": "Tibia gauche", "zf.shinR": "Tibia droit", "zf.ankleL": "Cheville gauche", "zf.ankleR": "Cheville droite", "zf.footL": "Pied gauche", "zf.footR": "Pied droit",
     "zd.head": "Nuque", "zd.neck": "Cervicales", "zd.shoulderL": "Trapèze gauche", "zd.shoulderR": "Trapèze droit", "zd.armL": "Triceps gauche", "zd.armR": "Triceps droit", "zd.chest": "Haut du dos", "zd.abs": "Bas du dos / lombaires", "zd.hipL": "Fessier gauche", "zd.hipR": "Fessier droit", "zd.thighL": "Ischio-jambier gauche", "zd.thighR": "Ischio-jambier droit", "zd.kneeL": "Arrière-genou gauche", "zd.kneeR": "Arrière-genou droit", "zd.shinL": "Mollet gauche", "zd.shinR": "Mollet droit", "zd.ankleL": "Tendon d'Achille gauche", "zd.ankleR": "Tendon d'Achille droit", "zd.footL": "Talon gauche", "zd.footR": "Talon droit",
@@ -66,8 +55,8 @@ const H: Record<string, Record<string, string>> = {
     "ex.def.1n": "Mobilité articulaire douce", "ex.def.1d": "Amplitudes progressives, sans douleur", "ex.def.2n": "Protocole PEACE & LOVE", "ex.def.2d": "Protège, élève, charge progressive, vascularise",
   },
   en: {
-    "h.enPanne": "Your reported pains could not be loaded. This history looks empty, but nothing is lost — try again in a moment.", "h.title": "Health & Performance", "h.subtitle": "Your AI physio, your journal, your safety and your nutrition — all in one place.",
-    "tab.kine": "AI Physio", "tab.journal": "Journal", "tab.guardian": "Safety", "tab.nutrition": "Nutrition", "tab.poids": "Weight",
+    "h.enPanne": "Your reported pains could not be loaded. This history looks empty, but nothing is lost — try again in a moment.", "h.title": "Health and performance", "h.subtitle": "Your AI physio, your race nutrition and your weight — all in one place.",
+    "tab.kine": "AI Physio", "tab.nutrition": "Nutrition", "tab.poids": "Weight",
     "k.where": "Where does it hurt?", "view.face": "Front", "view.dos": "Back",
     "k.hint": "Tap a zone on the body or in the list, adjust the pain, then ask the physio.",
     "k.pain": "Pain", "k.painLight": "Mild discomfort", "k.painHard": "Very painful",
@@ -75,26 +64,18 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Express protocol", "k.protoWait": "Stopgap protocol — for a precise plan, describe your pain to the AI physio on the right.",
     "k.suivi": "Your pain history", "k.suiviNone": "No pain reported in the last 60 days.", "k.suiviSince": "for {n} d", "k.suiviToday": "today", "k.suiviAgo": "{n} d ago", "trend.amelioration": "improving", "trend.aggravation": "worsening", "trend.stable": "stable", "trend.inconnue": "1st report", "chat.starters": "Get started", "chat.s1": "I get a recurring pain on every long run.", "chat.s2": "How should I adjust my week with this pain?", "chat.s3": "Which prevention exercises for my tendons?",
     "chat.title": "AI Physio", "chat.sub": "Answers tailored to your load & recovery",
-    "chat.seed": "Hello! I'm your sports physio. Tell me what you feel — area, since when, on exertion or at rest — or click a zone on the diagram, and I'll help.",
+    "chat.seed": "Hello, I'm your sports physio. Tell me what you feel — area, since when, on exertion or at rest — or click a zone on the diagram, and I'll help.",
     "chat.thinking": "The physio is thinking…", "chat.placeholder": "E.g. knee pain after my long runs…", "chat.photoAdd": "Add a photo", "chat.photoRemove": "Remove photo", "chat.photoReady": "Photo ready. It is analysed then forgotten: nothing is stored. Frame the area closely, in good light.", "chat.photoBadType": "Unreadable image. Accepted: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Could you look at this photo?",
-    "chat.disclaimer": "⚕️ Informational advice — not a substitute for medical care. Severe / persistent pain → see a doctor.",
+    "chat.disclaimer": "Informational advice — not a substitute for medical care. Severe / persistent pain → see a doctor.",
     "chat.errNoReply": "I couldn't reply, please try again.", "chat.errConn": "Couldn't connect to the AI physio. Try again.",
+    "chat.verrou": "The AI physio is part of the Starter and Premium plans.", "chat.verrouCta": "See the plans", "chat.quota": "You've used today's AI exchanges: they come back tomorrow.",
     "k.askPrompt": "I have pain in: {zone} (intensity {n}/10). What could it be, and what should I concretely do?",
-    "sec.title": "Safety on the run", "sec.sub": "What Pacevo really does for your safety — and what stays in your hands.",
-    "sec.live": "Share your live position", "sec.liveDesc": "From the Map, a tracking link sends your real-time position to someone close — no account or install on their side.", "sec.liveBtn": "Open the Map",
-    "sec.contact": "Emergency contact", "sec.contactDesc": "Saved in your settings and shown here. Pacevo calls or messages nobody: if something happens, you — or a witness — make the call.",
-    "gd.name": "First & last name", "gd.namePh": "John Smith", "gd.phone": "Phone", "gd.saveContact": "Save contact", "gd.savedContact": "Contact saved.", "sec.saveFail": "Contact not saved — try again.", "sec.call": "Call",
-    "sec.honest": "Pacevo doesn't detect falls and alerts nobody automatically: no app does without dedicated hardware. Your watch's incident detection (Garmin, Apple, Coros…) remains the reference — enable it there.",
-    "sec.kit": "Before a mountain outing", "sec.k1": "Tell someone where you go and when you'll be back.", "sec.k2": "Charged phone, whistle, survival blanket, waterproof jacket.", "sec.k3": "Water and salt on long hot runs; drink to thirst.", "sec.k4": "Emergency numbers: 112 (Europe).", "sec.k5": "Light and reflective clothing from dusk.",
     "k.annuler": "Undo", "k.etatQ": "{z} — how is it now?", "k.mieux": "Getting better", "k.pire": "Getting worse", "k.passe": "It's gone", "k.etatOk": "Noted — your coach takes it into account.", "k.etatPasse": "Noted: this pain no longer holds your plan back.", "k.etatErr": "Couldn't update. Try again.",
     "chat.new": "New consultation", "chat.newConfirm": "Clear the conversation? Your reported pains stay in your history.", "chat.resumed": "Previous consultation resumed — the physio remembers your exchanges.", "chat.newFail": "Couldn't clear, try again.",
     "k.mapOpen": "Where does it hurt? Show the body map", "k.mapClose": "Hide the body map", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Consultation summary", "bilan.hyp": "Hypotheses", "bilan.urgent": "Red flag: see a doctor promptly. The AI physio is no substitute for medical advice.", "bilan.exos": "Exercises", "bilan.charge": "Load", "bilan.reprise": "Return",
     "bilan.plan": "Schedule 2 weeks in my calendar", "bilan.planned": "{n} sessions added to the calendar (every other day).", "bilan.planFail": "The calendar couldn't be written.", "bilan.voirCal": "See the calendar",
     "bilan.proba.haute": "likely", "bilan.proba.moyenne": "possible", "bilan.proba.faible": "unlikely",
-    "n.title": "Nutrition Lab — Race strategy", "n.duration": "Race duration (hours)", "n.temp": "Expected temperature (°C)",
-    "n.carbs": "g carbs/h", "n.water": "ml water/h", "n.sodium": "mg sodium/h", "n.caffeine": "mg caffeine total", "n.plan": "Fueling plan", "n.total": "Race total",
-    "n.food1": "Energy gel + water", "n.food2": "Bar + fruit purée + water", "n.food3": "Gel + water + electrolytes",
     "grp.upper": "Upper body", "grp.trunk": "Trunk", "grp.pelvis": "Pelvis", "grp.thighs": "Thighs", "grp.knees": "Knees", "grp.legs": "Legs", "grp.feet": "Feet",
     "zf.head": "Head", "zf.neck": "Neck / cervical", "zf.shoulderL": "Left shoulder", "zf.shoulderR": "Right shoulder", "zf.armL": "Left arm", "zf.armR": "Right arm", "zf.chest": "Chest", "zf.abs": "Abs / core", "zf.hipL": "Left hip / groin", "zf.hipR": "Right hip / groin", "zf.thighL": "Left quadriceps", "zf.thighR": "Right quadriceps", "zf.kneeL": "Left knee", "zf.kneeR": "Right knee", "zf.shinL": "Left shin", "zf.shinR": "Right shin", "zf.ankleL": "Left ankle", "zf.ankleR": "Right ankle", "zf.footL": "Left foot", "zf.footR": "Right foot",
     "zd.head": "Nape", "zd.neck": "Cervical", "zd.shoulderL": "Left trapezius", "zd.shoulderR": "Right trapezius", "zd.armL": "Left triceps", "zd.armR": "Right triceps", "zd.chest": "Upper back", "zd.abs": "Lower back / lumbar", "zd.hipL": "Left glute", "zd.hipR": "Right glute", "zd.thighL": "Left hamstring", "zd.thighR": "Right hamstring", "zd.kneeL": "Left popliteal", "zd.kneeR": "Right popliteal", "zd.shinL": "Left calf", "zd.shinR": "Right calf", "zd.ankleL": "Left Achilles tendon", "zd.ankleR": "Right Achilles tendon", "zd.footL": "Left heel", "zd.footR": "Right heel",
@@ -109,8 +90,8 @@ const H: Record<string, Record<string, string>> = {
     "ex.def.1n": "Gentle joint mobility", "ex.def.1d": "Progressive range of motion, pain-free", "ex.def.2n": "PEACE & LOVE protocol", "ex.def.2d": "Protect, elevate, progressive load, perfuse",
   },
   de: {
-    "h.enPanne": "Deine gemeldeten Schmerzen konnten nicht geladen werden. Der Verlauf wirkt leer, es ist aber nichts verloren — versuch es gleich nochmal.", "h.title": "Gesundheit & Leistung", "h.subtitle": "Dein KI-Physio, dein Tagebuch, deine Sicherheit und deine Ernährung — alles an einem Ort.",
-    "tab.kine": "KI-Physio", "tab.journal": "Tagebuch", "tab.guardian": "Sicherheit", "tab.nutrition": "Ernährung", "tab.poids": "Gewicht",
+    "h.enPanne": "Deine gemeldeten Schmerzen konnten nicht geladen werden. Der Verlauf wirkt leer, es ist aber nichts verloren — versuch es gleich nochmal.", "h.title": "Gesundheit und Leistung", "h.subtitle": "Dein KI-Physio, deine Wettkampfernährung und dein Gewicht — alles an einem Ort.",
+    "tab.kine": "KI-Physio", "tab.nutrition": "Ernährung", "tab.poids": "Gewicht",
     "k.where": "Wo tut es weh?", "view.face": "Vorne", "view.dos": "Hinten",
     "k.hint": "Tippe eine Zone am Körper oder in der Liste an, stelle die Schmerzen ein und frage den Physio.",
     "k.pain": "Schmerz", "k.painLight": "Leichtes Unbehagen", "k.painHard": "Sehr schmerzhaft",
@@ -118,26 +99,18 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Express-Protokoll", "k.protoWait": "Überbrückungs-Protokoll — für einen genauen Plan beschreibe deine Schmerzen rechts dem KI-Physio.",
     "k.suivi": "Verlauf deiner Schmerzen", "k.suiviNone": "In den letzten 60 Tagen keine Schmerzen gemeldet.", "k.suiviSince": "seit {n} T", "k.suiviToday": "heute", "k.suiviAgo": "vor {n} T", "trend.amelioration": "bessert sich", "trend.aggravation": "verschlechtert sich", "trend.stable": "stabil", "trend.inconnue": "1. Meldung", "chat.starters": "Zum Einstieg", "chat.s1": "Bei jedem langen Lauf kommt derselbe Schmerz zurück.", "chat.s2": "Wie passe ich meine Woche mit diesem Schmerz an?", "chat.s3": "Welche Präventionsübungen für meine Sehnen?",
     "chat.title": "KI-Physio", "chat.sub": "Antworten passend zu deiner Belastung & Erholung",
-    "chat.seed": "Hallo! Ich bin dein Sportphysio. Beschreibe mir, was du spürst — Bereich, seit wann, bei Belastung oder in Ruhe — oder klicke eine Zone im Schema an, und ich helfe dir.",
+    "chat.seed": "Hallo, ich bin dein Sportphysio. Beschreibe mir, was du spürst — Bereich, seit wann, bei Belastung oder in Ruhe — oder klicke eine Zone im Schema an, und ich helfe dir.",
     "chat.thinking": "Der Physio überlegt…", "chat.placeholder": "Z. B. Knieschmerzen nach langen Läufen…", "chat.photoAdd": "Foto hinzufügen", "chat.photoRemove": "Foto entfernen", "chat.photoReady": "Foto bereit. Es wird analysiert und dann verworfen: nichts wird gespeichert. Bereich nah und gut ausgeleuchtet aufnehmen.", "chat.photoBadType": "Bild nicht lesbar. Erlaubt: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Kannst du dir dieses Foto ansehen?",
-    "chat.disclaimer": "⚕️ Informative Hinweise — kein Ersatz für ärztlichen Rat. Starke / anhaltende Schmerzen → zum Arzt.",
+    "chat.disclaimer": "Informative Hinweise — kein Ersatz für ärztlichen Rat. Starke / anhaltende Schmerzen → zum Arzt.",
     "chat.errNoReply": "Ich konnte nicht antworten, bitte erneut versuchen.", "chat.errConn": "Keine Verbindung zum KI-Physio. Versuche es erneut.",
+    "chat.verrou": "Die KI-Physio ist Teil der Tarife Starter und Premium.", "chat.verrouCta": "Tarife ansehen", "chat.quota": "Deine KI-Dialoge für heute sind aufgebraucht: morgen gibt es neue.",
     "k.askPrompt": "Ich habe Schmerzen im Bereich: {zone} (Intensität {n}/10). Was könnte es sein, und was soll ich konkret tun?",
-    "sec.title": "Sicherheit beim Laufen", "sec.sub": "Was Pacevo wirklich für deine Sicherheit tut — und was in deiner Hand bleibt.",
-    "sec.live": "Teile deine Live-Position", "sec.liveDesc": "Von der Karte aus sendet ein Tracking-Link deine Echtzeit-Position an eine nahestehende Person — ohne Konto oder Installation auf ihrer Seite.", "sec.liveBtn": "Karte öffnen",
-    "sec.contact": "Notfallkontakt", "sec.contactDesc": "In deinen Einstellungen gespeichert und hier angezeigt. Pacevo ruft niemanden an und schreibt niemandem: Passiert etwas, rufst du — oder ein Zeuge — an.",
-    "gd.name": "Vor- & Nachname", "gd.namePh": "Max Mustermann", "gd.phone": "Telefon", "gd.saveContact": "Kontakt speichern", "gd.savedContact": "Kontakt gespeichert.", "sec.saveFail": "Kontakt nicht gespeichert — bitte erneut versuchen.", "sec.call": "Anrufen",
-    "sec.honest": "Pacevo erkennt keine Stürze und alarmiert niemanden automatisch: Das tut keine App ohne spezielle Hardware. Die Unfallerkennung deiner Uhr (Garmin, Apple, Coros…) bleibt die Referenz — aktiviere sie dort.",
-    "sec.kit": "Vor einer Bergtour", "sec.k1": "Sag jemandem, wohin du gehst und wann du zurück bist.", "sec.k2": "Geladenes Handy, Pfeife, Rettungsdecke, wasserdichte Jacke.", "sec.k3": "Wasser und Salz auf langen Läufen bei Hitze; nach Durst trinken.", "sec.k4": "Notrufnummern: 112 (Europa).", "sec.k5": "Lampe und reflektierende Kleidung ab der Dämmerung.",
     "k.annuler": "Rückgängig", "k.etatQ": "{z} — wie ist es jetzt?", "k.mieux": "Wird besser", "k.pire": "Wird schlimmer", "k.passe": "Ist weg", "k.etatOk": "Notiert — dein Coach berücksichtigt es.", "k.etatPasse": "Notiert: dieser Schmerz bremst deinen Plan nicht mehr.", "k.etatErr": "Aktualisierung nicht möglich. Versuch es nochmal.",
     "chat.new": "Neue Konsultation", "chat.newConfirm": "Gespräch löschen? Deine gemeldeten Schmerzen bleiben in deinem Verlauf.", "chat.resumed": "Vorherige Konsultation fortgesetzt — der Physio erinnert sich an eure Gespräche.", "chat.newFail": "Löschen nicht möglich, bitte erneut versuchen.",
     "k.mapOpen": "Wo tut es weh? Körperschema zeigen", "k.mapClose": "Körperschema ausblenden", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Bilanz der Konsultation", "bilan.hyp": "Hypothesen", "bilan.urgent": "Rote Flagge: Geh zeitnah zum Arzt. Der KI-Physio ersetzt keinen ärztlichen Rat.", "bilan.exos": "Übungen", "bilan.charge": "Belastung", "bilan.reprise": "Wiedereinstieg",
     "bilan.plan": "2 Wochen in meinen Kalender eintragen", "bilan.planned": "{n} Einheiten in den Kalender eingetragen (jeden zweiten Tag).", "bilan.planFail": "Der Kalender konnte nicht geschrieben werden.", "bilan.voirCal": "Kalender ansehen",
     "bilan.proba.haute": "wahrscheinlich", "bilan.proba.moyenne": "möglich", "bilan.proba.faible": "unwahrscheinlich",
-    "n.title": "Nutrition Lab — Renn-Strategie", "n.duration": "Renndauer (Stunden)", "n.temp": "Erwartete Temperatur (°C)",
-    "n.carbs": "g KH/h", "n.water": "ml Wasser/h", "n.sodium": "mg Natrium/h", "n.caffeine": "mg Koffein gesamt", "n.plan": "Verpflegungsplan", "n.total": "Renn-Gesamt",
-    "n.food1": "Energie-Gel + Wasser", "n.food2": "Riegel + Fruchtmus + Wasser", "n.food3": "Gel + Wasser + Elektrolyte",
     "grp.upper": "Oberkörper", "grp.trunk": "Rumpf", "grp.pelvis": "Becken", "grp.thighs": "Oberschenkel", "grp.knees": "Knie", "grp.legs": "Unterschenkel", "grp.feet": "Füße",
     "zf.head": "Kopf", "zf.neck": "Hals / Nacken", "zf.shoulderL": "Linke Schulter", "zf.shoulderR": "Rechte Schulter", "zf.armL": "Linker Arm", "zf.armR": "Rechter Arm", "zf.chest": "Brust", "zf.abs": "Bauch / Core", "zf.hipL": "Linke Hüfte / Leiste", "zf.hipR": "Rechte Hüfte / Leiste", "zf.thighL": "Linker Quadrizeps", "zf.thighR": "Rechter Quadrizeps", "zf.kneeL": "Linkes Knie", "zf.kneeR": "Rechtes Knie", "zf.shinL": "Linkes Schienbein", "zf.shinR": "Rechtes Schienbein", "zf.ankleL": "Linker Knöchel", "zf.ankleR": "Rechter Knöchel", "zf.footL": "Linker Fuß", "zf.footR": "Rechter Fuß",
     "zd.head": "Nacken", "zd.neck": "Halswirbelsäule", "zd.shoulderL": "Linker Trapezius", "zd.shoulderR": "Rechter Trapezius", "zd.armL": "Linker Trizeps", "zd.armR": "Rechter Trizeps", "zd.chest": "Oberer Rücken", "zd.abs": "Unterer Rücken / Lende", "zd.hipL": "Linker Gesäßmuskel", "zd.hipR": "Rechter Gesäßmuskel", "zd.thighL": "Linker hinterer Oberschenkel", "zd.thighR": "Rechter hinterer Oberschenkel", "zd.kneeL": "Linke Kniekehle", "zd.kneeR": "Rechte Kniekehle", "zd.shinL": "Linke Wade", "zd.shinR": "Rechte Wade", "zd.ankleL": "Linke Achillessehne", "zd.ankleR": "Rechte Achillessehne", "zd.footL": "Linke Ferse", "zd.footR": "Rechte Ferse",
@@ -152,8 +125,8 @@ const H: Record<string, Record<string, string>> = {
     "ex.def.1n": "Sanfte Gelenkmobilität", "ex.def.1d": "Progressive Bewegungsamplitude, schmerzfrei", "ex.def.2n": "PEACE & LOVE Protokoll", "ex.def.2d": "Schützen, hochlagern, progressiv belasten, durchbluten",
   },
   es: {
-    "h.enPanne": "Tus dolores declarados no se han podido cargar. Este historial parece vacío, pero no se ha perdido nada — inténtalo de nuevo en un momento.", "h.title": "Salud y Rendimiento", "h.subtitle": "Tu fisio IA, tu diario, tu seguridad y tu nutrición — todo en un solo lugar.",
-    "tab.kine": "Fisio IA", "tab.journal": "Diario", "tab.guardian": "Seguridad", "tab.nutrition": "Nutrición", "tab.poids": "Peso",
+    "h.enPanne": "Tus dolores declarados no se han podido cargar. Este historial parece vacío, pero no se ha perdido nada — inténtalo de nuevo en un momento.", "h.title": "Salud y rendimiento", "h.subtitle": "Tu fisio IA, tu nutrición de carrera y tu peso — todo en un solo lugar.",
+    "tab.kine": "Fisio IA", "tab.nutrition": "Nutrición", "tab.poids": "Peso",
     "k.where": "¿Dónde te duele?", "view.face": "Frente", "view.dos": "Espalda",
     "k.hint": "Toca una zona del cuerpo o de la lista, ajusta el dolor y pregunta al fisio.",
     "k.pain": "Dolor", "k.painLight": "Molestia leve", "k.painHard": "Muy doloroso",
@@ -161,26 +134,18 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Protocolo exprés", "k.protoWait": "Protocolo de espera — para un plan preciso, describe tu dolor al fisio IA a la derecha.",
     "k.suivi": "Seguimiento de tus dolores", "k.suiviNone": "Ningún dolor declarado en los últimos 60 días.", "k.suiviSince": "desde hace {n} d", "k.suiviToday": "hoy", "k.suiviAgo": "hace {n} d", "trend.amelioration": "mejorando", "trend.aggravation": "empeorando", "trend.stable": "estable", "trend.inconnue": "1.ª declaración", "chat.starters": "Para empezar", "chat.s1": "Tengo un dolor que vuelve en cada tirada larga.", "chat.s2": "¿Cómo adapto mi semana con este dolor?", "chat.s3": "¿Qué ejercicios de prevención para mis tendones?",
     "chat.title": "Fisio IA", "chat.sub": "Respuestas adaptadas a tu carga y recuperación",
-    "chat.seed": "¡Hola! Soy tu fisio del deporte. Cuéntame qué sientes — zona, desde cuándo, en esfuerzo o en reposo — o haz clic en una zona del esquema, y te ayudo.",
+    "chat.seed": "Hola, soy tu fisio del deporte. Cuéntame qué sientes — zona, desde cuándo, en esfuerzo o en reposo — o haz clic en una zona del esquema, y te ayudo.",
     "chat.thinking": "El fisio está pensando…", "chat.placeholder": "Ej.: dolor de rodilla tras mis tiradas largas…", "chat.photoAdd": "Añadir una foto", "chat.photoRemove": "Quitar la foto", "chat.photoReady": "Foto lista. Se analiza y se descarta: no se guarda nada. Encuadra la zona de cerca y con buena luz.", "chat.photoBadType": "Imagen ilegible. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "¿Puedes mirar esta foto?",
-    "chat.disclaimer": "⚕️ Consejos informativos — no sustituyen un consejo médico. Dolor fuerte / persistente → consulta.",
+    "chat.disclaimer": "Consejos informativos — no sustituyen un consejo médico. Dolor fuerte / persistente → consulta.",
     "chat.errNoReply": "No he podido responder, inténtalo de nuevo.", "chat.errConn": "No se pudo conectar con el fisio IA. Inténtalo de nuevo.",
+    "chat.verrou": "El fisio IA forma parte de los planes Starter y Premium.", "chat.verrouCta": "Ver los planes", "chat.quota": "Has usado tus intercambios con la IA de hoy: vuelven mañana.",
     "k.askPrompt": "Tengo dolor en: {zone} (intensidad {n}/10). ¿Qué puede ser y qué debo hacer concretamente?",
-    "sec.title": "Seguridad en carrera", "sec.sub": "Lo que Pacevo hace de verdad por tu seguridad — y lo que queda en tus manos.",
-    "sec.live": "Comparte tu posición en directo", "sec.liveDesc": "Desde el Mapa, un enlace de seguimiento envía tu posición en tiempo real a alguien cercano — sin cuenta ni instalación por su parte.", "sec.liveBtn": "Abrir el Mapa",
-    "sec.contact": "Contacto de emergencia", "sec.contactDesc": "Guardado en tus ajustes y mostrado aquí. Pacevo no llama ni escribe a nadie: si pasa algo, eres tú — o un testigo — quien llama.",
-    "gd.name": "Nombre y apellidos", "gd.namePh": "Juan Pérez", "gd.phone": "Teléfono", "gd.saveContact": "Guardar contacto", "gd.savedContact": "Contacto guardado.", "sec.saveFail": "Contacto no guardado — inténtalo de nuevo.", "sec.call": "Llamar",
-    "sec.honest": "Pacevo no detecta caídas ni avisa a nadie automáticamente: ninguna aplicación lo hace sin el material dedicado. La detección de incidentes de tu reloj (Garmin, Apple, Coros…) sigue siendo la referencia — actívala allí.",
-    "sec.kit": "Antes de una salida de montaña", "sec.k1": "Di a alguien adónde vas y cuándo vuelves.", "sec.k2": "Móvil cargado, silbato, manta térmica, chaqueta impermeable.", "sec.k3": "Agua y sal en las tiradas largas con calor; bebe según la sed.", "sec.k4": "Números de emergencia: 112 (Europa).", "sec.k5": "Luz y ropa reflectante desde el anochecer.",
     "k.annuler": "Deshacer", "k.etatQ": "{z}: ¿cómo va?", "k.mieux": "Va mejor", "k.pire": "Va peor", "k.passe": "Ya pasó", "k.etatOk": "Anotado: tu entrenador lo tiene en cuenta.", "k.etatPasse": "Anotado: este dolor ya no frena tu plan.", "k.etatErr": "No se pudo actualizar. Reinténtalo.",
     "chat.new": "Nueva consulta", "chat.newConfirm": "¿Borrar la conversación? Tus dolores declarados siguen en tu historial.", "chat.resumed": "Consulta anterior retomada — el fisio recuerda vuestros intercambios.", "chat.newFail": "No se pudo borrar, inténtalo de nuevo.",
     "k.mapOpen": "¿Dónde te duele? Mostrar el esquema", "k.mapClose": "Ocultar el esquema", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Balance de la consulta", "bilan.hyp": "Hipótesis", "bilan.urgent": "Bandera roja: consulta pronto a un médico. El fisio IA no sustituye un consejo médico.", "bilan.exos": "Ejercicios", "bilan.charge": "Carga", "bilan.reprise": "Vuelta",
     "bilan.plan": "Programar 2 semanas en mi calendario", "bilan.planned": "{n} sesiones añadidas al calendario (un día sí, otro no).", "bilan.planFail": "No se pudo escribir en el calendario.", "bilan.voirCal": "Ver el calendario",
     "bilan.proba.haute": "probable", "bilan.proba.moyenne": "posible", "bilan.proba.faible": "poco probable",
-    "n.title": "Nutrition Lab — Estrategia de carrera", "n.duration": "Duración de la prueba (horas)", "n.temp": "Temperatura prevista (°C)",
-    "n.carbs": "g carbohidratos/h", "n.water": "ml agua/h", "n.sodium": "mg sodio/h", "n.caffeine": "mg cafeína total", "n.plan": "Plan de avituallamiento", "n.total": "Total carrera",
-    "n.food1": "Gel energético + agua", "n.food2": "Barrita + compota + agua", "n.food3": "Gel + agua + electrolitos",
     "grp.upper": "Tren superior", "grp.trunk": "Tronco", "grp.pelvis": "Pelvis", "grp.thighs": "Muslos", "grp.knees": "Rodillas", "grp.legs": "Piernas", "grp.feet": "Pies",
     "zf.head": "Cabeza", "zf.neck": "Cuello / cervicales", "zf.shoulderL": "Hombro izquierdo", "zf.shoulderR": "Hombro derecho", "zf.armL": "Brazo izquierdo", "zf.armR": "Brazo derecho", "zf.chest": "Pecho", "zf.abs": "Abdominales / core", "zf.hipL": "Cadera / ingle izquierda", "zf.hipR": "Cadera / ingle derecha", "zf.thighL": "Cuádriceps izquierdo", "zf.thighR": "Cuádriceps derecho", "zf.kneeL": "Rodilla izquierda", "zf.kneeR": "Rodilla derecha", "zf.shinL": "Espinilla izquierda", "zf.shinR": "Espinilla derecha", "zf.ankleL": "Tobillo izquierdo", "zf.ankleR": "Tobillo derecho", "zf.footL": "Pie izquierdo", "zf.footR": "Pie derecho",
     "zd.head": "Nuca", "zd.neck": "Cervicales", "zd.shoulderL": "Trapecio izquierdo", "zd.shoulderR": "Trapecio derecho", "zd.armL": "Tríceps izquierdo", "zd.armR": "Tríceps derecho", "zd.chest": "Espalda alta", "zd.abs": "Espalda baja / lumbares", "zd.hipL": "Glúteo izquierdo", "zd.hipR": "Glúteo derecho", "zd.thighL": "Isquiotibial izquierdo", "zd.thighR": "Isquiotibial derecho", "zd.kneeL": "Hueco poplíteo izquierdo", "zd.kneeR": "Hueco poplíteo derecho", "zd.shinL": "Gemelo izquierdo", "zd.shinR": "Gemelo derecho", "zd.ankleL": "Tendón de Aquiles izquierdo", "zd.ankleR": "Tendón de Aquiles derecho", "zd.footL": "Talón izquierdo", "zd.footR": "Talón derecho",
@@ -195,8 +160,8 @@ const H: Record<string, Record<string, string>> = {
     "ex.def.1n": "Movilidad articular suave", "ex.def.1d": "Amplitudes progresivas, sin dolor", "ex.def.2n": "Protocolo PEACE & LOVE", "ex.def.2d": "Protege, eleva, carga progresiva, vasculariza",
   },
   pt: {
-    "h.enPanne": "As tuas dores declaradas não puderam ser carregadas. Este histórico parece vazio, mas nada se perdeu — tenta novamente daqui a pouco.", "h.title": "Saúde e Desempenho", "h.subtitle": "O teu fisio IA, o teu diário, a tua segurança e a tua nutrição — tudo no mesmo sítio.",
-    "tab.kine": "Fisio IA", "tab.journal": "Diário", "tab.guardian": "Segurança", "tab.nutrition": "Nutrição", "tab.poids": "Peso",
+    "h.enPanne": "As tuas dores declaradas não puderam ser carregadas. Este histórico parece vazio, mas nada se perdeu — tenta novamente daqui a pouco.", "h.title": "Saúde e desempenho", "h.subtitle": "O teu fisio IA, a tua nutrição de prova e o teu peso — tudo no mesmo sítio.",
+    "tab.kine": "Fisio IA", "tab.nutrition": "Nutrição", "tab.poids": "Peso",
     "k.where": "Onde te dói?", "view.face": "Frente", "view.dos": "Costas",
     "k.hint": "Toca numa zona do corpo ou na lista, ajusta a dor e pergunta ao fisio.",
     "k.pain": "Dor", "k.painLight": "Desconforto ligeiro", "k.painHard": "Muito doloroso",
@@ -204,26 +169,18 @@ const H: Record<string, Record<string, string>> = {
     "k.protoExpress": "Protocolo expresso", "k.protoWait": "Protocolo de espera — para um plano preciso, descreve a tua dor ao fisio IA à direita.",
     "k.suivi": "Acompanhamento das tuas dores", "k.suiviNone": "Nenhuma dor declarada nos últimos 60 dias.", "k.suiviSince": "há {n} d", "k.suiviToday": "hoje", "k.suiviAgo": "há {n} d", "trend.amelioration": "a melhorar", "trend.aggravation": "a piorar", "trend.stable": "estável", "trend.inconnue": "1.ª declaração", "chat.starters": "Para começar", "chat.s1": "Tenho uma dor que volta em cada treino longo.", "chat.s2": "Como adapto a minha semana com esta dor?", "chat.s3": "Que exercícios de prevenção para os meus tendões?",
     "chat.title": "Fisio IA", "chat.sub": "Respostas adaptadas à tua carga e recuperação",
-    "chat.seed": "Olá! Sou o teu fisio do desporto. Conta-me o que sentes — zona, desde quando, em esforço ou em repouso — ou clica numa zona no esquema, e eu ajudo.",
+    "chat.seed": "Olá, sou o teu fisio do desporto. Conta-me o que sentes — zona, desde quando, em esforço ou em repouso — ou clica numa zona no esquema, e eu ajudo.",
     "chat.thinking": "O fisio está a pensar…", "chat.placeholder": "Ex.: dor no joelho após os meus treinos longos…", "chat.photoAdd": "Adicionar uma foto", "chat.photoRemove": "Remover a foto", "chat.photoReady": "Foto pronta. É analisada e depois descartada: nada é guardado. Enquadra a zona de perto e com boa luz.", "chat.photoBadType": "Imagem ilegível. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Podes olhar para esta foto?",
-    "chat.disclaimer": "⚕️ Conselhos informativos — não substituem aconselhamento médico. Dor forte / persistente → consulta.",
+    "chat.disclaimer": "Conselhos informativos — não substituem aconselhamento médico. Dor forte / persistente → consulta.",
     "chat.errNoReply": "Não consegui responder, tenta novamente.", "chat.errConn": "Não foi possível ligar ao fisio IA. Tenta novamente.",
+    "chat.verrou": "O fisio IA faz parte dos planos Starter e Premium.", "chat.verrouCta": "Ver os planos", "chat.quota": "Usaste as tuas trocas com a IA de hoje: voltam amanhã.",
     "k.askPrompt": "Tenho dor em: {zone} (intensidade {n}/10). O que pode ser e o que devo fazer concretamente?",
-    "sec.title": "Segurança em prova", "sec.sub": "O que a Pacevo faz mesmo pela tua segurança — e o que fica nas tuas mãos.",
-    "sec.live": "Partilha a tua posição em direto", "sec.liveDesc": "A partir do Mapa, uma ligação de seguimento envia a tua posição em tempo real a alguém próximo — sem conta nem instalação do lado dele.", "sec.liveBtn": "Abrir o Mapa",
-    "sec.contact": "Contacto de emergência", "sec.contactDesc": "Guardado nas tuas definições e mostrado aqui. A Pacevo não liga nem escreve a ninguém: se algo acontecer, és tu — ou uma testemunha — quem liga.",
-    "gd.name": "Nome completo", "gd.namePh": "João Silva", "gd.phone": "Telefone", "gd.saveContact": "Guardar contacto", "gd.savedContact": "Contacto guardado.", "sec.saveFail": "Contacto não guardado — tenta de novo.", "sec.call": "Ligar",
-    "sec.honest": "A Pacevo não deteta quedas nem alerta ninguém automaticamente: nenhuma aplicação o faz sem o material dedicado. A deteção de incidentes do teu relógio (Garmin, Apple, Coros…) continua a ser a referência — ativa-a lá.",
-    "sec.kit": "Antes de uma saída de montanha", "sec.k1": "Diz a alguém para onde vais e quando voltas.", "sec.k2": "Telemóvel carregado, apito, manta térmica, casaco impermeável.", "sec.k3": "Água e sal nas saídas longas com calor; bebe pela sede.", "sec.k4": "Números de emergência: 112 (Europa).", "sec.k5": "Luz e roupa refletora desde o anoitecer.",
     "k.annuler": "Anular", "k.etatQ": "{z} — como está agora?", "k.mieux": "Está melhor", "k.pire": "Está pior", "k.passe": "Já passou", "k.etatOk": "Registado — o teu treinador tem isso em conta.", "k.etatPasse": "Registado: esta dor já não trava o teu plano.", "k.etatErr": "Não foi possível atualizar. Tenta de novo.",
     "chat.new": "Nova consulta", "chat.newConfirm": "Apagar a conversa? As tuas dores declaradas ficam no teu histórico.", "chat.resumed": "Consulta anterior retomada — o fisio lembra-se das vossas trocas.", "chat.newFail": "Não foi possível apagar, tenta de novo.",
     "k.mapOpen": "Onde te dói? Mostrar o esquema", "k.mapClose": "Esconder o esquema", "k.zoneChip": "{zone} · {n}/10",
     "bilan.title": "Balanço da consulta", "bilan.hyp": "Hipóteses", "bilan.urgent": "Bandeira vermelha: consulta rapidamente um médico. O fisio IA não substitui um parecer médico.", "bilan.exos": "Exercícios", "bilan.charge": "Carga", "bilan.reprise": "Retoma",
     "bilan.plan": "Programar 2 semanas no meu calendário", "bilan.planned": "{n} sessões adicionadas ao calendário (dia sim, dia não).", "bilan.planFail": "Não foi possível escrever no calendário.", "bilan.voirCal": "Ver o calendário",
     "bilan.proba.haute": "provável", "bilan.proba.moyenne": "possível", "bilan.proba.faible": "pouco provável",
-    "n.title": "Nutrition Lab — Estratégia de prova", "n.duration": "Duração da prova (horas)", "n.temp": "Temperatura prevista (°C)",
-    "n.carbs": "g hidratos/h", "n.water": "ml água/h", "n.sodium": "mg sódio/h", "n.caffeine": "mg cafeína total", "n.plan": "Plano de abastecimento", "n.total": "Total da corrida",
-    "n.food1": "Gel energético + água", "n.food2": "Barra + compota + água", "n.food3": "Gel + água + eletrólitos",
     "grp.upper": "Tronco superior", "grp.trunk": "Tronco", "grp.pelvis": "Bacia", "grp.thighs": "Coxas", "grp.knees": "Joelhos", "grp.legs": "Pernas", "grp.feet": "Pés",
     "zf.head": "Cabeça", "zf.neck": "Pescoço / cervicais", "zf.shoulderL": "Ombro esquerdo", "zf.shoulderR": "Ombro direito", "zf.armL": "Braço esquerdo", "zf.armR": "Braço direito", "zf.chest": "Peito", "zf.abs": "Abdominais / core", "zf.hipL": "Anca / virilha esquerda", "zf.hipR": "Anca / virilha direita", "zf.thighL": "Quadríceps esquerdo", "zf.thighR": "Quadríceps direito", "zf.kneeL": "Joelho esquerdo", "zf.kneeR": "Joelho direito", "zf.shinL": "Canela esquerda", "zf.shinR": "Canela direita", "zf.ankleL": "Tornozelo esquerdo", "zf.ankleR": "Tornozelo direito", "zf.footL": "Pé esquerdo", "zf.footR": "Pé direito",
     "zd.head": "Nuca", "zd.neck": "Cervicais", "zd.shoulderL": "Trapézio esquerdo", "zd.shoulderR": "Trapézio direito", "zd.armL": "Tríceps esquerdo", "zd.armR": "Tríceps direito", "zd.chest": "Parte superior das costas", "zd.abs": "Lombar / parte inferior das costas", "zd.hipL": "Glúteo esquerdo", "zd.hipR": "Glúteo direito", "zd.thighL": "Isquiotibial esquerdo", "zd.thighR": "Isquiotibial direito", "zd.kneeL": "Cavado poplíteo esquerdo", "zd.kneeR": "Cavado poplíteo direito", "zd.shinL": "Gémeo esquerdo", "zd.shinR": "Gémeo direito", "zd.ankleL": "Tendão de Aquiles esquerdo", "zd.ankleR": "Tendão de Aquiles direito", "zd.footL": "Calcanhar esquerdo", "zd.footR": "Calcanhar direito",
@@ -322,22 +279,14 @@ const TON_TENDANCE: Record<Tendance, string> = {
   inconnue: "bg-zinc-100 text-zinc-500 ring-zinc-200",
 };
 
-type Tab = "kine" | "journal" | "guardian" | "nutrition" | "poids";
+// ⚠️ PLUS DE « JOURNAL » NI DE « SÉCURITÉ » (30/09/2026, Cyprien : « si c'est pas utile,
+// enlève-le »). Le journal n'alimentait rien — ni le coach, ni le plan ; le ressenti de
+// fin de séance le remplace. Le contact d'urgence a déménagé dans Paramètres › Sécurité,
+// le partage de position en direct reste sur la Carte.
+type Tab = "kine" | "nutrition" | "poids";
 type ChatMsg = { role: "user" | "model"; text: string; photo?: string };
 
-// Nombre qui s'anime en douceur quand sa valeur change (cartes nutrition).
-function AnimatedNumber({ value, className }: { value: number; className?: string }) {
-  const mv = useMotionValue(value);
-  const [display, setDisplay] = useState(value);
-  useEffect(() => {
-    const controls = fmAnimate(mv, value, { duration: 0.5, ease: "easeOut", onUpdate: (v) => setDisplay(Math.round(v)) });
-    return controls.stop;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
-  return <span className={className}>{display.toLocaleString()}</span>;
-}
-
-export function HealthCenter({ suivi = [], etats = [], enPanne = false, filInitial = [], contactInitial = { nom: "", tel: "" } }: {
+export function HealthCenter({ suivi = [], etats = [], enPanne = false, filInitial = [], coursesNutrition = [], poidsKg = null }: {
   suivi?: SuiviZone[];
   /** Pour chaque zone, la déclaration la plus récente et son état déclaré. */
   etats?: { cle: string; id: string; etat: string }[];
@@ -345,8 +294,9 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
   enPanne?: boolean;
   /** La consultation précédente, relue côté serveur (type `kine_chat`). */
   filInitial?: { role: "user" | "model"; text: string }[];
-  /** Le contact d'urgence enregistré dans les réglages. */
-  contactInitial?: { nom: string; tel: string };
+  /** Les prochaines courses et leur durée prédite, pour la nutrition (lib/health/coursesNutrition). */
+  coursesNutrition?: CourseNutri[];
+  poidsKg?: number | null;
 }) {
   // Chaque libellé est relié à son champ : sans cela, un lecteur d'écran annonce
   // le placeholder — ou rien — à la place du texte affiché.
@@ -354,6 +304,12 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
   const { lang } = useT();
   const tr: Tr = (k, p) => fill(H[lang]?.[k] ?? H.fr[k] ?? k, p);
   const [tab, setTab] = useState<Tab>("kine");
+  // Un lien peut ouvrir un onglet précis (« ?onglet=nutrition », depuis la page détaillée
+  // de l'objectif). Lu après le montage : le rendu serveur reste celui de l'onglet par défaut.
+  useEffect(() => {
+    const o = new URLSearchParams(window.location.search).get("onglet");
+    if (o === "nutrition" || o === "poids" || o === "kine") setTab(o);
+  }, []);
   const [view, setView] = useState<"face" | "dos">("face");
   /** États mis à jour depuis cet écran, avant le prochain chargement de la page. */
   const [majEtats, setMajEtats] = useState<Record<string, string>>({});
@@ -385,16 +341,13 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
   }
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [painLevel, setPainLevel] = useState(5);
-  const [emergencyName, setEmergencyName] = useState(contactInitial.nom);
-  const [emergencyPhone, setEmergencyPhone] = useState(contactInitial.tel);
-  const [contactEnCours, setContactEnCours] = useState(false);
-  const [raceHours, setRaceHours] = useState(6);
-  const [raceTemp, setRaceTemp] = useState(15);
 
   // ── Chat kiné IA ──────────────────────────────────────────────
   // ⚠️ LA CONSULTATION REPREND OÙ ELLE S'EST ARRÊTÉE (22/09/2026). Avant, le fil vivait
   // dans l'état du composant : changer d'onglet suffisait à faire « oublier » au kiné
   // tout ce qu'on venait de lui décrire. Le serveur rend les 40 derniers messages.
+  // Le serveur a refusé le kiné IA pour cette formule (402) : on montre la sortie.
+  const [verrou, setVerrou] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>(
     filInitial.length > 0 ? filInitial : [{ role: "model", text: tr("chat.seed") }],
   );
@@ -448,8 +401,6 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
   // Match du protocole sur le libellé FR (stable, quelle que soit la langue d'affichage).
   const rehabProtocol = selectedZone ? protocolFor(H.fr[selectedZone.labelKey] ?? "") : [];
 
-  const carbsPerHour = Math.round(40 + (raceHours > 3 ? (raceHours - 3) * 5 : 0));
-  const hydrationPerHour = Math.round(500 + (raceTemp - 15) * 20);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, sending]);
 
@@ -484,29 +435,25 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
           photo: sentPhoto ? { data: sentPhoto } : null,
         }),
       });
+      // ⚠️ 402 = LA FORMULE NE COUVRE PAS LE KINÉ IA, ce n'est pas une panne. Le refus
+      // s'affichait tel quel dans la conversation : « ⚠️ essai_expire », un code interne
+      // lu par un compte gratuit. On le dit en clair, avec la sortie (voir `verrou`).
+      if (res.status === 402) { setVerrou(true); return; }
       const json = await res.json();
+      // Les deux codes du plafond quotidien (`lib/billing/guard`) sont des CLÉS, pas des
+      // phrases : on les traduit au lieu de les afficher.
+      const erreur = json.error === "quota_ia_atteint" ? tr("chat.quota")
+        : json.error === "quota_indisponible" ? tr("chat.errNoReply")
+        : json.error || tr("chat.errNoReply");
       if (json.reply) { setMessages((m) => [...m, { role: "model", text: json.reply }]); setBilan(json.bilan ?? null); }
-      else setMessages((m) => [...m, { role: "model", text: "⚠️ " + (json.error || tr("chat.errNoReply")) }]);
+      else setMessages((m) => [...m, { role: "model", text: "" + erreur }]);
     } catch {
-      setMessages((m) => [...m, { role: "model", text: "⚠️ " + tr("chat.errConn") }]);
+      setMessages((m) => [...m, { role: "model", text: "" + tr("chat.errConn") }]);
     } finally {
       setSending(false);
     }
   }, [messages, sending, selectedSlot, view, painLevel, lang, photo]);
 
-  /** Le contact d'urgence : ÉCRIT dans les réglages, et l'échec est dit. */
-  async function enregistrerContact() {
-    setContactEnCours(true);
-    try {
-      const r = await fetch("/api/settings", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contactUrgenceNom: emergencyName.trim(), contactUrgenceTel: emergencyPhone.trim() }),
-      });
-      if (r.ok) toast.success(tr("gd.savedContact"));
-      else toast.error(tr("sec.saveFail"));
-    } catch { toast.error(tr("sec.saveFail")); }
-    setContactEnCours(false);
-  }
 
   /** « Nouvelle consultation » : le fil est effacé côté serveur AVANT l'écran. */
   async function nouvelleConsultation() {
@@ -551,11 +498,11 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
       )}
       {/* En-tête — hero */}
       <div className="flex items-center gap-3.5">
-        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white sm:h-12 sm:w-12 shadow-[0_10px_26px_-10px_rgba(16,185,129,0.65)]">
-          <Heart className="h-6 w-6" />
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-zinc-200/80 bg-white text-zinc-500 sm:h-11 sm:w-11">
+          <Heart className="h-5 w-5" strokeWidth={1.5} />
         </span>
         <div className="min-w-0">
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">{tr("h.title")}</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">{tr("h.title")}</h1>
           <p className="mt-0.5 line-clamp-2 text-[13px] text-zinc-500 sm:text-sm">{tr("h.subtitle")}</p>
         </div>
       </div>
@@ -566,8 +513,6 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
       <div className="-mx-1 flex gap-1 overflow-x-auto rounded-2xl bg-zinc-100/80 p-1 ring-1 ring-zinc-200/60 [scrollbar-width:none] sm:mx-0 sm:w-fit sm:overflow-visible">
         {([
           { v: "kine", l: tr("tab.kine"), icon: Stethoscope },
-          { v: "journal", l: tr("tab.journal"), icon: BookOpen },
-          { v: "guardian", l: tr("tab.guardian"), icon: Shield },
           { v: "nutrition", l: tr("tab.nutrition"), icon: Utensils },
           { v: "poids", l: tr("tab.poids"), icon: Scale },
         ] as const).map((t) => {
@@ -641,7 +586,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                           fill: on ? teinteDouleur(painLevel) : teinteVue ? teinteVue.fond : "url(#bodyGrad)",
                           stroke: on ? "#b91c1c" : teinteVue ? teinteVue.trait : "#cbd1d8",
                           strokeWidth: on || vu ? 1.5 : 1,
-                          className: "cursor-pointer transition-all hover:opacity-70",
+                          className: "cursor-pointer transition hover:opacity-70",
                           onClick: () => setSelectedSlot(on ? null : slot),
                         };
                         return tag === "ellipse"
@@ -654,7 +599,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                   <div className="col-span-7 max-h-[430px] overflow-y-auto pr-1 space-y-2">
                     {GROUP_ORDER.map((g) => (
                       <div key={g}>
-                        <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-400 mb-1">{tr(g)}</div>
+                        <div className="text-[11px] font-semibold text-zinc-400 mb-1 first-letter:uppercase">{tr(g)}</div>
                         <div className="flex flex-wrap gap-1">
                           {Object.entries(zoneMap).filter(([, z]) => z.groupKey === g).map(([slot, z]) => (
                             <button key={slot} onClick={() => setSelectedSlot(selectedSlot === slot ? null : slot)}
@@ -676,14 +621,14 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                 </div>
                 {selectedZone ? (
                   <div className="mt-3 pt-3 border-t border-zinc-100">
-                    <label htmlFor={`${cid}-r0`} className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("k.pain")} — <span className="font-semibold text-zinc-800">{tr(selectedZone.labelKey)}</span> : <span className="font-bold" style={{ color: teinteDouleur(painLevel) }}>{painLevel}/10</span></label>
+                    <label htmlFor={`${cid}-r0`} className="text-xs font-medium text-zinc-500 block mb-1.5">{tr("k.pain")} — <span className="font-semibold text-zinc-800">{tr(selectedZone.labelKey)}</span> : <span className="font-semibold" style={{ color: teinteDouleur(painLevel) }}>{painLevel}/10</span></label>
                     {/* Le curseur porte la MÊME couleur que la zone sur la silhouette : deux
                         barèmes différents pour une seule douleur se contrediraient à l'écran. */}
                     <input id={`${cid}-r0`} type="range" min={1} max={10} value={painLevel} onChange={(e) => setPainLevel(+e.target.value)}
                       className="w-full" style={{ accentColor: teinteDouleur(painLevel) }} />
-                    <div className="flex justify-between text-[10px] text-zinc-400 mt-0.5"><span>{tr("k.painLight")}</span><span>{tr("k.painHard")}</span></div>
+                    <div className="flex justify-between text-[11px] text-zinc-400 mt-0.5"><span>{tr("k.painLight")}</span><span>{tr("k.painHard")}</span></div>
                     <button onClick={askAboutZone} className="btn-brand w-full justify-center mt-3 text-sm">
-                      <Sparkles className="w-4 h-4" /> {tr("k.ask")}
+                      <MessageCircle className="w-4 h-4" strokeWidth={1.5} /> {tr("k.ask")}
                     </button>
                   </div>
                 ) : (
@@ -719,11 +664,11 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                           {/* ⚠️ On montre « 7 → 4 » seulement s'il y a DEUX déclarations.
                               Avec une seule, une flèche laisserait croire à une évolution
                               qui n'a jamais été mesurée. */}
-                          <div className="flex items-center gap-1 text-[13px] font-bold tabular-nums text-zinc-700">
+                          <div className="flex items-center gap-1 text-[13px] font-semibold tabular-nums text-zinc-700">
                             {z.signalements > 1 && <><span className="text-zinc-400">{z.premier}</span><span className="text-zinc-300">→</span></>}
                             <span>{z.dernier}</span><span className="text-[11px] font-medium text-zinc-400">/10</span>
                           </div>
-                          <span className={`rounded-lg px-1.5 py-0.5 text-[10px] font-semibold ring-1 ${ton[z.tendance]}`}>
+                          <span className={`rounded-lg px-1.5 py-0.5 text-[11px] font-semibold ring-1 ${ton[z.tendance]}`}>
                             {tr("trend." + z.tendance)}
                           </span>
                         </div>
@@ -785,7 +730,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                   <div className="space-y-2">
                     {rehabProtocol.map((ex, i) => (
                       <div key={i} className="flex items-start gap-2.5 p-2.5 bg-zinc-50 rounded-xl">
-                        <div className="w-6 h-6 bg-zinc-900 text-white rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</div>
+                        <div className="w-6 h-6 bg-zinc-900 text-white rounded-lg flex items-center justify-center text-xs font-semibold flex-shrink-0">{i + 1}</div>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-zinc-900 text-sm">{tr(ex.nameKey)}</div>
                           <div className="text-xs text-zinc-500">{tr(ex.descKey)}</div>
@@ -846,7 +791,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                 {/* Une consultation commence par une phrase, pas par une page blanche. */}
                 {messages.length <= 1 && !sending && (
                   <div className="pt-1">
-                    <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-zinc-400">{tr("chat.starters")}</div>
+                    <div className="mb-2 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{tr("chat.starters")}</div>
                     <div className="flex flex-wrap gap-2">
                       {(["chat.s1", "chat.s2", "chat.s3"] as const).map((k) => (
                         <button key={k} onClick={() => send(tr(k))}
@@ -862,6 +807,15 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                     <div className="bg-zinc-100 text-zinc-500 px-3.5 py-2.5 rounded-2xl rounded-bl-md text-sm flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" /> {tr("chat.thinking")}
                     </div>
+                  </div>
+                )}
+                {verrou && (
+                  <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-3.5 py-3">
+                    <Lock className="h-4 w-4 flex-shrink-0 text-zinc-500" />
+                    <p className="min-w-0 flex-1 text-sm text-zinc-700">{tr("chat.verrou")}</p>
+                    <Link href="/pricing" className="flex-shrink-0 rounded-xl bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-zinc-800">
+                      {tr("chat.verrouCta")}
+                    </Link>
                   </div>
                 )}
               </div>
@@ -906,7 +860,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                 <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
                   <div className="flex items-center gap-2">
                     <ClipboardList className="h-4 w-4 text-emerald-700" aria-hidden />
-                    <h4 className="text-sm font-bold text-emerald-900">{tr("bilan.title")}</h4>
+                    <h4 className="text-sm font-semibold text-emerald-900">{tr("bilan.title")}</h4>
                   </div>
                   {bilan.urgence && (
                     <p className="mt-2 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] font-semibold leading-relaxed text-rose-800">
@@ -915,11 +869,11 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                   )}
                   {bilan.hypotheses.length > 0 && (
                     <div className="mt-3">
-                      <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-800/70">{tr("bilan.hyp")}</div>
+                      <div className="text-[11px] font-semibold text-emerald-800/70 first-letter:uppercase">{tr("bilan.hyp")}</div>
                       <ul className="mt-1 space-y-1">
                         {bilan.hypotheses.map((h) => (
                           <li key={h.nom} className="flex items-center gap-2 text-[13px] text-zinc-800">
-                            <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${h.probabilite === "haute" ? "bg-emerald-600 text-white" : h.probabilite === "moyenne" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-600"}`}>
+                            <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${h.probabilite === "haute" ? "bg-emerald-600 text-white" : h.probabilite === "moyenne" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-600"}`}>
                               {tr(`bilan.proba.${h.probabilite}`)}
                             </span>
                             {h.nom}
@@ -930,7 +884,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                   )}
                   {bilan.exercices.length > 0 && (
                     <div className="mt-3">
-                      <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-800/70">{tr("bilan.exos")}</div>
+                      <div className="text-[11px] font-semibold text-emerald-800/70 first-letter:uppercase">{tr("bilan.exos")}</div>
                       <ul className="mt-1 space-y-1">
                         {bilan.exercices.map((e) => (
                           <li key={e.nom} className="text-[13px] text-zinc-800">
@@ -960,184 +914,10 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
           </motion.div>
         )}
 
-        {/* ── JOURNAL ── */}
-        {tab === "journal" && (
-          <motion.div key="journal" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25, ease: "easeOut" }}>
-            <SmartJournal />
-          </motion.div>
-        )}
-
-        {/* ── GUARDIAN ── */}
-        {/* ── SÉCURITÉ ──────────────────────────────────────────────────────────
-            ⚠️ CET ONGLET ANNONÇAIT CE QUI N'EXISTE PAS (22/09/2026) : « détection de
-            chute (accéléromètre + gyroscope) », « arrêt cardiaque via la montre »,
-            « alerte automatique SMS + appel », et un bouton « Enregistrer le contact »
-            qui affichait un succès sans rien écrire. Aucune de ces quatre choses n'était
-            implémentée — sur une fonction de SÉCURITÉ, c'est la promesse la plus
-            dangereuse qu'une application puisse faire : quelqu'un part seul en montagne
-            en croyant être surveillé. Ce qui reste est ce qui marche vraiment : le
-            partage de position en direct (Carte), un contact d'urgence réellement
-            enregistré et appelable, et la check-list avant une sortie. */}
-        {tab === "guardian" && (
-          <motion.div key="guardian" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25, ease: "easeOut" }}
-            className="grid gap-4 lg:grid-cols-2">
-
-            <div className="bento-card lg:col-span-2">
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600"><Shield className="h-6 w-6" /></span>
-                <div className="min-w-0">
-                  <h3 className="text-lg font-bold text-zinc-900">{tr("sec.title")}</h3>
-                  <p className="text-sm text-zinc-500">{tr("sec.sub")}</p>
-                </div>
-              </div>
-              <p className="mt-3 flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-[13px] leading-relaxed text-amber-900">
-                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" aria-hidden />{tr("sec.honest")}
-              </p>
-            </div>
-
-            {/* Ce qui existe : le partage de position en direct, depuis la Carte. */}
-            <div className="bento-card flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-600"><MapPin className="h-[18px] w-[18px]" /></span>
-                <h3 className="font-semibold text-zinc-900">{tr("sec.live")}</h3>
-              </div>
-              <p className="mt-2 flex-1 text-sm leading-relaxed text-zinc-600">{tr("sec.liveDesc")}</p>
-              <Link href="/dashboard/trail" className="btn-brand mt-3 w-full justify-center"><MapPin className="h-4 w-4" />{tr("sec.liveBtn")}</Link>
-            </div>
-
-            {/* Le contact d'urgence — ENREGISTRÉ pour de bon (api/settings), et appelable. */}
-            <div className="bento-card">
-              <div className="flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600"><Phone className="h-[18px] w-[18px]" /></span>
-                <h3 className="font-semibold text-zinc-900">{tr("sec.contact")}</h3>
-              </div>
-              <p className="mt-2 text-[13px] leading-relaxed text-zinc-500">{tr("sec.contactDesc")}</p>
-              <div className="mt-3 space-y-3">
-                <div>
-                  <label htmlFor={`${cid}-c0`} className="mb-1 block text-xs font-medium text-zinc-500">{tr("gd.name")}</label>
-                  <input id={`${cid}-c0`} value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} placeholder={tr("gd.namePh")}
-                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none" />
-                </div>
-                <div>
-                  <label htmlFor={`${cid}-c1`} className="mb-1 block text-xs font-medium text-zinc-500">{tr("gd.phone")}</label>
-                  <input id={`${cid}-c1`} value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} placeholder="+33 6 12 34 56 78" type="tel"
-                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3 text-sm transition-colors focus:border-emerald-400 focus:bg-white focus:outline-none" />
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={enregistrerContact} disabled={contactEnCours} className="btn-brand flex-1 justify-center disabled:opacity-60">
-                    {contactEnCours ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}{tr("gd.saveContact")}
-                  </button>
-                  {emergencyPhone.trim() && (
-                    <a href={`tel:${emergencyPhone.replace(/[^0-9+]/g, "")}`}
-                      className="flex items-center gap-1.5 rounded-xl border border-emerald-200 px-4 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50">
-                      <Phone className="h-4 w-4" />{tr("sec.call")}
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* La check-list — ce qui sauve vraiment, et qui ne dépend d'aucune technologie. */}
-            <div className="bento-card lg:col-span-2">
-              <div className="flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600"><ListChecks className="h-[18px] w-[18px]" /></span>
-                <h3 className="font-semibold text-zinc-900">{tr("sec.kit")}</h3>
-              </div>
-              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                {(["sec.k1", "sec.k2", "sec.k3", "sec.k4", "sec.k5"] as const).map((k) => (
-                  <li key={k} className="flex items-start gap-2.5 rounded-xl bg-zinc-50 px-3 py-2.5 text-sm leading-relaxed text-zinc-700">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" aria-hidden />{tr(k)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── NUTRITION ── */}
+        {/* ── NUTRITION ── (lib/coach/nutritionCourse : les mêmes chiffres que le coach) */}
         {tab === "nutrition" && (
           <motion.div key="nutrition" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25, ease: "easeOut" }}>
-            <div className="bento-card">
-              <div className="mb-5 flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600"><Utensils className="h-[18px] w-[18px]" /></span>
-                <h3 className="font-semibold text-zinc-900">{tr("n.title")}</h3>
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Réglages + total */}
-                <div className="space-y-5">
-                  <div>
-                    <div className="mb-2 flex items-baseline justify-between">
-                      <label htmlFor={`${cid}-r1`} className="text-xs font-medium uppercase tracking-wide text-zinc-400">{tr("n.duration")}</label>
-                      <span className="text-lg font-bold tabular-nums text-zinc-900">{raceHours}<span className="ml-0.5 text-sm font-semibold text-zinc-400">h</span></span>
-                    </div>
-                    <input id={`${cid}-r1`} type="range" min={1} max={24} step={0.5} value={raceHours} onChange={(e) => setRaceHours(parseFloat(e.target.value))} className="w-full accent-emerald-500" />
-                  </div>
-                  <div>
-                    <div className="mb-2 flex items-baseline justify-between">
-                      <label htmlFor={`${cid}-r2`} className="text-xs font-medium uppercase tracking-wide text-zinc-400">{tr("n.temp")}</label>
-                      <span className="text-lg font-bold tabular-nums text-zinc-900">{raceTemp}<span className="ml-0.5 text-sm font-semibold text-zinc-400">°C</span></span>
-                    </div>
-                    <input id={`${cid}-r2`} type="range" min={0} max={40} step={1} value={raceTemp} onChange={(e) => setRaceTemp(parseInt(e.target.value))} className="w-full accent-orange-500" />
-                  </div>
-
-                  <div className="rounded-2xl border border-zinc-100 bg-zinc-50/70 p-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">{tr("n.total")}</div>
-                    <div className="mt-2 flex items-center gap-6">
-                      <span className="flex items-center gap-1.5"><Zap className="h-4 w-4 text-orange-500" /><span className="text-xl font-bold tabular-nums text-zinc-900">{Math.round(carbsPerHour * raceHours).toLocaleString()}</span><span className="text-xs font-medium text-zinc-400">g</span></span>
-                      <span className="flex items-center gap-1.5"><Droplets className="h-4 w-4 text-blue-500" /><span className="text-xl font-bold tabular-nums text-zinc-900">{(hydrationPerHour * raceHours / 1000).toFixed(1)}</span><span className="text-xs font-medium text-zinc-400">L</span></span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Métriques par heure (comptage animé) */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 to-amber-50 p-4 text-center transition-transform hover:-translate-y-0.5">
-                    <Zap className="mx-auto mb-2 h-5 w-5 text-orange-500" />
-                    <div className="text-3xl font-bold tabular-nums text-orange-600"><AnimatedNumber value={carbsPerHour} /></div>
-                    <div className="mt-1 text-xs text-zinc-500">{tr("n.carbs")}</div>
-                  </div>
-                  <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-sky-50 p-4 text-center transition-transform hover:-translate-y-0.5">
-                    <Droplets className="mx-auto mb-2 h-5 w-5 text-blue-500" />
-                    <div className="text-3xl font-bold tabular-nums text-blue-600"><AnimatedNumber value={hydrationPerHour} /></div>
-                    <div className="mt-1 text-xs text-zinc-500">{tr("n.water")}</div>
-                  </div>
-                  <div className="rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 to-fuchsia-50 p-4 text-center transition-transform hover:-translate-y-0.5">
-                    <div className="mb-1 text-xl">🧂</div>
-                    <div className="text-3xl font-bold tabular-nums text-purple-600"><AnimatedNumber value={Math.round(500 + raceTemp * 10)} /></div>
-                    <div className="mt-1 text-xs text-zinc-500">{tr("n.sodium")}</div>
-                  </div>
-                  <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-emerald-50 p-4 text-center transition-transform hover:-translate-y-0.5">
-                    <div className="mb-1 text-xl">☕</div>
-                    <div className="text-3xl font-bold tabular-nums text-emerald-600">{raceHours >= 3 ? <AnimatedNumber value={Math.round(raceHours * 20)} /> : "—"}</div>
-                    <div className="mt-1 text-xs text-zinc-500">{tr("n.caffeine")}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Plan de ravitaillement — timeline */}
-              <div className="mt-6">
-                <div className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-400">{tr("n.plan")}</div>
-                <div className="relative">
-                  <span className="absolute bottom-5 left-6 top-5 w-px bg-zinc-200" aria-hidden="true" />
-                  <div className="space-y-2">
-                    {Array.from({ length: Math.min(Math.ceil(raceHours), 8) }, (_, i) => ({
-                      h: i + 1, carbs: carbsPerHour, water: hydrationPerHour,
-                      food: i === 0 ? tr("n.food1") : i % 2 === 0 ? tr("n.food2") : tr("n.food3"),
-                    })).map((cp) => (
-                      <div key={cp.h} className="relative flex items-center gap-3">
-                        <span className="z-10 flex h-8 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-900 text-[11px] font-bold text-white">H+{cp.h}</span>
-                        <div className="flex flex-1 items-center gap-3 rounded-2xl bg-zinc-50 px-3.5 py-2.5">
-                          <span className="flex-1 text-sm text-zinc-700">{cp.food}</span>
-                          <span className="text-xs font-semibold text-orange-600">{cp.carbs} g</span>
-                          <span className="text-xs font-semibold text-blue-600">{cp.water} ml</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <NutritionCourse courses={coursesNutrition} poidsKg={poidsKg} />
           </motion.div>
         )}
 

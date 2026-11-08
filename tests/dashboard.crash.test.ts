@@ -37,11 +37,21 @@ function test(name: string, fn: () => void) {
 const AUJOURD_HUI = "2026-09-02";
 const jour = (n: number) => decaleJour(AUJOURD_HUI, -n);
 const sain = (v: number) => Number.isFinite(v) && !Number.isNaN(v);
+// ⚠️ La fenêtre des zones se compte depuis CE jour figé, pas depuis la date réelle : le
+// 11/10/2026, `jour(4)` (29/08) est sorti des 42 jours et deux tests ont rougi seuls.
+const zonesAu = (w: Parameters<typeof computeHrZones>[0]) => computeHrZones(w, AUJOURD_HUI);
+// ⚠️ Même règle pour la forme : sa fenêtre de 42 jours se comptait depuis la date RÉELLE. Le
+// 15/10/2026, toutes les séances de `seances()` (11/08 → 02/09) en étaient sorties : endurance
+// à 0 pour le 10 km comme pour le marathon, et « les repères suivent la distance » rougissait.
+const formeAu = (
+  w: Parameters<typeof computeForme>[0], vma: number, rec: number | null, reg: number | null,
+  obj: Parameters<typeof computeForme>[4] = null,
+) => computeForme(w, vma, rec, reg, obj, AUJOURD_HUI);
 
 console.log("\nZONES — le temps en zone ne s'invente pas");
 
 test("aucune entrée : zéro partout, jamais NaN", () => {
-  const z = computeHrZones([]);
+  const z = zonesAu([]);
   assert.equal(z.total, 0);
   assert.equal(z.seances, 0);
   for (const s of z.secs) assert.ok(sain(s) && s === 0, "une zone vaut NaN sur un historique vide");
@@ -50,7 +60,7 @@ test("aucune entrée : zéro partout, jamais NaN", () => {
 test("des séances SANS temps en zone ne produisent aucune zone — elles sont comptées à part", () => {
   // C'est la promesse centrale : quand la montre n'a rien mesuré, on ne déduit rien
   // d'une FC moyenne. On le dit, en comptant les séances écartées.
-  const z = computeHrZones([
+  const z = zonesAu([
     { date: jour(1), sport: "run", hr_zone_seconds: null },
     { date: jour(2), sport: "run" },
     { date: jour(3), sport: "run", hr_zone_seconds: [] },
@@ -62,7 +72,7 @@ test("des séances SANS temps en zone ne produisent aucune zone — elles sont c
 });
 
 test("vélo, rando et marche n'entrent jamais dans les zones de course", () => {
-  const z = computeHrZones([
+  const z = zonesAu([
     { date: jour(1), sport: "bike", hr_zone_seconds: [9000, 0, 0, 0, 0, 0, 0] },
     { date: jour(2), sport: "hike", hr_zone_seconds: [9000, 0, 0, 0, 0, 0, 0] },
     { date: jour(3), sport: "walk", hr_zone_seconds: [9000, 0, 0, 0, 0, 0, 0] },
@@ -73,19 +83,19 @@ test("vélo, rando et marche n'entrent jamais dans les zones de course", () => {
 });
 
 test("une montre qui renvoie 7 tranches ne perd rien : tout au-dessus de la 5e est agrégé", () => {
-  const z = computeHrZones([{ date: jour(1), sport: "run", hr_zone_seconds: [10, 20, 30, 40, 50, 60, 70] }]);
+  const z = zonesAu([{ date: jour(1), sport: "run", hr_zone_seconds: [10, 20, 30, 40, 50, 60, 70] }]);
   assert.equal(z.total, 280, "du temps mesuré a été perdu en route");
   assert.equal(z.secs[4], 50 + 60 + 70, "les zones hautes ne sont pas agrégées dans la dernière bande");
 });
 
 test("une montre qui renvoie moins de tranches ne fait pas planter le calcul", () => {
-  const z = computeHrZones([{ date: jour(1), sport: "run", hr_zone_seconds: [100, 200] }]);
+  const z = zonesAu([{ date: jour(1), sport: "run", hr_zone_seconds: [100, 200] }]);
   assert.equal(z.total, 300);
   for (const s of z.secs) assert.ok(sain(s));
 });
 
 test("valeurs corrompues : null, négatif, texte, Infinity", () => {
-  const z = computeHrZones([
+  const z = zonesAu([
     { date: jour(1), sport: "run", hr_zone_seconds: [100, null as never, "x" as never, Infinity as never, NaN as never] },
   ]);
   for (const s of z.secs) assert.ok(sain(s), `une zone vaut ${s}`);
@@ -93,13 +103,13 @@ test("valeurs corrompues : null, négatif, texte, Infinity", () => {
 });
 
 test("hors fenêtre de 6 semaines : rien n'est compté", () => {
-  const z = computeHrZones([{ date: jour(60), sport: "run", hr_zone_seconds: [3600, 0, 0, 0, 0] }]);
+  const z = zonesAu([{ date: jour(60), sport: "run", hr_zone_seconds: [3600, 0, 0, 0, 0] }]);
   assert.equal(z.total, 0, "une séance vieille de 60 jours entre encore dans la fenêtre");
 });
 
 test("une date illisible ne fait pas exploser le calcul", () => {
   for (const d of ["", "pas-une-date", "0000-00-00", "2026-13-45"]) {
-    const z = computeHrZones([{ date: d, sport: "run", hr_zone_seconds: [600, 0, 0, 0, 0] }]);
+    const z = zonesAu([{ date: d, sport: "run", hr_zone_seconds: [600, 0, 0, 0, 0] }]);
     assert.ok(sain(z.total), `date « ${d} » → total ${z.total}`);
   }
 });
@@ -193,14 +203,14 @@ console.log("\nSCORE DE FORME — un /100 doit dire contre quoi il mesure");
 const seances = (n: number, km: number) => Array.from({ length: n }, (_, i) => ({ date: jour(i * 2), sport: "run", distance_km: km }));
 
 test("sans objectif, le score annonce des repères GÉNÉRIQUES", () => {
-  const f = computeForme(seances(12, 10), 17, 80, 80, null);
+  const f = formeAu(seances(12, 10), 17, 80, 80, null);
   assert.equal(f.reference, "general", "un repère générique est présenté comme la mesure de l'athlète");
   assert.equal(f.cibleLongueKm, null);
 });
 
 test("avec un objectif, les repères suivent la distance visée", () => {
-  const dix = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: null });
-  const mara = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 42.2, targetSeconds: null });
+  const dix = formeAu(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: null });
+  const mara = formeAu(seances(12, 10), 17, 80, 80, { distanceKm: 42.2, targetSeconds: null });
   assert.equal(dix.reference, "objectif");
   assert.ok((dix.cibleLongueKm ?? 0) < (mara.cibleLongueKm ?? 0),
     `la cible de sortie longue ne dépend pas de l'objectif : ${dix.cibleLongueKm} vs ${mara.cibleLongueKm}`);
@@ -211,9 +221,11 @@ test("avec un objectif, les repères suivent la distance visée", () => {
 });
 
 test("la vitesse se mesure au chrono visé quand il existe", () => {
-  const sansCible = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: null });
-  const ambitieux = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 1800 });
-  const modeste = computeForme(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 3600 });
+  const sansCible = formeAu(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: null });
+  // 28'20 et non 30'00 : avec le modèle de Daniels (02/10/2026), 30'00 pour 17 km/h donnait
+  // PILE 75 — le même score que sans objectif, par coïncidence arithmétique.
+  const ambitieux = formeAu(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 1700 });
+  const modeste = formeAu(seances(12, 10), 17, 80, 80, { distanceKm: 10, targetSeconds: 3600 });
   assert.notEqual(ambitieux.speed, sansCible.speed, "le chrono visé ne change rien à l'axe vitesse");
   assert.ok(modeste.speed >= ambitieux.speed,
     `un objectif plus modeste doit être plus facilement atteint : ${modeste.speed} vs ${ambitieux.speed}`);
@@ -221,21 +233,25 @@ test("la vitesse se mesure au chrono visé quand il existe", () => {
 
 test("tous les axes restent bornés entre 0 et 100, quoi qu'on envoie", () => {
   const cas = [
-    computeForme([], 0, 0, 0, null),
-    computeForme(seances(200, 60), 30, 100, 100, { distanceKm: 5, targetSeconds: 1 }),
-    computeForme(seances(1, 0), -5, -50, 500, { distanceKm: -10, targetSeconds: -1 }),
-    computeForme([{ date: "pas-une-date", sport: "run", distance_km: NaN }], NaN, NaN, NaN, { distanceKm: NaN, targetSeconds: NaN }),
-    computeForme([{ date: jour(1), sport: "bike", distance_km: 200 }], 17, 80, 80, null),
+    formeAu([], 0, 0, 0, null),
+    formeAu(seances(200, 60), 30, 100, 100, { distanceKm: 5, targetSeconds: 1 }),
+    formeAu(seances(1, 0), -5, -50, 500, { distanceKm: -10, targetSeconds: -1 }),
+    formeAu([{ date: "pas-une-date", sport: "run", distance_km: NaN }], NaN, NaN, NaN, { distanceKm: NaN, targetSeconds: NaN }),
+    formeAu([{ date: jour(1), sport: "bike", distance_km: 200 }], 17, 80, 80, null),
+    // 06/11/2026 : récupération et régularité peuvent manquer (aucune mesure récente,
+    // aucune journée prescrite) — absentes, pas zéro.
+    formeAu(seances(10, 8), 17, null, null, null),
   ];
   for (const f of cas) {
     for (const [k, v] of Object.entries({ total: f.total, endurance: f.endurance, speed: f.speed, recovery: f.recovery, regularity: f.regularity })) {
-      assert.ok(sain(v) && v >= 0 && v <= 100, `${k} vaut ${v}`);
+      if (v === null && (k === "recovery" || k === "regularity")) continue;
+      assert.ok(v != null && sain(v) && v >= 0 && v <= 100, `${k} vaut ${v}`);
     }
   }
 });
 
 test("le vélo n'entre pas dans le score d'un coureur", () => {
-  const velo = computeForme([{ date: jour(1), sport: "bike", distance_km: 120 }], 17, 80, 80, null);
+  const velo = formeAu([{ date: jour(1), sport: "bike", distance_km: 120 }], 17, 80, 80, null);
   assert.equal(velo.endurance, 0, "une sortie vélo de 120 km fait grimper l'endurance de course");
 });
 
@@ -303,7 +319,7 @@ test("« record personnel » dit sur quelle profondeur d'historique il est calcu
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
   const b = nu("src/components/dashboard/BentoDashboard.tsx");
   if (!/\{premiereSeance && \(/.test(b)) fails.push("la carte des records n'annonce plus depuis quand elle calcule");
-  else if (!/t\("dash\.rec\.depuis", \{ d: new Date\(premiereSeance\)/.test(b)) fails.push("la profondeur affichée n'est plus celle de la première séance");
+  else if (!/t\("dash\.rec\.depuis", \{ d: formatDateCivile\(String\(premiereSeance\)/.test(b)) fails.push("la profondeur affichée n'est plus celle de la première séance");
   else passed++;
   // Et elle doit être RENSEIGNÉE : une propriété jamais transmise laisse la ligne muette.
   const page = nu("src/app/dashboard/page.tsx");

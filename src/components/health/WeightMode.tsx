@@ -320,10 +320,10 @@ export function WeightMode() {
         <>
           {/* ── Chiffres clés ── */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard icon={<Scale className="h-5 w-5 text-zinc-500" />} label={tr("bmi")} value={dec(plan.bmi)} hint={BAND_LABEL[plan.band]?.[lang] ?? BAND_LABEL[plan.band]?.fr ?? ""} />
-            <StatCard icon={<Flame className="h-5 w-5 text-orange-500" />} label={tr("target")} value={plan.targetKcal.toLocaleString(lang)} hint={tr("perDay")} accent="orange" />
-            <StatCard icon={<Dumbbell className="h-5 w-5 text-violet-500" />} label={tr("protein")} value={String(plan.proteinG)} hint={tr("gPerDay")} accent="violet" />
-            <StatCard icon={<TrendingDown className="h-5 w-5 text-emerald-500" />} label={tr("trend")}
+            <StatCard icon={<Scale className="h-4 w-4 text-zinc-400" strokeWidth={1.5} />} label={tr("bmi")} value={dec(plan.bmi)} hint={BAND_LABEL[plan.band]?.[lang] ?? BAND_LABEL[plan.band]?.fr ?? ""} />
+            <StatCard icon={<Flame className="h-4 w-4 text-zinc-400" strokeWidth={1.5} />} label={tr("target")} value={plan.targetKcal.toLocaleString(lang)} hint={tr("perDay")} accent="orange" />
+            <StatCard icon={<Dumbbell className="h-4 w-4 text-zinc-400" strokeWidth={1.5} />} label={tr("protein")} value={String(plan.proteinG)} hint={tr("gPerDay")} accent="violet" />
+            <StatCard icon={<TrendingDown className="h-4 w-4 text-zinc-400" strokeWidth={1.5} />} label={tr("trend")}
               value={plan.measured ? `${plan.measured.ratePerWeek > 0 ? "+" : plan.measured.ratePerWeek < 0 ? "−" : ""}${dec(Math.abs(plan.measured.ratePerWeek))}` : "—"}
               hint={plan.measured ? tr("perWeek") : tr("noTrend")} accent="emerald" />
           </div>
@@ -384,7 +384,7 @@ export function WeightMode() {
               </div>
               {plan.caps.length > 0 && (
                 <div className="mt-4 rounded-xl bg-emerald-50 p-3">
-                  <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-700"><ShieldCheck className="h-3.5 w-3.5" /> {tr("caps")}</div>
+                  <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-emerald-700 first-letter:uppercase"><ShieldCheck className="h-3.5 w-3.5" /> {tr("caps")}</div>
                   <ul className="space-y-1 text-xs leading-relaxed text-emerald-900">
                     {plan.capCodes.map((c, i) => <li key={i}>· {tr(`c.${c.code}`, c.params && { ...c.params, bmi: c.params.bmi != null ? dec(Number(c.params.bmi)) : "" })}</li>)}
                   </ul>
@@ -443,7 +443,7 @@ export function WeightMode() {
 
           {/* ── Ce qui est supposé : affiché, pas caché ── */}
           <div className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4">
-            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500"><Info className="h-3.5 w-3.5" /> {tr("assumptions")}</div>
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-zinc-500 first-letter:uppercase"><Info className="h-3.5 w-3.5" /> {tr("assumptions")}</div>
             <ul className="space-y-1.5 text-xs leading-relaxed text-zinc-600">
               {plan.assumptionCodes.map((a, i) => <li key={i}>· {tr(`a.${a.code}`, a.params && { ...a.params, factor: dec(Number(a.params.factor ?? 0)) })}</li>)}
               {plan.currentSource === "profil" && <li>· {tr("fromProfile")}</li>}
@@ -490,13 +490,14 @@ export function WeightMode() {
 }
 
 function StatCard({ icon, label, value, hint, accent }: { icon: React.ReactNode; label: string; value: string; hint: string; accent?: "orange" | "violet" | "emerald" }) {
-  const tone = accent === "orange" ? "text-orange-600" : accent === "violet" ? "text-violet-600" : accent === "emerald" ? "text-emerald-600" : "text-zinc-900";
+  // Une carte de chiffre n'a pas de couleur propre (passe « unslop ») : `accent` est gardé pour les appels.
+  const tone = "text-zinc-900"; void accent;
   return (
     <div className="bento-card !p-4">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">{label}</span>{icon}
+        <span className="text-[13px] text-zinc-500 first-letter:uppercase">{label}</span>{icon}
       </div>
-      <div className={`text-2xl font-bold tabular-nums ${tone}`}>{value}</div>
+      <div className={`text-2xl font-semibold tabular-nums ${tone}`}>{value}</div>
       <div className="mt-0.5 text-xs text-zinc-500">{hint}</div>
     </div>
   );
@@ -508,7 +509,7 @@ function Row({ label, value, sub, strong, accent }: { label: string; value: stri
       <span className={`${strong ? "font-semibold text-zinc-900" : "text-zinc-600"}`}>
         {label}{sub && <span className="ml-1.5 text-xs text-zinc-400">{sub}</span>}
       </span>
-      <span className={`tabular-nums ${accent ? "font-bold text-emerald-600" : strong ? "font-semibold text-zinc-900" : "text-zinc-700"}`}>{value}</span>
+      <span className={`tabular-nums ${accent ? "font-semibold text-emerald-600" : strong ? "font-semibold text-zinc-900" : "text-zinc-700"}`}>{value}</span>
     </div>
   );
 }
@@ -516,8 +517,8 @@ function Row({ label, value, sub, strong, accent }: { label: string; value: stri
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-zinc-100 bg-zinc-50/70 p-3">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">{label}</div>
-      <div className="mt-1 text-base font-bold text-zinc-900">{value}</div>
+      <div className="text-[11px] font-medium text-zinc-400 first-letter:uppercase">{label}</div>
+      <div className="mt-1 text-base font-semibold text-zinc-900">{value}</div>
     </div>
   );
 }

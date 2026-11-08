@@ -177,9 +177,15 @@ test("le niveau suit la MÊME échelle de VMA que le coach", () => {
   assert.equal(niveauDeVma(17.6), "confirme");
   assert.equal(niveauDeVma(20), "elite");
   assert.equal(niveauDeVma(null), "debutant", "une VMA absente doit être prudente, pas optimiste");
+  // Depuis le 30/10/2026, UNE seule copie des bornes : `lib/running/niveau`, que le coach,
+  // ce catalogue et l'étiquette affichée appellent tous. Ce test vérifiait que deux copies
+  // restaient égales ; il vérifie désormais qu'il n'y en a plus qu'une.
   const coach = readFileSync("src/lib/ai/coachContext.ts", "utf8");
-  assert.ok(/vma < 13 \? "debutant" : vma < 16 \? "intermediaire" : vma < 19 \? "confirme"/.test(coach),
-    "les bornes de niveau du coach ont changé : le catalogue ne dit plus la même chose que lui");
+  assert.ok(/niveauDeVma\(vma\) \?\? "debutant"/.test(coach) && /from "@\/lib\/running\/niveau"/.test(coach),
+    "le coach n'utilise plus l'échelle commune : le catalogue ne dit plus la même chose que lui");
+  const catalogue = readFileSync("src/lib/plans/catalogue.ts", "utf8");
+  assert.ok(/from "@\/lib\/running\/niveau"/.test(catalogue) && !/< 16\b/.test(catalogue),
+    "le catalogue des plans a de nouveau sa propre copie des bornes");
 });
 
 console.log(`\n${passed} test(s) de plans passé(s), ${fails.length} échec(s)`);

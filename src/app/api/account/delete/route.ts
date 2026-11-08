@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { estJetonOAuth, jetonDe } from "@/lib/intervals/auth";
+import { revoquer } from "@/lib/intervals/oauth";
 
 // POST /api/account/delete — supprime le compte de l'utilisateur connecté (irréversible).
 export async function POST() {
@@ -38,6 +40,11 @@ export async function POST() {
    * elles sont réellement parties. Un échec laisse l'athlète connecté, capable de
    * recommencer.
    */
+  // Le jeton intervals.icu est lu AVANT l'effacement (la ligne `profiles` l'emporte), et rendu
+  // APRÈS : sans cela, Pacevo restait autorisé chez intervals.icu (audit du 24/10/2026).
+  const { data: montre, error: eMontre } = await admin.from("profiles").select("intervals_api_key").eq("id", user.id).maybeSingle();
+  if (eMontre) console.error("[compte] jeton intervals.icu illisible, non révoqué :", eMontre.message);
+
   const { error: eNotifs } = await admin.from("notifications").delete().eq("user_id", user.id);
   if (eNotifs) {
     console.error("[compte] notifications non supprimées :", eNotifs.message);
@@ -54,6 +61,9 @@ export async function POST() {
       { status: 500 },
     );
   }
+  // Au mieux : `revoquer` ne lève jamais, et un refus d'intervals.icu ne retient pas la suppression.
+  const jeton = montre?.intervals_api_key;
+  if (estJetonOAuth(jeton)) await revoquer(jetonDe(String(jeton)));
 
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

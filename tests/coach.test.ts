@@ -25,7 +25,7 @@ import { contientGrosMot, premierGrosMot, NB_FORMES_SURVEILLEES } from "../src/l
 import { avertissementAge, avertissementsAge, kmEffort } from "../src/lib/coach/ageDistance";
 import { etatDouble, scinderFacile, seanceDoubleSeuil, AVERTISSEMENT_LACTATE } from "../src/lib/coach/doubleSessions";
 import { oneSessionPerSlot, slotKey } from "../src/lib/coach/sessions";
-import { vmaFromPaceCurve, bestVmaFromWorkouts, effectiveVma, dureeEnConditionsNeutres, PART_PENALITE_CHALEUR, pctVmaForDistance, easyPaceFromHeartRate, MIN_SEANCES_ALLURE_Z2, LONG_RUN_PRET_KM, LONG_RUN_PLANCHER_KM } from "../src/lib/running/fitness";
+import { vmaFromPaceCurve, bestVmaFromWorkouts, effectiveVma, dureeEnConditionsNeutres, PART_PENALITE_CHALEUR, pctVmaForDistance, easyPaceFromHeartRate, MIN_SEANCES_ALLURE_Z2, LONG_RUN_PRET_KM, LONG_RUN_PLANCHER_KM, vmaFromEffort, predictRaceSec } from "../src/lib/running/fitness";
 import { heatAdvice, windAdvice, altitudeLossPct, heatAcclimation } from "../src/lib/weather/openMeteo";
 import { parseReps, parsePaceSec, stepsForType, warmCoolMin, buildWorkoutDescription, montreDe, metriquesMixtesSupportees, DESTINATIONS_MONTRE , lectureDe, estAppleWatch } from "../src/lib/watch/intervals";
 import { buildWeekPlan, CONFIRMED_DAYS } from "../src/lib/ai/autoPlan";
@@ -35,7 +35,7 @@ import { T as T_UI } from "../src/lib/i18n/translations";
 import { LANDING as LANDING_T } from "../src/components/landing/landingI18n";
 import { accesDe, peut, motifRefus, JOURS_ESSAI } from "../src/lib/billing/access";
 import { TARIFS, FORMULES, accesDuPrice } from "../src/lib/stripe/client";
-import { PRIX_AFFICHES, REMISE_ANNUELLE_PCT, MOIS_FACTURES_PAR_AN, MOIS_OFFERTS, economieAnnuelle } from "../src/lib/billing/prix";
+import { PRIX_AFFICHES, moisOfferts, MOIS_OFFERTS_MAX, economieAnnuelle, parMois } from "../src/lib/billing/prix";
 import { jetonDesinscription, jetonValide } from "../src/lib/newsletter/token";
 import { emailConfirmation } from "../src/lib/newsletter/confirmation";
 import { emailNouvelInscrit } from "../src/lib/notify/nouvelInscrit";
@@ -1439,7 +1439,9 @@ test("les onglets Santé cités correspondent aux VRAIS libellés de l'écran", 
   // nom français : « no separador "Poids" » à un lusophone dont l'onglet affiche « Peso ».
   const hc = readFileSync("src/components/health/HealthCenter.tsx", "utf8");
   for (const [lg, labels] of Object.entries(HEALTH_TABS)) {
-    assert.equal(labels.length, 5, `${lg} : 5 onglets attendus`);
+    // 3 onglets depuis le 30/09/2026 (Journal et Sécurité retirés) — et AUCUN des anciens.
+    assert.equal(labels.length, 3, `${lg} : 3 onglets attendus`);
+    assert.ok(!labels.some((l) => /Journal|Tagebuch|Diario|Diário|Sécurité|Safety|Sicherheit|Seguridad|Segurança/.test(l)), `${lg} : l'assistant cite un onglet retiré`);
     for (const label of labels) {
       assert.ok(hc.includes(`"${label}"`), `onglet « ${label} » (${lg}) absent de HealthCenter.tsx`);
     }
@@ -1989,8 +1991,10 @@ test("le marathon dépend de la plus longue sortie, pas d'une constante", () => 
   const bas = pctVmaForDistance(42.195, LONG_RUN_PLANCHER_KM);
   const pret = pctVmaForDistance(42.195, LONG_RUN_PRET_KM);
   assert.ok(pret > bas, "une préparation aboutie doit valoir mieux qu'un plancher");
-  assert.equal(Math.round(bas * 1000) / 10, 75);
-  assert.equal(Math.round(pret * 1000) / 10, 79);
+  // Modèle Daniels & Gilbert (02/10/2026), coureur de référence à 17 km/h : 75,9 % sans
+  // socle, 80,5 % préparé — la fourchette marathon de la littérature (75-80 %).
+  assert.equal(Math.round(bas * 1000) / 10, 75.9);
+  assert.equal(Math.round(pret * 1000) / 10, 80.5);
   // Au-delà de la référence, on plafonne : 40 km de sortie longue ne rend pas le
   // marathon plus facile que la physiologie ne le permet.
   assert.equal(pctVmaForDistance(42.195, 40), pret);
@@ -2013,11 +2017,17 @@ test("les courtes distances ne dépendent PAS du socle d'endurance", () => {
 });
 
 test("lire une performance ne suppose aucune préparation", () => {
-  // `vmaFromEffort` ne doit pas appliquer le bonus de socle : on lit ce qui a été fait,
-  // on ne récompense pas l'athlète d'avoir un gros volume.
-  const code = codeOf("src/lib/running/fitness.ts");
-  const appel = code.match(/speed \/ pctVmaForDistance\(([^)]*)\)/)?.[1] ?? "";
-  assert.equal(appel.trim(), "distanceKm", `vmaFromEffort passe « ${appel} » à pctVmaForDistance`);
+  // `vmaFromEffort` ne doit pas appliquer le socle : on lit ce qui a été fait, on ne
+  // récompense pas l'athlète d'avoir un gros volume. Preuve par l'aller-retour : un
+  // marathon PRÉPARÉ (socle complet, aucune pénalité) se relit à la VMA d'origine ; le
+  // même marathon couru sans socle, plus lent, se relit plus bas — jamais « corrigé ».
+  const PRET = { sortieLongueKm: 40, volumeHebdoKm: 120 };
+  for (const vma of [14, 17, 20]) {
+    for (const km of [5, 10, 21.0975, 42.195]) {
+      assert.ok(Math.abs(vmaFromEffort(km, predictRaceSec(vma, km, PRET))! - vma) <= 0.1, `${vma} km/h sur ${km} km ne se relit pas à l'identique`);
+    }
+    assert.ok(vmaFromEffort(42.195, predictRaceSec(vma, 42.195))! < vma - 0.3, "un marathon sans socle se relit comme s'il avait été préparé");
+  }
 });
 
 console.log("\nCHALEUR — une performance se lit DANS SES CONDITIONS");
@@ -2118,7 +2128,8 @@ test("la VO2max de la montre est CROISÉE avec la courbe, plus reléguée au der
   // son meilleur 5 000 m est une sortie d'entraînement. Constaté en production :
   // courbe 17,3 km/h contre VO2max 63 → 18,0, et un « meilleur » 10 000 m à 41'08.
   const r = effectiveVma({ paceCurveBest: COURBE, garminVo2: 63, fromRuns: null });
-  assert.equal(vmaFromPaceCurve(COURBE), 17.3, "la courbe donne bien 17,3");
+  // 5 000 m en 18'27 = VDOT 54,7 → 17,8 km/h (modèle de Daniels, 02/10/2026).
+  assert.equal(vmaFromPaceCurve(COURBE), 17.8, "la courbe donne bien 17,8");
   assert.equal(r.vma, 18, "la VO2max (63 → 18,0) doit l'emporter sur la courbe");
   assert.equal(r.source, "vo2max", "et la source doit le DIRE, sinon l'athlète subit le chiffre");
 });
@@ -2127,7 +2138,7 @@ test("quand la courbe est la meilleure, c'est elle qui gagne", () => {
   // Le croisement n'est pas « la VO2max gagne toujours » : les deux sources ne peuvent
   // que sous-estimer, donc on retient la plus favorable, d'où qu'elle vienne.
   const r = effectiveVma({ paceCurveBest: COURBE, garminVo2: 45, fromRuns: null });
-  assert.equal(r.vma, 17.3);
+  assert.equal(r.vma, 17.8);
   assert.equal(r.source, "courbe");
 });
 
@@ -2140,7 +2151,10 @@ test("sans courbe ni VO2max, on retombe sur les séances — jamais sur zéro", 
 test("aucune chaîne parallèle ne recalcule la VMA dans son coin", () => {
   // C'est la cause RACINE des quatre chiffres divergents : chaque écran refaisait la
   // chaîne à la main, et chaque commentaire jurait pourtant qu'elle était identique.
-  for (const f of ["src/app/dashboard/page.tsx", "src/app/dashboard/profile/page.tsx", "src/lib/ai/coachContext.ts"]) {
+  // Le tableau de bord passe par `vmaAffichee` (partagé avec la page détaillée), qui passe
+  // par `effectiveVma` : c'est ce module-là qui est contrôlé, et la page doit l'appeler.
+  assert.match(codeOf("src/app/dashboard/page.tsx"), /vmaAffichee\(\{/, "le tableau de bord ne passe plus par la VMA partagée");
+  for (const f of ["src/lib/dashboard/vmaAffichee.ts", "src/app/dashboard/profile/page.tsx", "src/lib/ai/coachContext.ts"]) {
     const src = codeOf(f);
     assert.ok(/effectiveVma\(/.test(src), `${f} ne passe pas par effectiveVma`);
     // `vmaFromVo2max` ne doit plus être appelée hors de la fonction commune : c'est
@@ -3494,7 +3508,8 @@ test("la séance DÉJÀ COURUE aujourd'hui n'est pas réécrite", () => {
   // fournir. L'effacement ET l'insertion ET la poussée montre doivent partir de la
   // MÊME date, sans quoi le calendrier et la montre divergent.
   const src = codeOf("src/lib/ai/autoCoach.ts");
-  assert.ok(/const from = dayZeroFrozen \? week\[1\]\.date : today/.test(src), "le gel du jour 0 a disparu");
+  // `semaineMoteur` (30/10/2026) : la semaine du moteur AVANT les ajustements appliqués par l'athlète.
+  assert.ok(/const from = dayZeroFrozen \? (week|semaineMoteur)\[1\]\.date : today/.test(src), "le gel du jour 0 a disparu");
   assert.ok(/\.gte\("data->>date", from\)/.test(src), "l'effacement ne part pas de la date gelée");
   // `semaineCoach` : la même semaine, enrichie des conseils du coach avancé (Premium).
   assert.ok(/(week|semaineCoach)\.filter\(\(d: PlanDay\) => d\.date >= from\)/.test(src), "l'insertion ne part pas de la date gelée");
@@ -3507,8 +3522,9 @@ test("la séance DÉJÀ COURUE aujourd'hui n'est pas réécrite", () => {
 test("la chaîne sync → analyse → replanification → montre n'existe qu'à un endroit", () => {
   // Elle a existé en trois exemplaires divergents. Le cron n'importait aucune trace GPS
   // et ignorait le garde-fou anti-rafale : invisible à raison d'un passage par nuit,
-  // ruineux à raison d'un passage toutes les 10 minutes.
-  for (const f of ["src/app/api/cron/sync-all/route.ts", "src/app/api/intervals/sync/route.ts"]) {
+  // ruineux à raison d'un passage toutes les 10 minutes. Le webhook d'intervals.icu, lui,
+  // appelait le coach SANS le garde-fou des 10 minutes jusqu'au 16/10/2026.
+  for (const f of ["src/app/api/cron/sync-all/route.ts", "src/app/api/intervals/sync/route.ts", "src/app/api/webhooks/intervals/route.ts"]) {
     const src = codeOf(f);
     assert.ok(!/autoCoachForUser/.test(src), `${f} rappelle le coach directement au lieu de passer par replanIfFresh`);
     assert.ok(!/importMissingTracks/.test(src), `${f} garde sa propre importation de traces`);
@@ -3942,7 +3958,10 @@ test("un repli local ne se félicite JAMAIS", () => {
   const messages = [...i18n.matchAll(/"t\.savedLocal": "([^"]+)"/g)].map((m) => m[1]);
   assert.equal(messages.length, 5, "les 5 langues doivent avoir le message");
   for (const m of messages) {
-    assert.ok(/⚠️/.test(m), `message de repli sans avertissement : « ${m} »`);
+    // 06/11/2026 (passe « unslop ») : plus d'emoji ⚠️ dans le texte — c'est `toast.warning`
+    // (vérifié ci-dessus) qui porte l'icône d'avertissement. Le texte, lui, doit insister sur
+    // CE navigateur et dire que la sauvegarde en ligne a échoué.
+    assert.ok(/\b(CE|THIS|DIESEM|ESTE|NESTE)\b/.test(m) && /—/.test(m), `message de repli sans avertissement : « ${m} »`);
     assert.ok(!/^(Parcours sauvegardé localement|Route saved locally)/.test(m), `message trop rassurant : « ${m} »`);
   }
 });
@@ -3956,11 +3975,24 @@ test("les migrations récentes ne contiennent AUCUNE instruction DROP", () => {
   //
   // Périmètre : à partir de la migration 007. La 006 en contient douze, écrites avant
   // cette règle — les réécrire n'apporterait rien, elles sont déjà passées.
+  //
+  // ⚠️ UNE SEULE EXCEPTION, ÉTROITE : la 040 retire PostGIS (inutilisé), seul moyen de
+  // fermer `spatial_ref_sys` (propriété de supabase_admin, alerte de sécurité du
+  // 27/10/2026). Toute autre instruction DROP, dans la 040 comme ailleurs, rougit.
+  const TOLEREES: Record<string, string> = { "040_retrait_postgis.sql": "drop extension if exists postgis cascade;" };
   for (const f of readdirSync("supabase/migrations").filter((x) => x.endsWith(".sql") && x >= "007")) {
     const lignes = readFileSync(`supabase/migrations/${f}`, "utf8").split("\n")
       .filter((l) => !l.trim().startsWith("--"));
-    const drops = lignes.filter((l) => /^\s*drop\b/i.test(l));
+    const drops = lignes.filter((l) => /^\s*drop\b/i.test(l) && l.trim() !== TOLEREES[f]);
     assert.deepEqual(drops, [], `${f} contient une instruction DROP : ${drops[0]?.trim()}`);
+  }
+  // L'exception ne vaut que tant que PostGIS reste inutilisé : aucun code ne doit lire ni
+  // écrire les colonnes qu'elle a emportées, ni appeler une fonction ST_*.
+  for (const f of ["src", "scripts"].flatMap((d) => readdirSync(d, { recursive: true }).map((x) => `${d}/${x}`))
+    .filter((x) => /\.(ts|tsx)$/.test(x))) {
+    const src = readFileSync(f, "utf8");
+    assert.ok(!/start_location|races_location_idx|\bST_[A-Z][a-zA-Z]+\(/i.test(src),
+      `${f} utilise PostGIS, retiré par la migration 040 : le réinstaller (schéma extensions) avant`);
   }
 });
 
@@ -4358,13 +4390,14 @@ test("l'IA propose, mais ne peut pas rouvrir l'intensité que le plan a fermée"
   const ferme = contraintesDe(week, 0, ["ratio aigu:chronique à 1,4"]);
   const long = "Ton seuil tombe deux jours après ta course : le décaler au samedi te laisse un jour de récupération de plus.";
 
-  // Budget ouvert : déplacer une séance est un conseil légitime.
-  const a = validerAjustement({ date: "2026-08-23", action: "decaler", texte: long }, ouvert);
+  // Budget ouvert : déplacer une séance est un conseil légitime — vers un jour de repos, que la
+  // proposition doit nommer (« vers ») depuis qu'elle s'applique en un geste (30/10/2026).
+  const a = validerAjustement({ date: "2026-08-23", action: "decaler", vers: "2026-08-24", texte: long }, ouvert);
   assert.ok(a.ok && a.ajustement.action === "decaler");
 
   // ⚠️ LE CŒUR. Budget à ZÉRO — fatigue réelle — déplacer une séance de qualité, c'est
   // la reposer ailleurs dans la semaine. Seul l'allègement reste recevable.
-  const refus = validerAjustement({ date: "2026-08-23", action: "decaler", texte: long }, ferme);
+  const refus = validerAjustement({ date: "2026-08-23", action: "decaler", vers: "2026-08-24", texte: long }, ferme);
   assert.ok(!refus.ok, "un déplacement sur budget nul doit être REFUSÉ");
   const allege = validerAjustement({ date: "2026-08-23", action: "alleger", texte: long }, ferme);
   assert.ok(allege.ok, "alléger reste possible quand le budget est nul");
@@ -4885,9 +4918,19 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
         `${formule} : ${PLAFOND_JOUR[etat]} appels/j coûtent ${pireCas.toFixed(2)} €/mois au pire, `
         + `soit ${(part * 100).toFixed(0)} % des ${net(ttc).toFixed(2)} € nets — au-delà de ${PART_MAX * 100} %, la marge ne tient plus`);
     }
+    // À L'ANNÉE (Premium à 119,90 € depuis le 30/10/2026) : la commission fixe ne se paie
+    // qu'une fois par an. Au pire, l'IA ne doit pas manger plus de 40 % du net annuel.
+    for (const [formule, etat] of [["starter", "starter"], ["premium", "premium"]] as const) {
+      const ht = TARIFS[formule].an.centimes / 100 / 1.2;
+      const netMois = (ht - (ht * 0.029 + 0.25)) / 12;
+      const part = (PLAFOND_JOUR[etat] * 30 * COUT_APPEL) / netMois;
+      assert.ok(part <= 0.4, `${formule} annuel : au pire ${(part * 100).toFixed(0)} % du net, la remise annuelle mange la marge`);
+    }
     assert.equal(PLAFOND_JOUR.gratuit, 0, "le palier gratuit ne doit consommer aucun jeton");
     assert.ok(PLAFOND_JOUR.essai > 0, "sans crédits pendant l'essai, personne ne peut juger ce qu'il achète");
-    assert.equal(PLAFOND_JOUR.essai, PLAFOND_JOUR.premium, "l'essai doit montrer le niveau Premium");
+    // Décision du 30/10/2026 (Cyprien) : l'essai garde les FONCTIONS Premium, mais le VOLUME
+    // d'IA de Starter — de quoi juger en sept jours sans payer trente appels par jour.
+    assert.equal(PLAFOND_JOUR.essai, PLAFOND_JOUR.starter, "l'essai doit avoir le volume d'IA de Starter");
   });
 
   test("la vitrine ne promet pas au gratuit ce que le code lui refuse", () => {
@@ -5370,22 +5413,34 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       assert.ok(!/const PRIX(_AFFICHES)? *[:=]/.test(src),
         `${f} : redéclare des prix en local au lieu d'importer la source`);
     }
-    // La remise annoncée doit être celle qu'on applique vraiment. On affiche « 2 mois
-    // offerts » — exact — et JAMAIS un pourcentage : 1 − 10/12 vaut 16,67 %, qu'un
-    // arrondi à « −17 % » surestimerait sur une promesse commerciale.
-    assert.equal(MOIS_FACTURES_PAR_AN, 10, "la remise annuelle n'est plus de deux mois offerts");
-    assert.equal(MOIS_OFFERTS, 2);
+    // La remise annoncée doit être celle qu'on applique vraiment : des MOIS offerts, comptés
+    // vers le bas sur les prix réels — jamais un pourcentage, qu'un arrondi surestimerait.
     for (const f of FORMULES) {
-      assert.equal(economieAnnuelle(f), TARIFS[f].mois.centimes * 2,
-        `${f} : l'économie annoncée ne vaut pas deux mensualités`);
+      assert.ok(economieAnnuelle(f) >= moisOfferts(f) * TARIFS[f].mois.centimes,
+        `${f} : « ${moisOfferts(f)} mois offerts » annoncés pour une économie plus petite`);
+      assert.ok(economieAnnuelle(f) < (moisOfferts(f) + 1) * TARIFS[f].mois.centimes, `${f} : des mois offerts oubliés dans l'annonce`);
     }
-    assert.ok(REMISE_ANNUELLE_PCT < 17, "on ne doit jamais afficher une remise arrondie vers le HAUT");
-    // La remise annuelle doit valoir DEUX MOIS OFFERTS, ni plus ni moins : l'ancien
-    // « −33 % » (80 € contre 120 €) bradait l'abonnement sans raison.
-    for (const f of FORMULES) {
-      assert.equal(TARIFS[f].an.centimes, TARIFS[f].mois.centimes * 10,
-        `${f} : la remise annuelle ne vaut pas deux mois offerts`);
+    // LES DEUX REMISES DÉCIDÉES (30/10/2026) : deux mois sur Starter, quatre sur Premium —
+    // Premium à l'année revient au prix de Starter au mois, et sous l'annuel de Runna.
+    assert.equal(moisOfferts("starter"), 2, "Starter annuel n'offre plus deux mois");
+    assert.equal(moisOfferts("premium"), 4, "Premium annuel n'offre plus quatre mois");
+    assert.equal(MOIS_OFFERTS_MAX, 4, "le sélecteur « jusqu'à N mois offerts » ne suit plus les prix");
+    assert.ok(parMois("premium", "an") <= PRIX_AFFICHES.starter.mois, "Premium à l'année coûte plus par mois que Starter au mois");
+    assert.ok(TARIFS.premium.an.centimes > TARIFS.starter.an.centimes, "Premium annuel doit rester plus cher que Starter annuel");
+    // Aucune vitrine n'écrit le nombre de mois en dur : il vient des prix.
+    for (const l of ALL_LANGS) {
+      const p = LANDING_T[l].pricing;
+      assert.ok(p.economie.includes("{n}") && p.moisOfferts.includes("{n}"), `${l} : le nombre de mois offerts est écrit en dur`);
     }
+    for (const f of ["src/app/page.tsx", "src/app/pricing/page.tsx"]) {
+      assert.match(codeOf(f), /economie\.replace\("\{n\}", String\(MOIS_OFFERTS_MAX\)\)/, `${f} : le sélecteur n'affiche plus les mois calculés`);
+      assert.match(codeOf(f), /moisOfferts\.replace\("\{n\}", String\(moisOfferts\(plan\.cle/, `${f} : la carte n'affiche plus ses mois offerts`);
+    }
+    // LE PRIX DÉBITÉ EST RELU CHEZ STRIPE : un tarif créé à l'ancien montant ne passe pas.
+    const checkout = codeOf("src/app/api/stripe/checkout/route.ts");
+    assert.match(checkout, /prixStripe\.unit_amount !== attendu/, "le paiement ne vérifie plus le montant chez Stripe");
+    assert.ok(checkout.indexOf("prixStripe.unit_amount !== attendu") < checkout.indexOf("stripe.customers.create"),
+      "le montant est vérifié APRÈS la création du client : un refus laisserait un client orphelin");
     // Et l'écart entre les deux formules doit rester positif — Premium contient Starter.
     assert.ok(TARIFS.premium.mois.centimes > TARIFS.starter.mois.centimes,
       "Premium doit coûter plus cher que Starter");
@@ -5408,8 +5463,14 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       assert.equal(p.plans.length, 3, `${l} : ${p.plans.length} formules attendues (gratuit, starter, premium)`);
       assert.deepEqual(p.plans.map((x) => x.cle), ["gratuit", "starter", "premium"], `${l} : clés de formule inattendues`);
       assert.ok(p.gratuitNote.length > 10, `${l} : le palier gratuit n'annonce pas qu'il ne demande pas de carte`);
+      // ⚠️ TROIS LIGNES AU MOINS, et plus quatre. Depuis le 22/10/2026 (Cyprien), l'analyse
+      // développée, le GPX et le kiné sont dans LES DEUX formules payantes : la carte
+      // Premium se résume à « Tout le Starter » plus ce qui la distingue VRAIMENT (le
+      // triple d'IA, le coach avancé). Lui imposer une quatrième ligne, c'était exiger
+      // qu'on lui invente une exclusivité — exactement ce qui avait produit « Posture
+      // Lab » et « Accès API développeur ». Le garde-fou vise une carte VIDE, pas courte.
       for (const plan of p.plans) {
-        assert.ok(plan.name && plan.pitch && plan.cta && plan.features.length >= 4, `${l}/${plan.cle} : formule incomplète`);
+        assert.ok(plan.name && plan.pitch && plan.cta && plan.features.length >= 3, `${l}/${plan.cle} : formule incomplète`);
       }
       // Ce qui se passe APRÈS l'essai doit être écrit, dans chaque langue.
       assert.ok(p.apres.length > 40, `${l} : la dégradation en consultation n'est pas expliquée`);
@@ -5463,14 +5524,17 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
 
     assert.ok(p.some((d) => d.type === "Vélo"),
       "aucune séance sans impact alors que 60 % du volume doit sortir de la course");
-    const aPied = p.filter((d) => d.type === "Endurance" || d.type === "Récup");
+    const aPied = p.filter((d) => d.type === "Endurance" || d.type === "Récup" || d.type === "Marche/course");
     assert.ok(aPied.length > 0, "aucune séance à pied dans le plan : le scénario ne prouve rien");
     // On vise le TITRE canonique, pas le mot « marche » : « Repos complet. Marche,
     // étirements… » et la récupération en marchant des lignes droites le contiennent déjà,
     // donc une assertion sur le texte serait vraie sans que rien n'ait été converti.
+    // Et le TYPE : c'est lui que la montre lit (05/11/2026 — resté « Endurance », la séance
+    // partait en course continue sous un titre « Marche/course »).
     for (const d of aPied) {
       assert.match(d.title, /^Marche\/course$/,
         `séance à pied en course continue malgré l'alternance marche/course demandée : « ${d.title} »`);
+      assert.equal(d.type, "Marche/course", `séance « ${d.title} » envoyée à la montre comme « ${d.type} »`);
     }
     // Et les 4 autres langues suivent : sans cela, un athlète non francophone verrait la
     // consigne d'origine — la divergence silencieuse que `reecrire` existe pour éviter.
@@ -5491,13 +5555,31 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     const marche = p.filter((d) => /^Marche\/course$/.test(d.title));
     assert.ok(marche.length > 0, "aucune séance marche/course produite : le scénario ne teste rien");
     for (const d of marche) {
-      const b = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, null, 17.6, 15, 10);
+      const b = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, null, 17.6, 15, 10, "garmin");
       assert.ok(b, `séance marche/course non poussable → elle serait EFFACÉE de la montre : « ${d.title} »`);
-      // Le texte ne doit pas contenir de motif « N × valeur », que `parseReps` lirait comme
-      // des répétitions et transformerait en fractionné avec allures cibles.
-      assert.equal(parseReps(d.detail, null), null,
-        `la marche/course est lue comme un fractionné par la montre : « ${d.detail} »`);
+      // ⚠️ La montre recevait de la COURSE CONTINUE (05/11/2026). Elle doit recevoir
+      // l'alternance elle-même : des courses et des marches numérotées, à la fréquence
+      // cardiaque, sans aucune allure cible (pas un fractionné).
+      const etapes = b!.description.split("\n").filter((x) => x.startsWith("- "));
+      assert.ok(etapes.some((x) => /Z2 HR Course 1\//.test(x)) && etapes.some((x) => /Z1 HR Marche 1\//.test(x)),
+        `pas d'alternance course/marche sur la montre : ${etapes.join(" | ")}`);
+      assert.ok(!etapes.some((x) => /Pace|\/km/i.test(x)), `une allure cible est imposée : ${etapes.join(" | ")}`);
     }
+    // Elle dure autant que le footing qu'elle remplace (sa distance ENTIÈRE à l'allure
+    // facile, lue dans l'étiquette — le « Corps : » n'en est que le milieu).
+    const minutesMontre = (d: { title: string; detail: string; type: string; tags: string[] }) =>
+      (buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, null, 17.6, 15, 10, "garmin")?.description ?? "")
+        .split("\n").reduce((t, l) => t + Number(l.match(/^- (\d+)m /)?.[1] ?? 0), 0);
+    const sansRegle = buildWeekPlan(ctx(), new Date());
+    let compares = 0;
+    for (const d of marche) {
+      const avant = sansRegle.find((x) => x.date === d.date && x.type === "Endurance");
+      if (!avant) continue;
+      compares++;
+      assert.ok(Math.abs(minutesMontre(d) - minutesMontre(avant)) <= 4,
+        `marche/course de ${minutesMontre(d)} min à la place d'un footing de ${minutesMontre(avant)} min (${d.date})`);
+    }
+    assert.ok(compares > 0, "aucun footing remplacé à comparer : le contrôle de durée ne prouve rien");
   });
 
   test("sans mode perte de poids, aucune marche/course n'est imposée", () => {
@@ -5510,6 +5592,31 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       "une marche/course est imposée à un athlète qui n'est pas en perte de poids");
     assert.ok(!p.some((d) => d.type === "Vélo" && /sans impact/i.test(d.title)),
       "du volume sans impact est imposé à un athlète qui n'est pas en perte de poids");
+  });
+
+  test("les kilomètres annoncés sont la séance ENTIÈRE, échauffement et retour au calme compris", () => {
+    // ⚠️ Audit du 05/11/2026 : l'échauffement (15 min) et le retour au calme (10 min)
+    // s'AJOUTAIENT aux kilomètres annoncés. Un footing « 8 km » partait sur la montre en
+    // 15 min + 8 km + 10 min, ~5 km de plus, et la semaine dépassait sa cible d'autant
+    // par sortie. On mesure ce que la montre fait courir, pas le texte.
+    const p = buildWeekPlan(ctx(), new Date());
+    const allureMin = 4 + 52 / 60;
+    const aMesurer = p.filter((d) => d.type === "Endurance" || d.type === "Sortie longue");
+    assert.ok(aMesurer.some((d) => d.type === "Endurance") && aMesurer.some((d) => d.type === "Sortie longue"),
+      "il faut au moins un footing et une sortie longue pour que ce test dise quelque chose");
+    for (const d of aMesurer) {
+      const km = Number(d.tags.join(" ").match(/(\d+(?:[.,]\d+)?) km/)?.[1]?.replace(",", "."));
+      assert.ok(km > 0, `pas de distance annoncée : ${d.tags.join(", ")}`);
+      const w = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, null, 17.6, 15, 10, "garmin");
+      const minutes = (w?.description ?? "").split("\n").reduce((t, l) => t + Number(l.match(/^- (\d+)m /)?.[1] ?? 0), 0);
+      const attendu = km * allureMin;
+      assert.ok(Math.abs(minutes - attendu) <= Math.max(5, attendu * 0.12),
+        `${d.type} annoncé ${km} km (~${Math.round(attendu)} min) : la montre fait courir ${minutes} min`);
+      // Et l'échauffement reste à la mesure de la séance : le corps en est l'essentiel. Un
+      // footing de 24 min ne se court pas en 15 min d'échauffement et 5 min de footing.
+      const corps = Number((w?.description ?? "").match(/^- (\d+)m [^\n]*Endurance facile/m)?.[1] ?? 0);
+      assert.ok(corps >= minutes / 2, `${d.type} de ${minutes} min : seulement ${corps} min de corps`);
+    }
   });
 
   test("la FC max se lit sur TOUT l'historique, jamais sur la fenêtre de 60 séances", () => {
@@ -5536,7 +5643,8 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
       "maxHrEff retient la FC déclarée même si une FC plus haute a été enregistrée");
     // La FC déclarée au PROFIL (migration 029) doit être lue, sinon le champ de l'inscription
     // est un champ qui jette ce qu'on lui donne.
-    assert.ok(/maxHrDeclare = num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\)/.test(src),
+    // 07/11/2026 : la montre (réglage intervals.icu) sert de repli via `maxDeReference`.
+    assert.ok(/maxHrDeclare = maxDeReference\(num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\)/.test(src),
       "la FC max déclarée à l'inscription (profiles.max_hr) n'est pas lue");
     assert.ok(/restHr = num\(b\?\.resting_hr\) \?\? num\(p\?\.resting_hr\)/.test(src),
       "la FC de repos déclarée à l'inscription (profiles.resting_hr) n'est pas lue");
@@ -5646,11 +5754,8 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // meilleure, il la rend plus chère — et `coach` est le cas d'école : son propre
     // prompt demande « max 4 phrases ».
     const PLAFONDS: Record<string, number> = {
-      coach: 600, session: 600, "journal-analyze": 500, support: 1200, cours: 1400,
+      coach: 600, session: 600, support: 1200, cours: 1400,
       physio: 1600,
-      // Le plan complet rend un JSON de plusieurs semaines : c'est la seule route qui
-      // justifie un budget large, et elle n'est appelée qu'à la demande.
-      "training-plan": 8192,
       // L'ajustement rend DEUX PHRASES et un champ d'action. Le budget couvre le
       // raisonnement interne de Gemini 2.5, pas un essai : c'est la route la plus
       // susceptible d'être appelée souvent — chaque ouverture du plan — donc celle où
@@ -5773,18 +5878,16 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // enseignes, calculées par un simple multiplicateur, qui sont fictives — et c'était
     // exactement celles que la vitrine citait nommément.
     //
-    // La liste interdite est donc DÉRIVÉE DU CODE plutôt que recopiée : le jour où une
-    // enseigne quitte la table simulée, elle devient citable sans qu'on ait à y penser,
-    // et le jour où la table disparaît, ce test le dit.
-    const shop = codeOf("src/app/api/shop/prices/route.ts");
-    const fictives = [...shop.matchAll(/retailer_name: "([^"]+)",\s*multiplier:/g)].map((m) => m[1]);
-    assert.ok(fictives.length >= 4,
-      "la table de prix simulés a disparu : la boutique devient réelle, la vitrine peut "
-      + "à nouveau en parler et ce test doit être rouvert");
-    for (const nom of fictives) {
+    // ⚠️ LA ROUTE DES PRIX SIMULÉS A ÉTÉ SUPPRIMÉE (01/10/2026, « reste dans la légalité ») :
+    // plus appelée par l'application, elle restait PUBLIQUE — des prix calculés par
+    // multiplicateur, attribués à des enseignes nommées (pratique commerciale trompeuse s'ils
+    // s'affichaient), et un appel à l'API interne de Decathlon sous une identité de
+    // navigateur. Elle ne doit pas revenir, et la vitrine ne cite toujours pas ces enseignes.
+    assert.ok(!existsSync("src/app/api/shop/prices/route.ts"), "la route des prix simulés est revenue");
+    for (const nom of ["i-Run", "Alltricks", "Lepape", "Ekosport", "Décathlon"]) {
       for (const l of ALL_LANGS) {
         assert.ok(!JSON.stringify(LANDING_T[l].features).includes(nom),
-          `${l} : la vitrine cite « ${nom} », dont le prix est calculé par multiplicateur`);
+          `${l} : la vitrine cite « ${nom} » comme source de prix`);
       }
     }
   });
@@ -6341,21 +6444,20 @@ test("la carte Ligue ne lit plus une table que personne ne remplit", () => {
   }
 });
 
-test("la carte Ligue montre les composantes RÉELLEMENT calculées", () => {
-  const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
-  // Le trou est comblé par ce que `computeDiscipline` calcule en direct, à partir des
-  // séances et de la VFC : le total affiché cesse d'être un chiffre tombé du ciel.
-  // ⚠️ PREMIÈRE VERSION DE CE TEST : FAUSSE. Elle cherchait « disc.consistency »
-  // n'importe où dans le fichier — or la carte Score Discipline lit LES MÊMES champs.
-  // Retirer une composante de la carte Ligue laissait donc le test au VERT (mutation
-  // faite, mutation passée). On vise maintenant le COUPLE clé+valeur, qui n'existe
-  // que dans cette carte : retirer une seule ligne la fait rougir.
-  for (const c of ["precision", "consistency", "recovery"]) {
-    assert.ok(src.includes(`["dash.discipline.${c}", disc.${c}]`),
-      `la carte Ligue n'affiche plus la composante ${c} : le trou blanc revient`);
+test("la carte Ligue est retirée et sa rangée reste pavée", () => {
+  // 07/11/2026 (Cyprien : « Retire-la ») : la carte Ligue répétait les trois composantes et le
+  // total de la carte Score discipline, sous un « Bronze » identique pour tous (une seule ligue
+  // en base, aucun palier jamais franchi). Retirée ; Volume et Zones se partagent la rangée.
+  const src = readFileSync("src/components/dashboard/BentoDashboard.tsx", "utf8").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+  assert.ok(!src.includes('t("dash.league.title")'), "la carte Ligue est revenue : elle doublonne la carte Score discipline");
+  for (const titre of ['t("dash.volume.title")', "zl.title"]) {
+    const i = src.indexOf(titre);
+    const carte = src.slice(src.lastIndexOf("<motion.div", i), i);
+    assert.match(carte, /col-span-12 md:col-span-6 bento-card/, `${titre} ne prend plus la moitié de la rangée : un trou blanc revient`);
   }
-  // Aucune de ces valeurs n'est inventée : elles sortent toutes du même calcul que le total.
-  assert.match(src, /const disc = computeDiscipline\(workouts, hrv, freshSleep, state\)/);
+  // Le classement reste joignable depuis la carte Badges.
+  assert.match(src, /href="\/dashboard\/leagues"/, "plus aucun lien vers le classement");
+  assert.match(src, /const disc = computeDiscipline\(workouts, hrv, freshSleep, state, \{ aujourdhui: jour, serie: streak\?\.days \?\? null \}\)/);
 });
 
 test("aucune route de mesure jetable n'est partie en production", () => {
@@ -6410,7 +6512,8 @@ test("le volume se compare à une médiane, et l'étiquette dit laquelle", () =>
   // L'étiquette annonçait « vs moy. 4 sem. » alors que le code moyennait CINQ semaines,
   // et une moyenne est écrasée par une coupure : une semaine à 5 km faisait tomber la
   // référence de 70,7 à 58 km. `robustWeeklyKm` écarte les semaines non courues.
-  assert.match(src, /const volRef = robustWeeklyKm\(runs, Date\.now\(\) - 7 \* 86400000, 8\)/,
+  // 06/11/2026 : ancrée sur le jour de l'athlète (plus l'horloge), toujours hors semaine en cours.
+  assert.match(src, /const volRef = robustWeeklyKm\(runs, Date\.parse\(`\$\{jour\}T12:00:00Z`\) - 7 \* 86400000, 8\)/,
     "la référence de volume n'est plus la médiane robuste, hors semaine en cours");
   // L'étiquette doit SUIVRE le calcul, sinon elle ment à nouveau.
   assert.match(src, /\{volumeDelta != null \? t\(volumeRefLabel\) :/,
@@ -6449,7 +6552,10 @@ test("aucune carte n'annonce un pourcentage qui n'est calculé nulle part", () =
   // la fonction — et tombait sur `sleepScore`, un simple nom de PARAMÈTRE. Un test qui
   // rougit sur le vocabulaire au lieu du comportement ne prouve rien.
   // Ce qui compte est ce que la fonction RENVOIE : uniquement une couleur et une phrase.
-  const readiness = src.slice(src.indexOf("function computeReadiness"), src.indexOf("function computeReadiness") + 700);
+  // Toute la fonction, jusqu'à son accolade fermante — une fenêtre de 700 caractères la
+  // coupait dès qu'un paramètre s'ajoutait (05/11/2026 : `montreReliee`).
+  const debutReadiness = src.indexOf("function computeReadiness");
+  const readiness = src.slice(debutReadiness, src.indexOf("\n}\n", debutReadiness));
   const retours = readiness.match(/return \{[^}]*\}/g) ?? [];
   assert.ok(retours.length >= 3, "computeReadiness a changé de forme, ce test ne l'inspecte plus");
   for (const r of retours) {
@@ -6482,8 +6588,11 @@ test("une VFC périmée est datée, et ne décide plus de la forme du jour", () 
   // Le sommeil imposait déjà 2 jours de fraîcheur ; la VFC, rien. Constaté le
   // 01/09/2026 : la dernière mesure datait du 26 août et s'affichait sans date, et
   // c'est elle qui produisait « Tu es frais — bon jour pour une séance de qualité ».
-  assert.match(src, /const hrvFraiche = hrvJours != null && hrvJours <= 2;/,
-    "la fraîcheur de la VFC n'est plus contrôlée");
+  // La règle vit dans `statsVfc` (partagée avec la fiche détaillée) ; la carte la lit.
+  // 05/11/2026 : une mesure datée du FUTUR n'est pas fraîche non plus (âge négatif).
+  assert.match(src, /const hrvFraiche = sv\.fraiche;/, "la fraîcheur de la VFC n'est plus contrôlée");
+  assert.match(codeOf("src/lib/dashboard/discipline.ts"), /fraiche: jours != null && jours >= 0 && jours <= 2,/,
+    "la fraîcheur de la VFC n'est plus bornée à 2 jours");
   assert.match(src, /computeReadiness\(hrvFraiche \? hrvDelta : null, hrvFraiche \? hrvBaseline : null,/,
     "la forme du jour se décide à nouveau sur une VFC qui peut être périmée");
   assert.ok(src.includes('t(hrvJours > 1 ? "dash.hrv.stale" : "dash.hrv.stale1"'),
@@ -6515,9 +6624,11 @@ test("aucun calcul du tableau de bord ne découpe le temps en millisecondes", ()
   const cibles: [string, string[]][] = [
     ["src/lib/dashboard/zones.ts", ["computeHrZones"]],
     ["src/lib/running/volume.ts", ["robustWeeklyKm", "demonstratedWeeklyKm"]],
-    ["src/components/dashboard/BentoDashboard.tsx", ["computeWeeklyTrend", "computeWeekSummary"]],
+    ["src/components/dashboard/BentoDashboard.tsx", ["computeWeekSummary"]],
+    // Sortie du composant le 04/10/2026, partagée avec la page détaillée « Volume ».
+    ["src/lib/dashboard/semaines.ts", ["computeWeeklyTrend"]],
     ["src/lib/dashboard/forme.ts", ["computeForme"]],
-    ["src/lib/running/fitness.ts", ["loadRisk"]],
+    ["src/lib/running/fitness.ts", ["loadRisk", "chargesQuotidiennes"]],
   ];
   for (const [fichier, fns] of cibles) {
     const src = codeOf(fichier);
@@ -6534,9 +6645,11 @@ test("aucun calcul du tableau de bord ne découpe le temps en millisecondes", ()
         `${fn} redécoupe le temps en millisecondes : sa fenêtre rebougera avec l'heure`);
     }
   }
-  // Et le gros chiffre de la carte Volume doit passer par le même helper que le reste.
+  // Et le gros chiffre de la carte Volume doit passer par le même helper que le reste —
+  // depuis le 30/10/2026, sur le jour civil de l'athlète fourni par le serveur (`jour`),
+  // le même au rendu et à l'hydratation (tests/hydratation.test.ts).
   const bento = codeOf("src/components/dashboard/BentoDashboard.tsx");
-  assert.match(bento, /const weeklyKm = runs\s*\n\s*\.filter\(w => dansFenetre\(w\.date, 7\)\)/,
+  assert.match(bento, /const weeklyKm = runs\s*\n\s*\.filter\(w => dansFenetre\(w\.date, 7, jour\)\)/,
     "le volume de la semaine n'est plus compté en jours de calendrier");
 });
 
