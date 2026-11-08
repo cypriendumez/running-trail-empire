@@ -110,3 +110,12 @@ public/brands/polar.svg
 /appli/android/build
 /appli/android/app/build
 /appli/android/.gradle
+
+# Équipe d'agents (ops/) : le dépôt est PUBLIC. Mails, factures, papiers administratifs,
+# briefings, réseaux et partenariats restent dans ~/Desktop/Pacevo/, jamais dans git.
+/ops/mails/
+/ops/compta/
+/ops/admin/
+/ops/briefings/
+/ops/social/
+/ops/partenariats/

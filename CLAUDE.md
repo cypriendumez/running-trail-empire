@@ -8,6 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Pile : Next.js 16 (App Router, React 19, Turbopack), TypeScript, Tailwind 3 ; Supabase (Postgres servi par PostgREST, Auth, RLS) ; Vercel en offre **Hobby** ; e-mails Resend ; IA Gemini ; montres via intervals.icu. `DEPLOYMENT.md` est périmé (OpenAI, Railway, anciens tarifs) : ne pas s'y fier.
 
+## Équipe d'agents (`ops/`)
+
+Cyprien pilote une équipe d'agents (routines cloud et sessions) décrite dans `ops/CONSTITUTION.md` : ses « corrections en vigueur » priment sur le texte, et ce fichier-ci prime sur les deux. Toute routine ou session d'agent lit d'abord `ops/STATE.md` (ce qui tourne vraiment, ce qui est bloqué) et `ops/memory/LESSONS_LEARNED.md`. « `@Nexus point` » = résumer `ops/STATE.md`. Le dépôt est public : mails, compta, papiers et briefings restent dans `~/Desktop/Pacevo/`, jamais dans git.
+
 ## Règles (chacune née d'un défaut réel)
 
 - **Rien n'est poussé ni déployé sans l'accord explicite de Cyprien.** `vercel deploy` téléverse le DISQUE, pas ce que git suit : jamais depuis un arbre modifié, jamais depuis le dépôt principal quand une autre session y travaille. Procédure : compétence `/deployer`.
