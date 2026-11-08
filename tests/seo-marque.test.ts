@@ -19,11 +19,12 @@ import { join } from "node:path";
 import {
   SITE_URL, NOM_MARQUE, TITRE_ACCUEIL, DESCRIPTION_MARQUE,
   donneesStructureesMarque, jsonLdMarque, serialiserJsonLd,
-  dateIsoFr, donneesStructureesArticle,
+  dateIsoFr, donneesStructureesArticle, debutDuJourParis,
 } from "../src/lib/brand/entite";
 import { RESEAUX } from "../src/lib/brand/reseaux";
 import { ARTICLES } from "../src/app/blog/articles";
 import { BLOG } from "../src/app/blog/blogI18n";
+import { POSTS, photoPartage } from "../src/app/blog/posts";
 
 let ok = 0;
 let ko = 0;
@@ -151,22 +152,52 @@ verifier("dateIsoFr lit « 21 août 2026 »", dateIsoFr("21 août 2026") === "20
 verifier("dateIsoFr lit « 1er mai 2026 »", dateIsoFr("1er mai 2026") === "2026-05-01", String(dateIsoFr("1er mai 2026")));
 verifier("dateIsoFr refuse une date impossible ou illisible (jamais inventée)",
   dateIsoFr("31 juin 2026") === null && dateIsoFr("bientôt") === null && dateIsoFr("21 aout 2026") === null);
+// Le test des résultats enrichis signalait « il manque le fuseau horaire » (08/11/2026).
+// Jours de changement d'heure compris : à minuit, l'heure n'a pas encore changé.
+for (const [jour, attendu] of [
+  ["2026-08-21", "2026-08-21T00:00:00+02:00"], ["2026-11-08", "2026-11-08T00:00:00+01:00"],
+  ["2026-03-29", "2026-03-29T00:00:00+01:00"], ["2026-10-25", "2026-10-25T00:00:00+02:00"],
+] as const) {
+  verifier(`debutDuJourParis(${jour}) = ${attendu}`, debutDuJourParis(jour) === attendu, String(debutDuJourParis(jour)));
+}
 let articlesOk = 0;
 for (const a of ARTICLES) {
   const titre = BLOG.fr.posts[a.cle]?.title;
-  const ld = donneesStructureesArticle({ slug: a.slug, titre, chapo: a.chapo, maj: a.maj, sources: a.sources }) as Noeud;
+  const photo = photoPartage(a.cle);
+  const ld = donneesStructureesArticle({ slug: a.slug, titre, chapo: a.chapo, maj: a.maj, sources: a.sources, image: photo }) as Noeud;
+  // La photo de partage est CELLE DE LA CARTE (même identifiant), au même rapport 4:3 :
+  // c'est ce cadrage-là qui a été audité.
+  const carte = POSTS.find((p) => p.key === a.cle)?.img.match(/photo-\d{10,}-[0-9a-z]+/)?.[0];
+  const img = ld.image as Noeud | undefined;
+  const photoOk = !!photo && !!carte && photo.url.includes(carte) && photo.width >= 1200 && photo.height * 4 === photo.width * 3
+    && new RegExp(`[?&]w=${photo.width}&h=${photo.height}&fit=crop`).test(photo.url)
+    && img?.url === photo.url && img?.width === photo.width && img?.height === photo.height;
   const auteur = ld.author as Noeud, editeur = ld.publisher as Noeud;
   const bon = ld["@type"] === "Article" && ld.headline === titre && !!titre
     && ld.url === `${SITE_URL}/blog/${a.slug}`
-    && ld.dateModified === dateIsoFr(a.maj) && typeof ld.dateModified === "string"
+    && typeof ld.dateModified === "string" && ld.dateModified === debutDuJourParis(dateIsoFr(a.maj) ?? "")
+    && /^\d{4}-\d{2}-\d{2}T00:00:00\+0[12]:00$/.test(ld.dateModified as string)
+    && photoOk
     && auteur?.name === "Pacevo" && editeur?.name === "Pacevo" && editeur?.["@id"] === org?.["@id"]
     && JSON.stringify(ld.citation) === JSON.stringify(a.sources.map((s) => s.url))
     && !("datePublished" in ld);
   if (bon) articlesOk++; else verifier(`article ${a.slug} : données structurées fidèles`, false, JSON.stringify(ld).slice(0, 300));
 }
-verifier(`les ${ARTICLES.length} articles ont des données structurées fidèles (titre, date de révision, éditeur Pacevo, sources)`, articlesOk === ARTICLES.length && ARTICLES.length > 0, `${articlesOk}/${ARTICLES.length}`);
+verifier(`les ${ARTICLES.length} articles ont des données structurées fidèles (titre, date de révision à l'heure de Paris, photo de leur carte, éditeur Pacevo, sources)`, articlesOk === ARTICLES.length && ARTICLES.length > 0, `${articlesOk}/${ARTICLES.length}`);
 verifier("la page d'article pose ces données", /<script type="application\/ld\+json" dangerouslySetInnerHTML=\{\{ __html: serialiserJsonLd\(ld\) \}\}\s*\/>/.test(code("src/app/blog/[slug]/page.tsx"))
   && /donneesStructureesArticle\(/.test(code("src/app/blog/[slug]/page.tsx")));
+verifier("sans photo connue, aucune image (jamais celle d'un autre article)", photoPartage("cle-inexistante") === null
+  && !("image" in donneesStructureesArticle({ slug: "x", titre: "x", chapo: "x", maj: "21 août 2026", sources: [], image: null })));
+// Partage : constaté le 08/11/2026, un article partait SANS IMAGE, et sur X avec le titre
+// de l'accueil. Viser le bloc de `generateMetadata`, pas le fichier.
+const pageArticle = code("src/app/blog/[slug]/page.tsx");
+const meta = pageArticle.slice(pageArticle.indexOf("export async function generateMetadata"), pageArticle.indexOf("export default"));
+const og = meta.slice(meta.indexOf("openGraph:"), meta.indexOf("twitter:"));
+const tw = meta.slice(meta.indexOf("twitter:"));
+verifier("l'article déclare son image de partage (Open Graph)", /images:\s*\[\{\s*url:\s*photo\.url/.test(og) && /const photo = photoPartage\(a\.cle\)/.test(meta));
+verifier("l'article déclare son adresse dans Open Graph", /url:\s*`\/blog\/\$\{a\.slug\}`/.test(og));
+verifier("sur X, l'article a SON titre, SA description et SA photo", meta.includes("twitter:") && /title:\s*t\.title/.test(tw) && /description:\s*a\.chapo/.test(tw) && /images:\s*\[photo\.url\]/.test(tw));
+verifier("le JSON-LD de l'article reçoit la photo", /image:\s*photoPartage\(a\.cle\)/.test(pageArticle));
 
 console.log(`\n${ok + ko} contrôles marque · ${ko} problème(s)`);
 process.exit(ko ? 1 : 0);

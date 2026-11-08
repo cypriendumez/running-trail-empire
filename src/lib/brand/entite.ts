@@ -1,5 +1,6 @@
 import { RESEAUX } from "@/lib/brand/reseaux";
 import { EDITEUR } from "@/lib/brand/editeur";
+import { jourCivil, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
 /**
  * L'ENTITÉ « PACEVO » TELLE QUE LES MOTEURS DOIVENT LA LIRE — une seule copie.
@@ -124,6 +125,25 @@ export function dateIsoFr(texte: string): string | null {
 }
 
 /**
+ * « 2026-08-21 » → « 2026-08-21T00:00:00+02:00 » : le début du jour À PARIS, avec son
+ * décalage réel (+01:00 l'hiver, +02:00 l'été). Le test des résultats enrichis signalait
+ * une date sans heure ni fuseau (08/11/2026). Minuit n'est pas une heure inventée : c'est
+ * la façon d'écrire « ce jour-là » dans un format qui exige une heure.
+ *
+ * Le bon décalage est celui pour lequel minuit local tombe bien CE jour-là à Paris ; +02:00
+ * est essayé d'abord (l'été, +01:00 donnerait 01:00 du même jour, donc passerait aussi).
+ * Jours de changement d'heure compris : minuit est encore à l'heure d'avant.
+ */
+export function debutDuJourParis(iso: string): string | null {
+  for (const decalage of ["+02:00", "+01:00"]) {
+    const instant = `${iso}T00:00:00${decalage}`;
+    if (Number.isNaN(new Date(instant).getTime())) return null;
+    if (jourCivil(instant, FUSEAU_DEFAUT) === iso) return instant;
+  }
+  return null;
+}
+
+/**
  * Données structurées d'un article du blog, PUBLIÉ PAR l'organisation de l'accueil (même
  * `@id`). Chaque article sourcé rattache ainsi le nom « Pacevo » à la course à pied aux
  * yeux du moteur. Aucune donnée ajoutée : pas de date de publication (le texte ne garde
@@ -131,9 +151,12 @@ export function dateIsoFr(texte: string): string | null {
  */
 export function donneesStructureesArticle(a: {
   slug: string; titre: string; chapo: string; maj: string; sources: { url: string }[];
+  /** La photo auditée de la carte, au format de partage (`photoPartage` du blog). */
+  image?: { url: string; width: number; height: number } | null;
 }) {
   const url = `${SITE_URL}/blog/${a.slug}`;
-  const revise = dateIsoFr(a.maj);
+  const jour = dateIsoFr(a.maj);
+  const revise = jour ? debutDuJourParis(jour) : null;
   // ⚠️ L'ORGANISATION EST RÉÉCRITE EN ENTIER, pas seulement son `@id` : le moteur ne
   // va pas chercher sur l'accueil un nœud déclaré ailleurs, et un auteur sans `name` est
   // signalé par le test des résultats enrichis.
@@ -154,6 +177,8 @@ export function donneesStructureesArticle(a: {
     mainEntityOfPage: url,
     inLanguage: "fr-FR",
     ...(revise ? { dateModified: revise } : {}),
+    // Sans photo connue, pas de champ : jamais l'image d'un autre article ni le logo en guise d'illustration.
+    ...(a.image ? { image: { "@type": "ImageObject", url: a.image.url, width: a.image.width, height: a.image.height } } : {}),
     author: pacevo,
     publisher: pacevo,
     isPartOf: { "@type": "WebSite", "@id": `${SITE_URL}/#site`, name: NOM_MARQUE, url: `${SITE_URL}/` },
