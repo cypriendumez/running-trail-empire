@@ -17,17 +17,20 @@ des deux.*
 8. **Base de production** : aucun agent n'y écrit. Lecture seule (`begin transaction read only` dans le cloud) ; un changement = du SQL donné à Cyprien.
 9. **Quota** : les routines cloud consomment le quota HEBDOMADAIRE de Cyprien, partagé avec ses sessions (trois passages du blog ont déjà échoué sur cette limite). « Carte blanche sur les tokens » est donc remplacé par : un agent sans changement depuis son dernier passage écrit `RAS` et s'arrête (règle 5 du texte), et les agents sont **regroupés** en peu de routines :
 
-| Routine | Agents | Cadence | Existe ? |
+| Routine | Agents | Cadence (la nuit, voir correction 12) | Où |
 |---|---|---|---|
-| Bugs Pacevo | `@Sweeper` | toutes les 3 h, 8 h–23 h | Oui |
-| Blog Pacevo (×2) | `@Plume` | 1er/15 + lundi | Oui |
-| Coach | `@Sparring` + `@SafeRun` | lundi 10 h | À créer |
-| Direction | `@Nexus` + `@PostMortem` + `@Greffier` | vendredi 10 h | À créer |
-| Sécurité et veille | `@Bunker` + `@Vault` + `@Radar` + contrôle `@TimeMachine` (dernière sauvegarde réussie) | le 5 du mois, 10 h | À créer |
-| Courrier | `@Concierge` | quotidien 8 h | BLOQUÉ (aucun connecteur mail) |
+| Bugs Pacevo | `@Sweeper` | tous les jours, 6 h et 23 h | cloud |
+| Blog Pacevo (×2) | `@Plume` | 1er/15 à 3 h + lundi 3 h 30 | cloud |
+| Coach | `@Sparring` + `@SafeRun` | lundi 5 h | cloud |
+| Direction | `@Nexus` + `@PostMortem` + `@Greffier` | vendredi 6 h | cloud |
+| Sécurité et veille | `@Bunker` + `@Vault` + `@Radar` + contrôle de la sauvegarde publique | le 5 du mois, 4 h | cloud |
+| Courrier | `@Concierge` | tous les jours, 8 h | Mac (écrit dans ~/Desktop/Pacevo) |
+| Sauvegarde chiffrée | `@TimeMachine` | dimanche 11 h | Mac (écrit dans ~/Desktop/Pacevo) |
 
-10. **`@TimeMachine` « chaque nuit à 3 h »** : il n'y a rien à vérifier chaque nuit, la sauvegarde est hebdomadaire (dimanche 03 h 20) et ne couvre que les tables publiques. Contrôle mensuel dans la routine « Sécurité et veille » ; la sauvegarde des données personnelles attend une décision de Cyprien.
-11. **Réseau des routines** : `pacevo.fr` et `pacevo.app` se débloquent dans les réglages de l'environnement cloud « Default » sur claude.ai (action de Cyprien), pas par l'API.
+10. **`@TimeMachine` « chaque nuit à 3 h »** : il n'y a rien à vérifier chaque nuit. La sauvegarde publique (GitHub) est hebdomadaire ; depuis le 08/11/2026, une sauvegarde **privée et chiffrée** de toute la base (données des coureurs comprises) tourne chaque dimanche sur le Mac (`npm run sauvegarde:privee`). Le « test de restauration sur base isolée » exigerait un second projet Supabase : remplacé par une relecture complète de l'archive (déchiffrement + recomptage).
+11. **Réseau des routines** : `pacevo.fr`, `pacevo.app` et les sites des concurrents et des marques de montres sont autorisés dans l'environnement cloud « Default » (fait par Cyprien le 08/11/2026, prouvé). Ce réglage ne se change pas par l'API.
+12. **Horaires** : les routines cloud partagent la limite d'usage des 5 heures avec les sessions de Cyprien. Elles tournent donc la nuit, pas aux heures du texte (« 10 h par défaut »). Un passage de moins de 30 secondes est un refus pour limite atteinte.
+13. **Lancement** : le texte dit « janvier 2027 ». Décision du 08/11/2026 : premières ventes en **avril 2027**, début d'activité de la micro-entreprise le 1er avril 2027.
 
 ---
 

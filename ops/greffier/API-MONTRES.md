@@ -12,8 +12,8 @@ une condition du lancement. Les conditions d'intervals.icu autorisent l'usage co
 
 ## Ce qu'il faut avant toute demande (bloquant partout)
 
-- [ ] **Entreprise immatriculée** : SIREN, raison sociale. Tous les programmes sont « professionnels ». Le début d'activité est prévu le 01/01/2027 : la plupart des dossiers ne partent qu'après.
-- [ ] Adresse pro `contact@pacevo.fr` qui reçoit vraiment (tester un envoi).
+- [ ] **Entreprise immatriculée** : SIREN, raison sociale. Tous les programmes sont « professionnels ». Le début d'activité est prévu le 1er avril 2027 (dépôt au guichet à partir du 1er mars 2027) : la plupart des dossiers ne partent qu'après.
+- [x] Adresse pro `contact@pacevo.fr` qui reçoit vraiment : redirigée vers Outlook et vers la boîte de `@Concierge`, prouvé le 08/11/2026.
 - [ ] Politique de confidentialité à jour qui nomme chaque marque comme source de données (`/confidentialite`, 5 langues).
 - [ ] Une page « comment Pacevo utilise vos données de montre » et une adresse de redirection OAuth par marque (`https://pacevo.fr/api/<marque>/oauth/callback`).
 
@@ -30,6 +30,6 @@ une condition du lancement. Les conditions d'intervals.icu autorisent l'usage co
 
 ## Prochaines actions
 
-1. Cyprien : SIREN (début d'activité au 01/01/2027) → débloque Garmin et Suunto.
+1. Cyprien : SIREN (dépôt le 1er mars 2027, début d'activité le 1er avril 2027) → débloque Garmin et Suunto.
 2. `@Greffier` : créer un client Polar AccessLink de test (aucun coût, aucune signature) et noter précisément ce que l'API permet (lecture / envoi de séances).
 3. `@Greffier` : relire l'accord Strava en entier et écrire ce qui reste permis à Pacevo (afficher, partager) avant toute intégration.
