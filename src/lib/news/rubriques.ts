@@ -102,5 +102,23 @@ export const CONTEXTE_COURSE =
 /**
  * Une promotion n'est pas un article : « ce gilet Salomon […] perd 50 € » (L'Équipe,
  * 9/11/2026) passait le filtre nutrition par le mot « hydratation ».
+ *
+ * ⚠️ Elle s'applique à TOUTES les rubriques depuis le 10/11/2026 : « Traileuses longue
+ * distance, -26 % sur la chaussure de trail Asics Trabuco Max 5 » (Le Télégramme) ouvrait
+ * la rubrique « Trail & ultra ». La requête « matériel » de la semaine en ramenait une
+ * vingtaine sous toutes les formes : un prix (« à 323,74 € »), « tombe à », « dérapent
+ * de 270 à 120 € », « à saisir », « moins cher », « 11.11 d'AliExpress », « Single Day ».
+ * Un PRIX (« à 199 € », « 228,93 € ») signale une offre. Pas une SOMME : « la cagnotte
+ * atteint 100 000 € » est une information, et doit rester visible à la une.
  */
-export const PROMO = /perd \d+\s?€|-\s?\d+\s?%|\bpromo|soldes|bon plan|black friday|\bprix (cass|barr)/i;
+export const PROMO =
+  /perd \d+\s?€|-\s?\d+\s?%|\bpromo|soldes|bon plan|black friday|single day|\b11\.11\b|\bprix (cass|barr)|\d+,\d{2}\s?€|\bà \d+\s?€|tombe à|chute de|d[ée]rap|[àa] saisir|moins ch[eè]re?|r[ée]serves s.[ée]puisent|\boffre/i;
+
+/**
+ * Un TEST de matériel, pas un catalogue : la presse française publie surtout des
+ * sélections commerciales. « Matériel & chaussures » garde les tests, comparatifs et avis.
+ */
+export const TEST_MATERIEL = /\btests?\b|test ?:|comparatif|\bavis\b|\bessai\b|on a test|j.ai test|review|\bvs\.?\b/i;
+
+/** Hors course à pied, même quand le vocabulaire y ressemble (« un ensemble de ski technique »). */
+export const HORS_COURSE = /\bski\b|alpinisme|euroligue|\bnba\b|blazers/i;

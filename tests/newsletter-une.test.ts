@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { classerALaUne, motsDuTitre, texteDuSujet, type ArticleSemaine } from "../src/lib/news/alaune";
-import { FILTRES, PAS_ELITE, CONTEXTE_COURSE, PROMO } from "../src/lib/news/rubriques";
+import { FILTRES, PAS_ELITE, CONTEXTE_COURSE, PROMO, TEST_MATERIEL, HORS_COURSE } from "../src/lib/news/rubriques";
 import { chiffresVerifies, chiffresIntrus } from "../src/lib/newsletter/resume";
 import { construireEmail, LANGS } from "../src/lib/newsletter/email";
 
@@ -213,7 +213,7 @@ test("la lettre puise Élites dans la semaine entière, sans les sujets de la un
   assert.match(bloc, /FILTRES\.elite!\.test\(it\.title\)/);
   assert.match(bloc, /!PAS_ELITE\.test\(it\.title\)/, "les affluences record reviennent en Élites");
   assert.match(bloc, /!dejaALaUne\.has\(it\.link\)/, "un sujet de la une revient en Élites (Le Parisien sur la backyard, 9/11)");
-  assert.match(bloc, /parRubrique\[iElite\] = elites/, "le choix est calculé mais pas utilisé");
+  assert.match(bloc, /parRubrique\[iElite\] = sujetsElites\.map\(\(s\) => s\.article\)/, "le choix est calculé mais pas utilisé");
   // Et le texte du sujet arrive bien jusqu'au résumeur.
   assert.match(route, /texte: texteUne\.get\(it\.link\) \?\? it\.texte,/, "les sujets de la une repartent sans texte à résumer");
   assert.match(route, /medias: mediasUne\.get\(it\.link\),/);
@@ -235,7 +235,7 @@ test("l'aperçu construit la lettre sans lire les abonnés ni rien envoyer", () 
   const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
   // Le secret d'abord : l'aperçu n'est pas une porte ouverte sur les résumés et le quota.
   assert.ok(route.indexOf("CRON_SECRET") < route.indexOf('searchParams.get("apercu")'), "l'aperçu passe avant le contrôle du secret");
-  assert.match(route, /if \(!apercu\) \{\s*const avecLangue = await admin/, "l'aperçu lit la liste des abonnés");
+  assert.match(route, /if \(!apercu && !essai\) \{\s*const avecLangue = await admin/, "l'aperçu lit la liste des abonnés");
   const boucle = route.slice(route.indexOf("for (const { email, lang } of abonnes)"));
   const iApercu = boucle.indexOf("if (apercu) {"), iEnvoi = boucle.indexOf('envoyerEmail("newsletter"');
   assert.ok(iApercu > 0 && iApercu < iEnvoi, "l'aperçu n'est pas rendu AVANT l'appel d'envoi");
@@ -292,6 +292,66 @@ test("un résumé rejeté a UNE seconde chance, sous le même contrôle", () => 
   assert.match(relance, /!chiffresVerifies\(r, cible\.src\)\) continue;/, "la seconde version échappe au contrôle des chiffres");
   assert.match(relance, /const lot = rejetes\.slice\(0, TAILLE_LOT\);/, "la relance n'est plus bornée à un lot");
   assert.equal((fn.match(/generateContent\(/g) ?? []).length, 2, "un seul appel de relance, pas une boucle : le quota Gemini est partagé");
+});
+
+// ── 10/11 (fin) : promotions partout, matériel français, Élites résumé, envoi d'essai ──
+
+test("aucune promotion n'entre dans la lettre, quelle que soit sa forme", () => {
+  // Titres réels des requêtes de la semaine du 9/11/2026.
+  for (const t of ["Traileuses longue distance, -26% sur la chaussure de trail Asics Trabuco Max 5",
+    "Garmin Forerunner 265 à 323,74 € : montre running AMOLED", "11.11 d'AliExpress : la Garmin Forerunner 255 tombe à 228,93€",
+    "Ces baskets Mizuno dérapent de 270 à 120 € ce dimanche 8 novembre", "Garmin Forerunner 165 à 199 € : -29 % sur la montre GPS",
+    "Les réserves s'épuisent ce lundi : top 5 des chaussures de course adidas à saisir cette semaine de novembre",
+    "Vous ne trouverez pas de Garmin moins cher que sur cette page (offre spéciale Single Day)",
+    "Chaussures de trail : les meilleures Hoka en promotion en novembre",
+    // Chaque forme seule, sans autre indice dans le titre (vu par mutation : les titres
+    // réels cumulaient plusieurs indices et masquaient la perte de l'un d'eux).
+    "Top 5 des chaussures de course adidas à saisir cette semaine", "La montre Garmin la moins chère du moment"]) assert.ok(PROMO.test(t), `promotion admise : ${t}`);
+  // Une SOMME n'est pas un PRIX : elle reste à la une.
+  for (const t of ["Résultat des 25 heures qui courent : la cagnotte atteint 1 500 000 €", "près d'1,5 million d'euros de dons",
+    "Chaussures de running : pourquoi les prix s'envolent et comment acheter au meilleur prix ?",
+    "Test Kailas Fuga EX 330 : L'arme ultime pour l'ultra-trail ?"]) assert.ok(!PROMO.test(t), `écarté à tort : ${t}`);
+  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  assert.match(route, /const publiable = \(it: Item\) => !PROMO\.test\(it\.title\) && !HORS_COURSE\.test\(it\.title\);/);
+  assert.match(route, /const semaine = semaineBrute\.filter\(publiable\);/, "une promotion peut faire la une ou Élites");
+  const boucle = route.slice(route.indexOf("for (const it of parRubrique[n])"));
+  assert.match(boucle.slice(0, 400), /if \(!publiable\(it\)\) continue;/, "les rubriques lues sur le fil (Trail, Matériel) gardent leurs promotions");
+});
+
+test("Matériel : des TESTS en français d'abord, puis les tests anglophones résumables", () => {
+  for (const t of ["Test Kailas Fuga EX 330 : L'arme ultime pour l'ultra-trail ?", "Test Shokz OpenFit Air 2 : notre avis après plusieurs sorties en trail",
+    "Hoka Carbon X 3 vs Nike Alphafly 4 (comparatif 2026)", "Test Suunto Run 2 : la cartographie change-t-elle la donne ?"]) {
+    assert.ok(FILTRES.gear!.test(t) && TEST_MATERIEL.test(t) && !PROMO.test(t) && !HORS_COURSE.test(t), `test écarté : ${t}`);
+  }
+  assert.ok(!TEST_MATERIEL.test("Quelle montre Garmin choisir en 2026 ? Le guide des meilleurs modèles"), "une sélection n'est pas un test");
+  assert.ok(HORS_COURSE.test("Test Columbia Titanium Platinum Peak II 3L : un ensemble de ski technique"), "le ski entre dans Matériel");
+  const act = sansCommentaires("src/lib/news/actualites.ts");
+  assert.match(act, /export const REQUETES_MATERIEL = \[[\s\S]*?\]\.map\(\(q\) => `\$\{q\} when:7d`\)/, "les requêtes matériel ne sont plus bornées à la semaine");
+  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  const bloc = route.slice(route.indexOf("const iMateriel"), route.indexOf("const texteUne"));
+  assert.match(bloc, /FILTRES\.gear!\.test\(it\.title\) && TEST_MATERIEL\.test\(it\.title\) && publiable\(it\) && !dejaALaUne\.has\(it\.link\)/);
+  assert.match(bloc, /\.slice\(0, RUBRIQUES_LETTRE\[iMateriel\]\.max - 1\)/, "le français prend toutes les places : plus aucun test résumable");
+  assert.match(bloc, /parRubrique\[iMateriel\] = \[\.\.\.francais, \.\.\.parRubrique\[iMateriel\]\.filter/, "le français ne passe plus devant");
+  assert.match(route, /collecterMaterielSemaine\(\)\.catch\(/);
+});
+
+test("les résultats d'Élites repris par plusieurs médias sont résumés, comme la une", () => {
+  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  assert.match(route, /sujetsElites = classerALaUne\(resultats,/);
+  assert.match(route, /for \(const s of \[\.\.\.une, \.\.\.sujetsElites\]\) \{/, "Élites repart en titres seuls");
+});
+
+test("l'essai envoie la vraie lettre à la SEULE adresse de l'éditeur", () => {
+  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  assert.ok(route.indexOf("CRON_SECRET") < route.indexOf('searchParams.get("essai")'), "l'essai passe avant le contrôle du secret");
+  assert.match(route, /if \(essai\) abonnes = \[\{ email: EDITEUR\.email, lang: "fr" \}\];/, "l'essai n'écrit plus à l'éditeur seul");
+  assert.match(route, /if \(!apercu && !essai\) \{\s*const avecLangue = await admin/, "l'essai lit la liste des abonnés");
+  // L'adresse ne vient JAMAIS de la requête : sinon ce mode écrirait à n'importe qui.
+  const lus = [...route.matchAll(/searchParams\.get\("([^"]+)"\)/g)].map((m) => m[1]);
+  assert.deepEqual([...new Set(lus)].sort(), ["apercu", "avecTexte", "cat", "essai"].filter((p) => lus.includes(p)).sort());
+  assert.ok(!lus.some((p) => /mail|to|dest/i.test(p)), `un paramètre d'adresse est lu : ${lus.join(", ")}`);
+  // Et l'abonné d'essai est remplacé APRÈS le filtre, juste avant l'envoi.
+  assert.ok(route.indexOf("if (essai) abonnes =") > route.indexOf("abonnes = abonnes.filter((a) => a.email);"));
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
