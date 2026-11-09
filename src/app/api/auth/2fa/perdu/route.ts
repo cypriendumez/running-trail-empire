@@ -6,6 +6,7 @@ import { autoriserPartage, ipDe } from "@/lib/auth/limiteur";
 import { demanderRetrait } from "@/lib/auth/deuxFacteurs";
 import { emailRetraitDeuxFacteurs } from "@/lib/auth/emailConfirmation";
 import { envoyerEmail } from "@/lib/email/envoyer";
+import { lectureSessionEnPanne } from "@/lib/auth/mfaNavigateur";
 
 /**
  * « J'AI PERDU MON TÉLÉPHONE » — envoie, à l'adresse DU COMPTE, le lien qui retire la double
@@ -31,9 +32,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "envoi_impossible" }, { status: 503 });
   }
   const supabase = await createClientSansGarde2fa();
+  // ⚠️ UNE PANNE N'EST PAS UNE ABSENCE DE SESSION (relecture du 09/11/2026). `getUser` rend
+  // `user: null` aussi quand GoTrue ne répond pas ; la route répondait alors 401, et l'écran du
+  // code, qui renvoie à la connexion sur 401 (session coupée ailleurs), déconnectait un coureur
+  // qui venait de perdre son téléphone. 401 = session vraiment absente ; une panne = 503, journalisée.
+  const { data: lu, error: eLu } = await supabase.auth.getUser();
+  if (eLu && lectureSessionEnPanne(eLu)) {
+    await journaliser(`Session illisible (téléphone perdu) : ${eLu.name}${typeof eLu.status === "number" ? ` ${eLu.status}` : ""}${eLu.code ? ` ${eLu.code}` : ""}`);
+    return NextResponse.json({ ok: false, error: "indisponible" }, { status: 503 });
+  }
 
   const r = await demanderRetrait({
-    utilisateur: async () => (await supabase.auth.getUser()).data.user,
+    utilisateur: async () => lu.user,
     autoriser: (cle) => autoriserPartage(admin, cle, 3, 60 * 60_000),
     envoyerLien: async (email) => {
       const { data, error } = await admin.auth.admin.generateLink({ type: "recovery", email } as Parameters<typeof admin.auth.admin.generateLink>[0]);

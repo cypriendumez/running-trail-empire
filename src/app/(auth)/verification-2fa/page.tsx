@@ -12,6 +12,7 @@ import { AUTH } from "@/components/auth/authI18n";
 import { createClient } from "@/lib/supabase/client";
 import { cheminSur } from "@/lib/social/amisLiens";
 import { deconnexion } from "@/lib/auth/deconnexion";
+import { codeRefuse, facteurRetire, sessionCoupee } from "@/lib/auth/mfaNavigateur";
 
 /**
  * LE SECOND FACTEUR (08/11/2026) — après le mot de passe, Google ou un lien e-mail, un compte qui
@@ -32,20 +33,27 @@ export default function VerificationDeuxFacteurs() {
   const [loading, setLoading] = useState(false);
   const [perdu, setPerdu] = useState<"repos" | "encours" | "envoye">("repos");
   const suite = () => cheminSur(new URLSearchParams(window.location.search).get("next"));
+  // Session COUPÉE ailleurs (le retrait de la double authentification déconnecte les autres
+  // appareils) : rien à valider ici, retour à la connexion — voir `sessionCoupee`.
+  const versConnexion = async () => { await deconnexion(); router.replace("/login"); };
 
   useEffect(() => {
     const supabase = createClient();
     (async () => {
       const { data: niveau, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (error && sessionCoupee(error)) { await versConnexion(); return; }
       // Panne passagère : on le DIT, sans renvoyer en silence vers la connexion (relecture du 08/11).
       if (error) { toast.error(L.erreur, { duration: 8000 }); return; }
       if (!niveau) { router.replace("/login"); return; }
       // Rien à demander (pas de second facteur, ou déjà donné) : on continue.
       if (niveau.currentLevel === "aal2" || niveau.nextLevel !== "aal2") { router.replace(suite()); return; }
       const { data, error: eFacteurs } = await supabase.auth.mfa.listFactors();
+      if (eFacteurs && sessionCoupee(eFacteurs)) { await versConnexion(); return; }
       if (eFacteurs) { toast.error(L.erreur, { duration: 8000 }); return; }
       const totp = data?.totp?.[0];
-      if (!totp) { router.replace("/login"); return; }
+      // Plus aucun facteur (retiré entre-temps) : la garde serveur décide de la suite. `/login`
+      // relirait le niveau périmé en mémoire et renverrait ici — une boucle (relecture du 09/11).
+      if (!totp) { router.replace(suite()); router.refresh(); return; }
       setFacteur(totp.id);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,7 +64,11 @@ export default function VerificationDeuxFacteurs() {
     if (!facteur || !/^\d{6}$/.test(code)) { toast.error(L.codeFaux); return; }
     setLoading(true);
     const { error } = await createClient().auth.mfa.challengeAndVerify({ factorId: facteur, code });
-    if (error) { setLoading(false); setCode(""); toast.error(L.codeFaux); return; }
+    // Une session coupée entre-temps n'est pas un « code incorrect ».
+    if (error && sessionCoupee(error)) { await versConnexion(); return; }
+    // Facteur retiré entre-temps : plus de code à demander, la garde serveur décide de la suite.
+    if (error && facteurRetire(error)) { router.replace(suite()); router.refresh(); return; }
+    if (error) { setLoading(false); setCode(""); toast.error(codeRefuse(error) ? L.codeFaux : L.erreur); return; }
     router.replace(suite());
     router.refresh();
   }
@@ -68,6 +80,8 @@ export default function VerificationDeuxFacteurs() {
     }).catch(() => null);
     const j = r ? await r.json().catch(() => null) : null;
     if (r?.ok && j?.ok) { setPerdu("envoye"); return; }
+    // La route ne voit plus de session (coupée ailleurs) : même issue que plus haut.
+    if (r?.status === 401) { await versConnexion(); return; }
     setPerdu("repos");
     toast.error(r?.status === 429 ? L.perduTrop : L.erreur, { duration: 8000 });
   }

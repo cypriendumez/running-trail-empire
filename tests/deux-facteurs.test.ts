@@ -206,8 +206,11 @@ void (async () => {
     // Relecture du 08/11 : une lecture en échec affichait « Désactivée » — un faux état de sécurité.
     assert.match(c, /setActif\(error \? false : /, "une lecture des facteurs en échec s'affiche comme « double authentification désactivée »");
     assert.match(c, /if \(actif === false\) \{[\s\S]{0,200}\{L\.illisible\}/, "l'état illisible n'est pas dit à l'écran");
-    assert.match(c, /if \(eListe\) \{ setOccupe\(false\); toast\.error\(L\.erreur\); return; \}/, "l'activation ignore l'échec de la lecture des facteurs");
-    assert.match(c, /if \(eRetrait\) \{ setOccupe\(false\); toast\.error\(L\.erreur\); return; \}/, "l'activation ignore l'échec du retrait d'un enrôlement abandonné");
+    // L'échec passe par `echec` (09/11/2026) : le bouton se libère et la panne est DITE ; seule une
+    // session coupée ailleurs renvoie à la connexion.
+    assert.match(c, /if \(eListe\) \{ await echec\(eListe\); return; \}/, "l'activation ignore l'échec de la lecture des facteurs");
+    assert.match(c, /const echec = async \(e: unknown\) => \{\s*setOccupe\(false\);\s*if \(sessionCoupee\(e\)\) \{ await versConnexion\(\); return; \}\s*toast\.error\(L\.erreur\);/, "un échec ne libère plus le bouton ou ne dit plus la panne");
+    assert.match(c, /if \(eRetrait\) \{ await echec\(eRetrait\); return; \}/, "l'activation ignore l'échec du retrait d'un enrôlement abandonné");
     assert.ok(code("src/components/settings/SettingsView.tsx").includes("<DeuxFacteurs L={AUTH_L.deuxFacteurs} lang={lang} />"), "la carte n'est plus dans les réglages");
   });
 
@@ -243,6 +246,75 @@ void (async () => {
     assert.match(emailRetraitDeuxFacteurs("en", "b", "l").texte, /\n\nIf you didn't ask for this, don't click/);
     assert.notEqual(emailDeuxFacteursActivee("de", "b").objet, emailDeuxFacteursActivee("fr", "b").objet);
     assert.notEqual(emailRetraitDeuxFacteurs("en", "b", "l").objet, emailRetraitDeuxFacteurs("fr", "b", "l").objet, "l'e-mail anglais est en français");
+  });
+
+  await test("une session coupée ailleurs renvoie à la connexion, une panne réseau non (essai du 09/11)", async () => {
+    // Les VRAIES classes de supabase-js : c'est sur elles, pas sur le texte, que l'écran décide.
+    const { AuthSessionMissingError, AuthApiError, AuthRetryableFetchError } = await import("@supabase/supabase-js");
+    const { sessionCoupee, codeRefuse, aal2Exige, facteurRetire, lectureSessionEnPanne } = await import("../src/lib/auth/mfaNavigateur");
+    assert.equal(sessionCoupee(new AuthSessionMissingError()), true, "session_not_found (retrait de la 2FA ailleurs) pris pour une panne");
+    assert.equal(sessionCoupee(new AuthApiError("User from sub claim in JWT does not exist", 403, "user_not_found")), true, "user_not_found pris pour une panne");
+    assert.equal(sessionCoupee(new AuthApiError("invalid JWT", 403, "bad_jwt")), true, "bad_jwt pris pour une panne");
+    assert.equal(sessionCoupee(new AuthApiError("no authorization", 401, "no_authorization")), true, "401 pris pour une panne");
+    // Contre-poids : un coureur dont le wifi tousse, ou qui doit REDONNER son code, n'est PAS déconnecté.
+    assert.equal(sessionCoupee(new AuthRetryableFetchError("Failed to fetch", 0)), false, "une coupure réseau déconnecte le coureur");
+    for (const s of [429, 500, 502, 503, 504]) assert.equal(sessionCoupee(new AuthApiError("x", s, "unexpected_failure")), false, `${s} déconnecte le coureur`);
+    assert.equal(sessionCoupee(new AuthApiError("AAL2 required to enroll a new factor", 403, "insufficient_aal")), false, "« redonne ton code » (403) déconnecte le coureur");
+    assert.equal(sessionCoupee(new AuthApiError("AAL2 required to unenroll verified factor", 422, "insufficient_aal")), false, "« redonne ton code » (422) déconnecte le coureur");
+    assert.equal(sessionCoupee(new AuthApiError("Invalid TOTP code entered", 422, "mfa_verification_failed")), false, "un code faux déconnecte le coureur");
+    assert.equal(sessionCoupee(new Error("Session missing")), false, "un texte qui parle de session suffit à déconnecter");
+    // Une course entre deux onglets (session vivante) ne ferme pas tous les appareils du titulaire.
+    assert.equal(sessionCoupee(new AuthApiError("Invalid Refresh Token: Already Used", 400, "refresh_token_already_used")), false, "une course entre onglets déconnecte tous les appareils");
+    assert.equal(sessionCoupee(null), false);
+    // « Code incorrect » : seulement quand le CODE est refusé — pas sur une panne, pas sur une session coupée.
+    assert.equal(codeRefuse(new AuthApiError("Invalid TOTP code entered", 422, "mfa_verification_failed")), true, "un code faux n'est plus dit faux");
+    assert.equal(codeRefuse(new AuthApiError("challenge expired", 422, "mfa_challenge_expired")), true, "un défi expiré n'est plus dit");
+    assert.equal(codeRefuse(new AuthRetryableFetchError("Failed to fetch", 0)), false, "une coupure réseau dite « code incorrect »");
+    assert.equal(codeRefuse(new AuthApiError("x", 500, "unexpected_failure")), false, "une panne serveur dite « code incorrect »");
+    assert.equal(codeRefuse(new AuthApiError("x", 429, "over_request_rate_limit")), false, "un excès de requêtes dit « code incorrect »");
+    assert.equal(codeRefuse(new AuthApiError("no authorization", 401, "no_authorization")), false, "une session coupée dite « code incorrect »");
+    // Liste FERMÉE (second tour de relecture) : un 4xx qui n'accuse pas le code n'est pas un code faux.
+    assert.equal(codeRefuse(new AuthApiError("Factor not found", 404, "mfa_factor_not_found")), false, "un facteur retiré dit « code incorrect » : le coureur retape un code juste sans fin");
+    assert.equal(codeRefuse(new AuthApiError("AAL2 required", 403, "insufficient_aal")), false, "insufficient_aal dit « code incorrect »");
+    assert.equal(codeRefuse(new AuthApiError("bad request", 400, "validation_failed")), false, "validation_failed dit « code incorrect »");
+    assert.equal(facteurRetire(new AuthApiError("Factor not found", 404, "mfa_factor_not_found")), true, "un facteur retiré n'est plus reconnu");
+    assert.equal(facteurRetire(new AuthApiError("Invalid TOTP code entered", 422, "mfa_verification_failed")), false);
+    // Côté serveur (`/api/auth/2fa/perdu`) : une PANNE de lecture de session = 503, une session absente = 401.
+    assert.equal(lectureSessionEnPanne(new AuthRetryableFetchError("fetch failed", 0)), true, "une coupure réseau vers GoTrue répondrait 401 et déconnecterait");
+    assert.equal(lectureSessionEnPanne(new AuthApiError("x", 500, "unexpected_failure")), true, "une panne de GoTrue répondrait 401 et déconnecterait");
+    assert.equal(lectureSessionEnPanne(new AuthSessionMissingError()), false, "une session absente passerait pour une panne (503)");
+    assert.equal(lectureSessionEnPanne(new AuthApiError("no authorization", 401, "no_authorization")), false, "un 401 passerait pour une panne");
+    assert.equal(lectureSessionEnPanne(null), false);
+    // « Reconnecte-toi avec ton code » : sur le CODE d'erreur de GoTrue, plus sur le texte.
+    assert.equal(aal2Exige(new AuthApiError("AAL2 required to unenroll verified factor", 422, "insufficient_aal")), true);
+    assert.equal(aal2Exige(new AuthApiError("assurance level aal2 mentioned in a message", 422, "validation_failed")), false, "décidé sur le texte");
+    // L'écran du code applique la règle à ses QUATRE chemins d'erreur, et la panne garde son message.
+    const page = code("src/app/(auth)/verification-2fa/page.tsx");
+    assert.match(page, /const versConnexion = async \(\) => \{ await deconnexion\(\); router\.replace\("\/login"\); \};/, "la session coupée ne ramène plus à la connexion");
+    for (const e of ["error", "eFacteurs"]) {
+      assert.ok(page.includes(`if (${e} && sessionCoupee(${e})) { await versConnexion(); return; }`), `« ${e} » : une session coupée reste bloquée sur l'écran du code`);
+    }
+    assert.equal(page.match(/sessionCoupee\(error\)/g)?.length, 2, "niveau d'assurance ET validation du code : l'un des deux ne reconnaît plus une session coupée");
+    assert.ok(page.includes("if (r?.status === 401) { await versConnexion(); return; }"), "« J'ai perdu mon téléphone » sans session reste bloqué");
+    assert.ok(page.includes("if (eFacteurs) { toast.error(L.erreur"), "une panne passagère n'est plus dite");
+    assert.ok(page.includes("toast.error(codeRefuse(error) ? L.codeFaux : L.erreur)"), "écran du code : une panne dite « code incorrect »");
+    assert.ok(page.includes("if (error && facteurRetire(error)) { router.replace(suite()); router.refresh(); return; }"), "écran du code : un facteur retiré laisse retaper un code sans fin");
+    assert.ok(page.includes("if (!totp) { router.replace(suite()); router.refresh(); return; }"), "écran du code : sans facteur, retour à /login qui renvoie ici (boucle)");
+    // La route ne répond 401 que pour une session VRAIMENT absente : une panne de GoTrue = 503
+    // (sinon l'écran, qui renvoie à la connexion sur 401, déconnectait sur une panne).
+    const route = code("src/app/api/auth/2fa/perdu/route.ts");
+    assert.match(route, /const \{ data: lu, error: eLu \} = await supabase\.auth\.getUser\(\);\s*if \(eLu && lectureSessionEnPanne\(eLu\)\) \{\s*await journaliser\([\s\S]{0,300}?\);\s*return NextResponse\.json\(\{ ok: false, error: "indisponible" \}, \{ status: 503 \}\);/, "une panne de GoTrue répond 401 « non connecté »");
+    assert.ok(route.includes("utilisateur: async () => lu.user,"), "la route relit la session sans son erreur");
+    // La carte des Réglages : même règle sur chacun de ses appels.
+    const carte = code("src/components/settings/DeuxFacteurs.tsx");
+    assert.match(carte, /const versConnexion = async \(\) => \{ await deconnexion\(\); window\.location\.assign\("\/login"\); \};/, "Réglages : la session coupée ne ramène plus à la connexion");
+    assert.ok(carte.includes("if (sessionCoupee(e)) { await versConnexion(); return; }"), "Réglages : l'échec d'un appel ignore la session coupée");
+    for (const e of ["eListe", "eRetrait"]) assert.ok(carte.includes(`if (${e}) { await echec(${e}); return; }`), `Réglages : « ${e} » ne passe plus par la règle`);
+    assert.ok(carte.includes("if (error) { await echec(error); return; }"), "Réglages : l'activation ne passe plus par la règle");
+    assert.equal(carte.match(/if \(error && sessionCoupee\(error\)\) \{ await versConnexion\(\); return; \}/g)?.length, 3, "Réglages : lecture, validation et retrait doivent reconnaître une session coupée");
+    assert.ok(carte.includes("toast.error(codeRefuse(error) ? L.codeFaux : L.erreur)"), "Réglages : une panne dite « code incorrect »");
+    assert.ok(carte.includes("toast.error(aal2Exige(error) ? L.reconnexion : L.erreur"), "Réglages : « reconnecte-toi » ne suit plus le code d'erreur");
+    assert.ok(!/error\.message/.test(carte), "Réglages : une décision sur le TEXTE de l'erreur est revenue");
   });
 
   console.log(`\n${passes} test(s) passé(s), ${fails.length} échec(s)`);

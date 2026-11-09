@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { Loader2, ShieldCheck, ShieldOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { AuthDict } from "@/components/auth/authI18n";
+import { deconnexion } from "@/lib/auth/deconnexion";
+import { aal2Exige, codeRefuse, sessionCoupee } from "@/lib/auth/mfaNavigateur";
 
 /**
  * DOUBLE AUTHENTIFICATION, FACULTATIVE (choix de Cyprien, 08/11/2026) — dans Réglages → Sécurité.
@@ -31,9 +33,20 @@ export function DeuxFacteurs({ L, lang }: { L: AuthDict["deuxFacteurs"]; lang: s
   const [code, setCode] = useState("");
   const [occupe, setOccupe] = useState(false);
 
+  // Session COUPÉE ailleurs (retrait de la double authentification depuis un autre appareil,
+  // 09/11/2026) : rien ne peut aboutir ici, retour à la connexion — voir `sessionCoupee`.
+  const versConnexion = async () => { await deconnexion(); window.location.assign("/login"); };
+  /** Un échec d'appel : session coupée → connexion ; sinon le message, et le bouton se libère. */
+  const echec = async (e: unknown) => {
+    setOccupe(false);
+    if (sessionCoupee(e)) { await versConnexion(); return; }
+    toast.error(L.erreur);
+  };
+
   async function relire() {
     setActif(undefined);
     const { data, error } = await createClient().auth.mfa.listFactors();
+    if (error && sessionCoupee(error)) { await versConnexion(); return; }
     setActif(error ? false : (data?.totp?.[0]?.id ?? null));
   }
   useEffect(() => { void relire(); }, []);
@@ -44,15 +57,16 @@ export function DeuxFacteurs({ L, lang }: { L: AuthDict["deuxFacteurs"]; lang: s
     // Un enrôlement abandonné (QR jamais validé) bloque le suivant : on le retire d'abord.
     // Chaque erreur est lue : sinon `enroll` échouerait ensuite avec un message sans cause.
     const { data: liste, error: eListe } = await sb.auth.mfa.listFactors();
-    if (eListe) { setOccupe(false); toast.error(L.erreur); return; }
+    if (eListe) { await echec(eListe); return; }
     for (const f of liste?.all ?? []) {
       if (f.factor_type !== "totp" || f.status !== "unverified") continue;
       const { error: eRetrait } = await sb.auth.mfa.unenroll({ factorId: f.id });
-      if (eRetrait) { setOccupe(false); toast.error(L.erreur); return; }
+      if (eRetrait) { await echec(eRetrait); return; }
     }
     const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: `Pacevo ${new Date().toISOString().slice(0, 16)}` });
+    if (error) { await echec(error); return; }
     setOccupe(false);
-    if (error || data?.type !== "totp") { toast.error(L.erreur); return; }
+    if (data?.type !== "totp") { toast.error(L.erreur); return; }
     setEnrolement({ id: data.id, qr: data.totp.qr_code, cle: data.totp.secret });
     setVoirCle(false);
     setCode("");
@@ -64,7 +78,9 @@ export function DeuxFacteurs({ L, lang }: { L: AuthDict["deuxFacteurs"]; lang: s
     setOccupe(true);
     const { error } = await createClient().auth.mfa.challengeAndVerify({ factorId: enrolement.id, code });
     setOccupe(false);
-    if (error) { setCode(""); toast.error(L.codeFaux); return; }
+    if (error && sessionCoupee(error)) { await versConnexion(); return; }
+    // « Code incorrect » seulement quand le CODE est refusé : une panne l'affichait aussi.
+    if (error) { setCode(""); toast.error(codeRefuse(error) ? L.codeFaux : L.erreur); return; }
     setEnrolement(null);
     toast.success(L.activee);
     // L'avis par e-mail au titulaire (`/api/auth/2fa/activee`) : si quelqu'un d'autre l'a activée
@@ -84,8 +100,9 @@ export function DeuxFacteurs({ L, lang }: { L: AuthDict["deuxFacteurs"]; lang: s
     setOccupe(true);
     const { error } = await createClient().auth.mfa.unenroll({ factorId: actif });
     setOccupe(false);
-    // GoTrue refuse depuis une session `aal1` : le cas d'une session ouverte avant l'activation.
-    if (error) { toast.error(/aal2|assurance/i.test(error.message) ? L.reconnexion : L.erreur, { duration: 8000 }); return; }
+    if (error && sessionCoupee(error)) { await versConnexion(); return; }
+    // GoTrue refuse depuis une session `aal1` (`insufficient_aal`) : session ouverte avant l'activation.
+    if (error) { toast.error(aal2Exige(error) ? L.reconnexion : L.erreur, { duration: 8000 }); return; }
     toast.success(L.desactivee);
     await relire();
   }
