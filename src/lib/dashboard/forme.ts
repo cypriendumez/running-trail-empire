@@ -51,7 +51,7 @@ export type Forme = {
   };
 };
 
-type Seance = { date: string; sport?: string | null; distance_km?: number | null };
+type Seance = { date: string; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null };
 
 /** Repères de repli, ceux d'avant. Conservés pour ne pas laisser un athlète SANS
  *  objectif devant une carte vide — mais annoncés comme génériques, pas comme sa mesure. */
@@ -91,6 +91,11 @@ export function socleDesSeances(workouts: Seance[], aujourdhui?: string): Socle 
   return {
     sortieLongueKm: plusLongue > 0 ? plusLongue : null,
     volumeHebdoKm: demonstratedWeeklyKm(courses.map((w) => ({ date: w.date, distance_km: km(w) }))),
+    // Les chronos courus dans la même fenêtre : une prédiction ne descend pas sous eux
+    // (voir `predictRaceSec`, marathon de Lille 2h41 prédit 2h43 le 09/11/2026).
+    realises: recentes
+      .map((w) => ({ km: km(w), sec: Number(w.duration_seconds) }))
+      .filter((r) => r.km > 0 && Number.isFinite(r.sec) && r.sec > 0),
   };
 }
 
