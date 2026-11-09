@@ -31,6 +31,7 @@ des deux.*
 11. **Réseau des routines** : `pacevo.fr`, `pacevo.app` et les sites des concurrents et des marques de montres sont autorisés dans l'environnement cloud « Default » (fait par Cyprien le 08/11/2026, prouvé). Ce réglage ne se change pas par l'API.
 12. **Horaires** : les routines cloud partagent la limite d'usage des 5 heures avec les sessions de Cyprien. Elles tournent donc la nuit, pas aux heures du texte (« 10 h par défaut »). Un passage très court PEUT être un refus pour limite atteinte, mais aussi un vrai « RAS » (09/11/2026) : lire `get_run_log` avant de conclure.
 13. **Lancement** : le texte dit « janvier 2027 ». Décision du 08/11/2026 : premières ventes en **avril 2027**, début d'activité de la micro-entreprise le 1er avril 2027.
+14. **Décompte** : l'introduction du texte annonce « 24 en Vague 2 et 22 en ATTENTE » ; son propre tableau (sections 6 et 8) en donne **22 en Vague 2 et 24 en ATTENTE**. C'est le tableau qui fait foi (recompté le 09/11/2026).
 
 ---
 

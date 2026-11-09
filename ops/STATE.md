@@ -61,7 +61,11 @@ https://pacevo.fr (HTTP 200) et https://pacevo.fr/version.json (alerte si « com
 | 61 | `@Concierge` | PLANIFIÉ | Boîte Gmail dédiée branchée ; `contact@` et `support@` y sont redirigés (prouvé, Outlook compris le 09/11). Filtre « jamais en spam » sur ces deux adresses ; le connecteur ne voit pas le Spam. 1er passage le 09/11 à 8 h. |
 | 64 | `@PostMortem` | **EXÉCUTÉ** | `ops/memory/LESSONS_LEARNED.md` tenu ; passage hebdo dans Direction. |
 
-## Unités en Vague 2 (24) et en attente (22)
+## Unités en Vague 2 (22) et en attente (24)
+
+Décompte fait sur le tableau de la constitution le 09/11/2026 (son introduction inverse les deux chiffres) :
+12 actifs + 22 en Vague 2 + 24 en attente + 6 fonctions de l'application + 6 numéros fusionnés = 70.
+Organigramme complet (PDF, hors dépôt) : `~/Desktop/Pacevo/organigramme-agents-pacevo.pdf`.
 
 Définies dans `ops/CONSTITUTION.md`, aucune routine. La Vague 2 sera ajoutée aux routines
 existantes avant le lancement (avril 2027), pas en routines séparées, pour ménager la limite
