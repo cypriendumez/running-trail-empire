@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { classerALaUne, motsDuTitre, texteDuSujet, POLITIQUE, type ArticleSemaine } from "../src/lib/news/alaune";
 import { FILTRES, PAS_ELITE, PAS_CONSEIL, CONTEXTE_COURSE, COURSE_A_PIED, PROMO, TEST_MATERIEL, HORS_COURSE, RUBRIQUES_LETTRE } from "../src/lib/news/rubriques";
 import { fusionnerListes, lienGoogleNews } from "../src/lib/news/actualites";
+import { validerEdition, ordonnerSelon, lundiDEnvoi, URL_EDITION } from "../src/lib/newsletter/edition";
 import { chiffresVerifies, chiffresIntrus } from "../src/lib/newsletter/resume";
 import { construireEmail, LANGS, libellesSections } from "../src/lib/newsletter/email";
 
@@ -25,6 +26,11 @@ function test(nom: string, fn: () => void) {
   catch (e) { fails.push(`${nom} — ${(e as Error).message}`); console.log(`  ✗ ${nom}\n      ${(e as Error).message}`); }
 }
 const sansCommentaires = (f: string) => readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+// La lettre = sa route + la sélection qu'elle partage avec les candidats de @Gazette
+// (`lib/newsletter/selection`, sortie de la route le 10/11/2026). La route d'abord : les
+// tests d'ORDRE (le secret avant l'aperçu, l'aperçu avant l'envoi) lisent la route.
+const codeLettre = () => sansCommentaires("src/app/api/newsletter/weekly/route.ts") + "\n" + sansCommentaires("src/lib/newsletter/selection.ts");
 
 let n = 0;
 const art = (source: string, title: string, date: string, texte?: string): ArticleSemaine =>
@@ -159,8 +165,8 @@ test("la lettre lit TOUTE la semaine pour sa une, sans le plafond de 48 du fil",
   const nb = (act.match(/export const REQUETES_SEMAINE = \[([\s\S]*?)\]/)?.[1].match(/"/g) ?? []).length / 2;
   assert.ok(nb >= 4, `${nb} requête(s) : une seule voit 1 article sur la backyard, « trail » en voit 12`);
 
-  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
-  assert.match(route, /classerALaUne\(semaine, maxUne\)/, "la une ne passe plus par le classement par médias");
+  const route = codeLettre();
+  assert.match(route, /classerALaUne\(semaine, maxUne \+ SUJETS_EN_PLUS\)/, "la une ne passe plus par le classement par médias");
   assert.match(route, /parRubrique\[0\] = une\.map\(\(s\) => s\.article\)/, "le classement est calculé mais la une ne l'utilise pas");
   assert.match(route, /if \(n > 0 && \(dejaALaUne\.has\(it\.link\) \|\| motsDuTitre\(it\.title\)\.some\(\(m\) => sujetsUne\.has\(m\)\)\)\) continue;/,
     "un sujet de la une peut revenir dans une autre rubrique");
@@ -208,7 +214,7 @@ test("Élites reconnaît un résultat, en français comme en anglais, mais pas u
 });
 
 test("la lettre puise Élites dans la semaine entière, sans les sujets de la une", () => {
-  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  const route = codeLettre();
   const bloc = route.slice(route.indexOf("const iElite"), route.indexOf("const texteUne"));
   assert.ok(bloc.length > 50, "le bloc Élites a disparu");
   assert.match(bloc, /semaine\.filter\(/, "Élites ne lit plus la semaine");
@@ -234,7 +240,7 @@ test("un sujet de la une cite le nombre d'autres médias, dans les cinq langues"
 });
 
 test("l'aperçu construit la lettre sans lire les abonnés ni rien envoyer", () => {
-  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  const route = codeLettre();
   // Le secret d'abord : l'aperçu n'est pas une porte ouverte sur les résumés et le quota.
   assert.ok(route.indexOf("CRON_SECRET") < route.indexOf('searchParams.get("apercu")'), "l'aperçu passe avant le contrôle du secret");
   assert.match(route, /if \(!apercu && !essai\) \{\s*const avecLangue = await admin/, "l'aperçu lit la liste des abonnés");
@@ -263,7 +269,7 @@ test("la lettre cherche la nutrition de la SEMAINE et la classe par date", () =>
   const req = act.match(/export const REQUETES_NUTRITION = \[([\s\S]*?)\]\.map\(\(q\) => `\$\{q\} when:7d`\)/);
   assert.ok(req, "les requêtes nutrition ne sont plus bornées à la semaine");
   assert.doesNotMatch(req![1], /nutrition sportive/, "« nutrition sportive » remonte l'industrie, pas les coureurs");
-  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  const route = codeLettre();
   const bloc = route.slice(route.indexOf("const iNutrition"), route.indexOf("const texteUne"));
   assert.ok(bloc.length > 50, "le bloc Nutrition a disparu");
   assert.match(bloc, /nutritionSemaine\s*\.filter\(\(it\) => FILTRES\.nutrition!\.test\(it\.title\) && CONTEXTE_COURSE\.test\(it\.title\) && !PROMO\.test\(it\.title\) && !dejaALaUne\.has\(it\.link\)\)/);
@@ -315,8 +321,8 @@ test("aucune promotion n'entre dans la lettre, quelle que soit sa forme", () => 
   for (const t of ["Résultat des 25 heures qui courent : la cagnotte atteint 1 500 000 €", "près d'1,5 million d'euros de dons",
     "Chaussures de running : pourquoi les prix s'envolent et comment acheter au meilleur prix ?",
     "Test Kailas Fuga EX 330 : L'arme ultime pour l'ultra-trail ?"]) assert.ok(!PROMO.test(t), `écarté à tort : ${t}`);
-  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
-  assert.match(route, /const publiable = \(it: Item\) => !PROMO\.test\(it\.title\) && !HORS_COURSE\.test\(it\.title\);/);
+  const route = codeLettre();
+  assert.match(route, /export const publiable = \(it: Item\) => !PROMO\.test\(it\.title\) && !HORS_COURSE\.test\(it\.title\);/);
   assert.match(route, /const semaine = semaineBrute\.filter\(publiable\);/, "une promotion peut faire la une ou Élites");
   const boucle = route.slice(route.indexOf("for (const it of parRubrique[n])"));
   assert.match(boucle.slice(0, 400), /if \(!publiable\(it\)\) continue;/, "les rubriques lues sur le fil (Trail, Matériel) gardent leurs promotions");
@@ -331,7 +337,7 @@ test("Matériel : des TESTS en français d'abord, puis les tests anglophones ré
   assert.ok(HORS_COURSE.test("Test Columbia Titanium Platinum Peak II 3L : un ensemble de ski technique"), "le ski entre dans Matériel");
   const act = sansCommentaires("src/lib/news/actualites.ts");
   assert.match(act, /export const REQUETES_MATERIEL = \[[\s\S]*?\]\.map\(\(q\) => `\$\{q\} when:7d`\)/, "les requêtes matériel ne sont plus bornées à la semaine");
-  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  const route = codeLettre();
   const bloc = route.slice(route.indexOf("const iMateriel"), route.indexOf("const texteUne"));
   assert.match(bloc, /FILTRES\.gear!\.test\(it\.title\) && TEST_MATERIEL\.test\(it\.title\) && publiable\(it\) && !dejaALaUne\.has\(it\.link\)/);
   assert.match(bloc, /\.slice\(0, RUBRIQUES_LETTRE\[iMateriel\]\.max - 1\)/, "le français prend toutes les places : plus aucun test résumable");
@@ -340,13 +346,13 @@ test("Matériel : des TESTS en français d'abord, puis les tests anglophones ré
 });
 
 test("les résultats d'Élites repris par plusieurs médias sont résumés, comme la une", () => {
-  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  const route = codeLettre();
   assert.match(route, /sujetsElites = classerALaUne\(resultats,/);
   assert.match(route, /for \(const s of \[\.\.\.une, \.\.\.sujetsElites\]\) \{/, "Élites repart en titres seuls");
 });
 
 test("l'essai envoie la vraie lettre à la SEULE adresse de l'éditeur", () => {
-  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  const route = codeLettre();
   assert.ok(route.indexOf("CRON_SECRET") < route.indexOf('searchParams.get("essai")'), "l'essai passe avant le contrôle du secret");
   assert.match(route, /if \(essai\) abonnes = \[\{ email: EDITEUR\.email, lang: "fr" \}\];/, "l'essai n'écrit plus à l'éditeur seul");
   assert.match(route, /if \(!apercu && !essai\) \{\s*const avecLangue = await admin/, "l'essai lit la liste des abonnés");
@@ -386,13 +392,15 @@ test("Conseils garde les conseils, pas le sport voisin ni les classements de pro
   // Même sans la liste HORS_COURSE, le football doit rester dehors (deux protections).
   assert.ok(!COURSE_A_PIED.test("William Saliba de retour à l'entraînement après la Coupe du monde"));
   // HORS_COURSE garde AUSSI la une et Élites, qui n'ont pas COURSE_A_PIED.
-  for (const t of ["Football : William Saliba de retour", "XV de France : Paul Boudehent ménagé", "Rugby : le Stade toulousain s'impose"]) assert.ok(HORS_COURSE.test(t), t);
+  for (const t of ["Football : William Saliba de retour", "XV de France : Paul Boudehent ménagé", "Rugby : le Stade toulousain s'impose",
+    // 10/11/2026 : un sujet de six médias parmi les candidats de la une, où « coureurs » désigne des cyclistes.
+    "Cyclisme. Roglic, Sénéchal, Laurance, Van der Breggen… Ces coureurs n'ont pas fini"]) assert.ok(HORS_COURSE.test(t), t);
   assert.ok(CONTEXTE_COURSE.test("William Saliba de retour à l'entraînement"), "CONTEXTE_COURSE contient bien « entraînement » : d'où COURSE_A_PIED");
   for (const t of ["La course de Saint-Pol", "Les coureuses du dimanche", "Courir en hiver", "Réussir son premier 10 km"]) assert.ok(COURSE_A_PIED.test(t), t);
 });
 
 test("la route remplit Conseils : français résumable d'abord, un article par média", () => {
-  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  const route = codeLettre();
   const bloc = route.slice(route.indexOf("const iConseils"), route.indexOf("const texteUne"));
   assert.ok(bloc.length > 50, "le bloc Conseils a disparu");
   assert.match(bloc, /FILTRES\.conseils!\.test\(it\.title\) && !PAS_CONSEIL\.test\(it\.title\)/);
@@ -436,6 +444,65 @@ test("un sujet n'est pas représenté par un titre politique quand il en a un au
   const [s] = classerALaUne([...nice, ...BRUIT], 1);
   assert.equal(s.medias, 3, `le sujet Nice-Cannes n'est pas formé (${s.mot})`);
   assert.ok(!POLITIQUE.test(s.article.title), `représenté par : « ${s.article.title} »`);
+});
+
+// ── 10/11 : @Gazette choisit, la lettre n'accepte que ses propres candidats ───────────────
+
+test("une édition ne vaut que pour SA semaine, et n'en garde que les rubriques et liens propres", () => {
+  const ok = validerEdition({ pour: "2026-11-16", rubriques: { une: ["https://a.fr/1"], conseils: ["https://b.fr/2", 42, "javascript:alert(1)"], inconnue: ["https://c.fr"] } }, "2026-11-16");
+  assert.ok(ok.edition, ok.raison);
+  assert.deepEqual(ok.edition!.rubriques, { une: ["https://a.fr/1"], conseils: ["https://b.fr/2"] }, "une rubrique inconnue ou un lien non http passe");
+  // La veille (aperçu du dimanche soir) et le lendemain (GitHub en retard) : acceptée.
+  assert.ok(validerEdition({ pour: "2026-11-16", rubriques: { une: ["https://a.fr"] } }, "2026-11-15").edition);
+  assert.ok(validerEdition({ pour: "2026-11-16", rubriques: { une: ["https://a.fr"] } }, "2026-11-17").edition);
+  // La semaine d'avant : refusée, avec sa raison.
+  const vieille = validerEdition({ pour: "2026-11-09", rubriques: { une: ["https://a.fr"] } }, "2026-11-16");
+  assert.equal(vieille.edition, null); assert.match(vieille.raison, /pas pour cette semaine/);
+  for (const brut of [null, "texte", { pour: "16/11/2026", rubriques: {} }, { pour: "2026-11-16" }, { pour: "2026-11-16", rubriques: { inconnue: ["https://a.fr"] } }]) {
+    assert.equal(validerEdition(brut, "2026-11-16").edition, null, `accepté : ${JSON.stringify(brut)}`);
+  }
+});
+
+test("l'édition choisit et ordonne, mais n'ajoute jamais un article que la lettre n'a pas collecté", () => {
+  const c = ["https://x.fr/1", "https://x.fr/2", "https://x.fr/3", "https://x.fr/4"].map((link) => ({ link }));
+  const r = ordonnerSelon(c, ["https://x.fr/3", "https://inconnu.fr/9", "https://x.fr/1", "https://x.fr/3"], (x) => x.link);
+  assert.deepEqual(r.map((x) => x.link), ["https://x.fr/3", "https://x.fr/1", "https://x.fr/2", "https://x.fr/4"]);
+  assert.equal(r.length, c.length, "un lien de l'édition a été AJOUTÉ aux candidats");
+  assert.equal(ordonnerSelon(c, undefined, (x) => x.link), c, "sans édition, l'ordre change");
+});
+
+test("le lundi d'envoi : le jour même si c'est lundi, sinon le prochain", () => {
+  assert.equal(lundiDEnvoi("2026-11-16"), "2026-11-16");
+  assert.equal(lundiDEnvoi("2026-11-15"), "2026-11-16", "dimanche");
+  assert.equal(lundiDEnvoi("2026-11-10"), "2026-11-16", "mardi");
+  assert.equal(lundiDEnvoi("2026-12-28"), "2026-12-28");
+  assert.equal(lundiDEnvoi("2026-12-31"), "2027-01-04", "changement d'année");
+});
+
+test("la lettre lit l'édition et la passe à la sélection ; la sélection l'applique à la une et aux rubriques", () => {
+  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  assert.match(route, /const lecture = await lireEdition\(aujourdhui\("Europe\/Paris"\)\);/);
+  assert.match(route, /await preparerSelection\(\{ base: BASE, edition: lecture\.edition \}\)/, "l'édition est lue mais pas appliquée");
+  assert.match(route, /edition: lecture\.edition \? \{ pour: lecture\.edition\.pour, appliquee: true \} : \{ appliquee: false, raison: lecture\.raison \}/, "la réponse ne dit plus si l'édition a servi");
+  const sel = sansCommentaires("src/lib/newsletter/selection.ts");
+  assert.match(sel, /if \(n > 0\) parRubrique\[n\] = ordonnerSelon\(parRubrique\[n\], edition\?\.rubriques\[r\.cle\], \(it\) => it\.link\);/, "l'édition n'atteint plus les rubriques");
+  assert.match(sel, /const une = ordonnerSelon\(candidatsUne, edition\?\.rubriques\.une, \(s\) => s\.article\.link\)\.slice\(0, maxUne\);/, "l'édition n'atteint plus la une, ou la une dépasse ses places");
+  // L'édition est appliquée APRÈS les filtres (promotions, hors-sujet) : elle ne choisit qu'entre candidats propres.
+  assert.ok(sel.indexOf("ordonnerSelon(parRubrique[n]") > sel.indexOf("const iConseils"), "l'édition passe avant les filtres");
+  const ed = sansCommentaires("src/lib/newsletter/edition.ts");
+  // Le fichier de `main` : celui que Cyprien a FUSIONNÉ, jamais une branche qu'un agent pousse seul.
+  assert.equal(URL_EDITION, "https://raw.githubusercontent.com/cypriendumez/running-trail-empire/main/ops/gazette/edition.json");
+  // Une édition illisible ne fait jamais tomber la lettre.
+  assert.match(ed, /export async function lireEdition[\s\S]*?try \{[\s\S]*?\} catch \(e\) \{\s*return \{ edition: null/);
+});
+
+test("les candidats de @Gazette sont publics, sans texte d'article ni donnée d'abonné", () => {
+  const src = sansCommentaires("src/app/api/newsletter/candidats/route.ts");
+  assert.doesNotMatch(src, /supabase|createAdminClient|newsletter_subscribers|envoyerEmail|resumerArticles|generateContent/, "le point public touche aux abonnés, à l'envoi ou au quota Gemini");
+  assert.doesNotMatch(src, /texte:/, "le texte des articles sort sur un point public");
+  assert.match(src, /preparerSelection\(\{ base, edition: null \}\)/, "@Gazette doit voir l'ordre AUTOMATIQUE, pas sa propre édition");
+  assert.match(src, /unstable_cache\([\s\S]*revalidate: 1800/, "la collecte est relancée à chaque appel public");
+  assert.match(src, /pour: lundiDEnvoi\(jour\)/);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

@@ -132,7 +132,7 @@ export const PROMO =
 export const TEST_MATERIEL = /\btests?\b|test ?:|comparatif|\bavis\b|\bessai\b|on a test|j.ai test|review|\bvs\.?\b/i;
 
 /** Hors course à pied, même quand le vocabulaire y ressemble (« un ensemble de ski technique »). */
-export const HORS_COURSE = /\bski\b|alpinisme|euroligue|\bnba\b|blazers|\bfootball\b|\brugby\b|\bxv de france\b|\btennis\b|\bhandball\b|\bcodes?\b/i;
+export const HORS_COURSE = /\bski\b|alpinisme|euroligue|\bnba\b|blazers|\bfootball\b|\brugby\b|\bxv de france\b|\btennis\b|\bhandball\b|\bcodes?\b|\bcyclisme\b|\bcyclistes?\b/i;
 
 /**
  * LA COURSE À PIED, ET RIEN D'AUTRE : pour « Conseils », plus strict que `CONTEXTE_COURSE`.

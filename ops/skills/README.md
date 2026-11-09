@@ -17,6 +17,13 @@ aux défauts réels de Pacevo) :
   (politique par commande, vue et `revoke … from anon`, revoke de colonne inefficace) ;
 - `/rejouer-plan` : le plan réel d'un athlète rejoué en local, lecture seule, sept jours de départ.
 
+Ajouté le 10/11/2026 pour @Gazette (n°19) :
+- `/edition-lettre` : choisir les articles de la lettre du lundi comme un rédacteur en chef qui connaît ses
+  lecteurs (grille : utilité pour un coureur coaché, événement, retentissement, résumable, fraîcheur,
+  diversité ; pièges vus le 9/11 : drame pour lui-même, politique, promotions, autre sport). Le jugement
+  tourne dans une routine Claude (abonnement de Cyprien), pas sur Gemini ; l'édition part en PR, Cyprien
+  fusionne.
+
 Sous-agents relecteurs (`.claude/agents/`, appelés par l'outil Agent) : `relecteur-independant`,
 `chasseur-echecs-muets`, `relecteur-tests`, `verificateur-sources`, `gardien-donnees-sante`.
 Tous en lecture seule. Une routine cloud ne les voit qu'une fois commités sur `main`.
