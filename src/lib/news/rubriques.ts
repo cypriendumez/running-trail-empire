@@ -87,3 +87,20 @@ export const RUBRIQUES_LETTRE = [
   { cle: "materiel", cat: "gear", max: 3 },
   { cle: "nutrition", cat: "nutrition", max: 2 },
 ] as const satisfies readonly { cle: string; cat: Cat; max: number }[];
+
+/**
+ * LA NUTRITION DU COUREUR, PAS CELLE DE TOUT LE MONDE.
+ *
+ * Les requêtes Google Actualités de la semaine du 9/11/2026 ramenaient, à côté des
+ * « trois conseils d'un coach » du marathon de La Baule, la charcuterie moins salée, la
+ * ménopause et la conservation des pommes de terre : tous passent `FILTRES.nutrition`.
+ * Un article de la rubrique doit donc AUSSI parler de course ou d'effort.
+ */
+export const CONTEXTE_COURSE =
+  /cour(se|ir|eur|euse)s?|running|runner|\btrail|marathon|ultra|endurance|sporti(f|ve)s?|\bsport\b|athl[èe]te|athlete|entra[îi]nement|training|exercise|effort|\brace\b/i;
+
+/**
+ * Une promotion n'est pas un article : « ce gilet Salomon […] perd 50 € » (L'Équipe,
+ * 9/11/2026) passait le filtre nutrition par le mot « hydratation ».
+ */
+export const PROMO = /perd \d+\s?€|-\s?\d+\s?%|\bpromo|soldes|bon plan|black friday|\bprix (cass|barr)/i;

@@ -14,8 +14,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { classerALaUne, motsDuTitre, texteDuSujet, type ArticleSemaine } from "../src/lib/news/alaune";
-import { FILTRES, PAS_ELITE } from "../src/lib/news/rubriques";
-import { chiffresVerifies } from "../src/lib/newsletter/resume";
+import { FILTRES, PAS_ELITE, CONTEXTE_COURSE, PROMO } from "../src/lib/news/rubriques";
+import { chiffresVerifies, chiffresIntrus } from "../src/lib/newsletter/resume";
 import { construireEmail, LANGS } from "../src/lib/newsletter/email";
 
 let passed = 0; const fails: string[] = [];
@@ -240,6 +240,58 @@ test("l'aperçu construit la lettre sans lire les abonnés ni rien envoyer", () 
   const iApercu = boucle.indexOf("if (apercu) {"), iEnvoi = boucle.indexOf('envoyerEmail("newsletter"');
   assert.ok(iApercu > 0 && iApercu < iEnvoi, "l'aperçu n'est pas rendu AVANT l'appel d'envoi");
   assert.match(boucle.slice(iApercu, iEnvoi), /return NextResponse\.json\(\{[\s\S]*envoye: 0/, "l'aperçu ne s'arrête pas avant l'envoi");
+});
+
+// ── 10/11 (suite) : Nutrition vide, et le sujet n° 1 parti sans résumé ─────────────────
+
+test("Nutrition garde la nutrition du COUREUR, pas la charcuterie ni les promotions", () => {
+  const garde = (t: string) => FILTRES.nutrition!.test(t) && CONTEXTE_COURSE.test(t) && !PROMO.test(t);
+  // Titres réels de la semaine du 9/11/2026.
+  for (const t of ["Marathon de La Baule. Régularité, nutrition, confiance… les trois conseils d'un coach spécialisé dans la course à pied",
+    "« Ils ne viennent plus simplement acheter une paire de chaussures » : de la foulée à la nutrition, ces boutiques qui accompagnent les coureurs",
+    "Carbohydrate intake during endurance exercise"]) assert.ok(garde(t), `écarté à tort : ${t}`);
+  for (const t of ["Alimentation : jambon, lardons, bacon… 450 produits de charcuterie seront bientôt moins gras et moins salés",
+    "« Limiter les féculents et apporter des protéines » : les conseils simples d'une nutritionniste pour bien vivre sa ménopause",
+    "Les experts en nutrition le confirment, pour conserver la fraîcheur des pommes de terre il faut les stocker au réfrigérateur",
+    "Trail : ce gilet Salomon ultra-léger conçu pour faciliter l'hydratation perd 50 €"]) assert.ok(!garde(t), `gardé à tort : ${t}`);
+});
+
+test("la lettre cherche la nutrition de la SEMAINE et la classe par date", () => {
+  const act = sansCommentaires("src/lib/news/actualites.ts");
+  const req = act.match(/export const REQUETES_NUTRITION = \[([\s\S]*?)\]\.map\(\(q\) => `\$\{q\} when:7d`\)/);
+  assert.ok(req, "les requêtes nutrition ne sont plus bornées à la semaine");
+  assert.doesNotMatch(req![1], /nutrition sportive/, "« nutrition sportive » remonte l'industrie, pas les coureurs");
+  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  const bloc = route.slice(route.indexOf("const iNutrition"), route.indexOf("const texteUne"));
+  assert.ok(bloc.length > 50, "le bloc Nutrition a disparu");
+  assert.match(bloc, /nutritionSemaine\s*\.filter\(\(it\) => FILTRES\.nutrition!\.test\(it\.title\) && CONTEXTE_COURSE\.test\(it\.title\) && !PROMO\.test\(it\.title\) && !dejaALaUne\.has\(it\.link\)\)/);
+  assert.match(bloc, /\.sort\(\(a, b\) => temps\(b\) - temps\(a\)\)/, "classée autrement que par date : un seul article survivrait au regroupement");
+  assert.doesNotMatch(bloc, /classerALaUne/, "le regroupement par mot réduirait la rubrique à un article (« nutrition » est son thème)");
+  assert.match(bloc, /parRubrique\[iNutrition\] = nutrition/);
+  assert.match(route, /collecterNutritionSemaine\(\)\.catch\(/, "une panne de la collecte nutrition ferait tomber la lettre");
+});
+
+test("un résumé rejeté a UNE seconde chance, sous le même contrôle", () => {
+  assert.deepEqual(chiffresIntrus("Un pic à 200 000 spectateurs et 1,5 million d'euros.", "1,5 million d'euros récoltés"), ["200000"]);
+  assert.deepEqual(chiffresIntrus("Detienne gagne après 25 boucles.", "25 boucles"), []);
+  // ⚠️ Le contournement réel du 10/11/2026 : refusé pour « 200 000 », le modèle a écrit
+  // « 200.000 », lu comme « 200 » et « 000 » — deux nombres présents partout.
+  const source = "Detienne gagne après 25 boucles, 200 km de route, 0 abandon chez les 1,5 million de spectateurs.";
+  assert.equal(chiffresVerifies("Un pic de 200.000 spectateurs.", source), false, "« 200.000 » passe le contrôle");
+  assert.equal(chiffresVerifies("Un pic de 200,000 spectateurs.", source), false, "« 200,000 » passe le contrôle");
+  assert.equal(chiffresVerifies("Un pic de 200 000 spectateurs.", source), false);
+  assert.ok(chiffresVerifies("Plus de 1,5 million de spectateurs.", source), "une décimale courte doit rester acceptée");
+  assert.ok(chiffresVerifies("30.000 participants", "plus de 30 000 participants"), "1.500 et 1 500 sont le même nombre");
+  assert.ok(chiffresVerifies("30 000 participants", "plus de 30.000 participants"));
+  const src = sansCommentaires("src/lib/newsletter/resume.ts");
+  const fn = src.slice(src.indexOf("export async function resumerArticles"), src.indexOf("const LANGUES"));
+  const relance = fn.slice(fn.indexOf("if (rejetes.length) {"));
+  assert.ok(fn.indexOf("if (rejetes.length) {") > 0, "plus de seconde tentative");
+  assert.match(fn, /if \(!chiffresVerifies\(r, x\.src\)\) \{ rejetes\.push\(\{ x, intrus: chiffresIntrus\(r, x\.src\) \}\); continue; \}/, "un rejet n'est plus noté avec ses nombres fautifs");
+  assert.match(relance, /intrus\.join\(", "\)/, "la relance ne dit pas au modèle quels nombres retirer");
+  assert.match(relance, /!chiffresVerifies\(r, cible\.src\)\) continue;/, "la seconde version échappe au contrôle des chiffres");
+  assert.match(relance, /const lot = rejetes\.slice\(0, TAILLE_LOT\);/, "la relance n'est plus bornée à un lot");
+  assert.equal((fn.match(/generateContent\(/g) ?? []).length, 2, "un seul appel de relance, pas une boucle : le quota Gemini est partagé");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

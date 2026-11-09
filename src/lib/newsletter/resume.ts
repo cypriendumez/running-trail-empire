@@ -157,9 +157,17 @@ export async function texteArticle(url: string): Promise<string | null> {
  * Toutes les suites de chiffres d'un texte, espaces internes retirés.
  * « 2 300 coureurs » et « 2300 » donnent la même entrée : c'est le NOMBRE qu'on compare,
  * pas sa typographie. L'espace fine insécable des milliers français en dépend.
+ *
+ * ⚠️ LE POINT ET LA VIRGULE AUSSI. Le 10/11/2026, refusé pour « 200 000 spectateurs »
+ * absents de ses sources, le modèle a réécrit « 200.000 spectateurs » — et le contrôle
+ * l'a laissé passer : il y lisait « 200 » et « 000 » (devenu « 0 »), deux nombres qu'on
+ * trouve partout. Un chiffre inventé contournait le garde-fou par sa seule typographie.
+ * Un séparateur suivi d'exactement trois chiffres est donc lu comme des milliers, quel
+ * qu'il soit (« 1.500 », « 1,500 », « 1 500 » valent 1500). Une décimale courte
+ * (« 1,5 million », « 21,1 km ») reste coupée en deux, des deux côtés de la comparaison.
  */
 function nombresDe(texte: string): string[] {
-  const sansEspacesDeMilliers = texte.replace(/(\d)[\s  ](?=\d{3}\b)/g, "$1");
+  const sansEspacesDeMilliers = texte.replace(/(\d)[\s  .,](?=\d{3}(?!\d))/g, "$1");
   return (sansEspacesDeMilliers.match(/\d+/g) ?? []).map((n) => n.replace(/^0+(?=\d)/, ""));
 }
 
@@ -171,6 +179,12 @@ function nombresDe(texte: string): string[] {
 export function chiffresVerifies(resume: string, source: string): boolean {
   const dansSource = new Set(nombresDe(source));
   return nombresDe(resume).every((n) => dansSource.has(n));
+}
+
+/** Les nombres du résumé absents de la source : ce que la seconde tentative doit retirer. */
+export function chiffresIntrus(resume: string, source: string): string[] {
+  const dansSource = new Set(nombresDe(source));
+  return [...new Set(nombresDe(resume).filter((n) => !dansSource.has(n)))];
 }
 
 const CONSIGNE = `Tu résumes des articles de presse running et trail pour une lettre hebdomadaire.
@@ -308,13 +322,41 @@ export async function resumerArticles(
   if (!parIndex.size) return { articles: nus(), diagnostic: "reponse-illisible", lisibles: lisibles.length };
 
   const resumes = new Map<string, string>();
+  const rejetes: { x: (typeof lisibles)[number]; intrus: string[] }[] = [];
   for (const [n, x] of lisibles.entries()) {
     const r = parIndex.get(n);
     if (!r || r.length < 40) continue;
     // ⚠️ LE CONTRÔLE. Un chiffre absent de la source condamne tout le résumé, pas
     // seulement la phrase : on ne sait pas laquelle est fausse.
-    if (!chiffresVerifies(r, x.src)) continue;
+    if (!chiffresVerifies(r, x.src)) { rejetes.push({ x, intrus: chiffresIntrus(r, x.src) }); continue; }
     resumes.set(x.a.link, r);
+  }
+
+  // ── UNE SECONDE CHANCE, UNE SEULE ─────────────────────────────────────────
+  // ⚠️ Le 9/11/2026, le sujet n° 1 de la lettre (la backyard de Clem qui court, 26 médias)
+  // est parti sans résumé : le modèle avait ajouté « un pic à 200 000 spectateurs »
+  // qu'aucune source ne donnait. Le rejet était juste ; perdre le résumé ne l'était pas.
+  // On redemande donc les résumés rejetés, en nommant les nombres fautifs, et la
+  // nouvelle version passe le MÊME contrôle. Un seul appel de plus, et seulement quand
+  // il y a eu rejet : le quota gratuit de Gemini est partagé avec toute l'app.
+  if (rejetes.length) {
+    const lot = rejetes.slice(0, TAILLE_LOT);
+    const bloc = lot
+      .map(({ x, intrus }, n) => `### ARTICLE ${n}\nTitre : ${x.a.title}\nSource : ${x.a.source}\n`
+        + `Ta version précédente a été REFUSÉE : elle contenait ${intrus.join(", ")}, absent(s) du texte. Réécris-la sans aucun nombre que le texte ne contient pas.\n`
+        + `Texte : ${x.src}`)
+      .join("\n\n");
+    const res = await generateContent(
+      [{ role: "user", parts: [{ text: `${CONSIGNE}\n\n${bloc}` }] }],
+      { temperature: 0.1, maxOutputTokens: 9000 },
+    );
+    if (res.ok) {
+      for (const [i, r] of extraireResumes(res.text)) {
+        const cible = lot[i]?.x;
+        if (!cible || r.trim().length < 40 || !chiffresVerifies(r, cible.src)) continue;
+        resumes.set(cible.a.link, r.trim());
+      }
+    }
   }
 
   return {

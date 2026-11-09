@@ -153,6 +153,30 @@ export async function collecterSemaine(maintenant = Date.now()): Promise<Item[]>
   });
 }
 
+/**
+ * La nutrition de la semaine, pour la rubrique du même nom.
+ *
+ * ⚠️ La rubrique est sortie VIDE le 9/11/2026 alors que Google Actualités comptait, la
+ * même semaine, 28 articles pour « nutrition course à pied » (« Régularité, nutrition,
+ * confiance… les trois conseils d'un coach », Ouest-France). La lettre lisait le fil
+ * « nutrition » du site : une requête SANS borne de date et deux flux anglophones qui
+ * publient peu, puis gardait la semaine. Il ne restait rien.
+ * « nutrition sportive » n'en fait pas partie : elle remonte surtout l'industrie
+ * (« prévisions du marché des produits de nutrition sportive à l'horizon 2035 »).
+ */
+export const REQUETES_NUTRITION = [
+  "nutrition course à pied", "nutrition running", "alimentation coureur", "hydratation course",
+].map((q) => `${q} when:7d`);
+
+export async function collecterNutritionSemaine(maintenant = Date.now()): Promise<Item[]> {
+  const depuis = maintenant - 7 * 24 * 3600 * 1000;
+  const tout = await fusionner(REQUETES_NUTRITION, FEEDS.filter((f) => f.cats.includes("nutrition")), DELAI_FLUX_MS + 2000);
+  return tout.filter((it) => {
+    const t = new Date(it.date).getTime();
+    return Number.isFinite(t) && t >= depuis;
+  });
+}
+
 /** Interroge Google Actualités et les flux, fusionne, dédoublonne, trie du plus récent au plus ancien. */
 async function fusionner(requetes: string[], feeds: Feed[], delaiTotal: number): Promise<Item[]> {
   const arrives: Item[][] = [];
