@@ -1,8 +1,10 @@
-# Textes à ajouter aux routines pour brancher les directeurs
+# Textes appliqués aux routines pour brancher les directeurs
 
-*Un fichier par routine ou tâche. Rien ici n'est appliqué tout seul : modifier une routine claude.ai
-(`RemoteTrigger` `update`) ou une tâche locale du Mac change une configuration permanente, donc GO de Cyprien
-d'abord, puis contrôle du premier passage (`list_runs` puis `get_run_log` : la durée seule ne dit rien, le journal
+*Un fichier par routine ou tâche, avec le texte exact appliqué le 09/11/2026 (GO de Cyprien, `RemoteTrigger`
+`update` pour les six routines cloud, `update_scheduled_task` pour la tâche du Mac). Direction et Blog sujets ont
+reçu l'outil `Agent` dans la même mise à jour : il manquait à leurs outils autorisés, et sans lui aucun sous-agent
+ne peut être appelé. Modifier une routine change une configuration permanente : GO de Cyprien d'abord, puis contrôle
+du premier passage (`list_runs` puis `get_run_log` : la durée seule ne dit rien, le journal
 tranche). Après un premier passage réussi et prouvé, le statut du directeur passe de « DÉFINI » à « ACTIF (dans
 <routine>) » dans `ops/direction/README.md` et `ops/STATE.md`.*
 

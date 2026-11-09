@@ -1,6 +1,6 @@
 # État de l'équipe d'agents Pacevo
 
-*Tenu par `@Nexus`. Mis à jour le 09/11/2026 à 10 h 08. Chaque ligne dit ce qui TOURNE VRAIMENT,
+*Tenu par `@Nexus`. Mis à jour le 09/11/2026 à 10 h 24. Chaque ligne dit ce qui TOURNE VRAIMENT,
 pas ce qui est prévu : un agent écrit dans la constitution mais sans routine planifiée n'existe pas.*
 
 > ⚠️ **Dépôt PUBLIC** (`cypriendumez/running-trail-empire`). Rien de personnel, de comptable ni
@@ -21,19 +21,19 @@ avec les sessions de Cyprien ; en journée, 8 passages sur 10 étaient refusés 
 
 | Routine | Agents | Quand (heure de Paris) | Modèle |
 |---|---|---|---|
-| Bugs Pacevo | `@Sweeper` | tous les jours, 6 h et 23 h | Sonnet 5.5 |
-| Blog Pacevo, un article sourcé | `@Plume` | le 1er et le 15, 3 h | Opus 5 |
-| Blog Pacevo, sujets | `@Plume` | lundi 3 h 30 | Sonnet 5 |
-| Coach Pacevo | `@Sparring`, `@SafeRun` | lundi 5 h | Opus 5.5 |
-| Direction Pacevo | `@Nexus`, `@PostMortem`, `@Greffier` | vendredi 6 h | Sonnet 5.5 |
-| Sécurité et veille Pacevo | `@Bunker`, `@Vault`, `@Radar` (+ contrôle de la sauvegarde publique) | le 5 du mois, 4 h | Sonnet 5.5 |
+| Bugs Pacevo | `@Sweeper` (+ visa `@Architect` depuis le 09/11, à prouver) | tous les jours, 6 h et 23 h | Sonnet 5.5 |
+| Blog Pacevo, un article sourcé | `@Plume` (+ visa `@Mercator` depuis le 09/11, à prouver) | le 1er et le 15, 3 h | Opus 5 |
+| Blog Pacevo, sujets | `@Plume` (+ visa `@Mercator` depuis le 09/11, à prouver) | lundi 3 h 30 | Sonnet 5 |
+| Coach Pacevo | `@Sparring`, `@SafeRun` (+ visa `@HeadCoach` depuis le 09/11, à prouver) | lundi 5 h | Opus 5.5 |
+| Direction Pacevo | `@Nexus`, `@PostMortem`, `@Greffier` (+ `@Strategos`, `@Trésorier`, `@Atlas` depuis le 09/11, à prouver) | vendredi 6 h | Sonnet 5.5 |
+| Sécurité et veille Pacevo | `@Bunker`, `@Vault`, `@Radar` (+ contrôle de la sauvegarde publique ; + visas `@Architect` et `@Mercator` depuis le 09/11, à prouver) | le 5 du mois, 4 h | Sonnet 5.5 |
 
 **Tâches locales (Mac de Cyprien, app Claude)** : elles écrivent dans `~/Desktop/Pacevo/`, ce
 qu'une routine cloud ne peut pas faire.
 
 | Tâche | Agent | Quand |
 |---|---|---|
-| Courrier du matin | `@Concierge` | tous les jours, 8 h |
+| Courrier du matin | `@Concierge` (+ visa `@Chancelier` depuis le 09/11, à prouver) | tous les jours, 8 h |
 | Sauvegarde chiffrée de la base | `@TimeMachine` | dimanche 11 h |
 
 **Tâches GitHub Actions** (suivies dans /admin › Automatisation) : synchro du coach, sauvegarde

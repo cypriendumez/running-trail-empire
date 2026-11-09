@@ -36,7 +36,7 @@ Sans limites, « tous les tests passent » s'obtient en supprimant le test. Chaq
 
 ## 3. Le juge n'est pas l'accusé
 
-La routine qui écrit ne se note pas seule. Avant la PR : `npm run verify` (juge déterministe), puis le skill `double-relecture` avec les sous-agents de `.claude/agents/` (juges indépendants). « Relis ton travail une dernière fois » ne compte pas comme relecture.
+La routine qui écrit ne se note pas seule. Avant la PR : `npm run verify` (juge déterministe), puis le skill `double-relecture` avec les sous-agents de `.claude/agents/` (juges indépendants). « Relis ton travail une dernière fois » ne compte pas comme relecture. Depuis le 09/11/2026, le directeur du pôle (sous-agent `headcoach`, `architect`, `mercator`… selon la routine, voir `ops/direction/README.md`) relit en plus, dans le même passage, et son visa va dans la description de la PR : il s'ajoute à la double relecture, il ne la remplace pas.
 
 ## 4. Pas de question en cours de route
 
