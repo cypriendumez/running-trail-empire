@@ -617,12 +617,17 @@ async function main() {
     const sansRecup = await contexte(apresLille(SUB16, false), { seances: marathonCouru });
     assert.ok(enRecup.recuperation && !sansRecup.recuperation, "précondition : seule la première est en récupération");
     const proche = (a: number, b: number) => Math.abs(a - b) <= 1;
-    const attendu = Math.round(sansRecup.volume.targetKm * facteurVolumeApresCourse({ joursDepuis: 5, joursTotal: 26 }));
+    // ⚠️ LA SEMAINE ALLÉGÉE (une sur quatre, horloge ISO) réduit la référence SANS récupération
+    // de 20 %, pas la semaine en récupération (« ni semaine allégée par-dessus », coachContext).
+    // L'habitude se lit donc sans elle — sinon ce test rougissait toute la semaine allégée
+    // (16-22/11/2026 : « 48 km au lieu de ~38 »). Le drapeau est celui du coach.
+    const allegement = sansRecup.cycle.deload ? 0.8 : 1;
+    const attendu = Math.round((sansRecup.volume.targetKm / allegement) * facteurVolumeApresCourse({ joursDepuis: 5, joursTotal: 26 }));
     assert.ok(proche(enRecup.volume.targetKm, attendu),
-      `${enRecup.volume.targetKm} km visés à J+5 au lieu de ~${attendu} (${sansRecup.volume.targetKm} km hors récupération)`);
+      `${enRecup.volume.targetKm} km visés à J+5 au lieu de ~${attendu} (${sansRecup.volume.targetKm} km hors récupération${allegement < 1 ? ", semaine allégée" : ""})`);
     // La feuille de route dit la même chose que le plan : 70 % de l'habitude la semaine
-    // suivante, puis 85 % (l'habitude = la première semaine hors récupération).
-    const habitude = sansRecup.macroPlan[0].volumeKm;
+    // suivante, puis 85 % (l'habitude = la première semaine hors récupération, sans allègement).
+    const habitude = sansRecup.macroPlan[0].volumeKm / allegement;
     assert.ok(proche(enRecup.macroPlan[1].volumeKm, Math.round(habitude * 0.7)),
       `semaine 2 : ${enRecup.macroPlan[1].volumeKm} km au lieu de ~70 % de ${habitude}`);
     assert.ok(proche(enRecup.macroPlan[2].volumeKm, Math.round(habitude * 0.85)),
@@ -638,9 +643,15 @@ async function main() {
     const enRecup = await contexte(MARATHON(ilYa(5)), { seances: marathonCouru });
     const sansCourse = await contexte(null, { seances: marathonCouru });
     assert.ok(enRecup.recuperation && !enRecup.macroPlan.length && !sansCourse.recuperation, "précondition : récupération sans macro-plan");
-    const attendu = Math.round(sansCourse.volume.targetKm * facteurVolumeApresCourse({ joursDepuis: 5, joursTotal: 26 }));
+    // ⚠️ SEMAINE ALLÉGÉE : sans objectif, la référence prend ×0,8 AU LIEU de la progression
+    // (×1,10 pour ce profil : ni passif court, ni fracture, ni perte de poids), tandis que la
+    // récupération garde sa base (« ni semaine allégée par-dessus »). On remonte donc la
+    // référence à sa semaine normale — sinon ce test rougissait toute la semaine allégée
+    // (16-22/11/2026 : « 53 km au lieu de ~38 », 95 km un jour normal, 69 ce jour-là).
+    const habituel = sansCourse.cycle.deload ? (sansCourse.volume.targetKm / 0.8) * 1.10 : sansCourse.volume.targetKm;
+    const attendu = Math.round(habituel * facteurVolumeApresCourse({ joursDepuis: 5, joursTotal: 26 }));
     assert.ok(Math.abs(enRecup.volume.targetKm - attendu) <= 1,
-      `${enRecup.volume.targetKm} km visés à J+5 au lieu de ~${attendu} (${sansCourse.volume.targetKm} km sans course)`);
+      `${enRecup.volume.targetKm} km visés à J+5 au lieu de ~${attendu} (${sansCourse.volume.targetKm} km sans course${sansCourse.cycle.deload ? ", semaine allégée" : ""})`);
   });
 
   await test("pendant la récupération, la sortie longue ne dépasse pas 30 % du volume réduit", async () => {
