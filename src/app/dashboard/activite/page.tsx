@@ -17,6 +17,7 @@ import { colonnesEditionPresentes, COLONNES_EDITION } from "@/lib/activities/col
 import { nomAffiche } from "@/lib/activities/renommage";
 import { seLitEnVitesse, vitesseKmh, kmhDepuisAllure, fmtKmh } from "@/lib/activities/vitesse";
 import { T } from "@/lib/i18n/translations";
+import { pausesDeTrace, vitesseEnMouvement, dureeCourte } from "@/lib/activities/pauses";
 
 export const dynamic = "force-dynamic";
 
@@ -153,6 +154,16 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
             ({ lat, lon, t, alt: alt ?? undefined, hr: hr ?? undefined, cad: cad ?? undefined, pw: pw ?? undefined } as TrackPoint));
           splits = computeSplits(pts);
           profil = elevationProfile(pts);
+          // ── Les arrêts : la base ne garde que le temps EN MOUVEMENT, la trace garde l'heure
+          //    de chaque point (lib/activities/pauses). Rien n'est affiché sans arrêt détecté.
+          const arrets = pausesDeTrace(pts, vitesseEnMouvement(wk.distance_km, wk.duration_seconds));
+          if (arrets && arrets.liste.length) {
+            const longue = arrets.liste.reduce((a, b) => (b.dureeSec > a.dureeSec ? b : a));
+            const km = longue.km.toLocaleString(langue, { maximumFractionDigits: 1 });
+            chiffres.push({ label: T[langue]["act.ecoule"], value: hhmm(arrets.ecouleSec) });
+            chiffres.push({ label: T[langue]["act.arrets"], value: `${arrets.liste.length} · ${dureeCourte(arrets.totalSec)}` });
+            chiffres.push({ label: T[langue]["act.arretLong"], value: `${dureeCourte(longue.dureeSec)} ${T[langue]["act.auKm"].replace("{km}", km)}` });
+          }
           // Tracé allégé pour la carte : la précision au mètre n'apporte rien à
           // cette échelle et alourdirait la page pour rien.
           polyline = encodePolyline(simplify(pts, 25));

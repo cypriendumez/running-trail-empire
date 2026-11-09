@@ -18,6 +18,7 @@
 
 import { parseReps, parsePaceSec, FOURCHETTE_QUALITE_SEC } from "@/lib/watch/intervals";
 import { serieDeRepetitions, blocPrincipal, type DetailIntervalles, type FluxSeance } from "@/lib/intervals/performance";
+import type { PausesSeance } from "@/lib/activities/pauses";
 
 /** Part de la FC max au-delà de laquelle une séance est DURE. Même valeur que le reste
  *  du coach (`PART_FC_DURE` dans coachContext) : deux seuils divergents donneraient deux
@@ -167,6 +168,9 @@ export type FaitsSeance = {
     alternance: [number, number] | null;
   } | null;
   prescrit: { type: string; titre: string } | null;
+  /** Les arrêts relus sur la trace GPS (`lib/activities/pauses`) : `null` = non demandés ou
+   *  inconnus (sans trace, c'est dit dans `manques`), liste vide = aucun arrêt détecté. */
+  arrets: PausesSeance | null;
   /** Ce qu'on NE SAIT PAS. Le modèle doit le dire au lieu de combler. */
   manques: string[];
 };
@@ -204,6 +208,8 @@ export function faitsDeSeance(
   contexte?: ContexteSeance,
   /** Les flux d'une séance de trail (analyse complète). ABSENTS = non demandés. */
   flux?: FluxSeance | "illisible",
+  /** Les arrêts relus sur la trace. ABSENTS = non demandés ; `null` = pas de trace lisible. */
+  arrets?: PausesSeance | null,
 ): FaitsSeance {
   const manques: string[] = [];
   const distanceKm = positif(s.distance_km);
@@ -386,6 +392,8 @@ export function faitsDeSeance(
   // ── LE TRAIL : montées et descentes, sur les flux.
   const trail = flux && flux !== "illisible" ? analyseTrail(flux) : null;
   if (flux === "illisible") manques.push("les flux d'altitude n'ont pas pu être lus : ne commente ni les montées ni les descentes");
+  // Sans trace horodatée, on ne sait pas s'il s'est arrêté : « aucun arrêt » serait inventé.
+  if (arrets === null) manques.push("pas de trace GPS horodatée : les arrêts éventuels sont inconnus, n'en parle pas");
 
   // ── LA ZONE VISÉE : celle que le corps de séance prescrit (« Corps : 50 min en Z2 »). Les zones
   // de l'échauffement (« FC Z1→Z2 ») ne comptent pas : seul le corps dit l'intention.
@@ -420,6 +428,7 @@ export function faitsDeSeance(
     rang,
     trail, contexte: contexteFait, progression, zoneVisee, repetitions, ecart,
     prescrit: prescrit?.type ? { type: String(prescrit.type), titre: String(prescrit.titre ?? "") } : null,
+    arrets: arrets ?? null,
     manques,
   };
 }

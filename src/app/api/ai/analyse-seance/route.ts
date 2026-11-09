@@ -14,6 +14,7 @@ import { intervallesDeSeance, fluxDeSeance } from "@/lib/intervals/performance";
 import { identifiantsDe, type ProfilIdentifiants } from "@/lib/intervals/identifiants";
 import { getAccountLang } from "@/lib/i18n/serverLang";
 import { journaliserEchec } from "@/lib/journal/echecServeur";
+import { pausesDeTrace, pointsStockes, vitesseEnMouvement } from "@/lib/activities/pauses";
 
 /**
  * L'ANALYSE D'UNE SÉANCE — passée ou tout juste arrivée.
@@ -182,11 +183,18 @@ export async function POST(req: Request) {
     : undefined;
   // Le jour de la course visée, le « prescrit » EST la course : la séance du coach publiée ce
   // jour-là (une « Récupération » le 25/10, jour du marathon de Lille) ne sert pas de référence.
+  // ── Les arrêts, relus sur la trace déjà enregistrée (aucun appel à intervals.icu) : la base
+  //    ne garde que le temps en mouvement. Sans trace lisible, `null` : l'analyse dit qu'elle
+  //    ne sait pas, elle ne conclut jamais « aucun arrêt ».
+  const { data: trace, error: eTrace } = await supabase.from("activity_tracks").select("points").eq("workout_id", workoutId).maybeSingle();
+  if (eTrace) console.error("[analyse-seance] trace illisible, arrêts inconnus :", eTrace.message);
+  const arrets = eTrace || !trace ? null
+    : pausesDeTrace(pointsStockes((trace as { points?: unknown }).points), vitesseEnMouvement(s.distance_km, s.duration_seconds));
   const course = courseDuJour((objRes.data as { data?: ObjectifAvecPrecedente } | null)?.data, String(s.date).slice(0, 10), Number(s.distance_km));
   const faits = faitsDeSeance(s, { fcMax }, comparables,
     course ? { type: TYPE_COURSE, titre: course.nom || null, detail: null }
       : p ? { type: p.data?.sessionType ?? null, titre: p.title ?? null, detail: p.data?.subtitle ?? p.body ?? null } : null,
-    intervalles, contexte, flux);
+    intervalles, contexte, flux, arrets);
 
   // ── 5. Le modèle. Il rédige, il ne calcule pas.
   // ⚠️ LA LANGUE DU COMPTE, PAS LE FRANÇAIS EN DUR. L'invite imposait « en français » :
