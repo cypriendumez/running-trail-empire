@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState , useId } from "react";
-import { Turnstile, CLE_TURNSTILE, type TurnstileRef } from "@/components/auth/Turnstile";
+import { Turnstile, CLE_TURNSTILE, TOAST_CAPTCHA, type TurnstileRef } from "@/components/auth/Turnstile";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, MailCheck } from "lucide-react";
@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (CLE_TURNSTILE && !captcha) { toast.error(captchaHs ? D.captcha.indisponible : D.captcha.attente, { duration: 8000 }); return; }
+    if (CLE_TURNSTILE && !captcha) { toast.error(captchaHs ? D.captcha.indisponible : D.captcha.attente, { id: TOAST_CAPTCHA, duration: 8000 }); return; }
     setLoading(true);
     setAide(null);
     // ⚠️ PAR NOTRE ROUTE, PAS `supabase.auth.resetPasswordForEmail()`. Ce dernier envoie le
