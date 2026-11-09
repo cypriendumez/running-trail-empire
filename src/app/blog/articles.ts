@@ -575,7 +575,7 @@ export const ARTICLES: Article[] = [
         h: "La conclusion honnête",
         p: [
           "Aucun classement ne peut te dire quel modèle prendre, parce que les deux paramètres décisifs — ton terrain et ton pied — ne figurent dans aucun test.",
-          "Ce que l'on peut faire, en revanche, c'est suivre l'usure. Pacevo enregistre le kilométrage par paire : c'est un fait mesuré, pas un avis, et il vaut mieux qu'une intuition pour décider quand une paire est en fin de vie.",
+          "Ce que l'on peut faire, en revanche, c'est suivre l'usure. Pacevo permet de déclarer le kilométrage de chaque paire : ce n'est pas une mesure automatique — aucune montre ne transmet quelle paire a été portée à quelle sortie — mais un chiffre que l'athlète renseigne lui-même, et qui vaut mieux qu'une intuition pour décider quand une paire est en fin de vie.",
         ],
       },
     ],
@@ -999,6 +999,168 @@ export const ARTICLES: Article[] = [
         label:
           "Silbernagel KG et al. Continued sports activity, using a pain-monitoring model, during rehabilitation in patients with Achilles tendinopathy: a randomized controlled study. Am J Sports Med, 2007",
         url: "https://pubmed.ncbi.nlm.nih.gov/17307888/",
+      },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    slug: "gps-en-foret-pourquoi-ta-montre-se-trompe",
+    cle: "p14",
+    maj: "9 novembre 2026",
+    chapo:
+      "Plusieurs trails se courent en forêt ces prochains week-ends, et l'un d'eux de nuit. C'est exactement le terrain où le signal satellite se dégrade. Voici ce qu'une étude de validation a mesuré, et le repère qui reste fiable quand l'allure affichée ne l'est plus.",
+    blocs: [
+      {
+        h: "Ce qu'une montre calcule, pas ce qu'elle voit",
+        p: [
+          "Une montre GPS ne mesure pas ta vitesse : elle enregistre une suite de positions, à intervalles réguliers, et calcule la distance puis l'allure à partir de l'écart entre deux points. L'allure instantanée affichée au poignet est donc une dérivée — une position moins une autre, divisée par un temps très court.",
+          "Cette construction est fragile par nature. Une position légèrement décalée ne fait presque rien à la distance totale d'une sortie d'une heure, mais elle peut faire bondir ou chuter l'allure instantanée calculée sur quelques secondes. Sous les arbres, c'est précisément cette position ponctuelle qui se dégrade.",
+        ],
+      },
+      {
+        h: "Ce qu'une étude de validation a mesuré",
+        p: [
+          "Une équipe suisse menée par Rahel Gilgen-Ammann a testé huit montres GPS de sport (Apple, Coros, Garmin, Polar, Suunto) sur un même parcours répété à ciel ouvert, en zone urbaine et en forêt, à la marche, en course et à vélo. L'étude a été publiée dans JMIR mHealth and uHealth en 2020.",
+          "Ses résultats : l'erreur de distance mesurée se situe entre 3,2 % et 6,1 % selon les montres, tous terrains confondus. À ciel ouvert, six des huit montres restent précises ; en forêt et en zone urbaine, la précision se dégrade nettement, et les montres sous-estiment généralement la distance parcourue.",
+          "Autre résultat qui compte pour un coureur plutôt qu'un marcheur : la course affiche des taux d'erreur plus élevés que la marche ou le vélo pour la majorité des montres testées. Le mode de déplacement lui-même joue, pas seulement le terrain.",
+        ],
+      },
+      {
+        h: "Pourquoi l'allure affichée trompe le plus là où on la regarde le plus",
+        p: [
+          "Le réflexe, sous un sous-bois technique, est de regarder l'allure pour savoir si on accélère ou si on cale. C'est exactement le moment où ce chiffre est le moins fiable : moins de satellites visibles, signal réfléchi par les troncs et le relief, et une allure instantanée qui amplifie chaque erreur de position.",
+          "Un coureur qui corrige sa foulée à chaque sursaut d'allure sous les arbres ne corrige rien de réel — il réagit à du bruit de mesure. C'est fatigant, et ça casse une régularité d'effort qui, elle, est réelle.",
+        ],
+      },
+      {
+        h: "Ce qui reste fiable sous le couvert",
+        p: [
+          "La fréquence cardiaque et la sensation d'effort ne dépendent d'aucun satellite : elles restent le repère le plus stable quand le terrain se complique, sous-bois dense ou portion technique en dévers.",
+          "La distance totale d'une sortie bouge peu en valeur absolue, même avec une erreur de quelques pour cent — c'est l'allure seconde par seconde qui perd le plus de sens, pas le volume de la séance une fois rentré.",
+          "Une astuce simple, déjà suggérée par la littérature sur la validation des montres : étalonner son matériel sur un parcours de distance connue, en conditions dégagées, pour savoir à quel point se fier à l'allure affichée sur SA propre montre avant de s'y fier en forêt.",
+        ],
+      },
+      {
+        h: "Ce que Pacevo en fait",
+        p: [
+          "L'app relit, via intervals.icu, les mêmes traces GPS que celles enregistrées par la montre — elle n'a pas accès à une source de position plus précise que l'appareil au poignet, et ne prétend corriger aucune erreur de ce type.",
+          "C'est pourquoi l'intensité d'une séance se juge d'abord à la fréquence cardiaque, jamais à l'allure instantanée brute : sur un trail boisé, c'est la donnée qui reste interprétable.",
+        ],
+      },
+      {
+        h: "Ce que ça ne change pas",
+        p: [
+          "Rien de tout cela ne rend une montre inutile en forêt. Les auteurs de l'étude recommandent eux-mêmes l'usage de toutes les montres testées, en particulier pour l'enregistrement de distance en terrain dégagé — la limite concerne la lecture en temps réel sous couvert, pas le suivi d'entraînement dans son ensemble.",
+        ],
+      },
+    ],
+    sources: [
+      {
+        label:
+          "Gilgen-Ammann R, Schweizer T, Wyss T. Accuracy of Distance Recordings in Eight Positioning-Enabled Sport Watches: Instrument Validation Study. JMIR Mhealth Uhealth, 2020",
+        url: "https://pubmed.ncbi.nlm.nih.gov/32396865/",
+      },
+      {
+        label:
+          "Buchheit M. Monitoring training status with HR measures: do all roads lead to Rome ? Front Physiol, 2014",
+        url: "https://pubmed.ncbi.nlm.nih.gov/24578692/",
+      },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    slug: "plaque-carbone-en-trail-ce-qui-manque-encore",
+    cle: "p15",
+    maj: "9 novembre 2026",
+    chapo:
+      "ASICS, Merrell, Adidas, Nike et Brooks ont chacun sorti un modèle de trail à plaque carbone en 2026. L'argument de vente reprend presque mot pour mot celui de la route. Le mécanisme qu'il invoque est pourtant prouvé ailleurs, sur un terrain différent.",
+    blocs: [
+      {
+        h: "Une vague de sorties en 2026",
+        p: [
+          "ASICS a présenté la Metafuji Trail 2 le 10 juillet 2026, avec une plaque carbone en forme de X pensée pour la propulsion en montée ; la paire est disponible depuis le 1er août, à 250 dollars.",
+          "Merrell a suivi avec la MTL SpeedArc Peak, sa première chaussure à plaque carbone : une plaque fourchue — la Carbon Fiber FlexPlate — prise entre deux couches de mousse, pensée pour garder de la souplesse à l'avant-pied sur terrain rocheux. Le modèle a reçu un European Outdoor Award aux Outdoor Business Days de Riva del Garda, avant même sa sortie en magasin ; il est vendu autour de 290 dollars.",
+          "Adidas a dévoilé en août 2026 la Terrex Agravic Speed Ultra Evo, vendue 500 dollars en édition limitée. Nike a élargi sa gamme trail ACG avec l'Ultrafly 2, dont la plaque carbone ne court que sur une partie de la longueur de la semelle, vendue 260 dollars. Brooks a présenté la Cascadia Elite, construite à partir d'un prototype porté par Chris Myers à la Western States — elle embarque une plaque en Pebax chargé de carbone, pas une plaque carbone pleine, pour environ 275 dollars. Côté accessible, la Kiprun Kipsummit Race de Decathlon reprend le principe à plaque carbone pour environ 200 euros.",
+          "Signe que le sujet ne fait pas consensus dans l'industrie : The North Face a choisi la direction inverse avec son Offtrail Ultra, sans plaque ni grosse épaisseur de semelle — un retour assumé à un trail plus simple.",
+        ],
+      },
+      {
+        h: "Ce qu'une plaque fait, prouvé sur route",
+        p: [
+          "Le lien entre économie de course et performance est solide : les travaux de Wouter Hoogkamer, déjà cités sur ce blog à propos des chaussures de trail en général, montrent qu'une modification de l'économie de course se traduit directement en performance sur distance.",
+          "Sur route, une étude ultérieure de la même équipe a isolé l'effet de la plaque : sur dix-huit coureurs de haut niveau, un prototype combinant mousse à haut retour d'énergie et plaque rigide a réduit le coût énergétique de la course d'environ 4 % par rapport à deux chaussures de compétition classiques, à masse de chaussure égale — la baisse a été observée chez les dix-huit coureurs testés, à trois allures différentes. Cette étude a été menée sur tapis roulant, surface plane et prévisible — c'est ce terrain-là, précisément, qu'elle a étudié.",
+        ],
+      },
+      {
+        h: "Pourquoi le trail n'est pas la route",
+        p: [
+          "Un sentier n'offre ni surface plane ni appui répété à l'identique. Chaque foulée tombe sur un angle différent — racine, pierre, dévers — et la cheville doit pouvoir se tordre et absorber ce que la plaque, par construction, rigidifie.",
+          "En descente technique, c'est la stabilité torsionnelle et la perception du sol sous le pied qui protègent la foulée, pas la propulsion. Une plaque pensée pour pousser en ligne droite peut devenir un désavantage sur un terrain qui demande l'inverse.",
+          "Aucune étude contrôlée ne mesure aujourd'hui, à notre connaissance, le gain d'économie de course d'une plaque carbone sur sentier technique comme cela a été fait sur route ou piste. C'est une absence de preuve, pas une preuve d'absence — mais elle doit se dire comme telle.",
+        ],
+      },
+      {
+        h: "Ce que les fiches produit ne disent pas",
+        p: [
+          "Les arguments marketing des sorties 2026 empruntent le vocabulaire de la route — propulsion, retour d'énergie, performance — pour un public qui court sur un terrain où ce vocabulaire n'a pas été vérifié de la même façon. Rien n'interdit qu'une plaque aide aussi en trail ; rien ne le démontre non plus pour l'instant au niveau où la route a été étudiée.",
+          "C'est une distinction qu'aucune fiche produit n'est incitée à faire, et c'est exactement la nuance qui coûte le plus cher à ignorer à l'achat.",
+        ],
+      },
+      {
+        h: "Ce qui compte avant la plaque",
+        p: [
+          "L'article déjà publié sur ce blog a détaillé les quatre paramètres qui décident vraiment en trail : la masse, les crampons adaptés à TON terrain, l'amorti selon la durée de l'effort, et surtout le chaussant. Une plaque carbone s'ajoute à cette liste, elle ne la remplace pas.",
+          "Sur un terrain cassant ou très technique, un modèle sans plaque, plus souple, peut rester le meilleur choix — exactement la position défendue par The North Face avec son Offtrail Ultra.",
+        ],
+      },
+      {
+        h: "Ce que Pacevo en fait",
+        p: [
+          "L'app permet de déclarer le kilométrage de chaque paire pour suivre son usure. Ce chiffre n'est pas mesuré automatiquement — aucune montre ne transmet quelle paire a été portée à quelle sortie — c'est l'athlète qui le renseigne lui-même, et c'est dit comme tel : un chiffre déclaré vaut mieux qu'une jauge qui semble mesurée sans l'être.",
+          "Aucun test ni aucun chiffre de performance n'est associé à une marque ou un modèle dans Pacevo — la décision reste celle du coureur, en fonction de son terrain.",
+        ],
+      },
+    ],
+    sources: [
+      {
+        label:
+          "Hoogkamer W et al. Altered Running Economy Directly Translates to Altered Distance-Running Performance. Med Sci Sports Exerc, 2016",
+        url: "https://pubmed.ncbi.nlm.nih.gov/27327023/",
+      },
+      {
+        label:
+          "Hoogkamer W et al. A Comparison of the Energetic Cost of Running in Marathon Racing Shoes. Sports Med, 2018",
+        url: "https://pubmed.ncbi.nlm.nih.gov/29143929/",
+      },
+      {
+        label: "ASICS — communiqué officiel, lancement de la Metafuji Trail 2 (10 juillet 2026)",
+        url: "https://news-emea.asics.com/latest-News/the-new-asics-metafuji--trail-2-has-arrived--more-speed-for-body---mind/s/01780585-69c0-4f29-99b1-80b428e3bb06",
+      },
+      {
+        label: "Believe in the Run — Adidas Terrex Agravic Speed Ultra Evo, aperçu (août 2026)",
+        url: "https://believeintherun.com/shoe-reviews/adidas-terrex-agravic-speed-ultra-evo-preview/",
+      },
+      {
+        label: "Galaxus — la Merrell MTL SpeedArc Peak récompensée d'un European Outdoor Award (26 mai 2026)",
+        url: "https://galaxus.ch/en/page/merrells-mtl-speedarc-peak-is-designed-for-trail-running-42746",
+      },
+      {
+        label: "Road Trail Run — Nike ACG Ultrafly 2, test multi-testeurs (février 2026)",
+        url: "https://www.roadtrailrun.com/2026/02/worn-to-be-wild-nike-acg-ultrafly-2-and.html",
+      },
+      {
+        label: "T3 — Brooks Cascadia Elite, lancement (mars 2026)",
+        url: "https://www.t3.com/active/running/brooks-cascadia-elite-launch-0326",
+      },
+      {
+        label: "Road Trail Run — Kiprun Kipsummit Race de Decathlon, test (février 2026)",
+        url: "https://www.roadtrailrun.com/2026/02/dom-layfields-kiprun-kipsummit-race.html",
+      },
+      {
+        label: "T3 — The North Face Offtrail Ultra, lancement sans plaque carbone (août 2026)",
+        url: "https://www.t3.com/active/running/the-north-face-offtrail-ultra-launch-0826",
       },
     ],
   },
