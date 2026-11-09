@@ -730,7 +730,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // des lignes droites (coût en fatigue quasi nul, entretien de la vitesse), ce qui
   // compte double une semaine sans aucune séance de qualité.
   const distances = repartirFootings(easySlots.length, easyKm, rawEasy >= 3 ? kmMinFooting : 3, easyCap);
-  const gardes = { taper: ctx.cycle.taper, semaineCourse: raceIdx >= 0, sansHistorique: ctx.noHistory };
+  const gardes = { taper: ctx.cycle.taper, semaineCourse: raceIdx >= 0, sansHistorique: ctx.noHistory, douleur };
   easySlots.forEach((i, rang) => put(i, {
     type: "Endurance",
     title: (l) => { const v = varianteFooting(rang, easySlots.length, gardes);

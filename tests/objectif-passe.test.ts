@@ -221,6 +221,21 @@ async function main() {
       "la reprise relève une qualité que la douleur avait retirée");
   });
 
+  // Cas réel du 09/11/2026 : J+15 du marathon, périostite tibiale signalée SEULE (ni VFC ni
+  // nuit). La douleur ôtait sa séance AVANT le plafond de reprise, qui l'absorbait : un seuil
+  // restait prescrit deux jours après la douleur.
+  await test("en reprise, une douleur seule retire la séance de qualité restante", () => {
+    const seule = { ...FRAIS, pains: ["Tibia (périoste)"] };
+    assert.ok(computeQualityBudget(seule).qBudget >= 1, "précondition : hors reprise, la douleur seule ne laisse déjà plus de qualité");
+    const r = computeQualityBudget({ ...seule, apresCourse: { motif: "reprise après le marathon", reprise: true } });
+    assert.equal(r.qBudget, 0, `${r.qBudget} séance(s) de qualité en reprise malgré une douleur au tibia`);
+    assert.ok(r.easeReasons.includes("douleur signalée"), "la douleur n'est pas donnée comme motif");
+    // Sans plafond, la douleur coûte UNE séance, pas deux : le garde-fou ne la compte pas deux fois.
+    const sansPlancher = { ...FRAIS, isShortGoal: false, daysToRace: null, hasObjective: false };
+    assert.equal(computeQualityBudget({ ...sansPlancher, pains: ["mollet"] }).qBudget,
+      computeQualityBudget(sansPlancher).qBudget - 1, "hors plafond, la douleur ne retire pas exactement une séance");
+  });
+
   console.log("\nLE CONTEXTE DU COACH");
 
   await test("cinq jours après la course, l'objectif n'est plus l'objectif", async () => {

@@ -256,6 +256,20 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   // séance de VMA ou de seuil. En dernier, comme la récupération : aucun plancher ne la relève.
   if (i.marcheCourse) qBudget = 0;
 
+  // ── UNE DOULEUR NE SE FOND DANS AUCUN PLAFOND ───────────────────────────────
+  // La douleur retire sa séance plus haut, AVANT les plafonds : quand l'un d'eux tombe
+  // ensuite plus bas que le budget, il « absorbe » la déduction et la douleur ne coûte
+  // plus rien. Cas réel (Cyprien, 09/11/2026, J+15 du marathon de Lille, périostite
+  // tibiale signalée après sa séance) : 2 séances − 1 pour la douleur = 1, puis la reprise
+  // après course plafonne à 1 → séance au seuil maintenue deux jours après la douleur.
+  // On compare donc au MÊME athlète sans douleur : la douleur coûte une séance de ce qui
+  // lui serait permis, quel que soit le plafond qui s'applique. Sans plafond actif, rien
+  // ne change (les planchers sont déjà bloqués par la douleur, plus haut).
+  if (i.pains.length) {
+    const sansDouleur = computeQualityBudget({ ...i, pains: [] }).qBudget;
+    qBudget = Math.min(qBudget, Math.max(0, sansDouleur - 1));
+  }
+
   return {
     // Le français sort du MÊME gabarit que les autres langues : les deux ne peuvent
     // donc pas diverger au fil des retouches.
