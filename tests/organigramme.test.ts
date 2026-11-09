@@ -201,7 +201,7 @@ test("les textes de routines appellent des sous-agents qui existent, et chaque d
   }
   for (let n = 71; n <= 81; n++) {
     const l = parNumero.get(n)!;
-    if (/^DÉFINI, à brancher/.test(l.statut) || /^ACTIF \(dans/.test(l.statut)) {
+    if (/^DÉFINI, (à brancher|branché)/.test(l.statut) || /^ACTIF \(dans/.test(l.statut)) {
       assert.ok(appeles.has(slug(l.agent)), `${l.agent} est « ${l.statut} » mais aucun texte de routine n'appelle « ${slug(l.agent)} »`);
     }
   }

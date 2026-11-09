@@ -33,15 +33,17 @@ direction s'y ajoute par la correction en vigueur n°15. Dépôt PUBLIC : rien d
 - **En session, à la main** : « @HeadCoach, relis la PR #5 » ou « @Nexus point ».
 - **Modèle** : `opus` dans chaque fiche (Cyprien veut les directeurs à pleine puissance). Si le quota
   hebdomadaire le réclame, le repli est `sonnet` : changer la ligne `model:` des fiches, rien d'autre.
-- Les textes exacts à ajouter aux routines sont dans `ops/direction/routines/` ; ils s'appliquent après le GO
-  de Cyprien (modifier une routine est une configuration permanente), un premier passage contrôlé à chaque fois.
+- Les textes de `ops/direction/routines/` ont été appliqués le 09/11/2026 avec le GO de Cyprien : six routines
+  cloud (Direction et Blog sujets ont reçu l'outil Agent, qui leur manquait) et la tâche locale Courrier. Un
+  directeur reste « DÉFINI, branché » tant que son premier passage réel n'a pas été lu dans le journal
+  (`list_runs`, `get_run_log`) ; il passe « ACTIF (dans …) » ensuite, jamais avant.
 
 ## Les 81 numéros + @Vigie
 
 Statuts possibles : `ACTIF` (une routine ou une tâche l'exécute vraiment), `VAGUE 2` (défini, à brancher dans
 une routine existante avant avril 2027), `EN ATTENTE` (défini, démarre sur son déclencheur), `APP` (fonction de
 l'application, pas un agent), `FUSIONNÉ` (numéro absorbé par un autre agent), `DÉFINI` (direction du 09/11, sous-agent
-prêt, branchement en attente). Les statuts des n°1 à 70 sont ceux de l'index de la section 8 de la constitution
+prêt ; « branché » = texte appliqué à la routine, premier passage à prouver). Les statuts des n°1 à 70 sont ceux de l'index de la section 8 de la constitution
 et de `ops/STATE.md`.
 
 | n° | Agent | Pôle | Rend compte à | Statut réel (09/11/2026) | Où il s'exécute |
@@ -116,15 +118,15 @@ et de `ops/STATE.md`.
 | 68 | @DataCleaner | D. Technique, sécurité, sauvegardes | @Architect | EN ATTENTE (premiers vrais inscrits) | aucune routine |
 | 69 | @OnboardingCoach | E. Produit, design, mobile | @Maestro | VAGUE 2 | aucune routine |
 | 70 | @CrisisManager | A. Direction et amélioration | @Strategos | VAGUE 2 (sur incident) | aucune routine |
-| 71 | @Atlas | Direction | @Nexus | DÉFINI, à brancher dans Direction | sous-agent `atlas`, routine Direction (vendredi 6 h), juste avant @Nexus |
-| 72 | @Strategos | A. Direction et amélioration | @Atlas | DÉFINI, à brancher dans Direction | sous-agent `strategos`, routine Direction, avec les leçons de la semaine |
-| 73 | @Chancelier | B. Secrétariat et e-mails | @Atlas | DÉFINI, à brancher dans Courrier | sous-agent `chancelier`, tâche locale Courrier (Mac, 8 h), après @Concierge |
-| 74 | @HeadCoach | C. Science du sport et coach | @Atlas | DÉFINI, à brancher dans Coach | sous-agent `headcoach`, routine Coach (lundi 5 h) avant la PR ; à la demande sur toute PR qui touche `src/lib/coach`, `src/lib/ai/autoPlan.ts`, `src/lib/running`, `src/lib/watch` |
-| 75 | @Architect | D. Technique, sécurité, sauvegardes | @Atlas | DÉFINI, à brancher dans Bugs et Sécurité et veille | sous-agent `architect`, routines Bugs (6 h, 23 h) et Sécurité et veille (le 5) |
+| 71 | @Atlas | Direction | @Nexus | DÉFINI, branché le 09/11 dans Direction (premier passage à prouver) | sous-agent `atlas`, routine Direction (vendredi 6 h), juste avant @Nexus |
+| 72 | @Strategos | A. Direction et amélioration | @Atlas | DÉFINI, branché le 09/11 dans Direction (premier passage à prouver) | sous-agent `strategos`, routine Direction, avec les leçons de la semaine |
+| 73 | @Chancelier | B. Secrétariat et e-mails | @Atlas | DÉFINI, branché le 09/11 dans Courrier (premier passage à prouver) | sous-agent `chancelier`, tâche locale Courrier (Mac, 8 h), après @Concierge |
+| 74 | @HeadCoach | C. Science du sport et coach | @Atlas | DÉFINI, branché le 09/11 dans Coach (premier passage à prouver) | sous-agent `headcoach`, routine Coach (lundi 5 h) avant la PR ; à la demande sur toute PR qui touche `src/lib/coach`, `src/lib/ai/autoPlan.ts`, `src/lib/running`, `src/lib/watch` |
+| 75 | @Architect | D. Technique, sécurité, sauvegardes | @Atlas | DÉFINI, branché le 09/11 dans Bugs et Sécurité et veille (premier passage à prouver) | sous-agent `architect`, routines Bugs (6 h, 23 h) et Sécurité et veille (le 5) |
 | 76 | @Maestro | E. Produit, design, mobile | @Atlas | DÉFINI, s'active avec son pôle (Vague 2) | sous-agent `maestro`, à la demande sur toute PR d'interface, de traduction ou de store |
-| 77 | @Mercator | F. Marketing et acquisition | @Atlas | DÉFINI, à brancher dans Blog et Sécurité et veille | sous-agent `mercator`, routines Blog (1er/15, lundi) avant la PR, et Sécurité et veille pour le rapport de @Radar |
+| 77 | @Mercator | F. Marketing et acquisition | @Atlas | DÉFINI, branché le 09/11 dans Blog et Sécurité et veille (premier passage à prouver) | sous-agent `mercator`, routines Blog (1er/15, lundi) avant la PR, et Sécurité et veille pour le rapport de @Radar |
 | 78 | @Alliance | G. Fidélité, support, partenariats | @Atlas | DÉFINI, s'active avec son pôle (en attente) | sous-agent `alliance`, à la demande sur tout brouillon de relance, de partenariat ou de FAQ |
-| 79 | @Trésorier | H. Finance, administratif, juridique | @Atlas | DÉFINI, à brancher dans Direction | sous-agent `tresorier`, routine Direction, avec les dossiers de @Greffier |
+| 79 | @Trésorier | H. Finance, administratif, juridique | @Atlas | DÉFINI, branché le 09/11 dans Direction (premier passage à prouver) | sous-agent `tresorier`, routine Direction, avec les dossiers de @Greffier |
 | 80 | @Oracle | I. Données des coureurs | @Atlas | DÉFINI, s'active avec son pôle (en attente) | sous-agent `oracle`, à la demande sur toute analyse de données ou formule de prédiction |
 | 81 | @Conductor | J. Dans l'application | @Atlas | DÉFINI, s'active avec la Vague 2 | sous-agent `conductor`, à la demande avant toute PR sur une des six fonctions ; audit de l'existant |
 | — | @Vigie | D. Technique, sécurité, sauvegardes | @Architect | ACTIF (GitHub Actions + UptimeRobot, sans IA) | `vigie.yml` (demandé toutes les 30 min, 3 à 4 h réelles) ; UptimeRobot toutes les 5 min |
