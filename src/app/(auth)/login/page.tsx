@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState , useId} from "react";
-import { Turnstile, CLE_TURNSTILE, type TurnstileRef } from "@/components/auth/Turnstile";
+import { Turnstile, CLE_TURNSTILE, TOAST_CAPTCHA, type TurnstileRef } from "@/components/auth/Turnstile";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -108,7 +108,7 @@ export default function LoginPage() {
     e.preventDefault();
     // CAPTCHA (en sommeil sans clé, voir `components/auth/Turnstile`) : GoTrue vérifie lui-même le
     // jeton quand la protection est activée chez Supabase. Sans jeton, il refuserait la connexion.
-    if (CLE_TURNSTILE && !captcha) { toast.error(captchaHs ? C.indisponible : C.attente, { duration: 8000 }); return; }
+    if (CLE_TURNSTILE && !captcha) { toast.error(captchaHs ? C.indisponible : C.attente, { id: TOAST_CAPTCHA, duration: 8000 }); return; }
     setLoading(true);
     setAide(null);
     const supabase = createClient();

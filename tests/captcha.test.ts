@@ -192,6 +192,23 @@ void (async () => {
     assert.equal((legal.match(/\.\.\.avecTurnstile\("Cloudflare/g) ?? []).length, 5, "Cloudflare n'est pas nommé dans les cinq langues");
   });
 
+  await test("la notification « vérification anti-robot en cours » ne reste jamais collée (iPhone, 09/11/2026)", () => {
+    // Touchée du doigt, une notification Sonner met son compte à rebours en pause et ne le reprend
+    // jamais sur téléphone : elle restait sur le tableau de bord après la connexion.
+    const nu = (f: string) => readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+    const widget = nu("src/components/auth/Turnstile.tsx");
+    assert.match(widget, /export const TOAST_CAPTCHA = "captcha-attente";/);
+    assert.match(widget, /callback: \(jeton: string\) => \{ toast\.dismiss\(TOAST_CAPTCHA\); rappel\.current\(jeton\); \}/,
+      "le jeton arrive mais le message d'attente reste affiché");
+    for (const f of ["src/app/(auth)/login/page.tsx", "src/app/(auth)/signup/page.tsx", "src/app/(auth)/forgot-password/page.tsx", "src/components/settings/SettingsView.tsx"]) {
+      const src = nu(f);
+      const appels = src.match(/\.attente, \{[^}]*\}/g) ?? [];
+      assert.ok(appels.length >= 1, `${f} : message d'attente introuvable`);
+      for (const a of appels) assert.match(a, /id: TOAST_CAPTCHA/, `${f} : le message d'attente n'a pas d'identifiant (empilé, jamais retiré par le widget)`);
+    }
+    assert.match(nu("src/components/layout/Providers.tsx"), /<Toaster\s+position="bottom-right"\s+closeButton/, "les notifications n'ont plus de croix : une notification en pause reste à l'écran");
+  });
+
   console.log(`\n${passes} test(s) passé(s), ${fails.length} échec(s)`);
   if (fails.length) process.exit(1);
 })();

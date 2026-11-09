@@ -20,8 +20,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
+      {/* `closeButton` (09/11/2026) : sur téléphone, toucher une notification met son compte à
+          rebours en pause et il ne repart jamais — sans croix, elle restait à l'écran (capture de
+          Cyprien, « ça veut pas s'enlever »). */}
       <Toaster
         position="bottom-right"
+        closeButton
         toastOptions={{
           style: {
             borderRadius: "16px",
