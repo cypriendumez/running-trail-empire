@@ -29,7 +29,7 @@ des deux.*
 
 10. **`@TimeMachine` « chaque nuit à 3 h »** : il n'y a rien à vérifier chaque nuit. La sauvegarde publique (GitHub) est hebdomadaire ; depuis le 08/11/2026, une sauvegarde **privée et chiffrée** de toute la base (données des coureurs comprises) tourne chaque dimanche sur le Mac (`npm run sauvegarde:privee`). Le « test de restauration sur base isolée » exigerait un second projet Supabase : remplacé par une relecture complète de l'archive (déchiffrement + recomptage).
 11. **Réseau des routines** : `pacevo.fr`, `pacevo.app` et les sites des concurrents et des marques de montres sont autorisés dans l'environnement cloud « Default » (fait par Cyprien le 08/11/2026, prouvé). Ce réglage ne se change pas par l'API.
-12. **Horaires** : les routines cloud partagent la limite d'usage des 5 heures avec les sessions de Cyprien. Elles tournent donc la nuit, pas aux heures du texte (« 10 h par défaut »). Un passage de moins de 30 secondes est un refus pour limite atteinte.
+12. **Horaires** : les routines cloud partagent la limite d'usage des 5 heures avec les sessions de Cyprien. Elles tournent donc la nuit, pas aux heures du texte (« 10 h par défaut »). Un passage très court PEUT être un refus pour limite atteinte, mais aussi un vrai « RAS » (09/11/2026) : lire `get_run_log` avant de conclure.
 13. **Lancement** : le texte dit « janvier 2027 ». Décision du 08/11/2026 : premières ventes en **avril 2027**, début d'activité de la micro-entreprise le 1er avril 2027.
 
 ---

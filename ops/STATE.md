@@ -38,6 +38,10 @@ qu'une routine cloud ne peut pas faire.
 
 **Tâches GitHub Actions** (suivies dans /admin › Automatisation) : synchro du coach, sauvegarde
 hebdomadaire des tables publiques (dimanche 03 h 20), newsletter, veille des courses.
+`@Vigie` (`vigie.yml`) sonde pacevo.fr : demandé toutes les 30 min, mais GitHub ne lance les
+planifications de ce dépôt que toutes les 3 à 4 heures (mesuré le 09/11 : 2 passages planifiés en
+15 h, comme `sync-coach`). Une panne peut donc rester invisible quelques heures ; une sonde externe
+gratuite (UptimeRobot, toutes les 5 min) comblerait ce trou : compte à créer par Cyprien.
 
 ## Vague 1 : 12 agents sur 12 en place
 
