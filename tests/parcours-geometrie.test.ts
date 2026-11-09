@@ -13,9 +13,10 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import { geometrieParcours, geometrieVerifiee, depuisApiOsm, depuisOverpass, refusDefinitif, causes, ErreurSource } from "../src/lib/parcours/geometrie";
+import { geometrieParcours, geometrieVerifiee, depuisApiOsm, depuisOverpass, refusDefinitif, causes, ErreurSource, echecPassager } from "../src/lib/parcours/geometrie";
 import { tracePartiel, longueurKm, PART_MIN } from "../src/lib/parcours/trace";
 import { estDuCatalogue, distanceDuCatalogue } from "../src/lib/parcours/catalogue";
+import { MemoireJournal } from "../src/lib/parcours/journalTraces";
 import os from "os";
 
 let passed = 0; const fails: string[] = [];
@@ -312,6 +313,57 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
     assert.ok(Date.now() - t1 < 1000 && appels() === 1, "sans distance connue, une seconde recherche a été lancée");
   });
 
+  await test("l'autre source en PANNE n'est pas un parcours troué ; un fait du tracé, si", () => {
+    for (const [e, attendu, quoi] of [
+      [new ErreurSource("Overpass 429", 429, "overpass"), true, "429 (trop de requêtes)"],
+      [new ErreurSource("Overpass 504", 504, "overpass"), true, "504"],
+      [new ErreurSource("API OSM 500", 500, "api-osm"), true, "500"],
+      [new ErreurSource("API OSM : TimeoutError", 0, "api-osm"), true, "délai dépassé"],
+      [new ErreurSource("Overpass : TypeError", 0, "overpass"), true, "coupure réseau"],
+      [new ErreurSource("Overpass : runtime error: Query timed out", 0, "overpass"), true, "Overpass interrompue (remark)"],
+      [new AggregateError([new ErreurSource("Overpass 403", 403, "overpass"), new ErreurSource("Overpass 503", 503, "overpass")]), true, "un miroir en panne parmi d'autres"],
+      [new ErreurSource("API OSM : nœud manquant", 0, "api-osm"), false, "nœud manquant"],
+      [new ErreurSource("API OSM : plus de 300 relations", 0, "api-osm"), false, "trop de relations"],
+      [new ErreurSource("Overpass : géométrie vide", 0, "overpass"), false, "géométrie vide"],
+      [new ErreurSource("Overpass 403", 403, "overpass"), false, "403 (refus)"],
+      [new ErreurSource("API OSM 404", 404, "api-osm"), false, "étape supprimée (404)"],
+      [new AggregateError([new ErreurSource("Overpass 503", 503, "overpass"), new ErreurSource("Overpass : géométrie vide", 0, "overpass")]), false, "un miroir en panne, l'autre dit « géométrie vide » (le fait l'emporte)"],
+      [new AggregateError([new ErreurSource("API OSM : nœud manquant", 0, "api-osm"), new ErreurSource("Overpass 429", 429, "overpass")]), false, "nœud manquant d'un côté, 429 de l'autre (le fait l'emporte)"],
+      [new SyntaxError("Unexpected token <"), true, "page HTML illisible d'un Overpass surchargé"],
+    ] as [unknown, boolean, string][]) assert.equal(echecPassager(e), attendu, `${quoi} : ${attendu ? "une panne prise pour un fait du tracé" : "un fait du tracé pris pour une panne"}`);
+  });
+
+  await test("un morceau dont l'autre source est en panne : l'échec est rendu, et reconnu passager", async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("api.openstreetmap.org")) return new Response("{}", { status: 503 });
+      return new Response(JSON.stringify({ elements: geo([[1, 2]]).map((g, i) => ({ type: "way", id: 10 + i, geometry: g })) }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+    const v = await geometrieVerifiee("relation", "100", 30);
+    assert.equal(v.partiel, true);
+    assert.ok(v.echecs.length > 0 && v.echecs.some(echecPassager), "la panne de l'API officielle (503) n'est pas rendue comme passagère");
+  });
+
+  await test("journal des tracés : plafond compté en LIGNES écrites, fenêtre d'une heure, rien en double", () => {
+    const H = 60 * 60_000, J = 24 * H;
+    const m = new MemoireJournal(3, H, J);
+    assert.deepEqual(["a", "b", "c"].map((k) => m.incomplet(k, 0)), ["lister", "lister", "lister"]);
+    // Un parcours déjà listé, redemandé : rien, et il ne mange pas la place des autres.
+    for (let i = 1; i <= 5; i++) assert.equal(m.incomplet("a", i * 11 * 60_000), "rien", "un parcours déjà listé est réécrit ou consomme le plafond");
+    assert.equal(m.incomplet("d", 1000), "synthese", "au-delà du plafond, pas de ligne de synthèse");
+    assert.equal(m.incomplet("e", 2000), "rien", "la ligne de synthèse part plusieurs fois dans l'heure");
+    // Une heure plus tard : la fenêtre repart (place pour de nouveaux parcours, synthèse redevenue possible).
+    assert.equal(m.incomplet("f", H), "lister", "la fenêtre d'une heure ne se renouvelle pas (ou s'inverse)");
+    assert.equal(m.incomplet("f", H + 1), "rien");
+    assert.equal(m.incomplet("a", H + 2), "rien", "un parcours listé ce jour est relisté après une heure");
+    assert.equal(m.incomplet("a", J), "lister", "un parcours toujours troué le lendemain n'est plus jamais listé");
+    // Messages constants : une fois par fenêtre, garde posée dès le premier appel (avant tout await).
+    assert.equal(m.uneFois("panne overpass:503", 0), true);
+    assert.equal(m.uneFois("panne overpass:503", 1), false, "deux pannes simultanées écrivent deux lignes");
+    assert.equal(m.uneFois("panne api-osm:429", 2), true, "une cause différente est masquée par la première");
+    assert.equal(m.uneFois("panne overpass:503", H), true, "une panne qui dure n'est plus jamais redite");
+  });
+
   await test("un catalogue illisible n'est ni pris pour vide, ni retenu", () => {
     const ici = process.cwd();
     process.chdir(os.tmpdir()); // pas de data/ ici : lecture impossible
@@ -345,24 +397,37 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
     // Un MORCEAU de parcours : une exception (jamais gardée par unstable_cache), puis 422 sans CACHE.set.
     assert.match(route, /const v = await geometrieVerifiee\(type, id, distanceKm\);\s*if \(v\.partiel\) throw new TraceIncomplet\(/, "un morceau de parcours est de nouveau mis en cache 30 jours");
     // Catalogue illisible : pas de contrôle possible, donc PAS de cache persistant, et /admin le sait.
-    assert.match(route, /const signaler = distance === null && Date\.now\(\) - illisibleSignale > 60 \* 60_000;\s*if \(signaler\) illisibleSignale = Date\.now\(\);/, "le signalement d'un catalogue illisible n'est plus borné avant le premier await");
+    assert.match(route, /const signaler = distance === null && MEMOIRE\.uneFois\("catalogue illisible \(tracés\)", Date\.now\(\)\);/, "le signalement d'un catalogue illisible n'est plus borné avant le premier await");
+    // Plusieurs parcours en panne au même moment : une ligne par cause, garde synchrone avant l'écriture.
+    assert.match(route, /if \(!MEMOIRE\.uneFois\(`panne \$\{cause\}`, Date\.now\(\)\)\) return;\s*await journaliserEchecUneFois\(null, \{\s*\.\.\.base, message: `Tracé de parcours indisponible/, "une panne sur plusieurs parcours à la fois écrit de nouveau une ligne par recherche");
+    assert.match(route, /else if \(auCatalogue === null && MEMOIRE\.uneFois\("catalogue illisible \(supprimés\)", Date\.now\(\)\)\) await/, "le signalement « parcours supprimés non repérés » n'est plus borné");
     assert.match(route, /if \(signaler\) await journaliserEchecUneFois\(null, \{[\s\S]{0,120}message: "Catalogue des parcours illisible : tracés non vérifiés, cache coupé"/, "un catalogue illisible laisse de nouveau des morceaux non vérifiés sans rien dire");
     assert.match(route, /await \(distance === null \? tracePourCache\(type, id, 0\) : geometrieEnCache\(type, id, distance\)\);\s*return \{ coords, verifie: distance !== null \};/, "un catalogue illisible remet le tracé non vérifié dans le cache persistant");
     assert.match(route, /if \(!verifie\) return NextResponse\.json\(\{ coordinates: coords \}, \{ headers: \{ "Cache-Control": "no-store" \} \}\);\s*if \(CACHE\.size > 2000\) CACHE\.clear\(\);\s*CACHE\.set\(key, coords\);/, "un tracé non vérifié (catalogue illisible) est gardé dans la mémoire de l'instance ou par le navigateur");
     // Clics simultanés sur un même parcours : une seule recherche vers OpenStreetMap, UN seul journal.
     assert.match(route, /let enCours = EN_COURS\.get\(key\);\s*if \(!enCours\) \{[\s\S]{0,2000}EN_COURS\.set\(key, enCours\);\s*enCours\.finally\(\(\) => EN_COURS\.delete\(key\)\)/, "deux clics simultanés relancent deux recherches vers OpenStreetMap");
-    assert.match(route, /\} catch \(e\) \{\s*if \(\(e as \{ partiel\?: unknown \}\)\?\.partiel === true\) \{[\s\S]{0,300}PARTIELS\.set\(key, Date\.now\(\)\);\s*\}\s*await journaliserRecherche\(e, type, id\);\s*throw e;/, "la recherche partagée ne journalise plus son échec");
+    assert.match(route, /\} catch \(e\) \{\s*if \(\(e as \{ partiel\?: unknown \}\)\?\.partiel === true\) \{[\s\S]{0,500}PARTIELS\.set\(key, \{ jusqua: Date\.now\(\) \+ \(transitoire \? PARTIEL_PASSAGER_MS : PARTIEL_MS\), transitoire \}\);\s*\}\s*await journaliserRecherche\(e, type, id\);\s*throw e;/, "la recherche partagée ne journalise plus son échec, ou une panne passagère bloque le parcours 10 min");
+    // Morceau + autre source EN PANNE : « réessaie », jamais « parcours troué » (ni pour le coureur, ni dans /admin).
+    assert.match(route, /if \(v\.partiel\) throw new TraceIncomplet\(`tracé incomplet : \$\{type\} \$\{id\}`, v\.echecs, v\.echecs\.some\(echecPassager\)\);/, "la panne de l'autre source n'est plus distinguée d'un parcours troué");
+    assert.match(route, /if \(p\.transitoire\) e = new AggregateError\(p\.echecs, "autre source en panne"\);/, "une panne de l'autre source est journalisée comme un parcours troué");
+    assert.match(route, /partiel: true, transitoire: \(e as TraceIncomplet\)\.transitoire === true \}, \{ status: 422 \}/, "le navigateur ne sait plus qu'il peut réessayer");
+    assert.match(route, /partiel: true, transitoire: vuPartiel\.transitoire \}, \{ status: 422 \}/, "la réponse en mémoire perd l'indication de panne passagère");
+    assert.match(route, /const PARTIEL_PASSAGER_MS = 60_000;/, "une panne passagère bloque de nouveau le parcours 10 minutes");
+    // Plafond des lignes « Tracé incomplet » : /admin reste lisible si OSM se troue partout.
+    assert.match(route, /const decision = MEMOIRE\.incomplet\(`\$\{type\}\/\$\{id\}`, Date\.now\(\)\);\s*if \(decision === "rien"\) return;\s*if \(decision === "synthese"\) \{\s*await journaliserEchecUneFois\(null, \{[\s\S]{0,80}message: `Tracés incomplets : plus de \$\{INCOMPLETS_MAX_HEURE\} parcours en une heure/, "le nombre de lignes « Tracé incomplet » n'est plus plafonné");
+    assert.match(route, /const MEMOIRE = new MemoireJournal\(INCOMPLETS_MAX_HEURE\);/, "le plafond du journal n'est plus celui annoncé");
+    assert.match(route, /const INCOMPLETS_MAX_HEURE = 20;/, "plafond des lignes « Tracé incomplet » changé sans le dire");
     const reponses = route.slice(route.indexOf("const { coords, verifie } = await enCours;"));
     assert.ok(reponses.length > 50 && !/journaliser/.test(reponses), "chaque requête qui attend la recherche journalise de nouveau : N requêtes simultanées, N lignes");
-    assert.match(route, /if \(\(e as \{ partiel\?: unknown \}\)\?\.partiel === true\) \{\s*const echecs = \(e as TraceIncomplet\)\.echecs \?\? \[\];\s*await journaliserEchecUneFois\(null, \{\s*\.\.\.base, message: `Tracé incomplet sur OpenStreetMap : \$\{type\} \$\{id\}`,\s*meta: \{ type, id, autreSource:/, "un tracé incomplet n'est plus listé dans /admin, ou sans la cause de l'échec de l'autre source");
-    assert.match(route, /if \(\(e as \{ partiel\?: unknown \}\)\?\.partiel === true\) \{\s*return NextResponse\.json\(\{ error: "Tracé incomplet sur OpenStreetMap\.", partiel: true \}, \{ status: 422 \}\);/, "un tracé incomplet n'est plus dit au navigateur (422)");
-    assert.match(route, /const vuPartiel = PARTIELS\.get\(key\);\s*if \(vuPartiel && Date\.now\(\) - vuPartiel < PARTIEL_MS\) return/, "chaque clic sur un parcours incomplet réinterroge de nouveau OpenStreetMap");
+    assert.match(route, /await journaliserEchecUneFois\(null, \{\s*\.\.\.base, message: `Tracé incomplet sur OpenStreetMap : \$\{type\} \$\{id\}`,\s*meta: \{ type, id, autreSource: \[\.\.\.new Set\(p\.echecs/, "un tracé incomplet n'est plus listé dans /admin, ou sans la cause de l'échec de l'autre source");
+    assert.match(route, /if \(\(e as \{ partiel\?: unknown \}\)\?\.partiel === true\) \{\s*return NextResponse\.json\(\{ error: "Tracé incomplet sur OpenStreetMap\.", partiel: true, transitoire:/, "un tracé incomplet n'est plus dit au navigateur (422)");
+    assert.match(route, /const vuPartiel = PARTIELS\.get\(key\);\s*if \(vuPartiel && Date\.now\(\) < vuPartiel\.jusqua\) return/, "chaque clic sur un parcours incomplet réinterroge de nouveau OpenStreetMap");
     const navi = codeNu("src/components/parcours/ParcoursBrowser.tsx");
-    assert.equal((navi.match(/if \(res\?\.status === 422\) \{ toast\.error\(L\["t\.traceIncomplete"\]/g) ?? []).length, 2, "la carte ou l'export GPX prend un tracé incomplet (422) pour une panne");
+    assert.equal((navi.match(/if \(res\?\.status === 422\) \{ toast\.error\(L\[\(await res\.json\(\)\.catch\(\(\) => \(\{\}\)\)\)\.transitoire \? "t\.traceIndispo" : "t\.traceIncomplete"\]/g) ?? []).length, 2, "la carte ou l'export GPX confond un tracé incomplet (422), une panne passagère et une panne");
     // Un parcours supprimé d'OSM est listé dans /admin (pour le retirer du catalogue).
     assert.match(route, /if \(refusDefinitif\(e\)\) \{[\s\S]{0,400}const auCatalogue = estDuCatalogue\(type, id\);\s*if \(auCatalogue\) await journaliserEchecUneFois\(null, \{[\s\S]{0,200}message: `Parcours supprimé d'OpenStreetMap : \$\{type\} \$\{id\}`/,
       "un parcours mort n'est plus listé dans /admin, ou n'importe quel identifiant inventé peut remplir error_logs");
-    assert.match(route, /else if \(auCatalogue === null\) await journaliserEchecUneFois\(null, \{[\s\S]{0,200}message: "Catalogue des parcours illisible/,
+    assert.match(route, /else if \(auCatalogue === null && MEMOIRE\.uneFois\("[^"]*", Date\.now\(\)\)\) await journaliserEchecUneFois\(null, \{[\s\S]{0,200}message: "Catalogue des parcours illisible/,
       "un catalogue illisible fait taire la liste des parcours morts sans laisser de trace");
     assert.match(route, /: c instanceof SyntaxError \? "réponse illisible"/, "une page HTML illisible remet un extrait variable dans le message du journal");
     // Une erreur sans statut HTTP garde son libellé : « délai » et « tracé troué » ne se confondent plus.

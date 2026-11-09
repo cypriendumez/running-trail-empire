@@ -7,9 +7,10 @@ export const maxDuration = 30;
 import { NextRequest, NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { denyIfAnonymous } from "@/lib/api/adminGuard";
-import { geometrieVerifiee, refusDefinitif, causes, ErreurSource } from "@/lib/parcours/geometrie";
+import { geometrieVerifiee, refusDefinitif, causes, ErreurSource, echecPassager } from "@/lib/parcours/geometrie";
 import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { estDuCatalogue, distanceDuCatalogue } from "@/lib/parcours/catalogue";
+import { MemoireJournal } from "@/lib/parcours/journalTraces";
 
 /**
  * GÉOMÉTRIE GPS RÉELLE D'UN PARCOURS, chargée à la demande depuis OpenStreetMap (ODbL).
@@ -32,20 +33,31 @@ const CACHE = new Map<string, [number, number][]>();
 /** Un tracé trop court pour la distance du catalogue : refusé, et jamais mis en cache. */
 class TraceIncomplet extends Error {
   readonly partiel = true;
-  constructor(message: string, readonly echecs: unknown[]) { super(message); }
+  /** `transitoire` : l'autre source a échoué par une PANNE — le parcours n'est peut-être pas troué. */
+  constructor(message: string, readonly echecs: unknown[], readonly transitoire: boolean) { super(message); }
 }
 const tracePourCache = async (type: "relation" | "way", id: string, distanceKm: number) => {
   const v = await geometrieVerifiee(type, id, distanceKm);
   // Une exception n'est pas gardée par `unstable_cache` : le coureur pourra réessayer.
-  if (v.partiel) throw new TraceIncomplet(`tracé incomplet : ${type} ${id}`, v.echecs);
+  if (v.partiel) throw new TraceIncomplet(`tracé incomplet : ${type} ${id}`, v.echecs, v.echecs.some(echecPassager));
   return v.coords;
 };
 const geometrieEnCache = unstable_cache(tracePourCache, ["parcours-geometrie-v3"], { revalidate: 60 * 60 * 24 * 30 });
 /**
- * Un morceau vu il y a moins de 10 min : on le redit sans réinterroger OpenStreetMap (service
- * gratuit, quotas stricts) — sans cette mémoire, chaque clic relançait les deux sources.
+ * Un morceau vu récemment : on le redit sans réinterroger OpenStreetMap (service gratuit, quotas
+ * stricts) — sans cette mémoire, chaque clic relançait les deux sources. 10 min pour un parcours
+ * troué ; 1 min seulement quand l'autre source était en PANNE (le coureur va réessayer).
  */
-const PARTIELS = new Map<string, number>();
+const PARTIELS = new Map<string, { jusqua: number; transitoire: boolean }>();
+const PARTIEL_MS = 10 * 60_000;
+const PARTIEL_PASSAGER_MS = 60_000;
+/**
+ * Plafond des lignes « Tracé incomplet » par instance et par heure : au-delà, UNE ligne de synthèse —
+ * si OpenStreetMap se trouait sur des centaines de parcours, /admin ne serait plus lisible.
+ */
+const INCOMPLETS_MAX_HEURE = 20;
+/** Gardes synchrones du journal (voir `MemoireJournal`) : rien ne part en double, même en rafale. */
+const MEMOIRE = new MemoireJournal(INCOMPLETS_MAX_HEURE);
 /**
  * Deux clics (ou deux coureurs) sur le même parcours au même moment : UNE seule recherche, et UN seul
  * journal — c'est la recherche qui journalise, pas chaque requête qui l'attend (sinon N requêtes
@@ -53,8 +65,6 @@ const PARTIELS = new Map<string, number>();
  * illisible (tracé non confronté à sa distance, donc gardé nulle part).
  */
 const EN_COURS = new Map<string, Promise<{ coords: [number, number][]; verifie: boolean }>>();
-/** Dernier signalement d'un catalogue illisible par cette instance (garde synchrone, avant tout `await`). */
-let illisibleSignale = 0;
 
 /** Nom court et stable d'une cause, pour le message du journal (jamais d'identifiant ni d'extrait de page). */
 const nomCause = (c: unknown) => c instanceof ErreurSource
@@ -68,17 +78,30 @@ const nomCause = (c: unknown) => c instanceof ErreurSource
 /** Ce que /admin doit savoir d'une recherche ratée. Appelé UNE fois par recherche. */
 async function journaliserRecherche(e: unknown, type: "relation" | "way", id: string) {
   const base = { source: "parcours-geometrie", url: "/api/parcours/geometry" };
-  // Un MORCEAU de parcours (OpenStreetMap incomplet) : une ligne par parcours et par jour (seuls les
-  // parcours du catalogue ont une distance), avec la cause si l'autre source a échoué.
   if ((e as { partiel?: unknown })?.partiel === true) {
-    const echecs = (e as TraceIncomplet).echecs ?? [];
-    await journaliserEchecUneFois(null, {
-      ...base, message: `Tracé incomplet sur OpenStreetMap : ${type} ${id}`,
-      meta: { type, id, autreSource: [...new Set(echecs.flatMap((x) => causes(x)).map(nomCause))] },
-    });
-    return;
-  }
-  if (refusDefinitif(e)) {
+    const p = e as TraceIncomplet;
+    // L'autre source en PANNE : peut-être pas un morceau du tout — c'est une panne, dite comme telle
+    // plus bas (une ligne par cause et par jour), pas un parcours à retirer du catalogue.
+    if (p.transitoire) e = new AggregateError(p.echecs, "autre source en panne");
+    else {
+      // Un MORCEAU de parcours (OpenStreetMap troué) : une ligne par parcours et par jour (seuls les
+      // parcours du catalogue ont une distance), au plus INCOMPLETS_MAX_HEURE par heure et par instance.
+      const decision = MEMOIRE.incomplet(`${type}/${id}`, Date.now());
+      if (decision === "rien") return;
+      if (decision === "synthese") {
+        await journaliserEchecUneFois(null, {
+          ...base, message: `Tracés incomplets : plus de ${INCOMPLETS_MAX_HEURE} parcours en une heure, les suivants ne sont pas listés`,
+          meta: { premierNonListe: { type, id } },
+        });
+        return;
+      }
+      await journaliserEchecUneFois(null, {
+        ...base, message: `Tracé incomplet sur OpenStreetMap : ${type} ${id}`,
+        meta: { type, id, autreSource: [...new Set(p.echecs.flatMap((x) => causes(x)).map(nomCause))] },
+      });
+      return;
+    }
+  } else if (refusDefinitif(e)) {
     // Un parcours MORT dans le catalogue : listé dans /admin (une ligne par parcours et par jour) pour
     // pouvoir le retirer — SEULEMENT s'il y est vraiment : un identifiant inventé ne doit pas pouvoir
     // remplir error_logs (relecture du 09/11/2026).
@@ -87,7 +110,7 @@ async function journaliserRecherche(e: unknown, type: "relation" | "way", id: st
       ...base, message: `Parcours supprimé d'OpenStreetMap : ${type} ${id}`, meta: { type, id },
     });
     // Catalogue illisible dans la fonction : on ne peut plus repérer les parcours morts, on le DIT.
-    else if (auCatalogue === null) await journaliserEchecUneFois(null, {
+    else if (auCatalogue === null && MEMOIRE.uneFois("catalogue illisible (supprimés)", Date.now())) await journaliserEchecUneFois(null, {
       ...base, message: "Catalogue des parcours illisible : parcours supprimés non repérés",
     });
     return;
@@ -98,12 +121,12 @@ async function journaliserRecherche(e: unknown, type: "relation" | "way", id: st
   // blocage de l'après-midi (relecture du 09/11/2026).
   const statuts = causes(e).map((c) => (c as { message?: string })?.message ?? String(c));
   const cause = [...new Set(causes(e).map(nomCause))].sort().join(" · ");
+  // Plusieurs parcours en panne au même moment : une seule ligne par cause (garde synchrone).
+  if (!MEMOIRE.uneFois(`panne ${cause}`, Date.now())) return;
   await journaliserEchecUneFois(null, {
     ...base, message: `Tracé de parcours indisponible : ${cause}`, meta: { type, id, statuts },
   });
 }
-const PARTIEL_MS = 10 * 60_000;
-
 export async function GET(req: NextRequest) {
   // Interroge Overpass, un service communautaire GRATUIT aux quotas stricts. Laisser la
   // route ouverte aux requêtes anonymes, c'est risquer de faire bannir l'adresse IP de
@@ -121,15 +144,14 @@ export async function GET(req: NextRequest) {
   if (cached) return NextResponse.json({ coordinates: cached, cached: true }, { headers: garde });
 
   const vuPartiel = PARTIELS.get(key);
-  if (vuPartiel && Date.now() - vuPartiel < PARTIEL_MS) return NextResponse.json({ error: "Tracé incomplet sur OpenStreetMap.", partiel: true }, { status: 422 });
+  if (vuPartiel && Date.now() < vuPartiel.jusqua) return NextResponse.json({ error: "Tracé incomplet sur OpenStreetMap.", partiel: true, transitoire: vuPartiel.transitoire }, { status: 422 });
 
   let enCours = EN_COURS.get(key);
   if (!enCours) {
     const distance = distanceDuCatalogue(type, id);
     // Catalogue illisible : le tracé ne peut plus être confronté à sa distance. On ne le garde NULLE
     // PART (ni cache persistant, ni mémoire, ni navigateur) et on le DIT dans /admin.
-    const signaler = distance === null && Date.now() - illisibleSignale > 60 * 60_000;
-    if (signaler) illisibleSignale = Date.now();
+    const signaler = distance === null && MEMOIRE.uneFois("catalogue illisible (tracés)", Date.now());
     enCours = (async () => {
       if (signaler) await journaliserEchecUneFois(null, {
         source: "parcours-geometrie", url: "/api/parcours/geometry",
@@ -141,9 +163,10 @@ export async function GET(req: NextRequest) {
       } catch (e) {
         if ((e as { partiel?: unknown })?.partiel === true) {
           // Purge des entrées expirées ; tout vider d'un coup relançait toutes les recherches.
-          if (PARTIELS.size > 2000) for (const [k, t] of PARTIELS) if (Date.now() - t >= PARTIEL_MS) PARTIELS.delete(k);
+          if (PARTIELS.size > 2000) for (const [k, v] of PARTIELS) if (Date.now() >= v.jusqua) PARTIELS.delete(k);
           if (PARTIELS.size > 2000) PARTIELS.clear();
-          PARTIELS.set(key, Date.now());
+          const transitoire = (e as TraceIncomplet).transitoire === true;
+          PARTIELS.set(key, { jusqua: Date.now() + (transitoire ? PARTIEL_PASSAGER_MS : PARTIEL_MS), transitoire });
         }
         await journaliserRecherche(e, type, id);
         throw e;
@@ -164,7 +187,8 @@ export async function GET(req: NextRequest) {
     // Le journal est déjà écrit par la recherche : ici, seulement la réponse.
     // Un MORCEAU de parcours (OpenStreetMap incomplet) : ni montré, ni gardé 30 jours.
     if ((e as { partiel?: unknown })?.partiel === true) {
-      return NextResponse.json({ error: "Tracé incomplet sur OpenStreetMap.", partiel: true }, { status: 422 });
+      // `transitoire` : l'autre source était en panne — le navigateur dit « réessaie », pas « troué ».
+      return NextResponse.json({ error: "Tracé incomplet sur OpenStreetMap.", partiel: true, transitoire: (e as TraceIncomplet).transitoire === true }, { status: 422 });
     }
     // La relation n'existe plus sur OpenStreetMap : un refus DÉFINITIF, pas « réessaie plus tard ».
     if (refusDefinitif(e)) {
