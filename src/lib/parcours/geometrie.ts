@@ -1,4 +1,5 @@
 import { UA_PACEVOBOT } from "@/lib/races/robot";
+import { longueurKm, tracePartiel } from "@/lib/parcours/trace";
 
 /**
  * GÉOMÉTRIE GPS RÉELLE D'UN PARCOURS, depuis OpenStreetMap (ODbL) — logique sortie de la route
@@ -267,12 +268,29 @@ export async function depuisOverpass(type: "relation" | "way", id: string, commu
 
 /** La première géométrie valable des deux sources. Une erreur n'est PAS mise en cache. */
 export async function geometrieParcours(type: "relation" | "way", id: string): Promise<[number, number][]> {
+  return (await geometrieVerifiee(type, id, 0)).coords;
+}
+
+/**
+ * UN MORCEAU N'EST PAS LE PARCOURS, ET IL NE DOIT PAS RESTER EN CACHE (09/11/2026).
+ *
+ * Les deux sources partent ensemble ; la première géométrie valable gagne (le cas courant, 0,3 s).
+ * Si elle n'est qu'un morceau — moins des trois quarts de la distance du catalogue —, on ATTEND
+ * l'autre source, déjà partie (rien n'est relancé : un service gratuit, des quotas stricts), et on
+ * garde la plus longue. Toujours partiel : on le DIT (`partiel`), avec la cause de l'échec de l'autre
+ * source s'il y en a une (`echecs`), et la route ne le met pas en cache — avant, le coureur voyait
+ * « tracé incomplet » 30 jours sans pouvoir réessayer, même si l'autre source avait le parcours.
+ * Distance inconnue (0) : aucun contrôle ici, le navigateur garde le sien.
+ */
+export async function geometrieVerifiee(
+  type: "relation" | "way", id: string, distanceKm: number,
+): Promise<{ coords: [number, number][]; partiel: boolean; echecs: unknown[] }> {
   const valable = async (p: Promise<[number, number][]>) => {
     const c = await p;
     if (c.length < 2) throw new Error("géométrie vide");
     return c;
   };
-  // La source qui perd est ANNULÉE dès que l'autre a gagné : pas de requête inutile laissée
+  // La source qui perd est ANNULÉE dès qu'on a ce qu'il faut : pas de requête inutile laissée
   // sur un service communautaire gratuit (risque de bannissement de l'adresse du serveur).
   const fin = new AbortController();
   const butoir = setTimeout(() => fin.abort(), DUREE_MAX_MS);
@@ -280,10 +298,18 @@ export async function geometrieParcours(type: "relation" | "way", id: string): P
     // Parcours SUPPRIMÉ d'OpenStreetMap (l'API officielle le dit en 0,3 s) : on n'attend pas les 12 s
     // d'un Overpass en panne pour l'annoncer — tout s'arrête, le refus remonte aussitôt.
     const api = depuisApiOsm(type, id, fin.signal).catch((e) => { if (refusDefinitif(e)) fin.abort(); throw e; });
-    return await Promise.any([valable(api), valable(depuisOverpass(type, id, fin.signal))]);
+    const sources = [valable(api), valable(depuisOverpass(type, id, fin.signal))];
+    const premier = await Promise.any(sources);
+    if (!(distanceKm > 0) || !tracePartiel(premier, distanceKm)) return { coords: premier, partiel: false, echecs: [] };
+    // Un morceau : l'autre source est encore en route (même butoir) — on l'attend, sans rien relancer.
+    const r = await Promise.allSettled(sources);
+    const ok = r.flatMap((x) => (x.status === "fulfilled" ? [x.value] : []));
+    const echecs = r.flatMap((x) => (x.status === "rejected" ? [x.reason] : []));
+    // À longueur égale, la première arrivée : le même tracé d'un appel à l'autre.
+    const coords = ok.reduce((a, b) => (longueurKm(b) > longueurKm(a) ? b : a), premier);
+    return { coords, partiel: tracePartiel(coords, distanceKm), echecs };
   } finally {
     clearTimeout(butoir);
     fin.abort();
   }
 }
-
