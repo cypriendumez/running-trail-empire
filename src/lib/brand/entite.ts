@@ -1,4 +1,4 @@
-import { RESEAUX } from "@/lib/brand/reseaux";
+import { PROFILS_OFFICIELS } from "@/lib/brand/reseaux";
 import { EDITEUR } from "@/lib/brand/editeur";
 import { jourCivil, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 
@@ -74,7 +74,7 @@ export function donneesStructureesMarque() {
         },
         description: DESCRIPTION_MARQUE,
         email: EDITEUR.email,
-        sameAs: RESEAUX.map((r) => r.url),
+        sameAs: PROFILS_OFFICIELS,
         knowsAbout: ["course à pied", "trail", "plan d'entraînement", "montre GPS", "variabilité de la fréquence cardiaque"],
       },
       {

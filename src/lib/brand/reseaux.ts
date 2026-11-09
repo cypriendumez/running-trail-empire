@@ -19,3 +19,22 @@ export const RESEAUX: Reseau[] = [
   { cle: "instagram", nom: "Instagram", url: "https://www.instagram.com/pacevo.fr" },
   { cle: "linkedin", nom: "LinkedIn", url: "https://www.linkedin.com/company/pacevo/" },
 ];
+
+/**
+ * PROFILS OFFICIELS SANS LOGO DANS LE PIED DE PAGE.
+ *
+ * `SocialLinks` dessine un glyphe par entrée de `RESEAUX` : un compte ajouté là sans glyphe
+ * deviendrait une pastille vide. Les profils ci-dessous ne s'affichent donc pas, mais ils sont
+ * déclarés aux moteurs (`sameAs` de `lib/brand/entite`) : chaque profil qui renvoie vers
+ * pacevo.fr aide Google à comprendre que « Pacevo » est une marque et non une faute de frappe
+ * pour « Pančevo » (constat du 08/11/2026).
+ *
+ * Club Strava créé le 09/11/2026 (club n° 2411323) ; l'adresse courte répond 200 sans
+ * connexion, avec le titre « Pacevo | Strava ».
+ */
+export const PROFILS_SANS_ICONE: { nom: string; url: string }[] = [
+  { nom: "Strava", url: "https://www.strava.com/clubs/pacevo" },
+];
+
+/** Tous les profils officiels de Pacevo : ceux du pied de page, puis les autres. */
+export const PROFILS_OFFICIELS: string[] = [...RESEAUX, ...PROFILS_SANS_ICONE].map((p) => p.url);

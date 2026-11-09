@@ -21,7 +21,7 @@ import {
   donneesStructureesMarque, jsonLdMarque, serialiserJsonLd,
   dateIsoFr, donneesStructureesArticle, debutDuJourParis,
 } from "../src/lib/brand/entite";
-import { RESEAUX } from "../src/lib/brand/reseaux";
+import { RESEAUX, PROFILS_SANS_ICONE } from "../src/lib/brand/reseaux";
 import { ARTICLES } from "../src/app/blog/articles";
 import { BLOG } from "../src/app/blog/blogI18n";
 import { POSTS, photoPartage } from "../src/app/blog/posts";
@@ -64,10 +64,21 @@ if (fichierLogo && existsSync(fichierLogo)) {
   verifier("le logo fait au moins 112 px (exigence de Google) et ses dimensions déclarées sont vraies",
     l >= 112 && h >= 112 && logo?.width === l && logo?.height === h, `${l}×${h} réels, ${logo?.width}×${logo?.height} déclarés`);
 }
-// ⚠️ SOURCE UNIQUE : les profils sont ceux du pied de page, pas une liste recopiée.
-verifier("sameAs = les comptes de lib/brand/reseaux, dans l'ordre",
-  JSON.stringify(org?.sameAs) === JSON.stringify(RESEAUX.map((r) => r.url)), JSON.stringify(org?.sameAs));
-verifier("tous les profils sont en https", (org?.sameAs as string[] | undefined)?.every((u) => u.startsWith("https://")) ?? false);
+// ⚠️ SOURCE UNIQUE : les profils sont ceux de lib/brand/reseaux (pied de page, puis profils
+// sans icône), pas une liste recopiée.
+const sameAs = (org?.sameAs as string[] | undefined) ?? [];
+verifier("sameAs = les comptes de lib/brand/reseaux (pied de page, puis sans icône), dans l'ordre",
+  JSON.stringify(sameAs) === JSON.stringify([...RESEAUX, ...PROFILS_SANS_ICONE].map((r) => r.url)), JSON.stringify(sameAs));
+verifier("tous les profils sont en https", sameAs.length > 0 && sameAs.every((u) => u.startsWith("https://")));
+// Club créé avec Cyprien le 09/11/2026 : un profil de course de plus qui renvoie vers pacevo.fr.
+verifier("le club Strava Pacevo est déclaré", sameAs.includes("https://www.strava.com/clubs/pacevo"), JSON.stringify(sameAs));
+verifier("aucun profil déclaré deux fois", new Set(sameAs).size === sameAs.length, JSON.stringify(sameAs));
+// Pied de page : un compte de RESEAUX sans glyphe y deviendrait une pastille vide.
+const piedReseaux = code("src/components/brand/SocialLinks.tsx");
+verifier("chaque compte du pied de page a son logo dessiné",
+  RESEAUX.every((r) => new RegExp(`\\b${r.cle}:\\s*\\(`).test(piedReseaux)), RESEAUX.map((r) => r.cle).join(", "));
+verifier("le pied de page n'affiche que RESEAUX, pas les profils sans icône",
+  /RESEAUX\.map\(/.test(piedReseaux) && !/PROFILS_(SANS_ICONE|OFFICIELS)/.test(piedReseaux));
 verifier("la description nomme la marque et la course", /^Pacevo\b/.test(DESCRIPTION_MARQUE) && /course à pied|trail/.test(DESCRIPTION_MARQUE));
 // Rien d'inventé : une note, un avis ou un effectif seraient affichés par le moteur comme des faits.
 const brut = JSON.stringify(donneesStructureesMarque());
