@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import {
   Activity, Heart, Target,
   Calendar, Footprints, Moon, ChevronRight,
-  Gauge, Mountain, Timer, Flame, TrendingUp, AlertTriangle, Shield, Users,
+  Gauge, Mountain, Timer, Flame, TrendingUp, AlertTriangle, Shield,
   type LucideIcon,
 } from "lucide-react";
 // ⚠️ PLUS DE recharts ICI (22/09/2026) : ≈ 500 kB de JS pour deux petits dessins, sur
@@ -56,7 +56,6 @@ interface Props {
   metriqueVfc?: MetriqueVfc | null;
   workouts: Workout[];
   plan: Record<string, unknown> | null;
-  league: Record<string, unknown> | null;
   /** Séances candidates aux records par distance, chargées sur TOUT l'historique par une
    *  requête dédiée. La liste `workouts` est plafonnée à 40 lignes : s'en servir revenait
    *  à annoncer « record personnel » sur le meilleur temps des deux derniers mois. */
@@ -84,7 +83,6 @@ interface Props {
   /** D'où vient la VMA affichée, et de quand — pour qu'on voie qu'elle suit la forme. */
   sourceVma?: SourceVma | null;
   loadRisk?: { acwr: number; monotony: number; deload: boolean; level: string; reason: string };
-  newMembersWeek?: number;
   /** Série calculée à la lecture (lib/streak) — jamais stockée, donc réparable. */
   streak?: StreakResult | null;
   /** État d'abonnement, déduit du profil (lib/billing/access). */
@@ -161,12 +159,12 @@ const ANALYSE_LABELS: Record<string, { titre: string; seance: string; lire: stri
 const ABREV_RECORD: Record<string, string> = { fr: "RP", en: "PB", de: "PB", es: "MP", pt: "RP" };
 
 // Libellés du rail de droite (multilingue).
-const RAIL_LABELS: Record<string, { badges: string; community: string; communitySub: string; see: string; newWeek: string; records: string; recommend: string }> = {
-  fr: { badges: "Badges", community: "Communauté", communitySub: "Rejoins les coureurs Pacevo", see: "Voir", newWeek: "nouveaux cette semaine", records: "Records personnels", recommend: "Voir les recommandations" },
-  en: { badges: "Badges", community: "Community", communitySub: "Join the Pacevo runners", see: "View", newWeek: "new this week", records: "Personal records", recommend: "View recommendations" },
-  de: { badges: "Abzeichen", community: "Community", communitySub: "Triff die Pacevo-Läufer", see: "Ansehen", newWeek: "neue diese Woche", records: "Persönliche Rekorde", recommend: "Empfehlungen ansehen" },
-  es: { badges: "Insignias", community: "Comunidad", communitySub: "Únete a los corredores Pacevo", see: "Ver", newWeek: "nuevos esta semana", records: "Records personales", recommend: "Ver recomendaciones" },
-  pt: { badges: "Medalhas", community: "Comunidade", communitySub: "Junta-te aos corredores Pacevo", see: "Ver", newWeek: "novos esta semana", records: "Recordes pessoais", recommend: "Ver recomendações" },
+const RAIL_LABELS: Record<string, { records: string; recommend: string }> = {
+  fr: { records: "Records personnels", recommend: "Voir les recommandations" },
+  en: { records: "Personal records", recommend: "View recommendations" },
+  de: { records: "Persönliche Rekorde", recommend: "Empfehlungen ansehen" },
+  es: { records: "Records personales", recommend: "Ver recomendaciones" },
+  pt: { records: "Recordes pessoais", recommend: "Ver recomendações" },
 };
 
 // Score de forme — 4 axes calculés du réel (endurance & vitesse dérivées des séances/VMA,
@@ -205,7 +203,7 @@ import type { CleIndicateur } from "@/lib/indicateurs/types";
 /** Une distance, un dénivelé : une valeur absente, négative ou illisible compte pour 0. */
 const positif = (v: number | null | undefined): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
 
-export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, league, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, newMembersWeek, streak, acces, donneesIncompletes, jourAujourdhui, planCoach = null, montreReliee = false, analyses = [], cibleVolumeKm = null }: Props) {
+export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, streak, acces, donneesIncompletes, jourAujourdhui, planCoach = null, montreReliee = false, analyses = [], cibleVolumeKm = null }: Props) {
   const { t, lang } = useT();
   // ⚠️ LES NOMBRES À LA LANGUE (06/11/2026). `toFixed` écrivait « 11.4 km/h » et « 15.0 km »
   // en allemand, espagnol, portugais et français, où la décimale est une virgule. Et
@@ -350,12 +348,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   const volumeDelta = volRef ? weeklyKm - volRef.km : prevAvg > 0 ? weeklyKm - prevAvg : null;
   const volumeRefLabel = volRef ? "dash.volume.vsMedian" : "dash.volume.vsAvg";
   const records = computeRecords(workouts);
-  // La plus longue course CONNUE : récentes, candidates aux records sur tout l'historique,
-  // et records déclarés (courus avant la montre). Pour les badges 10K / 21K / 42K.
-  const KM_DECLARE: Record<string, number> = { "5k": 5, "10k": 10, semi: 21.1, marathon: 42.2 };
-  const plusLongueConnue = Math.max(0, records?.longest ?? 0,
-    ...prWorkouts.map((w) => (Number.isFinite(Number(w.distance_km)) ? Number(w.distance_km) : 0)),
-    ...recordsDeclares.map((r) => KM_DECLARE[r.distance] ?? 0));
   // La dernière séance COURUE et son analyse mémorisée (lib/dashboard/derniereAnalyse).
   const analyse = derniereAnalyse(runs, analyses);
   const al = ANALYSE_LABELS[lang] ?? ANALYSE_LABELS.fr;
@@ -441,7 +433,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
         <div className="mb-1 flex items-center justify-between">
           <div className="metric-label">{t("dash.records.title")}</div>
         </div>
-        <div className="mb-3 text-[11px] text-zinc-400">{t("dash.records.sub")}</div>
+        {/* « Récentes » ne disait pas jusqu'où : ce sont les séances CHARGÉES (les 40
+            dernières), pas tout l'historique — d'où la date de la plus ancienne. Les records
+            sur toute la carrière sont dans le rail (« Records personnels »). */}
+        <div className="mb-3 text-[11px] text-zinc-400">{t("dash.records.sub", { date: formatDateCivile(records.depuis, lang, { day: "numeric", month: "long" }) })}</div>
         <div className="space-y-2.5">
           {rows.map((r) => (
             <div key={r.label} className="flex items-center gap-3">
@@ -454,11 +449,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
       </div>
     ) });
   }
-  // ⚠️ NE PAS REMETTRE « Cette semaine » ICI. Le rail de droite affiche déjà cette
-  //    carte, en permanence : les quatre mêmes chiffres (séances, distance, dénivelé,
-  //    durée) apparaissaient donc DEUX FOIS sur la même page, dans deux mises en forme
-  //    différentes — ce qui fait douter le lecteur de savoir laquelle est la bonne.
-  //    Le vivier de bouche-trous garde assez d'entrées sans elle.
   // ⚠️ NE PAS REMETTRE ICI UNE CARTE « Cette semaine ». Le rail de droite l'affiche
   //    déjà en permanence : les quatre mêmes chiffres (séances, distance, dénivelé,
   //    durée) apparaissaient DEUX FOIS sur la même page, dans deux mises en forme
@@ -468,11 +458,16 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
     <div className="bento-card flex h-full flex-col">
       <div className="mb-3 flex items-center justify-between">
         <div className="metric-label">{t("dash.readyCard.title")}</div>
-        <span className="h-3 w-3 rounded-full" style={{ background: readiness.accent }} />
+        <span className="h-3 w-3 rounded-full" style={{ background: readiness.pastille }} />
       </div>
       <p className="text-sm font-medium leading-relaxed text-zinc-700">{readiness.tagline}</p>
       <div className="mt-auto space-y-1.5 pt-4 text-xs">
-        {hrvDelta != null && hrvBaseline != null && (
+        {/* ⚠️ L'ÉCART DE VFC SEULEMENT S'IL EST FRAIS (09/11/2026, capture de Cyprien). La carte
+            disait « Rien de récent reçu de ta montre (VFC…) » et affichait juste dessous
+            « VFC ↑ 1 ms » : l'écart de la mesure du 30/10, dix jours plus tôt, présenté comme
+            celui du jour. Même règle que la phrase : une mesure périmée ne décide plus de la
+            forme, elle ne s'affiche donc plus ici (la carte VFC la montre, datée). */}
+        {hrvFraiche && hrvDelta != null && hrvBaseline != null && (
           <div className="flex justify-between"><span className="text-zinc-400">{t("dash.hrv.title")}</span><span className={`font-semibold ${hrvDelta >= 0 ? "text-emerald-600" : "text-amber-600"}`}>{hrvDelta >= 0 ? "↑" : "↓"} {Math.round(Math.abs(hrvDelta))} ms</span></div>
         )}
         {freshSleep && (
@@ -535,7 +530,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   const zl = ZONES_LABELS[lang] ?? ZONES_LABELS.fr;
   // Le niveau d'après la VMA affichée juste à côté (lib/running/niveau), plus `profiles.mode`.
   const levelLabel = t(CLE_NIVEAU[niveauDeVma(currentVma) ?? "inconnu"]);
-  const leagueName = String((league as { leagues?: { name?: string } } | null)?.leagues?.name ?? "");
   const nx = NEXT_LABELS[lang] ?? NEXT_LABELS.fr;
   const vit = VITALS[lang] ?? VITALS.fr;
   // ⚠️ LA FC DE REPOS, OU RIEN. Le repli prenait la FC MOYENNE de la dernière séance, sous
@@ -630,7 +624,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                 : new Date().toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}
             </h1>
             <p className="mt-1.5 flex items-center gap-2 text-[13px] text-zinc-500 sm:mt-2 sm:text-sm">
-              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: readiness.accent }} />
+              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: readiness.pastille }} />
               {readiness.tagline}
             </p>
             <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mt-4 sm:flex-wrap sm:overflow-visible">
@@ -1150,6 +1144,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               <div className="mb-4 flex items-center gap-2">
                 <Footprints className="h-4 w-4 text-zinc-500" />
                 <div className="metric-label">{t("dash.last.title")}{w0.title ? ` — ${cleanActivityName(w0.title)}` : ""}</div>
+                {/* ⚠️ LA DATE (09/11/2026). Sans elle, « Dernière séance » se lisait comme celle
+                    d'hier : la carte montrait un footing du 25/10, quinze jours plus tôt, sous
+                    un graphique de la semaine entièrement vide. */}
+                <span className="ml-auto flex-shrink-0 text-xs text-zinc-400">{formatDateCivile(String(w0.date).slice(0, 10), lang, { weekday: "short", day: "numeric", month: "short" })}</span>
               </div>
               <div className="grid grid-cols-3 gap-x-4 gap-y-5 sm:grid-cols-4">
                 {lastMetrics.map((m) => (
@@ -1421,8 +1419,8 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             les trois composantes et le total de la carte Score discipline du rail, sous un
             niveau « Bronze » identique pour tous : en base, une seule ligue (juin 2026) et tous
             les profils en bronze — rien ne fait monter de palier. Volume et Zones se partagent
-            désormais la rangée, moitié-moitié, sans trou. Le classement reste à un clic
-            (lien « Voir le classement » de la carte Badges). */}
+            désormais la rangée, moitié-moitié, sans trou. Le classement reste dans le
+            menu de gauche (Ligues) ; la carte Badges qui y menait a été retirée le 09/11/2026. */}
       </div>
       </div>
 
@@ -1579,64 +1577,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
         {/* Bilan de la semaine (Premium) : plusieurs séances lues ensemble. Starter voit la carte verrouillée. */}
         <BilanSemaine ouvert={!!acces && peut(acces.etat, "bilan")} />
 
-        {/* Badges — jalons de distance réels.
-            ⚠️ SUR TOUT L'HISTORIQUE ET AVEC LA TOLÉRANCE DU GPS (06/11/2026). La plus longue
-            sortie venait des 40 dernières séances : un marathon d'il y a trois mois faisait
-            perdre le badge 42K. Et le seuil était 42,2 km : un marathon mesuré 42,19 km par la
-            montre n'était jamais validé. Les records DÉCLARÉS comptent : ils ont été courus. */}
-        {plusLongueConnue > 0 && (
-          <div className="bento-card">
-            <div className="flex items-center justify-between">
-              <div className="metric-label">{rl.badges}</div>
-              <Link href="/dashboard/leagues" className="text-xs font-medium text-[#059669] hover:text-[#047857]">{t("dash.league.cta")}</Link>
-            </div>
-            {/* LES DOSSARDS (passe « unslop », 06/11/2026) : la distance courue s'épingle comme un
-                dossard, l'objet que tout coureur connaît. Gagné : bandeau vert et numéro plein ;
-                à venir : papier vide. Remplace trois hexagones dégradés (vert, violet, ambre). */}
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {[
-                { seuil: 9.9, l: "10K" },
-                { seuil: 21, l: "21K" },
-                { seuil: 42, l: "42K" },
-              ].map((b) => {
-                const earned = plusLongueConnue >= b.seuil;
-                return (
-                  <div key={b.l} className={`relative overflow-hidden rounded-md border ${earned ? "border-zinc-200 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]" : "border-dashed border-zinc-200 bg-zinc-50"}`}>
-                    <div className={`h-1.5 ${earned ? "bg-[#059669]" : "bg-transparent"}`} />
-                    {[["left-1.5", "top-3"], ["right-1.5", "top-3"], ["left-1.5", "bottom-1.5"], ["right-1.5", "bottom-1.5"]].map(([x, y]) => (
-                      <span key={x + y} aria-hidden className={`absolute ${x} ${y} h-1 w-1 rounded-full ${earned ? "bg-zinc-300" : "bg-zinc-200"}`} />
-                    ))}
-                    <div className={`py-2.5 text-center text-[17px] font-semibold tracking-tight tabular-nums ${earned ? "text-zinc-900" : "text-zinc-300"}`}>{b.l}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Communauté active */}
-        <div className="bento-card">
-          <div className="flex items-center justify-between">
-            <div className="metric-label">{rl.community}</div>
-            <Link href="/dashboard/communaute" className="text-xs font-medium text-[#059669] hover:text-[#047857]">{rl.see}</Link>
-          </div>
-          <div className="mt-3 flex items-center gap-3">
-            <Users className="h-[18px] w-[18px] flex-shrink-0 text-zinc-400" strokeWidth={1.5} />
-            <div className="min-w-0">
-              {newMembersWeek && newMembersWeek > 0 ? (
-                <>
-                  <div className="text-lg font-semibold tabular-nums text-zinc-900">+{newMembersWeek}</div>
-                  <div className="text-xs text-zinc-400">{rl.newWeek}</div>
-                </>
-              ) : (
-                <>
-                  <div className="truncate text-sm font-semibold text-zinc-900">{leagueName || "Pacevo"}</div>
-                  <div className="text-xs text-zinc-400">{rl.communitySub}</div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        {/* ⚠️ LES CARTES « BADGES » ET « COMMUNAUTÉ » ONT ÉTÉ RETIRÉES (09/11/2026, Cyprien :
+            « enlève les 2 modules »). Les dossards 10K/21K/42K ne disaient rien de
+            l'entraînement, et « Communauté » n'affichait que « Pacevo — Rejoins les coureurs
+            Pacevo ». Ligues et Communauté restent dans le menu de gauche. */}
       </aside>
       </div>
     </div>
@@ -1799,9 +1743,13 @@ function computeReadiness(hrvDelta: number | null, hrvBaseline: number | null, s
   const phrase = recuperation
     ? t(cle, { course: recuperation.course, date: formatDateCivile(recuperation.reprise, lang, { day: "numeric", month: "long" }) })
     : t(cle === "dash.ready.none" && montreReliee ? "dash.ready.muette" : cle);
-  if (e === "top") return { accent: "#059669", tagline: phrase, cle };
-  if (e === "repos") return { accent: "#0284C7", tagline: phrase, cle };
-  return { accent: "#0d9488", tagline: phrase, cle };
+  // ⚠️ LA PASTILLE EST GRISE QUAND RIEN N'EST MESURÉ (09/11/2026). Elle restait colorée
+  // (vert-bleu, la teinte de « correct ») à côté de « pas de lecture de ta forme du jour » :
+  // un voyant allumé pour un état qui n'existe pas. `accent` ne change pas (anneaux, courbes).
+  const pastille = e === "aucun" ? "#d4d4d8" : null;
+  if (e === "top") return { accent: "#059669", pastille: pastille ?? "#059669", tagline: phrase, cle };
+  if (e === "repos") return { accent: "#0284C7", pastille: pastille ?? "#0284C7", tagline: phrase, cle };
+  return { accent: "#0d9488", pastille: pastille ?? "#0d9488", tagline: phrase, cle };
 }
 
 
@@ -1815,7 +1763,7 @@ function computeReadiness(hrvDelta: number | null, hrvBaseline: number | null, s
 //    semaine. Une seule définition du jour, ici comme ailleurs : `lib/dashboard/fenetre`.
 
 // Meilleures sorties récentes (sur l'historique chargé — honnête, pas « all-time »).
-function computeRecords(workouts: Workout[]): { longest: number; maxElev: number; longestSec: number; bestPace: number | null } | null {
+function computeRecords(workouts: Workout[]): { longest: number; maxElev: number; longestSec: number; bestPace: number | null; depuis: string } | null {
   // ⚠️ CETTE VARIABLE S'APPELAIT DÉJÀ `runs` MAIS NE FILTRAIT AUCUN SPORT — seulement
   //    la distance. Sur ce compte (69 sorties vélo et 23 randonnées sur 330), le
   //    « dénivelé max » affiché était 1267 m, mesuré lors d'une RANDONNÉE, sur une carte
@@ -1830,7 +1778,9 @@ function computeRecords(workouts: Workout[]): { longest: number; maxElev: number
     .filter(w => (w.distance_km ?? 0) >= 3 && (w.duration_seconds ?? 0) > 0)
     .map(w => (w.duration_seconds as number) / (w.distance_km as number)); // sec/km
   const bestPace = paces.length ? Math.min(...paces) : null;
-  return { longest, maxElev, longestSec, bestPace };
+  // La plus ancienne séance prise en compte : le début RÉEL de la fenêtre affichée.
+  const depuis = runs.map(w => String(w.date).slice(0, 10)).sort()[0];
+  return { longest, maxElev, longestSec, bestPace, depuis };
 }
 
 

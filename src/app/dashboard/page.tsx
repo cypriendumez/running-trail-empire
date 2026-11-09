@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { fuseauOuDefaut } from "@/lib/time/fuseau";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { lecturesEnEchec } from "@/lib/dashboard/lectures";
 import type { AnalyseMemorisee } from "@/lib/dashboard/derniereAnalyse";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
@@ -49,12 +48,11 @@ export default async function DashboardPage() {
   // séance de demain s'affichait comme « Séance du jour ». Le même jour que la série.
   const today = streakToday;
 
-  const [profileRes, hrvRes, workoutsRes, planRes, leagueRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, newMembersRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes, analysesRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes, analysesRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
     supabase.from("training_plans").select("*").eq("user_id", user!.id).eq("is_active", true).single(),
-    supabase.from("league_members").select("*, leagues(*)").eq("user_id", user!.id).order("score", { ascending: false }).limit(1).single(),
     supabase.from("sleep_data").select("total_sleep_min,sleep_score,body_battery_end,deep_sleep_min,rem_sleep_min,date").eq("user_id", user!.id).order("date", { ascending: false }).limit(1).single(),
     // ⚠️ ON NE RAMÈNE QUE LES SÉANCES À VENIR. Cette lecture rapportait les 40
     // dernières séances — 110 Ko mesurés, la plus grosse de la page — pour n'en garder
@@ -65,12 +63,8 @@ export default async function DashboardPage() {
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(60),
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", "race_objective").maybeSingle(),
     supabase.from("performance_baselines").select("vma_kmh,max_hr,tested_at").eq("user_id", user!.id).order("tested_at", { ascending: false }).limit(1).single(),
-    // ⚠️ COMPTÉ AVEC LA CLÉ DE SERVICE, ET SANS SOI-MÊME (06/11/2026). Avec la session, la
-    // règle RLS `profiles_select_own` ne laisse voir que son propre profil : la carte
-    // annonçait « +1 nouveaux cette semaine » à un inscrit de la semaine, qui se comptait
-    // lui-même, et 0 à tous les autres. Un COMPTE seulement (`head`), aucune ligne lue.
-    createAdminClient().from("profiles").select("id", { count: "exact", head: true })
-      .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()).neq("id", user!.id),
+    // La ligue et le compte des nouveaux inscrits de la semaine ne sont plus lus (09/11/2026) :
+    // ils ne servaient qu'aux cartes « Badges » et « Communauté », retirées du tableau de bord.
     // ── RECORDS PAR DISTANCE — requête DÉDIÉE, sur TOUT l'historique ──────────────
     // La liste principale est plafonnée à 40 activités, soit ici deux mois seulement.
     // La carte « Records personnels » se calculait dessus et annonçait donc, avec le
@@ -153,7 +147,6 @@ export default async function DashboardPage() {
     courses: coursesDeLObjectif((objRes.data?.data ?? null) as Parameters<typeof coursesDeLObjectif>[0]),
     today: streakToday,
   });
-  const newMembersWeek = newMembersRes.count ?? 0;
 
   // ⚠️ UNE COURSE PASSÉE N'EST PLUS L'OBJECTIF. Cinq jours après le marathon de Lille, la
   // carte proposait « Modifier mon objectif » prérempli avec Lille, 2 h 40 et le 25/10, et
@@ -283,7 +276,6 @@ export default async function DashboardPage() {
       metriqueVfc={vfc.metrique}
       workouts={workoutsRes.data ?? []}
       plan={planRes.data}
-      league={leagueRes.data}
       prWorkouts={prRes.data ?? []}
       premiereSeance={(premiereRes.data as { date?: string } | null)?.date ?? null}
       recordsDeclares={recordsDeclares}
@@ -300,7 +292,6 @@ export default async function DashboardPage() {
       currentVma={currentVma}
       sourceVma={sourceVma}
       loadRisk={risk}
-      newMembersWeek={newMembersWeek}
       streak={streak}
       acces={acces}
       jourAujourdhui={streakToday}

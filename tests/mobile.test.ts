@@ -206,7 +206,7 @@ test("les modules du tableau de bord vont du plus important au moins important",
   // 07/11/2026 (Cyprien : « du plus important au moins »). Colonne : séance, série, puis
   // « Aujourd'hui » (forme, VFC, vitesse), l'objectif, « Activité », enfin « Charge & forme ».
   // Rail : analyse de la dernière séance, la semaine, la discipline, les records, puis bilan
-  // Premium, badges et communauté.
+  // Premium (badges et communauté retirés le 09/11/2026).
   const src = codeNu("src/components/dashboard/BentoDashboard.tsx");
   const ordre = (reperes: string[], ou: string) => {
     const pos = reperes.map((r) => src.indexOf(r));
@@ -218,7 +218,7 @@ test("les modules du tableau de bord vont du plus important au moins important",
   assert.ok(src.indexOf("<ProfileCompletionBanner") > src.indexOf('className="flex min-w-0 flex-col"'), "la bannière de profil repasse au-dessus de « Bonjour » et repousse la séance");
   const rail = src.slice(src.indexOf("<aside"), src.indexOf("</aside>"));
   const r = (x: string) => rail.indexOf(x);
-  const reperes = ["{analyse && (", 'dash.summary.title', 'disc.hasData', "{rl.records}", "<BilanSemaine", "plusLongueConnue > 0", "rl.community"];
+  const reperes = ["{analyse && (", 'dash.summary.title', 'disc.hasData', "{rl.records}", "<BilanSemaine"];
   const absents = reperes.filter((x) => r(x) < 0);
   assert.deepEqual(absents, [], `rail : repères introuvables ${absents.join(", ")}`);
   for (let i = 1; i < reperes.length; i++) assert.ok(r(reperes[i - 1]) < r(reperes[i]), `rail : « ${reperes[i - 1]} » doit précéder « ${reperes[i]} »`);

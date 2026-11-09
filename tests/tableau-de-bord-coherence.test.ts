@@ -370,11 +370,6 @@ test("le risque de charge lit un an de charge, au jour de l'athlète", () => {
   assert.match(PAGE, /const risk = loadRisk\(\(chargeRes\.data \?\? \[\]\)[\s\S]{0,200}?, streakToday\);/, "le déload se calcule de nouveau sur 40 séances et le jour de Paris");
 });
 
-test("« nouveaux cette semaine » compte les autres inscrits, pas soi-même", () => {
-  assert.match(PAGE, /createAdminClient\(\)\.from\("profiles"\)\.select\("id", \{ count: "exact", head: true \}\)\s*\.gte\("created_at", [\s\S]{0,80}?\)\.neq\("id", user!\.id\)/,
-    "le compte repasse par la RLS (0 ou 1) ou se compte soi-même");
-});
-
 console.log("\nRELECTURE COMPLÈTE — TABLEAU DE BORD");
 
 test("la date de course vient de l'objectif ; le volume se mesure à la cible du coach", () => {
@@ -397,10 +392,10 @@ test("liste des séances : vraie zone dominante, pas de « 0 » parasite, la lis
   assert.equal(zoneDominante([Number.NaN, -3]), null);
 });
 
-test("records, badges, dernière séance", () => {
+test("records, dernière séance ; plus de cartes Badges ni Communauté (retirées le 09/11/2026)", () => {
   assert.match(BENTO, /\{ABREV_RECORD\[lang\] \?\? "RP"\}/, "« RP » s'affiche de nouveau dans toutes les langues");
-  assert.match(BENTO, /const earned = plusLongueConnue >= b\.seuil;/, "les badges relisent de nouveau les 40 dernières séances");
-  assert.match(BENTO, /\{ seuil: 42, l: "42K"/, "un marathon mesuré 42,19 km n'a de nouveau pas son badge");
+  assert.doesNotMatch(BENTO, /plusLongueConnue|rl\.badges|rl\.community|newMembersWeek/, "une carte Badges ou Communauté est revenue dans le tableau de bord");
+  assert.doesNotMatch(codeNu("src/app/dashboard/page.tsx"), /league_members|createAdminClient/, "la page relit la ligue ou compte les inscrits avec la clé de service pour une carte retirée");
   assert.match(BENTO, /if \(km != null && sec != null && isRun\(w\.sport\)\)/, "une allure au km s'affiche de nouveau pour le vélo");
   assert.match(BENTO, /value: ent\(cad\), unit: "spm"/, "la cadence n'est plus arrondie");
 });
@@ -513,6 +508,27 @@ test("métriques de la dernière séance : une valeur nulle ou négative n'est p
   assert.match(b, /Number\.isFinite\(n\) && n > 0 \? n : null/, "une durée négative ou une FC à 0 s'affiche de nouveau");
   assert.match(b, /const s = Math\.round\(sec \/ km\)/, "l'allure n'est plus arrondie à la seconde entière (4'60 possible)");
   assert.match(b, /sourceVma\.type === "seances" && sourceVma\.date && \(sourceVma\.km \?\? 0\) > 0/, "la VMA cite de nouveau une séance « (0 km) »");
+});
+
+// Capture de Cyprien, 09/11/2026 (J+15 du marathon, plus rien de la montre depuis le 30/10) :
+// « Forme du jour » disait « Rien de récent reçu de ta montre (VFC, sommeil) » et affichait
+// dessous « VFC ↑ 1 ms » (l'écart du 30/10) avec une pastille colorée ; « Dernière séance »
+// montrait le footing du 25/10 sans date ; « séances récentes » ne disait pas jusqu'où.
+test("section Activité : pas d'écart de VFC périmé, pastille grise sans mesure, séance datée, fenêtre des records datée", () => {
+  const b = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  const carteForme = b.slice(b.indexOf('key: "ready"'), b.indexOf("const fillers = fillerPool"));
+  assert.ok(carteForme.length > 0, "carte « Forme du jour » introuvable");
+  assert.match(carteForme, /\{hrvFraiche && hrvDelta != null && hrvBaseline != null && \(/, "« Forme du jour » affiche de nouveau un écart de VFC périmé");
+  assert.match(carteForme, /background: readiness\.pastille/, "la pastille de « Forme du jour » ne passe plus au gris sans mesure");
+  assert.match(b, /const pastille = e === "aucun" \? "#d4d4d8" : null/, "la pastille reste colorée quand rien n'est mesuré");
+  const derniere = b.slice(b.indexOf('t("dash.last.title")'), b.indexOf("lastMetrics.map"));
+  assert.match(derniere, /formatDateCivile\(String\(w0\.date\)\.slice\(0, 10\)/, "« Dernière séance » ne dit plus sa date");
+  assert.match(b, /t\("dash\.records\.sub", \{ date: formatDateCivile\(records\.depuis/, "« Tes meilleures sorties » ne date plus sa fenêtre");
+  for (const l of ["fr", "en", "de", "es", "pt"] as const) {
+    const d = T[l] as Record<string, string>;
+    assert.match(d["dash.records.sub"], /\{date\}/, `dash.records.sub sans {date} en ${l}`);
+    assert.doesNotMatch(d["dash.records.sub"], /récentes|recent|letzten|recientes/i, `dash.records.sub redevient vague en ${l}`);
+  }
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
