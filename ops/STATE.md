@@ -1,6 +1,6 @@
 # État de l'équipe d'agents Pacevo
 
-*Tenu par `@Nexus`. Mis à jour le 08/11/2026 au soir. Chaque ligne dit ce qui TOURNE VRAIMENT,
+*Tenu par `@Nexus`. Mis à jour le 09/11/2026 au matin. Chaque ligne dit ce qui TOURNE VRAIMENT,
 pas ce qui est prévu : un agent écrit dans la constitution mais sans routine planifiée n'existe pas.*
 
 > ⚠️ **Dépôt PUBLIC** (`cypriendumez/running-trail-empire`). Rien de personnel, de comptable ni
@@ -44,7 +44,7 @@ hebdomadaire des tables publiques (dimanche 03 h 20), newsletter, veille des cou
 | # | Agent | État | Preuve / remarque |
 |---|---|---|---|
 | 1 | `@Nexus` | PLANIFIÉ | Direction, 1er passage le 13/11. |
-| 3 | `@Sparring` | PLANIFIÉ | Coach, 1er passage le 09/11. 4 profils de la matrice manquent aux tests (`ops/sparring/PROFILS.md`). |
+| 3 | `@Sparring` | **EXÉCUTÉ** | 09/11 (5 h) : profil marathonien sub-3 h ajouté ; 2 défauts du plan trouvés (« /km/km », seuil 3 jours après un marathon), PR #4 fusionnée et en ligne (1e2173c). 3 profils de la matrice manquent encore (`ops/sparring/PROFILS.md`). |
 | 7 | `@SafeRun` | PLANIFIÉ | Coach, lundi. |
 | 8 | `@Sweeper` | **EXÉCUTÉ** | 08/11 : pacevo.fr joignable depuis le cloud (version lue), aucun défaut sur 24 h. Filtre `localhost` en place à la source depuis le 06/11. |
 | 9 | `@Bunker` | **EXÉCUTÉ** | 08/11 : 23 → 9 failles de dépendances, Next.js 16.4.5, déployé. Restent `zod` (importé nulle part) et la chaîne ESLint (non utilisée). |
@@ -53,7 +53,7 @@ hebdomadaire des tables publiques (dimanche 03 h 20), newsletter, veille des cou
 | 26 | `@Radar` | PLANIFIÉ | Sécurité et veille, le 5/12. Sites des concurrents autorisés dans le réseau cloud. |
 | 34 | `@Greffier` | PLANIFIÉ | Direction, vendredi. Check-list : `ops/greffier/API-MONTRES.md`. |
 | 48 | `@TimeMachine` | **EXÉCUTÉ** | 08/11 : 1re sauvegarde chiffrée complète de la base, relue et recomptée. Tâche locale chaque dimanche. |
-| 61 | `@Concierge` | PLANIFIÉ | Boîte Gmail dédiée branchée ; `contact@` et `support@` y sont redirigés (prouvé). 1er passage le 09/11 à 8 h. |
+| 61 | `@Concierge` | PLANIFIÉ | Boîte Gmail dédiée branchée ; `contact@` et `support@` y sont redirigés (prouvé, Outlook compris le 09/11). Filtre « jamais en spam » sur ces deux adresses ; le connecteur ne voit pas le Spam. 1er passage le 09/11 à 8 h. |
 | 64 | `@PostMortem` | **EXÉCUTÉ** | `ops/memory/LESSONS_LEARNED.md` tenu ; passage hebdo dans Direction. |
 
 ## Unités en Vague 2 (24) et en attente (22)
@@ -68,17 +68,19 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
 
 ## BLOQUÉES ou en cours
 
-1. **Mails envoyés depuis Outlook vers Gmail** : ni en direct ni par la redirection, aucun n'arrive
-   (4 essais le 08/11), alors que les mails venus d'ailleurs arrivent en moins d'une seconde.
-   Cause inconnue. Contrôle prévu le 09/11 à 7 h 30 (tâche locale) : retard ou refus.
-2. **Sauvegarde des données personnelles** : couverte chaque semaine sur le Mac (chiffrée), mais
+1. **Sauvegarde des données personnelles** : couverte chaque semaine sur le Mac (chiffrée), mais
    pas de copie quotidienne côté hébergeur tant que Supabase est sur l'offre gratuite. Passage à
    l'offre Pro à décider au lancement.
-3. **Chantier sécurité du 08/11** (mots de passe, CSP appliquée, CAPTCHA en sommeil, double
-   authentification facultative) : fusionné dans `main` et déployé le 08/11/2026 au soir. Restent
-   à Cyprien une migration, des réglages Supabase et, plus tard, l'activation du CAPTCHA ; la liste,
-   dans l'ordre, est hors dépôt : `~/Desktop/Pacevo/securite-2026-11-08-actions.md`. Aucun agent
-   n'exécute la migration ni ne change ces réglages à sa place.
+2. **Chantier sécurité du 08/11** (mots de passe, CSP appliquée, CAPTCHA en sommeil, double
+   authentification facultative) : déployé le 08/11 au soir ; migration 041 exécutée et réglages
+   Supabase faits par Cyprien le 09/11 vers 0 h 25 ; double authentification active sur son compte.
+   Reste, plus tard, l'activation du CAPTCHA (liste hors dépôt :
+   `~/Desktop/Pacevo/securite-2026-11-08-actions.md`). Aucun agent ne change ces réglages à sa place.
+
+## Résolues le 09/11/2026
+
+- Mails d'Outlook « perdus » vers Gmail : ils étaient tous dans le Spam de Gmail, invisible au connecteur. Sortis du spam, filtre posé ; `@Concierge` prévenu de cet angle mort.
+- PR #4 du Coach relue, vérifiée sur le Mac, fusionnée et déployée.
 
 ## Résolues le 08/11/2026
 
