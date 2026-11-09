@@ -10,6 +10,7 @@ import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { getPublicLang } from "@/lib/i18n/serverLang";
 import { PwaClient } from "@/components/pwa/PwaClient";
 import { SITE_URL, TITRE_ACCUEIL } from "@/lib/brand/entite";
+import { CLE_SESSION_LANCEMENT } from "@/lib/ui/lancement";
 
 // Polices réellement chargées (avant : variables jamais définies → tout en system-ui).
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -95,6 +96,16 @@ export default async function RootLayout({
   const lang = await getPublicLang();
   return (
     <html lang={lang} className={`${inter.variable} ${anton.variable}`} suppressHydrationWarning>
+      {/* ÉCRAN DE LANCEMENT déjà vu dans cette session → masqué AVANT la moindre peinture
+          (règle `html[data-lancement-vu] #lancement` de globals.css). Ce script vit ICI et non
+          dans le layout du tableau de bord : le layout racine n'est rendu que par le serveur,
+          alors qu'un <script> du tableau de bord était recréé par React à chaque arrivée sans
+          rechargement (après la connexion), où il ne s'exécute jamais et déclenche l'alerte
+          « Encountered a script tag » (constaté le 09/11/2026). `suppressHydrationWarning` sur
+          <html> : l'attribut posé avant l'hydratation est voulu. */}
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `try{if(sessionStorage.getItem(${JSON.stringify(CLE_SESSION_LANCEMENT)}))document.documentElement.setAttribute("data-lancement-vu","")}catch(e){}` }} />
+      </head>
       <body className="font-sans">
         <ErrorReporter />
         <Visite />

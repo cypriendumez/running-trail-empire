@@ -20,7 +20,6 @@ import { AttributionGarmin } from "@/components/legal/AttributionGarmin";
 import { estAdmin } from "@/lib/admin/acces";
 import { EcranLancement } from "@/components/layout/EcranLancement";
 import { MiseAJour } from "@/components/layout/MiseAJour";
-import { CLE_SESSION_LANCEMENT } from "@/lib/ui/lancement";
 import { DecorLancement } from "@/components/layout/DecorLancement";
 import { aConsenti } from "@/lib/auth/consentement";
 
@@ -70,12 +69,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <FuseauProvider fuseau={fuseau}>
       {/* ── ÉCRAN DE LANCEMENT ─────────────────────────────────────────────────────
           Rendu ICI, par le serveur, pour être visible dès la première image ; sa sortie
-          est décidée par <EcranLancement />. Le petit script le masque AVANT la moindre
-          peinture s'il a déjà été vu dans cette session — sans quoi il flasherait à
-          chaque rechargement. `suppressHydrationWarning` : ce script modifie l'élément
-          avant l'hydratation, c'est voulu. */}
+          est décidée par <EcranLancement />. S'il a déjà été vu dans cette session, le
+          script du layout RACINE le masque avant la moindre peinture (pas de <script> ici :
+          React le recréerait à chaque arrivée sans rechargement, sans jamais l'exécuter). */}
       <DecorLancement langue={langue} />
-      <script dangerouslySetInnerHTML={{ __html: `try{if(sessionStorage.getItem(${JSON.stringify(CLE_SESSION_LANCEMENT)}))document.getElementById("lancement").setAttribute("data-vu","")}catch(e){}` }} />
       <EcranLancement />
       <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
         <AutoSync />

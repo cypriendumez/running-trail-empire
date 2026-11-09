@@ -34,6 +34,8 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
 
   const [openNotif, setOpenNotif] = useState(false);
   const [openMenu, setOpenMenu] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loadingNotif, setLoadingNotif] = useState(true);
   const [masquees, setMasquees] = useState<string[]>(masqueesInitiales);
@@ -69,6 +71,28 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
     }, 250);
     return () => clearTimeout(t);
   }, [q]);
+
+  // Clic (ou toucher) hors du menu du profil ou des notifications → il se ferme ; Échap aussi.
+  // ⚠️ Avant (jusqu'au 09/11/2026) : un voile `fixed inset-0` sous le menu. Mais l'en-tête porte
+  // `md:backdrop-blur-sm`, et un `backdrop-filter` fait de l'élément le cadre de ses enfants
+  // `fixed` : le voile ne couvrait que les 64 px de l'en-tête. Sur ordinateur, seul un clic
+  // dans la bande blanche du haut fermait le menu (Cyprien, 09/11/2026). Un écouteur sur le
+  // document ne dépend d'aucun cadre.
+  useEffect(() => {
+    if (!openNotif && !openMenu) return;
+    const dehors = (e: PointerEvent) => {
+      const cible = e.target as Node;
+      if (openNotif && notifRef.current && !notifRef.current.contains(cible)) setOpenNotif(false);
+      if (openMenu && menuRef.current && !menuRef.current.contains(cible)) setOpenMenu(false);
+    };
+    const echap = (e: KeyboardEvent) => { if (e.key === "Escape") { setOpenNotif(false); setOpenMenu(false); } };
+    document.addEventListener("pointerdown", dehors);
+    document.addEventListener("keydown", echap);
+    return () => {
+      document.removeEventListener("pointerdown", dehors);
+      document.removeEventListener("keydown", echap);
+    };
+  }, [openNotif, openMenu]);
 
   // Clic hors de la zone de recherche → ferme le panneau.
   useEffect(() => {
@@ -223,7 +247,7 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
 
       <div className="flex items-center gap-3 ml-auto">
         {/* Notifications */}
-        <div className="relative">
+        <div ref={notifRef} className="relative">
           <button
             aria-label="Notifications"
             onClick={() => { const willOpen = !openNotif; setOpenNotif(willOpen); setOpenMenu(false); if (willOpen) markAllRead(); }}
@@ -238,7 +262,6 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
           </button>
           {openNotif && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setOpenNotif(false)} />
               {/* ⚠️ SUR TÉLÉPHONE, LE PANNEAU PREND TOUTE LA LARGEUR sous la barre (une
                   feuille), au lieu d'un menu de 320 px accroché à la cloche qui sortait
                   de l'écran ; à partir de sm, le menu d'avant. Cyprien, 21/09/2026. */}
@@ -288,7 +311,7 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
         </div>
 
         {/* Avatar + nom → menu */}
-        <div className="relative">
+        <div ref={menuRef} className="relative">
           <button
             onClick={() => { setOpenMenu((v) => !v); setOpenNotif(false); }}
             className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-2xl hover:bg-zinc-50 transition-colors"
@@ -308,7 +331,6 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
           </button>
           {openMenu && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setOpenMenu(false)} />
               <div className="absolute right-0 mt-2 w-56 rounded-xl border border-zinc-200 bg-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-zinc-100">
                   <div className="text-sm font-semibold text-zinc-900 truncate">{name || t("topbar.account")}</div>

@@ -251,6 +251,7 @@ html[data-plein-ecran] [data-bulle-aide] { display: none !important; }
 #lancement[data-sortie] { opacity: 0; visibility: hidden; pointer-events: none; }
 #lancement[data-sortie] .lancement-contenu { transform: scale(1.04); }
 #lancement[data-vu] { display: none; }
+html[data-lancement-vu] #lancement { display: none; }
 .lancement-fond {
   background:
     radial-gradient(60% 45% at 50% 38%, rgba(52, 211, 153, .22) 0%, transparent 70%),
