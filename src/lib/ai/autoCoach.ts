@@ -26,7 +26,7 @@ import { programmeMarcheCourse, FENETRE_JOURS as FENETRE_MARCHE_COURSE, type Pro
 import { isRun } from "@/lib/intervals/sport";
 import { decaleJour } from "@/lib/streak/compute";
 import { reecritureLue, type SeanceEcrite } from "@/lib/coach/planNotifie";
-import { journaliserEchec, journaliserEchecUneFois } from "@/lib/journal/echecServeur";
+import { journaliserEchec, journaliserEchecUneFois, causeStable } from "@/lib/journal/echecServeur";
 
 type Admin = SupabaseClient;
 
@@ -57,7 +57,9 @@ async function marcheCourseDe(admin: Admin, userId: string): Promise<ProgrammeMa
   const jour = aujourdhui(FUSEAU_DEFAUT);
   const { data: seances, error: eSeances } = await admin.from("workouts").select("date, sport").eq("user_id", userId)
     .gte("date", decaleJour(jour, -FENETRE_MARCHE_COURSE)).order("date", { ascending: false }).limit(200);
-  if (eSeances) console.error("[coach] sorties illisibles pour la marche-course :", eSeances.message);
+  // Une ligne au journal (une fois par jour : ce chemin repasse toutes les 2 min), plus la
+  // seule console (relecture du 09/11/2026) : le repli sur la première étape reste voulu.
+  if (eSeances) await journaliserEchecUneFois(admin, { source: "coach-auto", userId, message: `Sorties illisibles pour la marche-course, première étape par défaut : ${eSeances.code ?? "?"} ${causeStable(eSeances.message)}` });
   const joursCourus = ((seances ?? []) as { date: string; sport?: string | null }[])
     .filter((w) => isRun(w.sport)).map((w) => String(w.date).slice(0, 10));
   return programmeMarcheCourse({ peutCourir30: false, joursCourus, aujourdhui: jour });
@@ -84,7 +86,13 @@ async function prescrireTestVma(admin: Admin, opts: { userId: string; athleteId?
     && derniere.read === true && derniere.title === T.title.slice(0, 80) && derniere.body === T.subtitle.slice(0, 200);
   const { error: ePurge } = await admin.from("notifications").delete()
     .eq("user_id", userId).eq("type", "coach_session").gte("data->>date", today);
-  if (ePurge) return { processed: false, reason: `purge test vma: ${ePurge.message}` };
+  // ⚠️ Ces deux échecs ne se voyaient qu'au passage du cron de nuit (relecture du 09/11/2026) :
+  // les déclencheurs de jour (synchro, Santé, VMA…) ignorent `processed: false`. Journalisés ici,
+  // une fois par jour et par cause.
+  if (ePurge) {
+    await journaliserEchecUneFois(admin, { source: "coach-auto", userId, message: `Test VMA non posé, plan à venir non purgé : ${ePurge.code ?? "?"} ${causeStable(ePurge.message)}` });
+    return { processed: false, reason: `purge test vma: ${ePurge.message}` };
+  }
 
   const { error } = await admin.from("notifications").insert({
     user_id: userId, type: "coach_session", title: T.title.slice(0, 80), body: T.subtitle.slice(0, 200), read: lue,
@@ -97,7 +105,10 @@ async function prescrireTestVma(admin: Admin, opts: { userId: string; athleteId?
       }])),
     },
   });
-  if (error) return { processed: false, reason: error.message };
+  if (error) {
+    await journaliserEchecUneFois(admin, { source: "coach-auto", userId, message: `Test VMA non écrit : ${error.code ?? "?"} ${causeStable(error.message)}` });
+    return { processed: false, reason: error.message };
+  }
 
   let pushed = 0;
   // Montre : seulement pour un accès complet. Un compte gratuit voit le test dans l'app et
@@ -207,8 +218,15 @@ export async function autoCoachForUser(
     }
   }
 
-  const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId, { objectifSeul, essentielle }).catch(() => null);
-  if (!ctx) return { processed: false, reason: "ctx_failed" };
+  // Le contexte qui plante perdait sa CAUSE : le journal de nuit ne disait que « ctx_failed »
+  // (relecture du 09/11/2026). Elle part au journal, une fois par jour et par cause.
+  let causeCtx = "";
+  const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], userId, { objectifSeul, essentielle })
+    .catch((e) => { causeCtx = causeStable(e); return null; });
+  if (!ctx) {
+    await journaliserEchecUneFois(admin, { source: "coach-auto", userId, message: `Contexte du coach impossible, plan laissé en place : ${causeCtx || "contexte vide"}` });
+    return { processed: false, reason: "ctx_failed" };
+  }
 
   // L'instant est retenu : le rappel Premium bâtit le plan complet pour le MÊME jour.
   const maintenant = new Date();

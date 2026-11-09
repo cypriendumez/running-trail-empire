@@ -15,6 +15,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { urlJournalisable } from "../src/lib/journal/urlJournal";
 import { sansAdresse, MASQUE } from "../src/lib/journal/sansAdresse";
+import { causeStable } from "../src/lib/journal/echecServeur";
 import { parseGPX } from "../src/lib/intervals/gpx";
 import { coursesExistantes } from "../src/lib/races/existantes";
 import { estMajeur, ageEntier, AGE_MINIMUM } from "../src/lib/legal/age";
@@ -203,6 +204,80 @@ testAsync("un profil illisible ne fait pas non plus repartir le coach de zéro",
   assert.equal(r.processed, false);
   assert.equal(r.reason, "profil illisible");
   assert.equal(ops.filter((o) => o.table === "notifications" && o.action !== "select").length, 0, "une écriture du plan a eu lieu");
+});
+
+// Relecture du 09/11/2026 : ces échecs ne se voyaient qu'au passage du cron de nuit (les
+// déclencheurs de jour — synchro, Santé, VMA — ignorent `processed: false`), et le contexte
+// qui plantait perdait sa cause (« ctx_failed » seul).
+const PROFIL_ESSAI = { created_at: new Date().toISOString(), subscription_tier: "premium", email: "coureur@exemple.fr", preferred_language: "fr" };
+testAsync("le test VMA qui ne se pose pas va au journal, sans toucher au plan", async () => {
+  const { autoCoachForUser } = await import("../src/lib/ai/autoCoach");
+  const purge = fauxClient((op) => {
+    if (op.table === "profiles") return { data: PROFIL_ESSAI };
+    if (op.table === "notifications" && op.action === "delete") return { error: { message: "canceling statement due to statement timeout (8123 ms)", code: "57014" } };
+    return { data: [] };
+  });
+  const r = await autoCoachForUser(purge.client as never, { userId: "u1" });
+  assert.equal(r.processed, false);
+  assert.ok(!purge.ops.some((o) => o.table === "notifications" && o.action === "insert"), "le test VMA s'empile sur l'ancien plan malgré la purge ratée");
+  assert.equal(auJournal(purge.ops).length, 1, "une purge ratée du test VMA n'atteint pas error_logs");
+  assert.match(auJournal(purge.ops)[0].message, /Test VMA non posé, plan à venir non purgé : 57014 canceling statement due to statement timeout \(# ms\)$/, "le message de la base n'est pas stabilisé, ou son code est perdu");
+  const ecrit = fauxClient((op) => {
+    if (op.table === "profiles") return { data: PROFIL_ESSAI };
+    if (op.table === "notifications" && op.action === "insert") return { error: { message: "permission denied for row 4512", code: "42501" } };
+    return { data: [] };
+  });
+  const r2 = await autoCoachForUser(ecrit.client as never, { userId: "u1" });
+  assert.equal(r2.processed, false);
+  assert.equal(auJournal(ecrit.ops).length, 1, "un test VMA non écrit n'atteint pas error_logs");
+  assert.match(auJournal(ecrit.ops)[0].message, /Test VMA non écrit : 42501 permission denied for row #$/, "le message de la base n'est pas stabilisé (le dédoublonnage quotidien ne tient plus), ou son code est perdu");
+  assert.ok(!/coureur@exemple/.test(auJournal(ecrit.ops)[0].message), "l'adresse du coureur part dans le journal");
+});
+
+testAsync("un contexte du coach qui plante laisse le plan en place et journalise sa cause", async () => {
+  const { autoCoachForUser } = await import("../src/lib/ai/autoCoach");
+  const { client, ops } = fauxClient((op) => {
+    if (op.table === "profiles") return { data: PROFIL_ESSAI };
+    if (op.table === "performance_baselines") return { data: { vma_kmh: 17 } };
+    if (op.table === "workouts") return "lever";
+    return { data: [] };
+  });
+  const r = await autoCoachForUser(client as never, { userId: "u1" });
+  assert.equal(r.processed, false);
+  assert.equal(r.reason, "ctx_failed", "témoin : le contexte n'a pas planté (le test ne prouverait rien)");
+  assert.equal(ops.filter((o) => o.table === "notifications" && o.action !== "select").length, 0, "le plan est touché alors que le contexte a planté");
+  const j = auJournal(ops);
+  assert.equal(j.length, 1, "un contexte qui plante n'atteint pas error_logs");
+  assert.match(j[0].message, /Contexte du coach impossible, plan laissé en place : coupure réseau simulée/, "la cause du plantage est perdue");
+  // Une cause qui varie d'un passage à l'autre déjouerait « une fois par jour » (synchro toutes les 2 min).
+  const a = causeStable(new Error("délai dépassé après 3021 ms (requête 9f8e7d6c-1a2b-4c3d-8e9f-001122334455)"));
+  assert.equal(a, causeStable(new Error("délai dépassé après 2987 ms (requête 0a1b2c3d-4e5f-4a6b-9c8d-aabbccddeeff)")), "deux pannes identiques donnent deux causes différentes : le journal n'est plus dédoublonné");
+  assert.ok(a.includes("délai dépassé"), "la cause stable a perdu son sens");
+  assert.ok(causeStable("x".repeat(500)).length <= 160, "une cause sans borne de longueur");
+  assert.equal(causeStable("coupure"), "coupure", "une valeur levée qui n'est pas une Error se perd");
+  // Elle tourne DANS un gestionnaire d'erreur : elle ne lève jamais, quoi qu'on lui donne.
+  const bizarre = Object.assign(new Error("x"), { message: { pas: "une chaîne" } as unknown as string });
+  for (const v of [Object.create(null), null, undefined, bizarre, { toString() { throw new Error("piège"); } }])
+    assert.equal(typeof causeStable(v), "string", "causeStable lève : le contexte qui plante ferait rejeter la replanification");
+  assert.equal(causeStable(Object.create(null)), "cause illisible");
+  assert.equal(causeStable({ message: "JWT expired", code: "PGRST301" }), "JWT expired", "une erreur PostgREST brute perd sa cause (« [object Object] »)");
+  assert.equal(causeStable(new TypeError("")), "TypeError", "une Error sans message ne dit plus rien");
+  assert.match(codeNu("src/lib/ai/autoCoach.ts"), /\.catch\(\(e\) => \{ causeCtx = causeStable\(e\); return null; \}\)/, "le contexte qui plante journalise de nouveau sa cause brute, non dédoublonnable");
+});
+
+testAsync("des sorties illisibles en marche-course vont au journal", async () => {
+  const { autoCoachForUser } = await import("../src/lib/ai/autoCoach");
+  const { ops } = await (async () => {
+    const f = fauxClient((op) => {
+      if (op.table === "profiles") return { data: { ...PROFIL_ESSAI, peut_courir_30min: false } };
+      if (op.table === "workouts") return { error: { message: "upstream connect error after 2048 ms", code: "PGRST000" } };
+      return { data: [] };
+    });
+    await autoCoachForUser(f.client as never, { userId: "u1" }).catch(() => null);
+    return f;
+  })();
+  assert.ok(auJournal(ops).some((l) => /Sorties illisibles pour la marche-course, première étape par défaut : PGRST000 upstream connect error after # ms$/.test(l.message)),
+    "une lecture ratée des sorties en marche-course ne laisse de trace que dans la console");
 });
 
 // ── 3. La suppression de compte efface tout, ou rien ────────────────────────────

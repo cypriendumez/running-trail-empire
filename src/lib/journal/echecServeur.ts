@@ -25,6 +25,28 @@ export type EchecServeur = {
 };
 
 /**
+ * La cause d'une exception, STABLE d'un passage à l'autre : identifiants et nombres
+ * remplacés, longueur bornée. Sans cela, « une fois par jour » ne dédoublonne plus rien
+ * dès qu'un message porte une valeur variable (durée, identifiant) — et la synchro repasse
+ * toutes les 2 min : jusqu'à ~720 lignes par jour et par compte (relecture du 09/11/2026).
+ */
+export function causeStable(e: unknown): string {
+  // ⚠️ Appelée DANS des gestionnaires d'erreur : elle ne doit jamais lever (relecture du
+  // 09/11/2026). `String()` lève sur un objet sans prototype, et le `message` d'une Error
+  // n'est pas forcément une chaîne.
+  try {
+    // Une erreur PostgREST brute est un objet `{ message, code }`, pas une Error : sans ce cas,
+    // sa cause devenait « [object Object] ». Une Error sans message garde au moins son nom.
+    const message = e && typeof e === "object" && typeof (e as { message?: unknown }).message === "string"
+      ? (e as { message: string }).message : null;
+    const brut = message ? message : e instanceof Error ? e.name : String(e);
+    return brut.replace(/\b[0-9a-f]{8,}(?:-[0-9a-f]{4,})*\b/gi, "[id]").replace(/\d+/g, "#").slice(0, 160);
+  } catch {
+    return "cause illisible";
+  }
+}
+
+/**
  * Écrit l'échec dans `error_logs` avec le client fourni (le client admin : la table n'a
  * pas à s'ouvrir aux sessions), ou un client admin créé ici.
  */
