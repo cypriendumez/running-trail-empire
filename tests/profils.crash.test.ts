@@ -418,8 +418,101 @@ async function profilMarathonienSub3() {
   });
 }
 
+
+// ════════════════════════════════════════════════════════════════════════════════
+// @SAFERUN — UNE DOULEUR DÉCLARÉE ORIENTE TOUJOURS VERS UN PROFESSIONNEL DE SANTÉ.
+// Le renvoi n'était porté que par le renforcement : une semaine SANS renfo (un seul jour
+// disponible) servait un plan allégé pour une douleur sans jamais dire de consulter.
+const RENVOI: Record<string, RegExp> = {
+  fr: /consulte un médecin ou un masseur-kinésithérapeute/, en: /see a doctor or a physiotherapist/,
+  de: /Ärztin, einem Arzt oder in die Physiotherapie/, es: /consulta a un médico o a un fisioterapeuta/,
+  pt: /consulta um médico ou um fisioterapeuta/,
+};
+const DIAGNOSTIC = /tendinite|tendinitis|fracture|fractura|fratura|périostite|periostitis|syndrome|síndrome|Syndrom|Ermüdungsbruch/i;
+async function profilDouleur() {
+  console.log("\n@SAFERUN — DOULEUR DÉCLARÉE : LE RENVOI MÉDICAL NE DÉPEND PLUS DU RENFORCEMENT");
+  const unJour = ARCHETYPES.find(([n]) => n === "1 seul jour disponible")![1];
+  const textes = (plan: PlanDay[]) => Object.keys(RENVOI).map((l) => [l, plan.map((d) => {
+    const t = l === "fr" ? d : (d.i18n as Record<string, { detail?: string; why?: string }> | undefined)?.[l] ?? d;
+    return `${t.detail ?? ""} ${t.why ?? ""}`;
+  }).join(" ")] as const);
+
+  await testA("une semaine sans renfo, une douleur active : le renvoi est donné, dans les 5 langues, sans diagnostic", async () => {
+    const plan = buildWeekPlan({ ...unJour, douleursActives: ["Genou gauche"] } as AthleteContext, new Date("2026-09-07T08:00:00Z"));
+    assert.ok(!plan.some((d) => d.type === "Renfo"), "précondition : la semaine porte un renfo, le cas n'est pas celui visé");
+    for (const [l, t] of textes(plan)) {
+      assert.ok(RENVOI[l].test(t), `${l} : aucun renvoi vers un médecin ou un kinésithérapeute`);
+      assert.ok(!DIAGNOSTIC.test(t), `${l} : un nom de diagnostic servi : « ${t.match(DIAGNOSTIC)?.[0]} »`);
+    }
+    // Jamais dans le détail : la montre analyse le détail, pas le pourquoi.
+    assert.ok(!plan.some((d) => RENVOI.fr.test(d.detail)), "le renvoi est entré dans le détail lu par la montre");
+  });
+
+  await testA("contre-épreuve : sans douleur, aucun renvoi médical ajouté ; avec un renfo, un seul renvoi", async () => {
+    const sans = buildWeekPlan(unJour, new Date("2026-09-07T08:00:00Z"));
+    assert.ok(!textes(sans).some(([l, t]) => RENVOI[l].test(t)), "un renvoi médical sans aucune douleur déclarée");
+    const base = ARCHETYPES.find(([n]) => n.startsWith("débutant"))![1];
+    const avec = buildWeekPlan({ ...base, douleursActives: ["Genou gauche"] } as AthleteContext, new Date("2026-09-07T08:00:00Z"));
+    assert.ok(avec.some((d) => d.type === "Renfo"), "précondition : pas de renfo dans la semaine du débutant");
+    const fr = textes(avec).find(([l]) => l === "fr")![1];
+    assert.equal(fr.match(new RegExp(RENVOI.fr.source, "g"))?.length, 1, "le renvoi est répété deux fois dans la même semaine");
+  });
+
+  await testA("course dans la semaine : après la ligne d'arrivée, le renfo est celui de la récupération (aucun saut)", async () => {
+    const AUJ = aujourdhui(FUSEAU_DEFAUT);
+    let vus = 0;
+    for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 15, 23]) {
+      const jour = plusJours(AUJ, k);
+      const { plan } = await sub3(jour, 3);
+      const course = plan.find((d) => d.type === "Course")!;
+      for (const d of plan.filter((x) => x.type === "Renfo" && x.date > course.date)) {
+        vus++;
+        assert.ok(!/bondissement/i.test(d.detail) && /RÉCUPÉRATION/.test(d.detail), `${jour} : « ${d.detail.slice(0, 90)} » le ${d.date}, après un marathon`);
+        assert.ok(!/à l'approche de la course/.test(d.detail), `${jour} : renfo « à l'approche de la course » APRÈS la course`);
+      }
+    }
+    assert.ok(vus > 0, "aucun renfo après la course rencontré : l'assertion ne prouve rien");
+    // Le renfo PRINCIPAL (un jour sans course, pas greffé le soir d'un footing) suit un autre
+    // chemin : trois jours disponibles, course en début de semaine, contexte fabriqué.
+    let principal = 0;
+    for (const dtr of [0, 1, 2]) {
+      const ctx = mk({
+        objective: { race: "Marathon", distanceKm: 42.195, targetPace: "5'40/km", targetTime: "4h", targetSeconds: 14400 },
+        daysToRace: dtr, weeksToRace: 0, cycle: { deload: false, taper: true, label: "" },
+        availability: { daysPerWeek: 3, days: [0, 2, 4] },
+        volume: { weekKm: 40, avg4wkKm: 40, targetKm: 20, longRunKm: 4 },
+        macroPlan: [{ week: 1, phase: "Affûtage", volumeKm: 20, quality: [], longRunKm: 0, focus: "" }],
+      });
+      const plan = buildWeekPlan(ctx, new Date("2026-09-07T08:00:00Z"));
+      const course = plan.find((d) => d.type === "Course")!;
+      for (const d of plan.filter((x) => x.type === "Renfo" && x.date > course.date && !x.moment)) {
+        principal++;
+        assert.ok(!/bondissement/i.test(d.detail) && /RÉCUPÉRATION/.test(d.detail), `course à J+${dtr} : « ${d.detail.slice(0, 90)} » le ${d.date}, après un marathon`);
+      }
+    }
+    assert.ok(principal > 0, "le renfo principal n'est jamais tombé après la course : le second chemin n'est pas éprouvé");
+  });
+
+  await testA("invite du coach IA : l'allure de course sans « /km/km », et aucun découpage sans chrono visé", async () => {
+    const AUJ = aujourdhui(FUSEAU_DEFAUT);
+    const { ctx } = await sub3(AUJ, 7 * 4 + 3);
+    assert.ok(/PLAN DE COURSE/.test(ctx.text), "précondition : pas de plan de course dans l'invite à 4 semaines");
+    assert.ok(!/\/km\s*\/km/.test(ctx.text), `« /km/km » dans l'invite : ${ctx.text.match(/.{40}\/km\s*\/km/)?.[0]}`);
+    assert.ok(/= 4'13\/km/.test(ctx.text), "l'allure visée a disparu du plan de course");
+    // Course sans chrono visé : on ne découpe pas une allure de 0'00.
+    const sansChrono = await aLaDate(AUJ, () => buildAthleteContext(fauxClient({
+      profiles: [SUB3.profil],
+      performance_baselines: [{ user_id: "u", vma_kmh: SUB3.vma, max_hr: 190, resting_hr: 46, tested_at: plusJours(AUJ, -30) }],
+      workouts: historiqueSub3(AUJ),
+      notifications: [{ user_id: "u", type: "race_objective", data: { race: "Marathon test", raceDate: plusJours(AUJ, 31), distanceKm: 42.195, targetTime: "", targetSeconds: 0, targetPace: "" } }],
+    }), "u"));
+    assert.ok(!/0'00/.test(sansChrono.text), `allure inventée dans l'invite : ${sansChrono.text.match(/.{60}0'00.{20}/)?.[0]}`);
+  });
+}
+
 (async () => {
   await profilMarathonienSub3();
+  await profilDouleur();
   console.log(`\n${passed} test(s) d'archétypes passé(s), ${fails.length} échec(s)`);
   if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
 })().catch((e) => { console.log("  ✗ plantage : " + (e as Error).stack); process.exit(1); });
