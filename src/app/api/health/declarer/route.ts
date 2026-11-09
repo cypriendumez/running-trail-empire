@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { autoCoachForUser } from "@/lib/ai/autoCoach";
 import { enregistrerDouleurDeclaree, SEUIL_DOULEUR_DECLAREE } from "@/lib/health/douleurDeclaree";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 
 /**
  * POST { zone, zoneKey, painLevel } — DÉCLARER UNE DOULEUR, SANS IA (09/11/2026).
@@ -43,13 +44,18 @@ export async function POST(req: Request) {
   const admin = createAdminClient();
   const { data: creds, error: eCreds } = await admin.from("profiles")
     .select("intervals_athlete_id, intervals_api_key").eq("id", user.id).maybeSingle();
+  // Un échec ne se voyait que dans la console (relecture du 09/11/2026) : il va au journal,
+  // où /admin le montre. La douleur, elle, est enregistrée : la réponse reste un succès.
+  const echec = (message: string) => journaliserEchec(admin, { source: "douleur", userId: user.id, url: "/api/health/declarer", message });
   if (!eCreds) {
     await autoCoachForUser(admin, {
       userId: user.id,
       athleteId: (creds?.intervals_athlete_id as string | null) ?? null,
       apiKey: (creds?.intervals_api_key as string | null) ?? null,
       notify: false,
-    }).catch((e) => console.error("[santé] replanification après déclaration :", e));
+    }).catch((e) => echec(`Replanification après déclaration : ${e instanceof Error ? e.message : String(e)}`));
+  } else {
+    await echec(`Replanification après déclaration impossible, profil illisible : ${eCreds.code ?? "?"} ${eCreds.message}`);
   }
   return NextResponse.json({ ok: true });
 }

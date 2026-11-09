@@ -755,6 +755,10 @@ test("le « kiné IA » est SUPPRIMÉ partout : routes, écran, vitrine, cours, 
   // Une déclaration replanifie tout de suite, comme « ça va mieux / ça empire ».
   const replan = decl.search(/if \(!eCreds\) \{\s*await autoCoachForUser\(admin, \{/);
   assert.ok(replan > decl.search(/if \(!ok\) return/), "la déclaration ne replanifie plus : l'écran promet un plan allégé qui ne bouge pas");
+  // Un échec de la replanification va au journal, pas seulement dans la console.
+  assert.match(decl, /\}\)\.catch\(\(e\) => echec\(/, "un plantage de la replanification ne va plus au journal d'erreurs");
+  assert.match(decl, /\} else \{\s*await echec\(`Replanification après déclaration impossible, profil illisible/, "un profil illisible empêche la replanification sans rien journaliser");
+  assert.match(decl, /const echec = \(message: string\) => journaliserEchec\(admin, \{ source: "douleur"/, "les échecs de la déclaration ne vont plus dans error_logs");
 });
 
 testAsync("une douleur se déclare à partir de 4/10, et une seconde plus forte le même jour relève le niveau", async () => {
@@ -796,6 +800,11 @@ test("les consignes santé du coach règlent la charge : ni soin, ni cause, ni e
   const sante = src.indexOf("SANTÉ & ANTÉCÉDENTS (");
   const cadre = src.indexOf("tu ne poses aucun diagnostic, tu ne prescris ni exercice de soin, ni traitement, ni examen. Toute question médicale → un médecin ou un masseur-kinésithérapeute.");
   assert.ok(sante > 0 && cadre > sante && cadre < src.indexOf("${cond.rules.length", sante), "l'invite ne dit plus au coach qu'il règle la charge et oriente pour le reste");
+  // La consigne de sécurité sur la douleur (même invite) : de la charge et une orientation, pas de soin.
+  const securite = src.slice(src.indexOf("⚠️ DOULEUR SIGNALÉE ("), src.indexOf("La santé prime sur le plan."));
+  assert.ok(securite.length > 200 && /médecin/.test(securite), "la consigne de sécurité sur la douleur a disparu, ou n'oriente plus vers un médecin");
+  const m = securite.match(SOIN);
+  assert.ok(!m, `la consigne de sécurité sur la douleur prescrit de nouveau un soin (« ${m?.[0]} »)`);
 });
 
 test("la fiche « reprendre après une blessure » renvoie au professionnel, sans règle de reprise par la douleur", () => {
