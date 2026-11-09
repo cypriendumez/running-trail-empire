@@ -2443,7 +2443,9 @@ ${catalog}`;
     const w = runs[0];
     if (objectifSeul || !w?.id || Math.floor((now - new Date(w.date).getTime()) / 86400000) > 3) return null;
     const { data, error } = await sb.from("activity_tracks").select("points").eq("workout_id", w.id).maybeSingle();
-    if (error || !data) return null;
+    // Une lecture ratée se DIT au journal ; une séance sans trace (tapis, import à venir) se tait.
+    if (error) { console.error("[coach] trace de la dernière séance illisible, arrêts inconnus :", error.code ?? "?", error.message); return null; }
+    if (!data) return null;
     return pausesDeTrace(pointsStockes((data as { points?: unknown }).points), vitesseEnMouvement(w.distance_km, w.duration_seconds));
   })();
   const lastSession = (() => {
