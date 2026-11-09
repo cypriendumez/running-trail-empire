@@ -38,7 +38,7 @@ import { EDITEUR, HEBERGEUR_APP, PAYS_APP, SOUS_TRAITANTS } from "../src/lib/bra
 import { STATUT_A_COMPLETER, statutEditeur } from "../src/lib/brand/statutEditeur";
 import { fournisseursActifs } from "../src/lib/auth/fournisseurs";
 import { nomAffiche, refusDe, avisDe, litAvis, TEXTE_MIN } from "../src/lib/avis/store";
-import { doitAfficher, refuser, reporter, lireEtat, REPORT_MS } from "../src/lib/avis/invite";
+import { doitAfficher, refuser, reporter, lireEtat, REPORT_MS, momentFavorable } from "../src/lib/avis/invite";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
@@ -1018,7 +1018,7 @@ test("l'athlète CONNECTÉ a un chemin pour écrire son avis", () => {
   // porte s'ouvrait du mauvais côté : la fonctionnalité existait, personne ne pouvait
   // l'atteindre, et aucun test ne rougissait puisque rien n'était cassé.
   const invite = readFileSync(join(ROOT, "src/components/dashboard/InviteAvis.tsx"), "utf8");
-  assert.match(invite, /href="\/avis"/, "l'invitation ne mène plus à la page des avis");
+  assert.match(invite, /href=\{`\/avis\?note=\$\{n\}`\}/, "les étoiles de l'invitation ne mènent plus à la page des avis, note posée");
   const dash = sansCommentaires(readFileSync(join(ROOT, "src/app/dashboard/page.tsx"), "utf8"));
   assert.match(dash, /<InviteAvis afficher=\{inviterAvis\}/, "le tableau de bord n'affiche plus l'invitation");
 
@@ -1028,6 +1028,23 @@ test("l'athlète CONNECTÉ a un chemin pour écrire son avis", () => {
   assert.match(dash, /SEANCES_AVANT_INVITE/, "l'invitation n'est plus conditionnée à un usage réel du produit");
   assert.match(dash, /avisRes\.data\?\.length \?\? 0\) === 0/,
     "l'invitation ne vérifie plus que l'athlète n'a pas déjà écrit un avis");
+
+  // ⚠️ AU BON MOMENT (09/11/2026), comme les grandes applications : juste après une séance
+  // du plan FAITE aujourd'hui ou hier — jamais à froid, jamais pour un simple repos.
+  assert.match(dash, /&& momentFavorable\(streak\.days, decaleJour\(streakToday, -1\)\)/, "l'invitation n'attend plus le bon moment (séance du plan faite)");
+  const j = (date: string, verdict: string, reason: string) => ({ date, verdict, reason });
+  assert.equal(momentFavorable([j("2026-11-08", "tenu", "seance-faite")], "2026-11-08"), true, "une séance du plan faite hier n'ouvre pas l'invitation");
+  assert.equal(momentFavorable([j("2026-11-07", "tenu", "seance-faite")], "2026-11-08"), false, "une séance d'avant-hier ouvre encore l'invitation");
+  assert.equal(momentFavorable([j("2026-11-09", "tenu", "repos-respecte")], "2026-11-08"), false, "un repos respecté ouvre l'invitation : on félicite d'un rien");
+  assert.equal(momentFavorable([j("2026-11-09", "rompu", "manquee")], "2026-11-08"), false, "une séance manquée ouvre l'invitation");
+  assert.equal(momentFavorable([], "2026-11-08"), false, "sans série, l'invitation s'ouvre");
+
+  // ⚠️ AUCUN TRI DES AVIS : toutes les notes mènent à la page publique ; une note basse
+  // reçoit EN PLUS un chemin vers le support, jamais À LA PLACE de la publication.
+  const form = sansCommentaires(readFileSync(join(ROOT, "src/components/avis/AvisForm.tsx"), "utf8"));
+  assert.doesNotMatch(sansCommentaires(invite), /note=\$\{n\}`\}[^>]*\bn >= 4|n >= 4[^\n]*\/avis|n <= 3[^\n]*\/contact/, "l'invitation trie les notes : seules les bonnes iraient au public");
+  assert.match(form, /if \(Number\.isInteger\(n\) && n >= 1 && n <= 5\) setNote\(n\);/, "la note touchée sur la carte n'est plus reprise dans le formulaire");
+  assert.match(form, /\{note <= 3 && \(/, "une note basse ne propose plus d'écrire au support");
 });
 
 test("un nouvel avis PRÉVIENT l'éditeur, et la moyenne ne sort jamais sans son compte", () => {
