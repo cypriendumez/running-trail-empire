@@ -13,7 +13,6 @@ import {
   type ParcoursHdf, type SortKey, type Facets,
 } from "@/data/parcoursHdf";
 import { tileUrl, thumbZoomFor } from "@/data/famousRoutes";
-import { generateTrace } from "@/lib/parcoursTrace";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { PX, fillP } from "./parcoursI18n";
 import { IconeSport } from "./IconeSport";
@@ -125,13 +124,26 @@ export function ParcoursBrowser({ initialSearch = "", exportGpx = false }: { ini
       let coordinates: [number, number][] | undefined = p.coordinates;
       if (!coordinates || coordinates.length < 2) {
         const oid = p.osm_id ?? p.id;
-        const res = await fetch(`/api/parcours/geometry?id=${oid}&type=${p.osm_type || "relation"}`);
-        const json = await res.json();
+        // Une limite : sans elle, le chargement tournait plus d'une minute quand OpenStreetMap ne
+        // répondait plus (09/11/2026). Le serveur, lui, s'arrête bien avant (deux sources à 12 s).
+        const res = await fetch(`/api/parcours/geometry?id=${oid}&type=${p.osm_type || "relation"}`, { signal: AbortSignal.timeout(25_000) }).catch(() => null);
+        // Chaque échec dit SA cause : une session expirée ou un parcours retiré d'OpenStreetMap
+        // ne sont pas « OpenStreetMap ne répond pas » (relecture du 09/11/2026).
+        if (res?.status === 401) { toast.error(L["t.sessionExpiree"], { id: tid }); return; }
+        if (res?.status === 404) { toast.error(L["t.gpxNa"], { id: tid }); return; }
+        const json = res?.ok ? await res.json().catch(() => ({})) : {};
         if (Array.isArray(json.coordinates) && json.coordinates.length > 1) coordinates = json.coordinates;
       }
-      if (!coordinates || coordinates.length < 2) coordinates = await generateTrace(p);
-      // Garde-fou : géométrie OSM incomplète (relation « coquille ») → on prévient au lieu d'afficher un tracé bancal.
-      if (coordinates.length < 4 || traceLengthKm(coordinates) < 0.4) {
+      // ⚠️ PLUS DE TRACÉ INVENTÉ (09/11/2026). Faute de géométrie, une boucle « déterministe »
+      // était fabriquée autour du départ (`generateTrace`) et affichée sous le NOM du vrai parcours :
+      // avec OpenStreetMap en panne, chaque clic montrait un faux tracé. On le dit, on n'invente rien.
+      if (!coordinates || coordinates.length < 2) {
+        toast.error(L["t.traceIndispo"], { id: tid });
+        return;
+      }
+      // Garde-fou : géométrie OSM incomplète (relation « coquille », ou un MORCEAU nettement plus court que
+      // la distance affichée sur la carte du parcours) → on prévient au lieu d'afficher un tracé bancal.
+      if (tracePartiel(coordinates, p.distance_km)) {
         toast.error(L["t.traceIncomplete"], { id: tid });
         return;
       }
@@ -383,6 +395,16 @@ export function ParcoursBrowser({ initialSearch = "", exportGpx = false }: { ini
 }
 
 // ─── GPX : tracé téléchargeable (montre / téléphone / appli GPS) ───────────────────
+/**
+ * Un tracé trop court pour être le parcours : moins de 4 points, moins de 400 m, ou moins des trois
+ * quarts de la distance AFFICHÉE sur sa carte (le catalogue est bâti sur la même chaîne principale :
+ * un tracé conforme passe, un fragment non). Relecture « échecs muets » du 09/11/2026.
+ */
+export function tracePartiel(coords: [number, number][], distanceAnnonceeKm: number): boolean {
+  const km = traceLengthKm(coords);
+  return coords.length < 4 || km < 0.4 || (distanceAnnonceeKm > 0 && km < distanceAnnonceeKm * 0.75);
+}
+
 function traceLengthKm(coords: [number, number][]): number {
   const R = 6371; let d = 0;
   for (let i = 1; i < coords.length; i++) {
@@ -434,11 +456,16 @@ function ParcoursCard({ p, near, loading, disabled, onLoad, exportGpx }: { p: Pa
     try {
       let coords: [number, number][] | undefined = p.coordinates;
       if (!coords || coords.length < 2) {
-        const res = await fetch(`/api/parcours/geometry?id=${p.osm_id ?? p.id}&type=${p.osm_type || "relation"}`);
-        const json = await res.json();
+        const res = await fetch(`/api/parcours/geometry?id=${p.osm_id ?? p.id}&type=${p.osm_type || "relation"}`, { signal: AbortSignal.timeout(25_000) }).catch(() => null);
+        if (res?.status === 401) { toast.error(L["t.sessionExpiree"], { id: tid }); return; }
+        const json = res?.ok ? await res.json().catch(() => ({})) : {};
         if (Array.isArray(json.coordinates)) coords = json.coordinates;
+        // Pas de réponse, ou une panne passagère : on le dit comme telle, pas « indisponible pour ce parcours ».
+        if ((!coords || coords.length < 2) && res?.status !== 404) { toast.error(L["t.traceIndispo"], { id: tid }); return; }
       }
       if (!coords || coords.length < 2) { toast.error(L["t.gpxNa"], { id: tid }); return; }
+      // Le même garde-fou qu'au chargement sur la carte : pas de GPX d'un morceau de parcours.
+      if (tracePartiel(coords, p.distance_km)) { toast.error(L["t.traceIncomplete"], { id: tid }); return; }
       const blob = new Blob([buildGpx(p.nom, coords)], { type: "application/gpx+xml" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
