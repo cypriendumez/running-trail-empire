@@ -1075,14 +1075,14 @@ export const ARTICLES: Article[] = [
     cle: "p15",
     maj: "9 novembre 2026",
     chapo:
-      "ASICS, Merrell, Adidas, Nike et Brooks ont chacun sorti un modèle de trail à plaque carbone en 2026. L'argument de vente reprend presque mot pour mot celui de la route. Le mécanisme qu'il invoque est pourtant prouvé ailleurs, sur un terrain différent.",
+      "ASICS, Merrell, Nike et Brooks ont chacun sorti un modèle de trail à plaque carbone en 2026, et Adidas un modèle à cadre carbone. L'argument de vente reprend presque mot pour mot celui de la route. Le mécanisme qu'il invoque est pourtant prouvé ailleurs, sur un terrain différent.",
     blocs: [
       {
         h: "Une vague de sorties en 2026",
         p: [
-          "ASICS a présenté la Metafuji Trail 2 le 10 juillet 2026, avec une plaque carbone en forme de X pensée pour la propulsion en montée ; la paire est disponible depuis le 1er août, à 250 dollars.",
-          "Merrell a suivi avec la MTL SpeedArc Peak, sa première chaussure à plaque carbone : une plaque fourchue — la Carbon Fiber FlexPlate — prise entre deux couches de mousse, pensée pour garder de la souplesse à l'avant-pied sur terrain rocheux. Le modèle a reçu un European Outdoor Award aux Outdoor Business Days de Riva del Garda, avant même sa sortie en magasin ; il est vendu autour de 290 dollars.",
-          "Adidas a dévoilé en août 2026 la Terrex Agravic Speed Ultra Evo, vendue 500 dollars en édition limitée. Nike a élargi sa gamme trail ACG avec l'Ultrafly 2, dont la plaque carbone ne court que sur une partie de la longueur de la semelle, vendue 260 dollars. Brooks a présenté la Cascadia Elite, construite à partir d'un prototype porté par Chris Myers à la Western States — elle embarque une plaque en Pebax chargé de carbone, pas une plaque carbone pleine, pour environ 275 dollars. Côté accessible, la Kiprun Kipsummit Race de Decathlon reprend le principe à plaque carbone pour environ 200 euros.",
+          "ASICS a présenté la Metafuji Trail 2 le 10 juillet 2026, avec une plaque carbone en forme de X pensée pour la propulsion en montée tout en gardant le contrôle en descente ; la paire est disponible depuis le 1er août, à 250 dollars.",
+          "Merrell a suivi avec la MTL SpeedArc Peak, présentée par la marque comme sa chaussure de trail la plus aboutie à ce jour après cinq ans de travail et sept prototypes : une plaque carbone fourchue, prise entre deux mousses, pensée pour garder de la souplesse à l'avant-pied sur terrain rocheux. Le modèle a reçu un European Outdoor Award aux Outdoor Business Days de Riva del Garda, avant même sa sortie en magasin prévue à l'été.",
+          "Adidas a dévoilé en août 2026 la Terrex Agravic Speed Ultra Evo, à 500 dollars : pas une plaque mais un cadre en carbone intégré au talon, vendue d'abord en avant-première à Chamonix pendant le salon de l'UTMB, avant une sortie plus large en décembre. Nike a élargi sa gamme trail ACG avec l'Ultrafly 2, dont la plaque carbone court sur toute la longueur de la semelle mais est fendue en son milieu pour garder de la souplesse, vendue 260 dollars. Brooks a présenté la Cascadia Elite, à environ 275 dollars : une plaque en Pebax chargé de carbone, pas une plaque carbone pleine. Côté accessible, la Kiprun Kipsummit Race de Decathlon reprend le principe à plaque carbone pour environ 200 euros.",
           "Signe que le sujet ne fait pas consensus dans l'industrie : The North Face a choisi la direction inverse avec son Offtrail Ultra, sans plaque ni grosse épaisseur de semelle — un retour assumé à un trail plus simple.",
         ],
       },
