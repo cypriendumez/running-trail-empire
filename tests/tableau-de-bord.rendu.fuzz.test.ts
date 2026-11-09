@@ -115,7 +115,6 @@ function compte(k: number) {
   return {
     profile: peut(0.05) ? null : { id: "u", full_name: un(["Ana", "", "N".repeat(60)]), preferred_language: "fr", vma: peut() ? nombre(10, 24) : null, max_hr: peut() ? nombre(170, 205) : null, created_at: `${passe(200)}T08:00:00Z` },
     hrv, metriqueVfc: un([null, "rmssd", "sdnn"]), workouts, plan: peut(0.2) ? { race_date: decale(AUJ, entre(5, 90)) } : null,
-    league: peut(0.4) ? { leagues: { name: un(["bronze", "silver", "gold", "platinum", "diamond", "??"]) }, points: entre(0, 999) } : null,
     prWorkouts: workouts, recordsDeclares: peut(0.8) ? [] : [{ distance: un(["5k", "10k", "semi", "marathon"] as const), secondes: entre(1000, 15000), date: passe(900), course: un([null, "Race-Z"]) }],
     premiereSeance: n ? workouts[workouts.length - 1].date : null,
     chargeHistory: workouts.map((w) => ({ date: w.date, tss: w.tss, type: w.type, duration_seconds: w.duration_seconds })),
@@ -127,7 +126,7 @@ function compte(k: number) {
     },
     objective, derniereCourse: !avecObjectif && peut(0.3) ? { race: "Race-P", raceDate: passe(20) } : null,
     currentVma: peut(0.25) ? null : nombre(9, 24), sourceVma: un([null, { type: "seances", date: passe(30), km: nombre(3, 30) }, { type: "test", date: passe(30) }, { type: "courbe" }, { type: "vo2max" }]),
-    newMembersWeek: entre(0, sale ? 100000 : 30), streak,
+    streak,
     acces: un([null, { etat: "gratuit", joursRestants: null, essaiExpire: false }, { etat: "essai", joursRestants: entre(0, 7), essaiExpire: false }, { etat: "gratuit", joursRestants: null, essaiExpire: true }, { etat: "premium", joursRestants: null, essaiExpire: false }, { etat: "starter", joursRestants: null, essaiExpire: false }]),
     donneesIncompletes: peut(0.9) ? [] : un([["seances"], ["profil", "charge", "records"], ["inconnu"]]),
     jourAujourdhui: AUJ,
