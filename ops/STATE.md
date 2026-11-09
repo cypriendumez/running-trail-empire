@@ -80,14 +80,18 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
 1. **Sauvegarde des données personnelles** : couverte chaque semaine sur le Mac (chiffrée), mais
    pas de copie quotidienne côté hébergeur tant que Supabase est sur l'offre gratuite. Passage à
    l'offre Pro à décider au lancement.
-2. **Chantier sécurité du 08/11** (mots de passe, CSP appliquée, CAPTCHA en sommeil, double
-   authentification facultative) : déployé le 08/11 au soir ; migration 041 exécutée et réglages
-   Supabase faits par Cyprien le 09/11 vers 0 h 25 ; double authentification active sur son compte.
-   Reste, plus tard, l'activation du CAPTCHA (liste hors dépôt :
-   `~/Desktop/Pacevo/securite-2026-11-08-actions.md`). Aucun agent ne change ces réglages à sa place.
 
 ## Résolues le 09/11/2026
 
+- **Chantier sécurité du 08/11 terminé** (mots de passe, CSP appliquée, double authentification
+  facultative, CAPTCHA). Migration 041 et réglages Supabase faits par Cyprien vers 0 h 25 ; double
+  authentification active sur son compte. **CAPTCHA Cloudflare Turnstile actif partout depuis 8 h 15** :
+  inscription, mot de passe oublié, changement de mot de passe (nos routes) et connexion par mot de
+  passe (Supabase → Attack Protection). Widget « Pacevo » dans le compte Cloudflare de Cyprien (hôtes
+  `pacevo.fr` et `localhost`), clés dans Vercel en Production. Essai réel réussi dans Chrome. Aucun
+  agent ne change ces réglages à sa place. ⚠️ Un navigateur piloté (navigateur intégré de Claude,
+  routines) échoue au CAPTCHA : pour voir une page authentifiée, lien `magiclink` fabriqué avec la clé
+  d'administration, jamais le formulaire de connexion.
 - Mails d'Outlook « perdus » vers Gmail : ils étaient tous dans le Spam de Gmail, invisible au connecteur. Sortis du spam, filtre posé ; `@Concierge` prévenu de cet angle mort.
 - PR #4 du Coach relue, vérifiée sur le Mac, fusionnée et déployée.
 
