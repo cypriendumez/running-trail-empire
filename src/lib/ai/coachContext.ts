@@ -2363,14 +2363,16 @@ ${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${lim
   }
   return lines.length ? `- 🏃‍♂️ TECHNIQUE DE COURSE (mesurée, pas supposée) : ${lines.join(" · ")}.\n` : "";
 })()}${(() => {
-  if (!objective || daysToRace == null || daysToRace < 0 || daysToRace > 35) return "";
+  // Sans chrono visé (course A du calendrier : `targetSeconds` à 0), aucun découpage : il
+  // s'écrivait « premier km à 0'00 », une allure inventée (@Sparring, 09/11/2026).
+  if (!objective || daysToRace == null || daysToRace < 0 || daysToRace > 35 || !(objective.targetSeconds > 0) || !(objective.distanceKm > 0)) return "";
   const goalSec = objective.targetSeconds / objective.distanceKm;      // s/km visés
   const fmt = (sc: number) => `${Math.floor(sc / 60)}'${String(Math.round(sc % 60)).padStart(2, "0")}`;
   // Négative split : partir 2-3 % au-dessus de l'allure cible et finir en dessous. C'est
   // la stratégie qui produit le plus de records personnels, et la plus dure à tenir sans
   // l'avoir répétée — d'où la simulation à l'entraînement.
   const k1 = fmt(goalSec * 1.025), kMid = fmt(goalSec), kEnd = fmt(goalSec * 0.985);
-  return `- 🏁 PLAN DE COURSE (J-${daysToRace}) : cible ${objective.targetTime} sur ${objective.distanceKm} km = ${objective.targetPace}/km. `
+  return `- 🏁 PLAN DE COURSE (J-${daysToRace}) : cible ${objective.targetTime} sur ${objective.distanceKm} km = ${kMid}/km. `
     + `Découpage à lui donner : premier km à ${k1} (JAMAIS plus vite — le km de trop payé au départ coûte le double à l'arrivée), `
     + `corps de course à ${kMid}, dernier tiers à ${kEnd} s'il en a sous le pied. `
     + `Départ en négative split : c'est ce qui produit le plus de records, et ça se RÉPÈTE à l'entraînement — `

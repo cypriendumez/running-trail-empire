@@ -163,6 +163,8 @@ export type TextesPlan = {
   renfoWhy: string;
   /** Douleur active (déclarée ou signalée après une séance) : la séance le dit, rien n'est ajouté. */
   renfoDouleur: string;
+  /** Douleur active dans une semaine SANS renforcement : le renvoi médical, porté par le « pourquoi » du premier jour. */
+  douleurOrientation: string;
   /** Axe personnalisé, choisi sur une MESURE de l'athlète. */
   renfoAxe: Record<string, string>;
 
@@ -297,6 +299,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoSpecifique: (s) => `30 à 35 min, FORCE UTILE À LA COURSE : squats bulgares ${s}×8 par jambe, fentes sautées ${s}×8, montées de mollets sur une jambe ${s}×12, nordic curls ${s}×6, gainage dynamique ${s}×40 s, bondissements ${s}×10. Explosif et court : on transfère la force vers la foulée, on ne cherche plus le volume.`,
     renfoDeveloppement: (s, plus) => `30 à 40 min, DÉVELOPPEMENT : gainage (planche, latéral) ${s}×45 s, squats ${s}×12, fentes ${s}×10 par jambe, montées de mollets ${s}×15, ischios nordic curls ${s}×6, proprioception sur une jambe ${s}×30 s. ${plus ? "Série supplémentaire par rapport à la semaine dernière — la surcharge vaut aussi pour le renfo." : "Charge maintenue cette semaine (assimilation)."}`,
     renfoWhy: "La prévention de blessure n°1, et un gain direct d'économie de foulée. Elle se périodise comme la course : fondations, puis force utile, puis simple entretien à l'approche du jour J.",
+    douleurOrientation: " ⚠️ DOULEUR SIGNALÉE : ce plan réduit l'intensité, il ne soigne pas. Si elle persiste ou s'aggrave, consulte un médecin ou un masseur-kinésithérapeute.",
     renfoDouleur: " ⚠️ DOULEUR SIGNALÉE : saute tout exercice qui sollicite la zone douloureuse ou réveille la douleur, et n'ajoute rien. Si elle persiste ou s'aggrave, consulte un médecin ou un masseur-kinésithérapeute.",
     renfoAxe: {
       raideur: " 🎯 EN PLUS, ton ratio vertical est élevé — tu montes plus que tu n'avances : corde à sauter 3×45 s, pogos (petits rebonds cheville) 3×20, bondissements sur place 3×10. On cherche un contact au sol COURT, pas de la force.",
@@ -422,6 +425,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoSpecifique: (s) => `30 to 35 min, STRENGTH THAT TRANSFERS TO RUNNING: Bulgarian split squats ${s}×8 per leg, jump lunges ${s}×8, single-leg calf raises ${s}×12, nordic curls ${s}×6, dynamic core ${s}×40 s, bounds ${s}×10. Explosive and short: we transfer strength into the stride, we no longer chase volume.`,
     renfoDeveloppement: (s, plus) => `30 to 40 min, DEVELOPMENT: core (plank, side) ${s}×45 s, squats ${s}×12, lunges ${s}×10 per leg, calf raises ${s}×15, nordic hamstring curls ${s}×6, single-leg proprioception ${s}×30 s. ${plus ? "One set more than last week — progressive overload applies to strength work too." : "Load held this week (assimilation)."}`,
     renfoWhy: "The number 1 injury prevention, and a direct gain in running economy. It is periodised like the running: foundations, then transferable strength, then simple maintenance as race day approaches.",
+    douleurOrientation: " ⚠️ PAIN REPORTED: this plan lowers the intensity, it does not treat anything. If it persists or gets worse, see a doctor or a physiotherapist.",
     renfoDouleur: " ⚠️ PAIN REPORTED: skip any exercise that loads the painful area or brings the pain back, and add nothing. If it persists or gets worse, see a doctor or a physiotherapist.",
     renfoAxe: {
       raideur: " 🎯 ALSO, your vertical ratio is high — you bounce more than you move forward: skipping rope 3×45 s, pogos 3×20, standing bounds 3×10. Aim for SHORT ground contact, not strength.",
@@ -547,6 +551,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoSpecifique: (s) => `30 bis 35 min, LAUFSPEZIFISCHE KRAFT: bulgarische Kniebeugen ${s}×8 pro Bein, Sprungausfallschritte ${s}×8, einbeiniges Wadenheben ${s}×12, Nordic Curls ${s}×6, dynamischer Rumpf ${s}×40 s, Sprünge ${s}×10. Explosiv und kurz: Wir übertragen die Kraft in den Laufschritt, Umfang ist nicht mehr das Ziel.`,
     renfoDeveloppement: (s, plus) => `30 bis 40 min, ENTWICKLUNG: Rumpf (Unterarmstütz, seitlich) ${s}×45 s, Kniebeugen ${s}×12, Ausfallschritte ${s}×10 pro Bein, Wadenheben ${s}×15, Nordic Curls ${s}×6, Propriozeption auf einem Bein ${s}×30 s. ${plus ? "Ein Satz mehr als letzte Woche — progressive Überlastung gilt auch für die Kräftigung." : "Belastung diese Woche gehalten (Verarbeitung)."}`,
     renfoWhy: "Die Verletzungsprävention Nummer 1 und ein direkter Gewinn an Laufökonomie. Sie wird periodisiert wie das Laufen: Fundament, dann laufspezifische Kraft, dann nur noch Erhaltung, wenn der Tag X näher rückt.",
+    douleurOrientation: " ⚠️ SCHMERZ GEMELDET: Dieser Plan senkt die Intensität, er behandelt nichts. Hält er an oder wird er stärker, geh zu einer Ärztin, einem Arzt oder in die Physiotherapie.",
     renfoDouleur: " ⚠️ SCHMERZ GEMELDET: Lass jede Übung weg, die die schmerzende Stelle belastet oder den Schmerz zurückbringt, und füge nichts hinzu. Hält er an oder wird er stärker, geh zu einer Ärztin, einem Arzt oder in die Physiotherapie.",
     renfoAxe: {
       raideur: " 🎯 ZUSÄTZLICH: dein Vertikalverhältnis ist hoch — du springst mehr, als du vorankommst: Seilspringen 3×45 s, Pogos 3×20, Standsprünge 3×10. Ziel ist KURZER Bodenkontakt, keine Kraft.",
@@ -672,6 +677,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoSpecifique: (s) => `30 a 35 min, FUERZA ÚTIL PARA CORRER: sentadillas búlgaras ${s}×8 por pierna, zancadas saltadas ${s}×8, elevaciones de gemelos a una pierna ${s}×12, nordic curls ${s}×6, core dinámico ${s}×40 s, saltos ${s}×10. Explosivo y corto: transferimos la fuerza a la zancada, ya no buscamos volumen.`,
     renfoDeveloppement: (s, plus) => `30 a 40 min, DESARROLLO: core (plancha, lateral) ${s}×45 s, sentadillas ${s}×12, zancadas ${s}×10 por pierna, elevaciones de gemelos ${s}×15, nordic curls de isquios ${s}×6, propiocepción a una pierna ${s}×30 s. ${plus ? "Una serie más que la semana pasada — la sobrecarga progresiva vale también para la fuerza." : "Carga mantenida esta semana (asimilación)."}`,
     renfoWhy: "La prevención de lesiones n.º 1, y una ganancia directa de economía de zancada. Se periodiza como la carrera: cimientos, luego fuerza útil, y solo mantenimiento al acercarse el día D.",
+    douleurOrientation: " ⚠️ DOLOR REGISTRADO: este plan reduce la intensidad, no trata nada. Si persiste o empeora, consulta a un médico o a un fisioterapeuta.",
     renfoDouleur: " ⚠️ DOLOR REGISTRADO: sáltate cualquier ejercicio que cargue la zona dolorida o despierte el dolor, y no añadas nada. Si persiste o empeora, consulta a un médico o a un fisioterapeuta.",
     renfoAxe: {
       raideur: " 🎯 ADEMÁS, tu ratio vertical es alto — subes más de lo que avanzas: comba 3×45 s, pogos 3×20, saltos en el sitio 3×10. Se busca un contacto CORTO con el suelo, no fuerza.",
@@ -797,6 +803,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     renfoSpecifique: (s) => `30 a 35 min, FORÇA ÚTIL À CORRIDA: agachamentos búlgaros ${s}×8 por perna, afundos saltados ${s}×8, elevações de gémeos a uma perna ${s}×12, nordic curls ${s}×6, core dinâmico ${s}×40 s, saltos ${s}×10. Explosivo e curto: transferimos a força para a passada, já não procuramos volume.`,
     renfoDeveloppement: (s, plus) => `30 a 40 min, DESENVOLVIMENTO: core (prancha, lateral) ${s}×45 s, agachamentos ${s}×12, afundos ${s}×10 por perna, elevações de gémeos ${s}×15, nordic curls de isquiotibiais ${s}×6, propriocepção a uma perna ${s}×30 s. ${plus ? "Uma série a mais do que na semana passada — a sobrecarga progressiva vale também para o reforço." : "Carga mantida esta semana (assimilação)."}`,
     renfoWhy: "A prevenção de lesões n.º 1, e um ganho direto de economia de passada. Periodiza-se como a corrida: fundações, depois força útil, e simples manutenção à medida que o dia D se aproxima.",
+    douleurOrientation: " ⚠️ DOR REGISTADA: este plano reduz a intensidade, não trata nada. Se persistir ou piorar, consulta um médico ou um fisioterapeuta.",
     renfoDouleur: " ⚠️ DOR REGISTADA: salta qualquer exercício que solicite a zona dorida ou desperte a dor, e não acrescentes nada. Se persistir ou piorar, consulta um médico ou um fisioterapeuta.",
     renfoAxe: {
       raideur: " 🎯 ALÉM DISSO, o teu rácio vertical é alto — sobes mais do que avanças: corda 3×45 s, pogos 3×20, saltos no lugar 3×10. Procura um contacto CURTO com o solo, não força.",

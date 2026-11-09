@@ -789,6 +789,10 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
       const recup = ctx.recuperation;
       if (recup && recup.phase !== "reprise") return PLAN_T[l].renfoRecup + garde;
       if (recup) return PLAN_T[l].renfoBase(sets) + enPlus + garde;
+      // APRÈS LA COURSE DE LA SEMAINE, avant même qu'elle soit synchronisée : le même renfo de
+      // récupération que le plan reconstruit ensuite (sans sauts ni excentrique). Le plan bâti à
+      // J−3 d'un marathon proposait sinon des bondissements à J+3 (@Sparring, 09/11/2026).
+      if (raceIdx >= 0 && renfoIdx > raceIdx) return PLAN_T[l].renfoRecup + garde;
       if (phase === "affûtage" || ctx.cycle.taper) return PLAN_T[l].renfoAffutage + garde;
       if (phase === "Base") return PLAN_T[l].renfoBase(sets) + enPlus + garde;
       if (phase === "Spécifique") return PLAN_T[l].renfoSpecifique(sets) + enPlus + garde;
@@ -918,11 +922,34 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     // Le matin AVANT le soir : les écrans trient par date, et deux séances de même
     // date doivent s'afficher dans l'ordre où elles se courent.
     if (doubles.length) {
-      return annoncerEcart(menagerArticulations(sortir([...week, ...doubles])));
+      return orienterDouleur(annoncerEcart(menagerArticulations(sortir([...week, ...doubles]))));
     }
   }
 
-  return annoncerEcart(menagerArticulations(sortir(week)));
+  return orienterDouleur(annoncerEcart(menagerArticulations(sortir(week))));
+
+  /**
+   * DOULEUR ACTIVE, SEMAINE SANS RENFORCEMENT : LE RENVOI MÉDICAL NE DOIT PAS DISPARAÎTRE.
+   * Depuis le 09/11/2026, la consigne « si elle persiste, consulte » n'était portée que par le
+   * renforcement (`gardeDouleur`). Une semaine sans renfo (un seul jour disponible, aucun jour
+   * libre) servait un plan allégé pour une douleur… sans jamais orienter vers un médecin ni un
+   * kinésithérapeute (@SafeRun, 09/11/2026). On l'ajoute au « pourquoi » du premier jour couru,
+   * jamais au détail : la montre analyse le détail, pas le pourquoi.
+   */
+  function orienterDouleur(jours: PlanDay[]): PlanDay[] {
+    if (!douleur || jours.some((d) => d.type === "Renfo")) return jours;
+    const i = Math.max(0, jours.findIndex((d) => !/Repos/i.test(d.type)));
+    const jour = jours[i];
+    if (!jour) return jours;
+    const i18n = { ...(jour.i18n ?? {}) } as Partial<Record<Lang, PlanDayText>>;
+    for (const l of AUTRES_LANGUES) {
+      const t = i18n[l];
+      if (t) i18n[l] = { ...t, why: `${t.why ?? ""}${PLAN_T[l].douleurOrientation}` };
+    }
+    const copie = [...jours];
+    copie[i] = { ...jour, why: `${jour.why ?? ""}${PLAN_T.fr.douleurOrientation}`, i18n };
+    return copie;
+  }
 
   /**
    * ── MÉNAGER LES ARTICULATIONS (mode perte de poids) ────────────────────────
@@ -1088,12 +1115,14 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
       && !joursDoubles.has(d.date) && !veilleDeDur(d.date));
     if (!hote) return jours;
 
+    // Après la course de la semaine : le renfo de récupération, sans sauts (voir plus haut).
+    const apresLaCourse = raceIdx >= 0 && hote.date > iso(dates[raceIdx]);
     const rendu = (l: Lang): PlanDayText => ({
       title: PLAN_T[l].renfoTitre,
       // ⚠️ La version ALLÉGÉE, volontairement. Ce renforcement-là s'ajoute à un footing
       // le même jour : y mettre de la force lourde ferait deux séances dures en une
       // journée, ce que le plan passe son temps à éviter ailleurs.
-      detail: PLAN_T[l].renfoAffutage + gardeDouleur(l),
+      detail: (apresLaCourse ? PLAN_T[l].renfoRecup : PLAN_T[l].renfoAffutage) + gardeDouleur(l),
       why: PLAN_T[l].renfoWhy,
       tags: [PLAN_T[l].tags["Renfo"], PLAN_T[l].tags["Prévention"]],
     });
