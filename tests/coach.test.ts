@@ -318,6 +318,26 @@ test("un jour de course n'est jamais entouré de séances dures", () => {
   }
 });
 
+test("le jour de la course, un feu rouge n'efface pas la course : il s'ajoute à son pourquoi", () => {
+  // Marathon de Lille, 25/10/2026 : douleur déclarée (mollet, tendon d'Achille) → le coach a publié
+  // « Récupération — 25 min en Z1 » le matin même, à la place du marathon.
+  const jour = new Date().toISOString().slice(0, 10);
+  const objectif = { race: "Marathon de Lille", distanceKm: 42.2, raceDate: jour, targetSeconds: 9600, targetTime: "2h40", targetPace: "3'47" };
+  const rouge = buildWeekPlan(ctx({ objective: objectif, daysToRace: 0, weeksToRace: 0, readiness: { level: "rouge", ...motifs("douleur en cours (Tendon d'Achille)"), advice: "" } } as never), new Date());
+  assert.equal(rouge[0].type, "Course", `jour de course sous feu rouge : ${rouge[0].type} à la place de la course`);
+  assert.match(rouge[0].why, /Feu rouge ce matin : douleur en cours \(Tendon d'Achille\)/, "le signal rouge n'est pas dit le jour de course");
+  assert.match(rouge[0].why, /ne prends pas le départ/, "aucune consigne de renoncer si la douleur s'aggrave");
+  for (const l of ["en", "de", "es", "pt"] as const) assert.ok((rouge[0].i18n?.[l]?.why ?? "").length > (rouge[0].why.length / 2), `pourquoi non traduit en ${l}`);
+  // Le DÉTAIL, lu par la montre, est celui d'une course ordinaire.
+  const vert = buildWeekPlan(ctx({ objective: objectif, daysToRace: 0, weeksToRace: 0 } as never), new Date());
+  assert.equal(rouge[0].detail, vert[0].detail, "le feu rouge modifie le texte lu par la montre le jour de course");
+  assert.doesNotMatch(vert[0].why, /Feu rouge/, "l'avertissement apparaît sans feu rouge");
+  // La course déjà courue et synchronisée le matin même : le jour reste celui de la course, pas
+  // une « Récupération — tu as déjà fait une séance dure » qui réécrirait l'histoire du jour.
+  const apres = buildWeekPlan(ctx({ objective: objectif, daysToRace: 0, weeksToRace: 0, lastHardDaysAgo: 0 } as never), new Date());
+  assert.equal(apres[0].type, "Course", `course synchronisée le matin : ${apres[0].type} à la place de la course`);
+});
+
 console.log("\nBOUT EN BOUT — site et montre disent la même chose");
 test("chaque séance du plan produit une séance montre cohérente", () => {
   const p = buildWeekPlan(ctx(), new Date());

@@ -833,7 +833,15 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     };
   };
 
-  if ((lvl === "rouge" || hardToday) && week[0].type !== "Repos") {
+  // ⚠️ LE JOUR DE LA COURSE, LE FEU ROUGE N'ANNULE PAS LA COURSE (09/11/2026). Marathon de Lille,
+  // 25/10 : une douleur déclarée (mollet, tendon d'Achille) a fait publier « Récupération — 25 min
+  // en Z1 » à la place du marathon, le matin même ; l'analyse l'a ensuite jugé « inapproprié ».
+  // Le départ appartient à l'athlète, pas au plan : la course reste la séance du jour, et le
+  // signal rouge s'ajoute à son « pourquoi » — l'écouter à l'échauffement, renoncer s'il s'aggrave.
+  // Le DÉTAIL (lu par la montre) ne change pas.
+  if (week[0].type === "Course" && lvl === "rouge") {
+    week[0] = reecrire(week[0], (l, avant) => ({ ...avant, why: `${avant.why}${PLAN_T[l].courseFeuRouge(motifs(l, 2))}` }));
+  } else if ((lvl === "rouge" || hardToday) && week[0].type !== "Repos" && week[0].type !== "Course") {
     week[0] = reecrire({ ...week[0], type: "Récup" }, (l) => ({
       title: PLAN_T[l].recupTitre,
       detail: PLAN_T[l].recupDetail(warm, cool),
