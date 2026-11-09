@@ -451,10 +451,10 @@ test("aucun mot ne touche le trait d'un anneau : les libellés vivent sous le ce
   const centres = [...bento.matchAll(/<div className="absolute inset-0 flex[^"]*items-center justify-center[^"]*">([\s\S]*?)\n\s*<\/div>/g)].map((m) => m[1]);
   assert.ok(centres.length >= 3, `${centres.length} centres d'anneau trouvés`);
   for (const c of centres) {
-    assert.ok(!c.includes("{hl.prep}"), "« préparation » est revenu dans l'anneau de l'objectif");
     assert.ok(!c.includes("fl.rate("), "le verdict de forme est revenu dans l'anneau");
   }
-  assert.match(bento, /<span className="hidden text-\[11px\] leading-none text-zinc-400 sm:block">\{hl\.prep\}<\/span>/, "« préparation » a disparu de sous l'anneau");
+  // Puis retiré tout à fait (même jour, Cyprien : « ça fait bizarre ») : le J‑40 suffit.
+  assert.doesNotMatch(bento, /\bprep:|hl\.prep/, "le mot « préparation » est revenu autour de l'anneau de l'objectif");
   assert.match(bento, /<span className="text-\[11px\] font-medium leading-none text-zinc-500">\{fl\.rate\(forme\.total\)\}<\/span>/, "le verdict de forme a disparu de sous l'anneau");
 });
 

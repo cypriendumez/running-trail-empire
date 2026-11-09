@@ -123,12 +123,12 @@ const KPI_LABELS: Record<string, { form: string; hrv: string; vma: string; vol: 
 };
 
 // Libellés du panneau objectif de l'en-tête (multilingue).
-const HERO_LABELS: Record<string, { goal: string; plan: string; prep: string; sept: string }> = {
-  fr: { goal: "Objectif", plan: "Voir mon plan", prep: "préparation", sept: "7 j" },
-  en: { goal: "Goal", plan: "View my plan", prep: "readiness", sept: "7 d" },
-  de: { goal: "Ziel", plan: "Mein Plan ansehen", prep: "Bereitschaft", sept: "7 T" },
-  es: { goal: "Objetivo", plan: "Ver mi plan", prep: "preparación", sept: "7 d" },
-  pt: { goal: "Objetivo", plan: "Ver o meu plano", prep: "preparação", sept: "7 d" },
+const HERO_LABELS: Record<string, { goal: string; plan: string; sept: string }> = {
+  fr: { goal: "Objectif", plan: "Voir mon plan", sept: "7 j" },
+  en: { goal: "Goal", plan: "View my plan", sept: "7 d" },
+  de: { goal: "Ziel", plan: "Mein Plan ansehen", sept: "7 T" },
+  es: { goal: "Objetivo", plan: "Ver mi plan", sept: "7 d" },
+  pt: { goal: "Objetivo", plan: "Ver o meu plano", sept: "7 d" },
 };
 
 // Bannière « prochaine séance » (multilingue).
@@ -651,11 +651,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                texte, un chevron — et la rangée ENTIÈRE mène au plan, ce que seul le bouton
                faisait avant. À partir de `sm`, rien ne change. */
             <Link href="/dashboard/calendrier" className="group/obj -mx-1 flex w-full items-center gap-3 rounded-2xl px-1 py-1 transition-colors active:bg-white/40 sm:mx-0 sm:w-auto sm:gap-5 sm:px-0 sm:py-0">
-              {/* Le mot « préparation » vit SOUS l'anneau, plus dedans (09/11/2026) : à 92 px,
-                  le vide intérieur laissait ~63 px à hauteur du mot, qui touchait le trait en
-                  français et le dépassait en allemand (« Bereitschaft »). Dessous, il a toute
-                  la largeur, dans les cinq langues ; l'anneau ne garde que le chiffre. */}
-              <div className="flex flex-shrink-0 flex-col items-center gap-1.5">
+              {/* L'anneau ne porte que son chiffre (09/11/2026) : le mot « préparation », dedans,
+                  touchait le trait ; dessous, il faisait bizarre (Cyprien). Le J‑40 et le nom de
+                  la course disent déjà de quoi il s'agit. */}
+              <div className="flex-shrink-0">
                 <div className="relative h-14 w-14 sm:h-[92px] sm:w-[92px]">
                   <svg className="h-full w-full -rotate-90" viewBox="0 0 92 92">
                     <circle cx="46" cy="46" r="40" fill="none" stroke="#f4f4f5" strokeWidth="7" />
@@ -667,7 +666,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                     <span className="text-sm font-semibold tabular-nums text-zinc-900 sm:text-xl">{objProgress ?? "—"}<span className="text-[11px] text-zinc-400 sm:text-xs">%</span></span>
                   </div>
                 </div>
-                <span className="hidden text-[11px] leading-none text-zinc-400 sm:block">{hl.prep}</span>
               </div>
               <div className="min-w-0 flex-1">
                 {/* Le libellé « Objectif » ne tient pas sur téléphone : le J‑32 et le nom de

@@ -23,11 +23,11 @@ import { TEXTE_MIN, TEXTE_MAX } from "@/lib/avis/bornes";
  * ferait dépendre une page publique de la session : à ne faire que si ça gêne vraiment.)
  */
 const T: Record<string, Record<string, string>> = {
-  fr: { titre: "Écris ton avis", sousTitre: "Il sera publié tel quel, sous ton prénom et l'initiale de ton nom.", note: "Ta note", texte: "Ton avis", place: "Ce qui t'a servi, ce qui t'a manqué…", envoyer: "Publier mon avis", envoi: "Envoi…", merci: "Merci. Ton avis est en ligne, tel que tu l'as écrit.", modifier: "Modifier mon avis", connecte: "Il faut un compte pour écrire un avis — c'est la garantie qu'ils viennent tous de vraies personnes.", seConnecter: "Se connecter", creer: "Créer un compte gratuit", court: "Encore {n} caractères", erreur: "Une erreur est survenue.", reseau: "Connexion impossible. Réessaie." },
-  en: { titre: "Write your review", sousTitre: "It will be published as written, under your first name and last initial.", note: "Your rating", texte: "Your review", place: "What helped, what was missing…", envoyer: "Publish my review", envoi: "Sending…", merci: "Thank you. Your review is live, exactly as you wrote it.", modifier: "Edit my review", connecte: "You need an account to write a review — that is what guarantees they all come from real people.", seConnecter: "Sign in", creer: "Create a free account", court: "{n} more characters", erreur: "Something went wrong.", reseau: "Connection failed. Try again." },
-  de: { titre: "Schreib deine Bewertung", sousTitre: "Sie wird unverändert veröffentlicht, mit Vorname und Initiale.", note: "Deine Bewertung", texte: "Dein Text", place: "Was geholfen hat, was gefehlt hat…", envoyer: "Bewertung veröffentlichen", envoi: "Senden…", merci: "Danke. Deine Bewertung ist online, genau so, wie du sie geschrieben hast.", modifier: "Bewertung bearbeiten", connecte: "Für eine Bewertung brauchst du ein Konto — so ist sichergestellt, dass alle von echten Menschen stammen.", seConnecter: "Anmelden", creer: "Kostenloses Konto erstellen", court: "Noch {n} Zeichen", erreur: "Ein Fehler ist aufgetreten.", reseau: "Keine Verbindung. Versuch es erneut." },
-  es: { titre: "Escribe tu opinión", sousTitre: "Se publicará tal cual, con tu nombre y la inicial del apellido.", note: "Tu nota", texte: "Tu opinión", place: "Lo que te sirvió, lo que faltó…", envoyer: "Publicar mi opinión", envoi: "Enviando…", merci: "Gracias. Tu opinión ya está publicada, tal y como la escribiste.", modifier: "Editar mi opinión", connecte: "Necesitas una cuenta para opinar — así se garantiza que todas vienen de personas reales.", seConnecter: "Iniciar sesión", creer: "Crear cuenta gratis", court: "Faltan {n} caracteres", erreur: "Se ha producido un error.", reseau: "Sin conexión. Inténtalo de nuevo." },
-  pt: { titre: "Escreve a tua avaliação", sousTitre: "Será publicada tal como escreves, com o teu nome e a inicial do apelido.", note: "A tua nota", texte: "A tua avaliação", place: "O que te ajudou, o que faltou…", envoyer: "Publicar a minha avaliação", envoi: "A enviar…", merci: "Obrigado. A tua avaliação está online, tal como a escreveste.", modifier: "Editar a minha avaliação", connecte: "Precisas de conta para avaliar — é isso que garante que todas vêm de pessoas reais.", seConnecter: "Entrar", creer: "Criar conta grátis", court: "Faltam {n} caracteres", erreur: "Ocorreu um erro.", reseau: "Sem ligação. Tenta de novo." },
+  fr: { titre: "Écris ton avis", sousTitre: "Il sera publié tel quel, sous ton prénom et l'initiale de ton nom.", note: "Ta note", texte: "Ton avis", place: "Ce qui t'a servi, ce qui t'a manqué…", envoyer: "Publier mon avis", envoi: "Envoi…", merci: "Merci. Ton avis est en ligne, tel que tu l'as écrit.", modifier: "Modifier mon avis", connecte: "Il faut un compte pour écrire un avis — c'est la garantie qu'ils viennent tous de vraies personnes.", seConnecter: "Se connecter", creer: "Créer un compte gratuit", court: "Encore {n} caractères", erreur: "Une erreur est survenue.", reseau: "Connexion impossible. Réessaie." , souci: "Un problème précis ? Écris-nous, on te répond.", ecrire: "Écrire au support" },
+  en: { titre: "Write your review", sousTitre: "It will be published as written, under your first name and last initial.", note: "Your rating", texte: "Your review", place: "What helped, what was missing…", envoyer: "Publish my review", envoi: "Sending…", merci: "Thank you. Your review is live, exactly as you wrote it.", modifier: "Edit my review", connecte: "You need an account to write a review — that is what guarantees they all come from real people.", seConnecter: "Sign in", creer: "Create a free account", court: "{n} more characters", erreur: "Something went wrong.", reseau: "Connection failed. Try again." , souci: "A specific problem? Write to us, we'll reply.", ecrire: "Contact support" },
+  de: { titre: "Schreib deine Bewertung", sousTitre: "Sie wird unverändert veröffentlicht, mit Vorname und Initiale.", note: "Deine Bewertung", texte: "Dein Text", place: "Was geholfen hat, was gefehlt hat…", envoyer: "Bewertung veröffentlichen", envoi: "Senden…", merci: "Danke. Deine Bewertung ist online, genau so, wie du sie geschrieben hast.", modifier: "Bewertung bearbeiten", connecte: "Für eine Bewertung brauchst du ein Konto — so ist sichergestellt, dass alle von echten Menschen stammen.", seConnecter: "Anmelden", creer: "Kostenloses Konto erstellen", court: "Noch {n} Zeichen", erreur: "Ein Fehler ist aufgetreten.", reseau: "Keine Verbindung. Versuch es erneut." , souci: "Ein konkretes Problem? Schreib uns, wir antworten.", ecrire: "Support kontaktieren" },
+  es: { titre: "Escribe tu opinión", sousTitre: "Se publicará tal cual, con tu nombre y la inicial del apellido.", note: "Tu nota", texte: "Tu opinión", place: "Lo que te sirvió, lo que faltó…", envoyer: "Publicar mi opinión", envoi: "Enviando…", merci: "Gracias. Tu opinión ya está publicada, tal y como la escribiste.", modifier: "Editar mi opinión", connecte: "Necesitas una cuenta para opinar — así se garantiza que todas vienen de personas reales.", seConnecter: "Iniciar sesión", creer: "Crear cuenta gratis", court: "Faltan {n} caracteres", erreur: "Se ha producido un error.", reseau: "Sin conexión. Inténtalo de nuevo." , souci: "¿Un problema concreto? Escríbenos, te respondemos.", ecrire: "Escribir al soporte" },
+  pt: { titre: "Escreve a tua avaliação", sousTitre: "Será publicada tal como escreves, com o teu nome e a inicial do apelido.", note: "A tua nota", texte: "A tua avaliação", place: "O que te ajudou, o que faltou…", envoyer: "Publicar a minha avaliação", envoi: "A enviar…", merci: "Obrigado. A tua avaliação está online, tal como a escreveste.", modifier: "Editar a minha avaliação", connecte: "Precisas de conta para avaliar — é isso que garante que todas vêm de pessoas reais.", seConnecter: "Entrar", creer: "Criar conta grátis", court: "Faltam {n} caracteres", erreur: "Ocorreu um erro.", reseau: "Sem ligação. Tenta de novo." , souci: "Um problema concreto? Escreve-nos, respondemos.", ecrire: "Escrever ao suporte" },
 };
 
 // Libellé de la note (survolée ou choisie) — rend le choix vivant, pas un simple compteur d'étoiles.
@@ -61,6 +61,12 @@ export function AvisForm() {
         if (r.status === 401) return setEtat("anonyme");
         const j = await r.json();
         if (j?.avis) { setNote(j.avis.note); setTexte(j.avis.texte); }
+        else {
+          // Arrivée depuis la carte à étoiles du tableau de bord (`/avis?note=4`) : la note
+          // touchée là-bas est déjà posée ici. Un avis existant garde, lui, SA note.
+          const n = Number(new URLSearchParams(window.location.search).get("note"));
+          if (Number.isInteger(n) && n >= 1 && n <= 5) setNote(n);
+        }
         setEtat("pret");
       })
       .catch(() => setEtat("anonyme"));
@@ -150,6 +156,14 @@ export function AvisForm() {
               à chaque survol, et la notation semble bouger sous le curseur. */}
           <span className="min-w-[6rem] text-sm font-semibold text-zinc-700">{notes[affichee - 1]}</span>
         </div>
+        {/* Une note basse se PUBLIE comme les autres (trier les avis est interdit) ; on
+            offre EN PLUS un chemin pour régler le problème. */}
+        {note <= 3 && (
+          <p className="mt-3 text-sm text-zinc-500">
+            {t.souci}{" "}
+            <Link href="/contact" className="font-semibold text-emerald-700 underline decoration-emerald-300 underline-offset-4 hover:decoration-emerald-600">{t.ecrire}</Link>
+          </p>
+        )}
       </fieldset>
 
       {/* ── LE TEXTE ──────────────────────────────────────────────────────────────
