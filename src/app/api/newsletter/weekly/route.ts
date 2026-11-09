@@ -5,9 +5,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { lienDesinscription } from "@/lib/newsletter/token";
 import { resumerArticles, traduireTextes, RESUMES_MAX, type ArticleResume } from "@/lib/newsletter/resume";
 import { construireEmail, estLang, type Lang, type Section, type Course } from "@/lib/newsletter/email";
-import { RUBRIQUES_LETTRE } from "@/lib/news/rubriques";
+import { RUBRIQUES_LETTRE, FILTRES, PAS_ELITE } from "@/lib/news/rubriques";
 import { collecterSemaine } from "@/lib/news/actualites";
-import { classerALaUne, motsDuTitre } from "@/lib/news/alaune";
+import { classerALaUne, motsDuTitre, texteDuSujet } from "@/lib/news/alaune";
 import { EDITEUR } from "@/lib/brand/editeur";
 import { envoyerEmail } from "@/lib/email/envoyer";
 
@@ -51,6 +51,14 @@ export async function GET(req: Request) {
   if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // ── L'APERÇU : toute la chaîne, sauf l'envoi ─────────────────────────────────
+  // `?apercu=fr` (ou en, de, es, pt) construit la lettre exactement comme le lundi —
+  // collecte, une, rubriques, résumés, traduction — et la RENVOIE au lieu de l'envoyer.
+  // Sans lui, la seule façon de voir la vraie lettre était d'écrire à tous les abonnés
+  // (09/11/2026 : la nouvelle une n'a pu être vérifiée que par morceaux). Les abonnés ne
+  // sont pas lus. ⚠️ Il consomme le quota Gemini comme un vrai envoi : pas en boucle.
+  const apercuDemande = new URL(req.url).searchParams.get("apercu");
+  const apercu: Lang | null = apercuDemande === null ? null : estLang(apercuDemande) ? apercuDemande : "fr";
 
   const CLE = process.env.RESEND_API_KEY;
   const FROM = process.env.RESEND_FROM;
@@ -98,7 +106,36 @@ export async function GET(req: Request) {
   // Les mots des sujets de la une : un autre article sur le même sujet n'y revient pas
   // par une autre rubrique (la backyard en « Trail », Bordeaux en « Élites »).
   const sujetsUne = new Set(une.filter((s) => s.mot).map((s) => s.mot));
+  // Et tous les articles rattachés à ces sujets, même sans leur mot (Le Parisien titrait
+  // « les 25 heures de Clem qui court », sans « backyard », et revenait en « Élites »).
+  const dejaALaUne = new Set(une.flatMap((s) => s.membres.map((m) => m.link)));
   const recents = une.length ? semaine : parRubrique[0];
+
+  // ── 1 ter. ÉLITES : les résultats de la semaine, par nombre de médias ──────
+  // ⚠️ La rubrique est sortie VIDE le 9/11/2026. Elle lisait le fil « elite » du site :
+  // une requête Google News sans borne de date (ses articles dataient de 2024 à
+  // septembre) et trois flux anglophones dont les titres passent rarement le filtre.
+  // Une fois gardés les seuls articles de la semaine, il ne restait rien. Elle puise
+  // désormais dans la semaine entière, comme la une, avec le filtre des résultats.
+  const iElite = RUBRIQUES_LETTRE.findIndex((r) => r.cle === "elite");
+  if (iElite > 0 && semaine.length) {
+    const resultats = semaine.filter((it) =>
+      FILTRES.elite!.test(it.title) && !PAS_ELITE.test(it.title) && !dejaALaUne.has(it.link)
+      && !motsDuTitre(it.title).some((m) => sujetsUne.has(m)));
+    const elites = classerALaUne(resultats, RUBRIQUES_LETTRE[iElite].max + 3).map((s) => s.article);
+    if (elites.length) parRubrique[iElite] = elites;
+  }
+
+  // Le texte à résumer pour chaque sujet de la une : ce qu'en titrent les médias (voir
+  // `texteDuSujet`). Seulement quand l'article retenu n'apporte pas déjà son texte.
+  const texteUne = new Map<string, string>();
+  const mediasUne = new Map<string, number>();
+  for (const s of une) {
+    if (s.medias >= 2) mediasUne.set(s.article.link, s.medias);
+    if ((s.article.texte ?? "").trim().length >= 320) continue;
+    const t = texteDuSujet(s);
+    if (t) texteUne.set(s.article.link, t);
+  }
 
   if (recents.length < MINIMUM_ARTICLES) {
     return NextResponse.json({
@@ -110,7 +147,7 @@ export async function GET(req: Request) {
   // ── 2. Les destinataires, avec leur langue ─────────────────────────────────
   const admin = createAdminClient();
   let abonnes: { email: string; lang: Lang }[] = [];
-  {
+  if (!apercu) {
     const avecLangue = await admin
       .from("newsletter_subscribers")
       .select("email, lang")
@@ -132,6 +169,7 @@ export async function GET(req: Request) {
     }
   }
   abonnes = abonnes.filter((a) => a.email);
+  if (apercu) abonnes = [{ email: "apercu@pacevo.fr", lang: apercu }];
   if (!abonnes.length) return NextResponse.json({ ok: true, envoye: 0, raison: "aucun abonné" });
 
   // ── 3. Le plan des rubriques, ÉTABLI AVANT LE RÉSUMÉ ──────────────────────
@@ -149,7 +187,7 @@ export async function GET(req: Request) {
     const liens: string[] = [];
     for (const it of parRubrique[n]) {
       if (!it.link || pris.has(it.link) || vivier.length >= RESUMES_MAX) continue;
-      if (n > 0 && motsDuTitre(it.title).some((m) => sujetsUne.has(m))) continue;
+      if (n > 0 && (dejaALaUne.has(it.link) || motsDuTitre(it.title).some((m) => sujetsUne.has(m)))) continue;
       pris.add(it.link);
       liens.push(it.link);
       vivier.push(it);
@@ -160,7 +198,11 @@ export async function GET(req: Request) {
 
   // ── 3 bis. Les résumés, une seule fois, en français ────────────────────────
   const { articles: base, diagnostic, lisibles } = await resumerArticles(
-    vivier.map((it) => ({ title: it.title, source: it.source, link: it.link, texte: it.texte })),
+    vivier.map((it) => ({
+      title: it.title, source: it.source, link: it.link,
+      texte: texteUne.get(it.link) ?? it.texte,
+      medias: mediasUne.get(it.link),
+    })),
   );
 
   // ── 3 bis. Les courses à venir, depuis la BASE ─────────────────────────────
@@ -257,6 +299,15 @@ export async function GET(req: Request) {
     const articles = parLangue.get(lang) ?? base;
     const lien = lienDesinscription(email, BASE);
     const { objet, html, texte } = construireEmail(lang, rubriquesDe(articles), courses, lien, BASE);
+    if (apercu) {
+      // Rien n'est envoyé : la lettre revient telle qu'elle serait partie.
+      return NextResponse.json({
+        ok: true, apercu: lang, envoye: 0, objet, texte, html,
+        une: une.map((s) => ({ sujet: s.mot || null, medias: s.medias, titre: s.article.title })),
+        rubriques: plan.map((p) => ({ cle: p.cle, articles: p.liens.length })),
+        resumes: articles.filter((x) => x.resume).length, articles: articles.length, diagnostic, lisibles,
+      });
+    }
     {
       const r = await envoyerEmail("newsletter", {
           from: FROM, to: [email], subject: objet, text: texte, html,

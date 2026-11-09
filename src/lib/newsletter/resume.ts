@@ -41,6 +41,11 @@ export type Article = {
    * 16 en production alors qu'aucun ne manquait depuis un poste de travail.
    */
   texte?: string;
+  /**
+   * Pour un sujet de la une : combien de médias en ont parlé. La lettre l'affiche à côté
+   * de la source, parce que le résumé vient alors des titres de tous ces médias.
+   */
+  medias?: number;
 };
 export type ArticleResume = Article & { resume: string | null };
 

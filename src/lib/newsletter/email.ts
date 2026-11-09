@@ -59,6 +59,12 @@ type Chrome = {
    * aller, et c'est ce silence qui transforme un désaccord en litige.
    */
   revuePresse: (contact: string) => string;
+  /**
+   * « et N autres médias », à côté de la source d'un sujet de la une. Son résumé vient
+   * des titres de tous ces médias : ne citer qu'une source laisserait croire qu'il
+   * résume un seul article.
+   */
+  autresMedias: (n: number) => string;
   pourquoi: string;
   desinscrire: string;
   locale: string;
@@ -83,7 +89,8 @@ const T: Record<Lang, Chrome> = {
     surtitre: (s) => `Semaine du ${s}`,
     titre: "L'actualité running et trail",
     chapo: "Ce qu'il fallait retenir cette semaine.",
-    auto: "Résumés produits automatiquement à partir des articles cités. Tout chiffre absent de la source d'origine est retiré avant l'envoi.",
+    auto: "Résumés produits automatiquement à partir des articles cités ; pour les sujets repris par plusieurs médias, à partir de leurs titres. Tout chiffre absent de la source d'origine est retiré avant l'envoi.",
+    autresMedias: (n) => (n === 1 ? "et 1 autre média" : `et ${n} autres médias`),
     revuePresse: (c) => `Revue de presse : chaque entrée cite le titre et l\u2019éditeur, renvoie vers son site, et le résumé est rédigé par nos soins. Aucun article ni aucune photo n\u2019est reproduit. Un éditeur peut demander le retrait de ses contenus à ${c}.`,
     pourquoi: "Tu reçois cet e-mail parce que tu t'es inscrit sur Pacevo.",
     desinscrire: "Se désinscrire en un clic",
@@ -98,7 +105,8 @@ const T: Record<Lang, Chrome> = {
     surtitre: (s) => `Week of ${s}`,
     titre: "This week in running and trail",
     chapo: "What mattered this week.",
-    auto: "Summaries are produced automatically from the articles cited. Any figure absent from the original source is removed before sending.",
+    auto: "Summaries are produced automatically from the articles cited; for stories covered by several outlets, from their headlines. Any figure absent from the original source is removed before sending.",
+    autresMedias: (n) => (n === 1 ? "and 1 other outlet" : `and ${n} other outlets`),
     revuePresse: (c) => `Press review: each entry cites the headline and the publisher, links to their site, and the summary is written by us. No article or photograph is reproduced. Publishers may request removal of their content at ${c}.`,
     pourquoi: "You're receiving this because you subscribed on Pacevo.",
     desinscrire: "Unsubscribe in one click",
@@ -113,7 +121,8 @@ const T: Record<Lang, Chrome> = {
     surtitre: (s) => `Woche vom ${s}`,
     titre: "Die Woche im Laufsport",
     chapo: "Was diese Woche zählte.",
-    auto: "Die Zusammenfassungen entstehen automatisch aus den genannten Artikeln. Jede Zahl, die in der Originalquelle fehlt, wird vor dem Versand entfernt.",
+    auto: "Die Zusammenfassungen entstehen automatisch aus den genannten Artikeln; bei Themen, über die mehrere Medien berichten, aus deren Schlagzeilen. Jede Zahl, die in der Originalquelle fehlt, wird vor dem Versand entfernt.",
+    autresMedias: (n) => (n === 1 ? "und 1 weiteres Medium" : `und ${n} weitere Medien`),
     revuePresse: (c) => `Pressespiegel: Jeder Eintrag nennt Titel und Verlag, verlinkt auf dessen Website; die Zusammenfassung stammt von uns. Kein Artikel und kein Foto wird wiedergegeben. Verlage können die Entfernung ihrer Inhalte unter ${c} verlangen.`,
     pourquoi: "Du erhältst diese E-Mail, weil du dich auf Pacevo angemeldet hast.",
     desinscrire: "Mit einem Klick abmelden",
@@ -128,7 +137,8 @@ const T: Record<Lang, Chrome> = {
     surtitre: (s) => `Semana del ${s}`,
     titre: "La actualidad del running y el trail",
     chapo: "Lo que ha contado esta semana.",
-    auto: "Los resúmenes se generan automáticamente a partir de los artículos citados. Toda cifra ausente de la fuente original se elimina antes del envío.",
+    auto: "Los resúmenes se generan automáticamente a partir de los artículos citados; para los temas cubiertos por varios medios, a partir de sus titulares. Toda cifra ausente de la fuente original se elimina antes del envío.",
+    autresMedias: (n) => (n === 1 ? "y 1 medio más" : `y ${n} medios más`),
     revuePresse: (c) => `Revista de prensa: cada entrada cita el titular y el editor, enlaza a su sitio, y el resumen lo redactamos nosotros. No se reproduce ningún artículo ni fotografía. Los editores pueden solicitar la retirada de sus contenidos en ${c}.`,
     pourquoi: "Recibes este correo porque te suscribiste en Pacevo.",
     desinscrire: "Darse de baja en un clic",
@@ -143,7 +153,8 @@ const T: Record<Lang, Chrome> = {
     surtitre: (s) => `Semana de ${s}`,
     titre: "A atualidade da corrida e do trail",
     chapo: "O que contou esta semana.",
-    auto: "Os resumos são gerados automaticamente a partir dos artigos citados. Qualquer número ausente da fonte original é removido antes do envio.",
+    auto: "Os resumos são gerados automaticamente a partir dos artigos citados; para os temas cobertos por vários meios, a partir dos seus títulos. Qualquer número ausente da fonte original é removido antes do envio.",
+    autresMedias: (n) => (n === 1 ? "e mais 1 meio" : `e mais ${n} meios`),
     revuePresse: (c) => `Revista de imprensa: cada entrada cita o título e o editor, remete para o seu site, e o resumo é redigido por nós. Nenhum artigo ou fotografia é reproduzido. Os editores podem pedir a remoção dos seus conteúdos em ${c}.`,
     pourquoi: "Recebes este e-mail porque te inscreveste no Pacevo.",
     desinscrire: "Cancelar a subscrição num clique",
@@ -159,12 +170,16 @@ const T: Record<Lang, Chrome> = {
 export const semaineDe = (lang: Lang, d = new Date()) =>
   d.toLocaleDateString(T[lang].locale, { day: "numeric", month: "long" });
 
-const listeArticles = (articles: ArticleResume[]) =>
+/** La source, et pour un sujet de la une le nombre d'autres médias qui en ont parlé. */
+const ligneSource = (a: ArticleResume, t: Chrome) =>
+  a.medias && a.medias > 1 ? `${a.source} · ${t.autresMedias(a.medias - 1)}` : a.source;
+
+const listeArticles = (articles: ArticleResume[], t: Chrome) =>
   articles
     .map(
       (a) => `<li style="margin:0 0 1.4rem;padding:0">
   <a href="${ech(a.link)}" style="color:#18181b;text-decoration:none;font-weight:650;font-size:1rem;line-height:1.4">${ech(a.title)}</a>
-  <div style="margin:.2rem 0 0;font-size:.74rem;color:#a1a1aa">${ech(a.source)}</div>
+  <div style="margin:.2rem 0 0;font-size:.74rem;color:#a1a1aa">${ech(ligneSource(a, t))}</div>
   ${a.resume ? `<p style="margin:.5rem 0 0;font-size:.9rem;line-height:1.65;color:#52525b">${ech(a.resume)}</p>` : ""}
 </li>`,
     )
@@ -194,7 +209,7 @@ export function construireEmail(
   const pleines = sections.filter((sec) => sec.articles.length);
 
   const corpsSections = pleines
-    .map((sec) => `${titreRubrique(t.sections[sec.cle])}<ul style="margin:0;padding:0;list-style:none">${listeArticles(sec.articles)}</ul>`)
+    .map((sec) => `${titreRubrique(t.sections[sec.cle])}<ul style="margin:0;padding:0;list-style:none">${listeArticles(sec.articles, t)}</ul>`)
     .join("");
 
   // Les courses viennent de la base, jamais d'un modèle : nom, date, ville et distance
@@ -236,7 +251,7 @@ export function construireEmail(
   });
 
   const texteSections = pleines
-    .map((sec) => `\n\n## ${t.sections[sec.cle].toUpperCase()}\n\n${sec.articles.map((a) => `• ${a.title}\n  ${a.source} — ${a.link}${a.resume ? `\n  ${a.resume}` : ""}`).join("\n\n")}`)
+    .map((sec) => `\n\n## ${t.sections[sec.cle].toUpperCase()}\n\n${sec.articles.map((a) => `• ${a.title}\n  ${ligneSource(a, t)} — ${a.link}${a.resume ? `\n  ${a.resume}` : ""}`).join("\n\n")}`)
     .join("");
   const texteCourses = courses.length
     ? `\n\n## ${t.courses.toUpperCase()}\n\n${courses.map((c) => `• ${dateCourse(c.date)} — ${c.nom}${c.ville ? ` (${c.ville})` : ""}${c.distance ? ` · ${c.distance} km` : ""}${c.url ? `\n  ${c.url}` : ""}`).join("\n")}\n\n${t.coursesNote}`

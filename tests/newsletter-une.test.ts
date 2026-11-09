@@ -13,7 +13,10 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { classerALaUne, motsDuTitre, type ArticleSemaine } from "../src/lib/news/alaune";
+import { classerALaUne, motsDuTitre, texteDuSujet, type ArticleSemaine } from "../src/lib/news/alaune";
+import { FILTRES, PAS_ELITE } from "../src/lib/news/rubriques";
+import { chiffresVerifies } from "../src/lib/newsletter/resume";
+import { construireEmail, LANGS } from "../src/lib/newsletter/email";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -157,8 +160,86 @@ test("la lettre lit TOUTE la semaine pour sa une, sans le plafond de 48 du fil",
   const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
   assert.match(route, /classerALaUne\(semaine, maxUne\)/, "la une ne passe plus par le classement par médias");
   assert.match(route, /parRubrique\[0\] = une\.map\(\(s\) => s\.article\)/, "le classement est calculé mais la une ne l'utilise pas");
-  assert.match(route, /if \(n > 0 && motsDuTitre\(it\.title\)\.some\(\(m\) => sujetsUne\.has\(m\)\)\) continue;/,
+  assert.match(route, /if \(n > 0 && \(dejaALaUne\.has\(it\.link\) \|\| motsDuTitre\(it\.title\)\.some\(\(m\) => sujetsUne\.has\(m\)\)\)\) continue;/,
     "un sujet de la une peut revenir dans une autre rubrique");
+});
+
+// ── 10/11 : Élites vide, une sans résumé, et aucune façon de voir la lettre sans l'envoyer ──
+
+test("un sujet garde TOUS ses articles, y compris ceux rattrapés sans son mot", () => {
+  const [backyard] = classerALaUne(SEMAINE, 1);
+  assert.ok(backyard.membres.includes(EQUIPE_SANS_MOT), "l'article de L'Équipe sans « backyard » n'est pas rattaché au sujet");
+  assert.ok(backyard.membres.includes(BREIZH));
+  for (const b of BACKYARD) assert.ok(backyard.membres.includes(b), `« ${b.title} » manque au sujet`);
+  assert.ok(!backyard.membres.some((m) => BORDEAUX.includes(m)), "Bordeaux s'est glissé dans la backyard");
+});
+
+test("le texte d'un sujet = les titres de ses médias, bornés, et le garde-fou des chiffres s'y applique", () => {
+  const [backyard] = classerALaUne(SEMAINE, 1);
+  const t = texteDuSujet(backyard);
+  assert.match(t, /^Ce texte n'est pas un article/, "le modèle doit savoir que ce ne sont que des titres");
+  assert.match(t, /Théo Detienne vainqueur, Mathieu Blanchard abandonne.*\(L'Équipe\)/, "un titre rattaché manque, ou sa source");
+  assert.match(t, /Le classement final avec le nombre de boucles du Backyard de Clem Qui Court \(20 Minutes\)/);
+  assert.ok(t.length >= 320, "trop court : le résumeur irait chercher la page Google News, qui ne donne rien");
+  assert.ok(texteDuSujet(backyard, 400).length <= 400, "la borne n'est pas tenue");
+  // Le 9/11, le modèle a ajouté « 200 000 spectateurs » : le contrôle doit le refuser.
+  assert.equal(chiffresVerifies("Théo Detienne a gagné devant 200 000 spectateurs.", t), false);
+  assert.equal(chiffresVerifies("Mathieu Blanchard a abandonné après 4 boucles.", t), true);
+  // Un article isolé n'a rien de plus que son titre.
+  const seul = classerALaUne([...RECENTS, ...BRUIT.slice(0, 5)], 1)[0];
+  assert.equal(texteDuSujet(seul), "");
+  // Deux médias au titre identique ne comptent qu'une ligne.
+  const doublon = [art("A", "Backyard de Clem Qui Court : Detienne gagne", "2026-11-08T10:00:00Z"), art("B", "Backyard de Clem Qui Court : Detienne gagne", "2026-11-08T11:00:00Z")];
+  const td = texteDuSujet(classerALaUne([...doublon, ...BRUIT], 1)[0]);
+  assert.equal((td.match(/Detienne gagne/g) ?? []).length, 1, "un titre repris deux fois occupe deux lignes");
+});
+
+test("Élites reconnaît un résultat, en français comme en anglais, mais pas une affluence record", () => {
+  const elite = FILTRES.elite!;
+  for (const t of ["Habtom Samuel and Fentaye Belayneh Win the 2026 Boston Half", "Rachid Habbaz s'impose au semi-marathon de Dreux",
+    "Pierrick Renault et Virginie Alleaud remportent les Foulées coursoises", "Jason Pointeau gagne le marathon de Bordeaux"]) {
+    assert.ok(elite.test(t) && !PAS_ELITE.test(t), `résultat non reconnu : ${t}`);
+  }
+  for (const t of ["Boeschepe : la 25e édition bat son record de participants", "Une troisième édition record pour le Trail nocturne des Lacs"]) {
+    assert.ok(PAS_ELITE.test(t), `une affluence passe pour un résultat : ${t}`);
+  }
+});
+
+test("la lettre puise Élites dans la semaine entière, sans les sujets de la une", () => {
+  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  const bloc = route.slice(route.indexOf("const iElite"), route.indexOf("const texteUne"));
+  assert.ok(bloc.length > 50, "le bloc Élites a disparu");
+  assert.match(bloc, /semaine\.filter\(/, "Élites ne lit plus la semaine");
+  assert.match(bloc, /FILTRES\.elite!\.test\(it\.title\)/);
+  assert.match(bloc, /!PAS_ELITE\.test\(it\.title\)/, "les affluences record reviennent en Élites");
+  assert.match(bloc, /!dejaALaUne\.has\(it\.link\)/, "un sujet de la une revient en Élites (Le Parisien sur la backyard, 9/11)");
+  assert.match(bloc, /parRubrique\[iElite\] = elites/, "le choix est calculé mais pas utilisé");
+  // Et le texte du sujet arrive bien jusqu'au résumeur.
+  assert.match(route, /texte: texteUne\.get\(it\.link\) \?\? it\.texte,/, "les sujets de la une repartent sans texte à résumer");
+  assert.match(route, /medias: mediasUne\.get\(it\.link\),/);
+});
+
+test("un sujet de la une cite le nombre d'autres médias, dans les cinq langues", () => {
+  const base = { title: "Backyard", link: "https://exemple.fr/b", resume: "Un résumé." };
+  const attendu: Record<string, RegExp> = { fr: /stadion\.com · et 25 autres médias/, en: /and 25 other outlets/, de: /und 25 weitere Medien/, es: /y 25 medios más/, pt: /e mais 25 meios/ };
+  for (const lg of LANGS) {
+    const m = construireEmail(lg, [{ cle: "une", articles: [{ ...base, source: "stadion.com", medias: 26 }] }], [], "https://exemple.fr/d", "https://exemple.fr");
+    assert.match(m.texte, attendu[lg], `${lg} : texte`);
+    assert.match(m.html, attendu[lg], `${lg} : html`);
+  }
+  const seul = construireEmail("fr", [{ cle: "une", articles: [{ ...base, source: "Le Monde", medias: 1 }] }], [], "https://exemple.fr/d", "https://exemple.fr");
+  assert.doesNotMatch(seul.texte, /autre/, "un article seul se dit repris par d'autres médias");
+});
+
+test("l'aperçu construit la lettre sans lire les abonnés ni rien envoyer", () => {
+  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  // Le secret d'abord : l'aperçu n'est pas une porte ouverte sur les résumés et le quota.
+  assert.ok(route.indexOf("CRON_SECRET") < route.indexOf('searchParams.get("apercu")'), "l'aperçu passe avant le contrôle du secret");
+  assert.match(route, /if \(!apercu\) \{\s*const avecLangue = await admin/, "l'aperçu lit la liste des abonnés");
+  const boucle = route.slice(route.indexOf("for (const { email, lang } of abonnes)"));
+  const iApercu = boucle.indexOf("if (apercu) {"), iEnvoi = boucle.indexOf('envoyerEmail("newsletter"');
+  assert.ok(iApercu > 0 && iApercu < iEnvoi, "l'aperçu n'est pas rendu AVANT l'appel d'envoi");
+  assert.match(boucle.slice(iApercu, iEnvoi), /return NextResponse\.json\(\{[\s\S]*envoye: 0/, "l'aperçu ne s'arrête pas avant l'envoi");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
