@@ -133,7 +133,7 @@ export function ParcoursBrowser({ initialSearch = "", exportGpx = false }: { ini
         if (res?.status === 401) { toast.error(L["t.sessionExpiree"], { id: tid }); return; }
         if (res?.status === 404) { toast.error(L["t.gpxNa"], { id: tid }); return; }
         // Le serveur n'a trouvé qu'un MORCEAU du parcours (ni montré, ni gardé en cache : réessayable).
-        if (res?.status === 422) { toast.error(L["t.traceIncomplete"], { id: tid }); return; }
+        if (res?.status === 422) { toast.error(L[(await res.json().catch(() => ({}))).transitoire ? "t.traceIndispo" : "t.traceIncomplete"], { id: tid }); return; }
         // « Réessaie dans quelques minutes » seulement pour une PANNE (503) ou une absence de réponse ;
         // un autre statut (400, 500) n'ira pas mieux dans cinq minutes.
         if (res && !res.ok && res.status !== 503) { toast.error(L["t.traceErr"], { id: tid }); return; }
@@ -444,7 +444,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad, exportGpx }: { p: Pa
       if (!coords || coords.length < 2) {
         const res = await fetch(`/api/parcours/geometry?id=${p.osm_id ?? p.id}&type=${p.osm_type || "relation"}`, { signal: AbortSignal.timeout(25_000) }).catch(() => null);
         if (res?.status === 401) { toast.error(L["t.sessionExpiree"], { id: tid }); return; }
-        if (res?.status === 422) { toast.error(L["t.traceIncomplete"], { id: tid }); return; }
+        if (res?.status === 422) { toast.error(L[(await res.json().catch(() => ({}))).transitoire ? "t.traceIndispo" : "t.traceIncomplete"], { id: tid }); return; }
         if (res && !res.ok && res.status !== 503 && res.status !== 404) { toast.error(L["t.gpxFail"], { id: tid }); return; }
         const json = res?.ok ? await res.json().catch(() => ({})) : {};
         if (Array.isArray(json.coordinates)) coords = json.coordinates;

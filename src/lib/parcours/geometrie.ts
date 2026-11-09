@@ -1,5 +1,6 @@
 import { UA_PACEVOBOT } from "@/lib/races/robot";
 import { longueurKm, tracePartiel } from "@/lib/parcours/trace";
+import { estErreurTransitoire } from "@/lib/cron/transitoire";
 
 /**
  * GÉOMÉTRIE GPS RÉELLE D'UN PARCOURS, depuis OpenStreetMap (ODbL) — logique sortie de la route
@@ -43,6 +44,29 @@ export function refusDefinitif(e: unknown): boolean {
  */
 export function causes(e: unknown): unknown[] {
   return e instanceof AggregateError ? e.errors.flatMap(causes) : [e];
+}
+
+/**
+ * L'ÉCHEC D'UNE SOURCE DIT-IL « RÉESSAIE » ? (09/11/2026) Quand une source n'a rendu qu'un morceau et
+ * que l'autre a échoué par une PANNE (statut passager ou 5xx, délai, coupure réseau, Overpass
+ * interrompue), le parcours n'est peut-être pas troué du tout : le coureur doit lire « réessaie dans
+ * quelques minutes », pas « tracé incomplet ». Le statut HTTP passe par `estErreurTransitoire` (règle
+ * du projet : l'erreur ET le statut). Sans statut, seul le NOM de l'erreur réseau compte — « nœud
+ * manquant », « trop de relations », « géométrie vide » sont des faits du tracé, pas des pannes.
+ */
+export function echecPassager(e: unknown): boolean {
+  const cs = causes(e);
+  // Un FAIT du tracé (nœud manquant, géométrie vide) l'emporte sur la panne d'un autre miroir :
+  // le parcours est peut-être vraiment troué, « réessaie » serait faux.
+  if (cs.some((c) => c instanceof ErreurSource && / : (nœud manquant|géométrie vide)$/.test(c.message))) return false;
+  return cs.some((c) => {
+    // Une page illisible (HTML d'un Overpass surchargé, rendu en 200) : une panne de son côté.
+    if (!(c instanceof ErreurSource)) return c instanceof Error && (c.name === "AbortError" || c.name === "TimeoutError" || c.name === "SyntaxError");
+    if (c.status) return estErreurTransitoire(c, c.status) || c.status >= 500;
+    if (/ : (TimeoutError|AbortError|TypeError)$/.test(c.message)) return true;
+    // Overpass interrompue (« remark » rendue en 200 : délai, mémoire) : une panne de son côté.
+    return c.message.startsWith("Overpass : ");
+  });
 }
 
 /** Le délai d'un appel, ET l'annulation commune dès qu'une source a gagné la course. */
