@@ -1,6 +1,6 @@
 # État de l'équipe d'agents Pacevo
 
-*Tenu par `@Nexus`. Mis à jour le 09/11/2026 au matin. Chaque ligne dit ce qui TOURNE VRAIMENT,
+*Tenu par `@Nexus`. Mis à jour le 09/11/2026 à 8 h 15. Chaque ligne dit ce qui TOURNE VRAIMENT,
 pas ce qui est prévu : un agent écrit dans la constitution mais sans routine planifiée n'existe pas.*
 
 > ⚠️ **Dépôt PUBLIC** (`cypriendumez/running-trail-empire`). Rien de personnel, de comptable ni
@@ -58,7 +58,7 @@ https://pacevo.fr (HTTP 200) et https://pacevo.fr/version.json (alerte si « com
 | 26 | `@Radar` | PLANIFIÉ | Sécurité et veille, le 5/12. Sites des concurrents autorisés dans le réseau cloud. |
 | 34 | `@Greffier` | PLANIFIÉ | Direction, vendredi. Check-list : `ops/greffier/API-MONTRES.md`. |
 | 48 | `@TimeMachine` | **EXÉCUTÉ** | 08/11 : 1re sauvegarde chiffrée complète de la base, relue et recomptée. Tâche locale chaque dimanche. |
-| 61 | `@Concierge` | PLANIFIÉ | Boîte Gmail dédiée branchée ; `contact@` et `support@` y sont redirigés (prouvé, Outlook compris le 09/11). Filtre « jamais en spam » sur ces deux adresses ; le connecteur ne voit pas le Spam. 1er passage le 09/11 à 8 h. |
+| 61 | `@Concierge` | **EXÉCUTÉ** | 09/11 (8 h 05, 1er passage) : 9 fils classés, 1 brouillon propre (trou « à compléter » au lieu d'inventer), 0 envoi, briefing et liste des fils traités écrits dans `~/Desktop/Pacevo/`. Filtre « jamais en spam » sur contact@ et support@ ; le connecteur ne voit pas le Spam. |
 | 64 | `@PostMortem` | **EXÉCUTÉ** | `ops/memory/LESSONS_LEARNED.md` tenu ; passage hebdo dans Direction. |
 
 ## Unités en Vague 2 (22) et en attente (24)
