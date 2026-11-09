@@ -117,9 +117,17 @@ void (async () => {
         assert.ok(!eCreer && cree?.user?.id, `création du compte de test impossible : ${eCreer?.message ?? "?"}`);
         uid = cree!.user!.id;
 
+        // ⚠️ PAS `signInWithPassword` : depuis le CAPTCHA Turnstile (09/11/2026), GoTrue refuse toute
+        // connexion par mot de passe sans jeton du navigateur (`captcha_failed`). Un lien de connexion
+        // fabriqué avec la clé d'administration (que GoTrue dispense de CAPTCHA), puis vérifié par
+        // `verifyOtp` (jamais soumis au CAPTCHA), ouvre la même session authentifiée. Appel direct à
+        // GoTrue, pas `/auth/confirm` : aucune fausse alerte « nouvel inscrit ».
+        const { data: lien, error: eLien } = await admin.auth.admin.generateLink({ type: "magiclink", email: courriel });
+        const jeton = lien?.properties?.hashed_token;
+        assert.ok(!eLien && jeton, `lien de connexion du compte de test impossible : ${eLien?.message ?? "?"}`);
         const sb = createClient(URL, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
-        const { error: eConnexion } = await sb.auth.signInWithPassword({ email: courriel, password: motDePasse });
-        assert.ok(!eConnexion, `connexion du compte de test impossible : ${eConnexion?.message ?? "?"}`);
+        const { data: ouverte, error: eConnexion } = await sb.auth.verifyOtp({ type: "magiclink", token_hash: jeton! });
+        assert.ok(!eConnexion && ouverte?.session, `connexion du compte de test impossible : ${eConnexion?.message ?? "pas de session"}`);
 
         // Escalade : doit être REFUSÉE par le déclencheur.
         const { error: eEscalade } = await sb.from("profiles").update({ subscription_tier: "premium" }).eq("id", uid);
