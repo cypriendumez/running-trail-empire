@@ -50,6 +50,8 @@ import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { decaleJour } from "@/lib/streak/compute";
 import { niveauDeVma } from "@/lib/running/niveau";
 import { libellesActifs, type Douleur } from "@/lib/health/douleurs";
+import { pausesDeTrace, pointsStockes, vitesseEnMouvement, dureeCourte } from "@/lib/activities/pauses";
+import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
 import { phaseDeSemaine, specifiqueEnTete, semainesAffutage, partAffutage, allegementDuBloc } from "@/lib/coach/phase";
 
@@ -101,7 +103,7 @@ export const COACH_SYSTEM = `Tu es un entraîneur de course à pied et de trail 
 Tu ANALYSES CHAQUE donnée fournie sans EN OUBLIER AUCUNE, et tu n'oublies JAMAIS l'objectif de course. Conseils concrets, chiffrés (allures, zones FC, durées, dénivelé), personnalisés et sûrs.`;
 
 type Wk = {
-  date: string; type?: string | null; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null;
+  id?: string; date: string; type?: string | null; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null;
   elevation_gain_m?: number | null; avg_hr?: number | null; training_effect?: number | null;
   tss?: number | null; avg_cadence_spm?: number | null; avg_power_watts?: number | null; max_hr?: number | null;
   vertical_oscillation_cm?: number | null; ground_contact_ms?: number | null; stride_length_m?: number | null;
@@ -419,7 +421,7 @@ export type LectureContexte = {
 /** Les seules colonnes de séance lues pour le palier gratuit : le volume, rien du corps. */
 const COLONNES_VOLUME = "date,type,distance_km,duration_seconds,elevation_gain_m";
 /** Starter : le volume, la fréquence cardiaque et la charge — ce qu'il faut pour adapter. */
-const COLONNES_ESSENTIELLES = "date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,weather_temp_c,gap_min_km,hr_zone_seconds,intensity_pct";
+const COLONNES_ESSENTIELLES = "id,date,type,distance_km,duration_seconds,elevation_gain_m,avg_hr,max_hr,training_effect,tss,weather_temp_c,gap_min_km,hr_zone_seconds,intensity_pct";
 /** Premium en plus : la foulée, la dérive cardiaque et la FC de récupération. */
 export const COLONNES_AVANCEES = "avg_cadence_spm,avg_power_watts,vertical_oscillation_cm,ground_contact_ms,stride_length_m,vertical_ratio_pct,cardiac_decoupling,hrr_bpm";
 
@@ -2434,6 +2436,24 @@ ${catalog}`;
   // le calendrier bouge sous ses yeux sans un mot.
   //
   // Rien n'est fabriqué ici : chaque ligne n'apparaît que si sa donnée existe.
+  // ── LES ARRÊTS DE LA DERNIÈRE SÉANCE (Cyprien, 09/11/2026 : « il doit prendre en compte
+  //    les pauses »). La base ne garde que le temps en mouvement ; la trace garde l'heure de
+  //    chaque point (lib/activities/pauses). Une lecture ratée ou sans trace : rien n'est dit,
+  //    jamais « aucun arrêt ».
+  const arretsDerniere = await (async () => {
+    const w = runs[0];
+    if (objectifSeul || !w?.id || Math.floor((now - new Date(w.date).getTime()) / 86400000) > 3) return null;
+    const { data, error } = await sb.from("activity_tracks").select("points").eq("workout_id", w.id).maybeSingle();
+    // Une lecture ratée se DIT au journal ; une séance sans trace (tapis, import à venir) se tait.
+    // Une fois par jour : ce contexte se reconstruit à chaque synchro (2 min).
+    if (error) {
+      console.error("[coach] trace de la dernière séance illisible, arrêts inconnus :", error.code ?? "?", error.message);
+      await journaliserEchecUneFois(null, { source: "coach-arrets", userId, message: `Trace de la dernière séance illisible, arrêts inconnus : ${error.code ?? "?"} ${error.message}` });
+      return null;
+    }
+    if (!data) return null;
+    return pausesDeTrace(pointsStockes((data as { points?: unknown }).points), vitesseEnMouvement(w.distance_km, w.duration_seconds));
+  })();
   const lastSession = (() => {
     const w = runs[0];
     if (!w?.date) return null;
@@ -2466,6 +2486,10 @@ ${catalog}`;
       shows.push(`effort à ${Math.round((w.avg_hr / fcMaxEst) * 100)} % de ta FC max estimée`);
     }
     if (w.tss != null) shows.push(`${Math.round(Number(w.tss))} points de charge`);
+    if (arretsDerniere?.liste.length) {
+      const n = arretsDerniere.liste.length;
+      shows.push(`${n} arrêt${n > 1 ? "s" : ""} (${dureeCourte(arretsDerniere.totalSec)} au total, le plus long ${dureeCourte(arretsDerniere.plusLongueSec)}) : allure et charge sont calculées sur le temps en mouvement`);
+    }
     return {
       date: String(w.date).slice(0, 10),
       label: `${classifyRun(w, fcMaxEst)}${bits.length ? ` · ${bits.join(" · ")}` : ""}`,

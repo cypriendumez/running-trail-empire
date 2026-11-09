@@ -8,6 +8,7 @@
 import { allureTexte, dateLisible, TYPE_COURSE, type FaitsSeance } from "@/lib/ai/analyseSeance";
 import { FOURCHETTE_QUALITE_SEC } from "@/lib/watch/intervals";
 import { SPORT_LABEL, type Sport } from "@/lib/intervals/sport";
+import { dureeCourte } from "@/lib/activities/pauses";
 
 /** Les sports qui se mesurent en VITESSE (km/h) : une allure au kilomètre n'y a pas de sens. */
 const EN_VITESSE = new Set(["bike", "ski", "row"]);
@@ -55,6 +56,16 @@ export function lignesDeFaits(f: FaitsSeance, lang: Lang, complet: boolean): str
   if (f.fcMoy != null) l.push(`FC moyenne ${f.fcMoy}${f.fcMax != null ? `, max ${f.fcMax}` : ""}${f.partFcMax != null ? ` — ${f.partFcMax} % de sa FC max` : ""}`);
   if (f.intensite) l.push(`Intensité RÉELLE, jugée à la fréquence cardiaque : ${f.intensite === "dure" ? "séance dure" : f.intensite === "moderee" ? "modérée" : "footing facile"}`);
   if (f.dplus != null) l.push(`Dénivelé positif ${f.dplus} m`);
+  // Les ARRÊTS (montre en pause ou immobile), relus sur la trace : la durée ci-dessus est le
+  // temps EN MOUVEMENT. Pour toutes les formules : c'est ce qui sépare une séance continue
+  // d'une séance hachée, et l'athlète l'a demandé (09/11/2026).
+  if (f.arrets) {
+    const a = f.arrets;
+    const km = (x: number) => new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(x);
+    l.push(a.liste.length
+      ? `Arrêts relevés sur la trace GPS : ${a.liste.length}, ${dureeCourte(a.totalSec)} au total (séance de ${Math.round(a.ecouleSec / 60)} min du départ à l'arrivée) — ${a.liste.map((p) => `${dureeCourte(p.dureeSec)} au km ${km(p.km)}`).join(" · ")}`
+      : "Aucun arrêt relevé sur la trace GPS : séance continue");
+  }
   // ── Réservé à la formule haute : les dimensions d'analyse supplémentaires. ──
   if (complet) {
     // Les nombres dans la langue de l'athlète : le modèle RECOPIE « 1.12 m » tel quel.
@@ -142,6 +153,12 @@ export function inviteAnalyse(faits: FaitsSeance, lang: Lang, complet: boolean):
       "  Ne commente ni la chaleur, ni la gestion de l'effort, ni quoi que ce soit d'autre.",
     ]),
     "- Juge l'intensité sur la fréquence cardiaque fournie, jamais sur le titre de la séance.",
+    ...(faits.arrets?.liste.length ? [
+      "- Les ARRÊTS sont un fait, pas une faute : n'en devine jamais la cause (feu, lacet, fatigue…). Allure et",
+      "  durée sont celles du temps en mouvement. Dans une séance de qualité, un arrêt de plus d'une minute",
+      "  pendant le corps de séance allonge la récupération prévue : dis-le, sans conclure qu'il a mal exécuté.",
+      "  Sur un footing ou une sortie longue, plusieurs arrêts longs hachent l'effort continu : dis-le aussi.",
+    ] : []),
     "- Pas de diagnostic médical, pas de « tu es apte ».",
     `- ${complet ? "Six à huit phrases" : "Trois à quatre phrases"}, ${LANGUE[lang]}.`,
     "- Commence directement par le fond : pas de salutation, pas de « je viens de relire ». Chaque mot est facturé.",

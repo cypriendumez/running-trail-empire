@@ -17,6 +17,8 @@ import { colonnesEditionPresentes, COLONNES_EDITION } from "@/lib/activities/col
 import { nomAffiche } from "@/lib/activities/renommage";
 import { seLitEnVitesse, vitesseKmh, kmhDepuisAllure, fmtKmh } from "@/lib/activities/vitesse";
 import { T } from "@/lib/i18n/translations";
+import { pausesDeTrace, vitesseEnMouvement, dureeCourte } from "@/lib/activities/pauses";
+import { journaliserTraceIllisible } from "@/lib/journal/traceIllisible";
 
 export const dynamic = "force-dynamic";
 
@@ -142,8 +144,11 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
         if (tss != null) forme.push({ label: T[langue]["frm.tss"], value: String(Math.round(tss)) });
         if (inten != null) forme.push({ label: T[langue]["frm.intensite"], value: `${Math.round(inten)} %` });
 
-        const { data: tr } = await sb.from("activity_tracks")
+        const { data: tr, error: eTrace } = await sb.from("activity_tracks")
           .select("points").eq("workout_id", String(wk.id)).maybeSingle();
+        // Une trace illisible n'est pas une séance sans trace : la carte et les arrêts se taisent,
+        // mais l'échec part au journal (lib/journal/traceIllisible).
+        if (eTrace) await journaliserTraceIllisible(user.id, "/dashboard/activite", eTrace);
         const bruts = ((tr as { points?: number[][] } | null)?.points ?? []);
         if (bruts.length >= 10) {
           // Positions du tableau `points` : 0 lat, 1 lon, 2 temps, 3 altitude, 4 FC,
@@ -153,6 +158,16 @@ export default async function ActivitePage({ searchParams }: { searchParams: Pro
             ({ lat, lon, t, alt: alt ?? undefined, hr: hr ?? undefined, cad: cad ?? undefined, pw: pw ?? undefined } as TrackPoint));
           splits = computeSplits(pts);
           profil = elevationProfile(pts);
+          // ── Les arrêts : la base ne garde que le temps EN MOUVEMENT, la trace garde l'heure
+          //    de chaque point (lib/activities/pauses). Rien n'est affiché sans arrêt détecté.
+          const arrets = pausesDeTrace(pts, vitesseEnMouvement(wk.distance_km, wk.duration_seconds));
+          if (arrets && arrets.liste.length) {
+            const longue = arrets.liste.reduce((a, b) => (b.dureeSec > a.dureeSec ? b : a));
+            const km = longue.km.toLocaleString(langue, { maximumFractionDigits: 1 });
+            chiffres.push({ label: T[langue]["act.ecoule"], value: hhmm(arrets.ecouleSec) });
+            chiffres.push({ label: T[langue]["act.arrets"], value: `${arrets.liste.length} · ${dureeCourte(arrets.totalSec)}` });
+            chiffres.push({ label: T[langue]["act.arretLong"], value: `${dureeCourte(longue.dureeSec)} ${T[langue]["act.auKm"].replace("{km}", km)}` });
+          }
           // Tracé allégé pour la carte : la précision au mètre n'apporte rien à
           // cette échelle et alourdirait la page pour rien.
           polyline = encodePolyline(simplify(pts, 25));
