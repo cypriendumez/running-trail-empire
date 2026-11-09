@@ -5,8 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { lienDesinscription } from "@/lib/newsletter/token";
 import { resumerArticles, traduireTextes, RESUMES_MAX, type ArticleResume } from "@/lib/newsletter/resume";
 import { construireEmail, estLang, type Lang, type Section, type Course } from "@/lib/newsletter/email";
-import { RUBRIQUES_LETTRE, FILTRES, PAS_ELITE } from "@/lib/news/rubriques";
-import { collecterSemaine } from "@/lib/news/actualites";
+import { RUBRIQUES_LETTRE, FILTRES, PAS_ELITE, CONTEXTE_COURSE, PROMO } from "@/lib/news/rubriques";
+import { collecterSemaine, collecterNutritionSemaine } from "@/lib/news/actualites";
 import { classerALaUne, motsDuTitre, texteDuSujet } from "@/lib/news/alaune";
 import { EDITEUR } from "@/lib/brand/editeur";
 import { envoyerEmail } from "@/lib/email/envoyer";
@@ -88,11 +88,13 @@ export async function GET(req: Request) {
   // à la main, elle parcourt la liste. Une rubrique inexistante y serait refusée par le
   // typage, plus seulement silencieusement remplacée par l'actualité générale.
   let echecSemaine: string | null = null;
-  const [parRubrique, semaine] = await Promise.all([
+  const [parRubrique, semaine, nutritionSemaine] = await Promise.all([
     Promise.all(RUBRIQUES_LETTRE.map((r) => recentsDe(r.cat))),
     // Une panne ici ne doit pas annuler la lettre : la une retombe sur le fil, et la
     // réponse (lue dans le journal de l'action GitHub) dit pourquoi.
     collecterSemaine().catch((e: unknown) => { echecSemaine = e instanceof Error ? e.message : String(e); return [] as Item[]; }),
+    // Même règle : une panne ne coûte que la rubrique, qui retombe sur le fil.
+    collecterNutritionSemaine().catch(() => [] as Item[]),
   ]);
 
   // ── 1 bis. LA UNE : les sujets dont le plus de médias ont parlé ────────────
@@ -124,6 +126,19 @@ export async function GET(req: Request) {
       && !motsDuTitre(it.title).some((m) => sujetsUne.has(m)));
     const elites = classerALaUne(resultats, RUBRIQUES_LETTRE[iElite].max + 3).map((s) => s.article);
     if (elites.length) parRubrique[iElite] = elites;
+  }
+
+  // ── 1 quater. NUTRITION : la semaine, la course, pas la charcuterie ──────────
+  // ⚠️ Vide le 9/11/2026 pour la même raison qu'Élites (voir `collecterNutritionSemaine`).
+  // Classée par DATE, pas par nombre de médias : « nutrition » est le thème de la
+  // rubrique, il réunirait tous ses articles en un seul « sujet » et n'en garderait qu'un.
+  const iNutrition = RUBRIQUES_LETTRE.findIndex((r) => r.cle === "nutrition");
+  if (iNutrition > 0 && nutritionSemaine.length) {
+    const temps = (it: Item) => new Date(it.date).getTime() || 0;
+    const nutrition = nutritionSemaine
+      .filter((it) => FILTRES.nutrition!.test(it.title) && CONTEXTE_COURSE.test(it.title) && !PROMO.test(it.title) && !dejaALaUne.has(it.link))
+      .sort((a, b) => temps(b) - temps(a));
+    if (nutrition.length) parRubrique[iNutrition] = nutrition;
   }
 
   // Le texte à résumer pour chaque sujet de la une : ce qu'en titrent les médias (voir
