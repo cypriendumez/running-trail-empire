@@ -1,6 +1,6 @@
 # État de l'équipe d'agents Pacevo
 
-*Tenu par `@Nexus`. Mis à jour le 09/11/2026 à 8 h 15. Chaque ligne dit ce qui TOURNE VRAIMENT,
+*Tenu par `@Nexus`. Mis à jour le 09/11/2026 à 9 h 40. Chaque ligne dit ce qui TOURNE VRAIMENT,
 pas ce qui est prévu : un agent écrit dans la constitution mais sans routine planifiée n'existe pas.*
 
 > ⚠️ **Dépôt PUBLIC** (`cypriendumez/running-trail-empire`). Rien de personnel, de comptable ni
@@ -61,11 +61,39 @@ https://pacevo.fr (HTTP 200) et https://pacevo.fr/version.json (alerte si « com
 | 61 | `@Concierge` | **EXÉCUTÉ** | 09/11 (8 h 05, 1er passage) : 9 fils classés, 1 brouillon propre (trou « à compléter » au lieu d'inventer), 0 envoi, briefing et liste des fils traités écrits dans `~/Desktop/Pacevo/`. Filtre « jamais en spam » sur contact@ et support@ ; le connecteur ne voit pas le Spam. |
 | 64 | `@PostMortem` | **EXÉCUTÉ** | `ops/memory/LESSONS_LEARNED.md` tenu ; passage hebdo dans Direction. |
 
+## Direction (créée le 09/11/2026) : 11 unités définies, aucune encore branchée
+
+Organigramme, rattachements et statuts : `ops/direction/README.md` (source unique, gardée par
+`tests/organigramme.test.ts`) ; fiches : `.claude/agents/` (sous-agents en lecture seule, modèle `opus`) ; textes à
+ajouter aux routines : `ops/direction/routines/`. Chaîne : agent → directeur de pôle → `@Atlas` → `@Nexus` → Cyprien.
+Aucune routine ni quota en plus : un directeur relit dans le passage de son agent, seulement s'il y a une PR ou un
+rapport. Statut honnête : « DÉFINI » tant qu'aucune routine n'appelle le sous-agent ; « ACTIF (dans …) » après un
+premier passage prouvé (`list_runs`, `get_run_log`). Le branchement attend le GO de Cyprien (modifier une routine est
+une configuration permanente).
+
+| # | Agent | Rôle | État | Branchement prévu (après le GO) |
+|---|---|---|---|---|
+| 1 | `@Nexus` | directeur général délégué, bras droit | ACTIF | déjà dans Direction ; devient aussi le sous-agent `nexus` |
+| 71 | `@Atlas` | directeur adjoint des opérations, bras gauche | DÉFINI | Direction (vendredi), juste avant `@Nexus` |
+| 72 | `@Strategos` | pôle A, stratégie et qualité des agents | DÉFINI | Direction, avec les leçons de la semaine |
+| 73 | `@Chancelier` | pôle B, secrétaire général | DÉFINI | Courrier (Mac, 8 h), après `@Concierge` |
+| 74 | `@HeadCoach` | pôle C, directeur scientifique | DÉFINI | Coach (lundi 5 h), avant la PR |
+| 75 | `@Architect` | pôle D, technique et sécurité | DÉFINI | Bugs (6 h, 23 h) et Sécurité et veille (le 5) |
+| 76 | `@Maestro` | pôle E, produit et design | DÉFINI | avec son pôle (Vague 2) ; à la demande sur toute PR d'interface |
+| 77 | `@Mercator` | pôle F, marketing | DÉFINI | Blog (1er/15, lundi) et Sécurité et veille (rapport de `@Radar`) |
+| 78 | `@Alliance` | pôle G, commercial et partenariats | DÉFINI | avec son pôle (en attente) ; à la demande |
+| 79 | `@Trésorier` | pôle H, finance et juridique | DÉFINI | Direction, avec les dossiers de `@Greffier` |
+| 80 | `@Oracle` | pôle I, données | DÉFINI | avec son pôle (en attente) ; à la demande |
+| 81 | `@Conductor` | pôle J, fonctions de l'application | DÉFINI | avec la Vague 2 (audit des 6 fonctions) ; à la demande |
+
 ## Unités en Vague 2 (22) et en attente (24)
 
 Décompte fait sur le tableau de la constitution le 09/11/2026 (son introduction inverse les deux chiffres) :
-12 actifs + 22 en Vague 2 + 24 en attente + 6 fonctions de l'application + 6 numéros fusionnés = 70.
-Organigramme complet (PDF, hors dépôt) : `~/Desktop/Pacevo/organigramme-agents-pacevo.pdf`.
+12 actifs + 11 de direction (définis, voir ci-dessus) + 22 en Vague 2 + 24 en attente + 6 fonctions de
+l'application + 6 numéros fusionnés = 81 numéros, sans trou, + `@Vigie`.
+Organigramme dans le dépôt : `ops/direction/README.md`. En PDF (hors dépôt) :
+`~/Desktop/Pacevo/structure de l'entreprise/organigramme-agents-pacevo.pdf`, régénéré par
+`organigramme-agents-pacevo.py` dans le même dossier.
 
 Définies dans `ops/CONSTITUTION.md`, aucune routine. La Vague 2 sera ajoutée aux routines
 existantes avant le lancement (avril 2027), pas en routines séparées, pour ménager la limite
