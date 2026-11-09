@@ -40,8 +40,9 @@ qu'une routine cloud ne peut pas faire.
 hebdomadaire des tables publiques (dimanche 03 h 20), newsletter, veille des courses.
 `@Vigie` (`vigie.yml`) sonde pacevo.fr : demandé toutes les 30 min, mais GitHub ne lance les
 planifications de ce dépôt que toutes les 3 à 4 heures (mesuré le 09/11 : 2 passages planifiés en
-15 h, comme `sync-coach`). Une panne peut donc rester invisible quelques heures ; une sonde externe
-gratuite (UptimeRobot, toutes les 5 min) comblerait ce trou : compte à créer par Cyprien.
+15 h, comme `sync-coach`). Ce trou est comblé depuis le 09/11 par **UptimeRobot** (offre gratuite,
+compte de Cyprien, alertes par mail sur son Outlook) : deux sondes toutes les 5 min, l'accueil
+https://pacevo.fr (HTTP 200) et https://pacevo.fr/version.json (alerte si « commit » disparaît).
 
 ## Vague 1 : 12 agents sur 12 en place
 
