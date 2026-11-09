@@ -173,7 +173,9 @@ void (async () => {
 
   test("Cloudflare Turnstile n'entre dans la CSP QUE si sa clé est posée", () => {
     const cf = "https://challenges.cloudflare.com";
-    assert.ok(!(prod.d["script-src"] ?? []).includes(cf) && !prod.d["frame-src"], "sans clé, la CSP ouvre quand même la porte à Cloudflare");
+    assert.ok(!(prod.d["script-src"] ?? []).includes(cf) && !prod.d["frame-src"] && !(prod.d["connect-src"] ?? []).includes(cf), "sans clé, la CSP ouvre quand même la porte à Cloudflare");
+    // 09/11/2026 : le script du CAPTCHA envoie ses signaux depuis la page (`/cdn-cgi/challenge-platform/…`).
+    assert.ok((avecCaptcha.d["connect-src"] ?? []).includes(cf), "avec la clé, les requêtes du CAPTCHA vers Cloudflare sont bloquées (connect-src)");
     assert.ok((avecCaptcha.d["script-src"] ?? []).includes(cf), "avec la clé, le script du CAPTCHA serait bloqué : plus personne ne pourrait se connecter");
     assert.deepEqual(avecCaptcha.d["frame-src"], [cf], "avec la clé, le cadre du CAPTCHA serait bloqué (ou frame-src s'ouvre à d'autres)");
     assert.deepEqual((avecCaptcha.d["script-src"] ?? []).filter((v) => v !== "'self'" && v !== "'unsafe-inline'"), [cf], "la clé Turnstile ouvre script-src à autre chose que Cloudflare");

@@ -55,8 +55,12 @@ export function EcranLancement() {
     const el = document.getElementById("lancement");
     let dejaVu = false;
     try { dejaVu = !!sessionStorage.getItem(CLE_SESSION); } catch { /* stockage bloqué : on joue l'écran */ }
+    // Posé aussi sur <html> : un tableau de bord remonté SANS rechargement (retour depuis une
+    // page publique) est alors masqué par la CSS dès sa première image, sans clignoter.
+    const vu = () => document.documentElement.setAttribute("data-lancement-vu", "");
     if (!el || dejaVu || el.hasAttribute("data-vu")) {
       el?.setAttribute("data-vu", "");
+      if (dejaVu) vu();
       return;
     }
     let fini = false;
@@ -70,7 +74,7 @@ export function EcranLancement() {
       minuteries.push(window.setTimeout(() => {
         el.setAttribute("data-sortie", "");
         try { sessionStorage.setItem(CLE_SESSION, "1"); } catch { /* sans stockage, il rejouera : sans gravité */ }
-        minuteries.push(window.setTimeout(() => el.setAttribute("data-vu", ""), DUREE_SORTIE_MS));
+        minuteries.push(window.setTimeout(() => { el.setAttribute("data-vu", ""); vu(); }, DUREE_SORTIE_MS));
         prechauffer();
       }, reste));
     };

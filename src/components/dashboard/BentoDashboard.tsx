@@ -125,12 +125,12 @@ const KPI_LABELS: Record<string, { form: string; hrv: string; vma: string; vol: 
 };
 
 // Libellés du panneau objectif de l'en-tête (multilingue).
-const HERO_LABELS: Record<string, { goal: string; plan: string; prep: string; sept: string }> = {
-  fr: { goal: "Objectif", plan: "Voir mon plan", prep: "préparation", sept: "7 j" },
-  en: { goal: "Goal", plan: "View my plan", prep: "readiness", sept: "7 d" },
-  de: { goal: "Ziel", plan: "Mein Plan ansehen", prep: "Bereitschaft", sept: "7 T" },
-  es: { goal: "Objetivo", plan: "Ver mi plan", prep: "preparación", sept: "7 d" },
-  pt: { goal: "Objetivo", plan: "Ver o meu plano", prep: "preparação", sept: "7 d" },
+const HERO_LABELS: Record<string, { goal: string; plan: string; sept: string }> = {
+  fr: { goal: "Objectif", plan: "Voir mon plan", sept: "7 j" },
+  en: { goal: "Goal", plan: "View my plan", sept: "7 d" },
+  de: { goal: "Ziel", plan: "Mein Plan ansehen", sept: "7 T" },
+  es: { goal: "Objetivo", plan: "Ver mi plan", sept: "7 d" },
+  pt: { goal: "Objetivo", plan: "Ver o meu plano", sept: "7 d" },
 };
 
 // Bannière « prochaine séance » (multilingue).
@@ -657,16 +657,20 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                texte, un chevron — et la rangée ENTIÈRE mène au plan, ce que seul le bouton
                faisait avant. À partir de `sm`, rien ne change. */
             <Link href="/dashboard/calendrier" className="group/obj -mx-1 flex w-full items-center gap-3 rounded-2xl px-1 py-1 transition-colors active:bg-white/40 sm:mx-0 sm:w-auto sm:gap-5 sm:px-0 sm:py-0">
-              <div className="relative h-14 w-14 flex-shrink-0 sm:h-[92px] sm:w-[92px]">
-                <svg className="h-full w-full -rotate-90" viewBox="0 0 92 92">
-                  <circle cx="46" cy="46" r="40" fill="none" stroke="#f4f4f5" strokeWidth="7" />
-                  <circle cx="46" cy="46" r="40" fill="none" stroke="#059669" strokeWidth="7" strokeLinecap="round"
-                    strokeDasharray={`${(2 * Math.PI * 40 * (objProgress ?? 0)) / 100} ${2 * Math.PI * 40}`}
-                    className="transition-[stroke-dasharray] duration-700" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-                  <span className="text-sm font-semibold tabular-nums text-zinc-900 sm:text-base">{objProgress ?? "—"}<span className="text-[11px] text-zinc-400">%</span></span>
-                  <span className="mt-0.5 hidden text-[11px] text-zinc-400 sm:mt-1 sm:block">{hl.prep}</span>
+              {/* L'anneau ne porte que son chiffre (09/11/2026) : le mot « préparation », dedans,
+                  touchait le trait ; dessous, il faisait bizarre (Cyprien). Le J‑40 et le nom de
+                  la course disent déjà de quoi il s'agit. */}
+              <div className="flex-shrink-0">
+                <div className="relative h-14 w-14 sm:h-[92px] sm:w-[92px]">
+                  <svg className="h-full w-full -rotate-90" viewBox="0 0 92 92">
+                    <circle cx="46" cy="46" r="40" fill="none" stroke="#f4f4f5" strokeWidth="7" />
+                    <circle cx="46" cy="46" r="40" fill="none" stroke="#059669" strokeWidth="7" strokeLinecap="round"
+                      strokeDasharray={`${(2 * Math.PI * 40 * (objProgress ?? 0)) / 100} ${2 * Math.PI * 40}`}
+                      className="transition-[stroke-dasharray] duration-700" />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center leading-none">
+                    <span className="text-sm font-semibold tabular-nums text-zinc-900 sm:text-xl">{objProgress ?? "—"}<span className="text-[11px] text-zinc-400 sm:text-xs">%</span></span>
+                  </div>
                 </div>
               </div>
               <div className="min-w-0 flex-1">
@@ -875,19 +879,24 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           {forme.hasData ? (
             <>
             <div className="flex items-center gap-5">
-              <div className="relative h-28 w-28 flex-shrink-0">
-                <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="#F4F4F5" strokeWidth="9" />
-                  <circle cx="50" cy="50" r="42" fill="none" stroke={readiness.accent} strokeWidth="9"
-                    strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 42 * forme.total / 100} ${2 * Math.PI * 42}`}
-                    className="transition-[stroke-dasharray] duration-700" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[2rem] font-semibold leading-none tracking-tight tabular-nums text-zinc-900">{forme.total}</span>
-                  <span className="mt-0.5 text-[11px] text-zinc-400">{fl.of}</span>
-                  <span className="mt-1 text-[11px] font-medium text-zinc-500">{fl.rate(forme.total)}</span>
+              {/* Le verdict (« Bonne forme ») vit SOUS l'anneau (09/11/2026) : en troisième
+                  ligne dedans, il tombait là où le cercle se resserre et touchait le trait
+                  (capture de Cyprien). Dedans : le chiffre et « / 100 », rien d'autre. */}
+              <div className="flex flex-shrink-0 flex-col items-center gap-2">
+                <div className="relative h-28 w-28">
+                  <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="#F4F4F5" strokeWidth="9" />
+                    <circle cx="50" cy="50" r="42" fill="none" stroke={readiness.accent} strokeWidth="9"
+                      strokeLinecap="round"
+                      strokeDasharray={`${2 * Math.PI * 42 * forme.total / 100} ${2 * Math.PI * 42}`}
+                      className="transition-[stroke-dasharray] duration-700" />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-[2rem] font-semibold leading-none tracking-tight tabular-nums text-zinc-900">{forme.total}</span>
+                    <span className="mt-1 text-[11px] leading-none text-zinc-400">{fl.of}</span>
+                  </div>
                 </div>
+                <span className="text-[11px] font-medium leading-none text-zinc-500">{fl.rate(forme.total)}</span>
               </div>
               <div className="flex-1 space-y-2.5">
                 {[

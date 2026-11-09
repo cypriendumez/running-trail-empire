@@ -27,10 +27,19 @@ console.log("\n=== ÉCRAN DE LANCEMENT ===\n");
 test("il est rendu par le serveur, AVANT la page, et masqué d'office s'il a déjà été vu", () => {
   const layout = codeNu("src/app/dashboard/layout.tsx");
   const decor = layout.indexOf("<DecorLancement langue={langue} />");
-  const script = layout.indexOf("sessionStorage.getItem(${JSON.stringify(CLE_SESSION_LANCEMENT)})");
   const page = layout.indexOf("{children}");
-  assert.ok(decor > 0 && script > decor && page > script, "le décor et son script doivent précéder la page");
+  assert.ok(decor > 0 && page > decor, "le décor doit précéder la page");
   assert.match(layout, /<EcranLancement \/>/);
+  // 09/11/2026 : un <script> dans le layout du tableau de bord est RECRÉÉ par React à chaque
+  // arrivée sans rechargement (après la connexion) — jamais exécuté, alerte « Encountered a
+  // script tag ». Le masquage d'office vit dans le <head> du layout RACINE, rendu par le serveur.
+  assert.doesNotMatch(layout, /<script\b/, "un <script> dans le layout du tableau de bord : React le recrée sans l'exécuter");
+  const racine = codeNu("src/app/layout.tsx");
+  const tete = racine.match(/<head>([\s\S]*?)<\/head>/);
+  assert.ok(tete, "le layout racine n'a plus de <head>");
+  assert.ok(tete![1].includes('sessionStorage.getItem(${JSON.stringify(CLE_SESSION_LANCEMENT)}))document.documentElement.setAttribute("data-lancement-vu","")'),
+    "le script de masquage d'office a quitté le <head> du layout racine");
+  assert.match(CSS, /html\[data-lancement-vu\] #lancement \{ display: none; \}/, "l'attribut posé par le script ne masque plus rien");
   // Le décor est un composant SERVEUR (refait le 02/10/2026) : sans « use client », il est
   // dans le HTML de la première réponse — rien n'attend le JavaScript.
   const decorSrc = codeNu("src/components/layout/DecorLancement.tsx");
@@ -43,7 +52,7 @@ test("il est rendu par le serveur, AVANT la page, et masqué d'office s'il a dé
 test("la clé de session vit dans un module neutre, pas dans le composant client", () => {
   assert.equal(CLE_SESSION_LANCEMENT, "pacevo_lancement");
   assert.doesNotMatch(readFileSync("src/lib/ui/lancement.ts", "utf8"), /"use client"/);
-  assert.doesNotMatch(codeNu("src/app/dashboard/layout.tsx"), /CLE_SESSION\b(?!_LANCEMENT)/, "une constante lue d'un module client n'est qu'une référence côté serveur");
+  assert.doesNotMatch(codeNu("src/app/layout.tsx"), /CLE_SESSION\b(?!_LANCEMENT)/, "une constante lue d'un module client n'est qu'une référence côté serveur");
 });
 
 test("ni clignotement, ni otage : durée minimale et durée maximale", () => {

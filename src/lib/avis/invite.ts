@@ -60,3 +60,18 @@ export function lireEtat(brut: string | null): EtatInvite {
     };
   } catch { return {}; }
 }
+
+/**
+ * LE BON MOMENT (09/11/2026) — comme les grandes applications : on demande un avis JUSTE
+ * APRÈS une réussite, pas à l'ouverture. Ici : une séance que le coach avait prescrite,
+ * FAITE aujourd'hui ou hier (verdict « tenu », motif « seance-faite » de la série). Un
+ * repos respecté ou une journée sans plan ne comptent pas : on ne félicite pas d'un rien.
+ *
+ * `depuis` est le premier jour accepté (« hier » chez l'athlète), au format AAAA-MM-JJ :
+ * les dates de la série sont des jours civils, comparables comme du texte.
+ */
+export type JourSerie = { date: string; verdict: string; reason: string };
+
+export function momentFavorable(jours: readonly JourSerie[], depuis: string): boolean {
+  return jours.some((j) => j.date >= depuis && j.verdict === "tenu" && j.reason === "seance-faite");
+}

@@ -8,6 +8,7 @@ import type { AnalyseMemorisee } from "@/lib/dashboard/derniereAnalyse";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { TestVmaBanner } from "@/components/dashboard/TestVmaBanner";
 import { InviteAvis } from "@/components/dashboard/InviteAvis";
+import { momentFavorable } from "@/lib/avis/invite";
 import { TYPE_AVIS } from "@/lib/avis/store";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
@@ -266,7 +267,10 @@ export default async function DashboardPage() {
    *    d'utilisateurs réels — un avis sollicité trop tôt n'en est pas un.
    */
   const SEANCES_AVANT_INVITE = 5;
-  const inviterAvis = (avisRes.data?.length ?? 0) === 0 && (nbSeancesRes.count ?? 0) >= SEANCES_AVANT_INVITE;
+  // …et au BON MOMENT (09/11/2026) : juste après une séance du plan faite aujourd'hui ou
+  // hier. C'est là que les grandes applications demandent, jamais à froid.
+  const inviterAvis = (avisRes.data?.length ?? 0) === 0 && (nbSeancesRes.count ?? 0) >= SEANCES_AVANT_INVITE
+    && momentFavorable(streak.days, decaleJour(streakToday, -1));
 
   return (
     <>

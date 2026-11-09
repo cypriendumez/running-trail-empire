@@ -150,7 +150,10 @@ const nextConfig: NextConfig = {
     })();
     // CAPTCHA Cloudflare Turnstile (`components/auth/Turnstile`) : son script et son cadre ne sont
     // autorisés QUE si la clé est posée — sans elle, aucune porte n'est ouverte pour rien.
-    // Directives exigées par Cloudflare (doc « Turnstile — Content Security Policy », lue le 08/11/2026).
+    // Directives exigées par Cloudflare (doc « Turnstile — Content Security Policy », lue le 08/11/2026) :
+    // script-src et frame-src. connect-src en plus (09/11/2026) : le script du CAPTCHA, dans la PAGE,
+    // envoie ses signaux à `challenges.cloudflare.com/cdn-cgi/challenge-platform/…` ; la CSP les
+    // bloquait (vu dans la console de /login), sur un domaine déjà de confiance pour script-src.
     const turnstile = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? " https://challenges.cloudflare.com" : "";
     const csp = [
       "default-src 'self'",
@@ -163,7 +166,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
       `img-src 'self' data: blob: ${supabase.https} https://images.unsplash.com https://images.pexels.com https://cdnjs.cloudflare.com https://icons.duckduckgo.com ${tuiles}`,
-      `connect-src 'self' ${supabase.https} ${supabase.wss} https://*.open-meteo.com https://api.bigdatacloud.net https://router.project-osrm.org ${tuiles}`,
+      `connect-src 'self' ${supabase.https} ${supabase.wss} https://*.open-meteo.com https://api.bigdatacloud.net https://router.project-osrm.org ${tuiles}${turnstile}`,
       "worker-src 'self' blob:",
       "manifest-src 'self'",
       "report-uri /api/csp-report",

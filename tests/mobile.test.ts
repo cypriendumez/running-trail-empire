@@ -427,5 +427,36 @@ test("« Mes activités » ouvre la LISTE DES SORTIES, et reste allumé sur ses 
   }
 });
 
+test("le menu du profil et les notifications se ferment d'un clic n'importe où dans la page", () => {
+  // 09/11/2026 — Cyprien : « je suis obligé de cliquer sur le haut blanc de la page ». L'en-tête
+  // porte un `backdrop-filter` (flou) : il devient le cadre de ses enfants `fixed`, et le voile
+  // `fixed inset-0` qui devait capter le clic ne couvrait plus que l'en-tête.
+  const top = codeNu("src/components/layout/TopBar.tsx");
+  const entete = top.match(/<header className="([^"]*)"/)?.[1] ?? "";
+  if (/backdrop-|transform|filter|will-change/.test(entete)) {
+    assert.doesNotMatch(top, /fixed inset-0[^"]*" onClick=/, "un voile `fixed inset-0` dans l'en-tête flouté ne couvre que l'en-tête");
+  }
+  assert.match(top, /document\.addEventListener\("pointerdown", dehors\)/, "plus d'écouteur de clic hors du menu");
+  assert.match(top, /openMenu && menuRef\.current && !menuRef\.current\.contains\(cible\)\) setOpenMenu\(false\)/, "un clic hors du menu du profil ne le ferme plus");
+  assert.match(top, /openNotif && notifRef\.current && !notifRef\.current\.contains\(cible\)\) setOpenNotif\(false\)/, "un clic hors des notifications ne les ferme plus");
+  assert.match(top, /<div ref=\{menuRef\} className="relative">/, "la zone du menu n'est plus repérée : tout clic, même dedans, le fermerait");
+  assert.match(top, /<div ref=\{notifRef\} className="relative">/, "la zone des notifications n'est plus repérée");
+  assert.match(top, /e\.key === "Escape"\) \{ setOpenNotif\(false\); setOpenMenu\(false\); \}/, "Échap ne ferme plus les menus");
+});
+
+test("aucun mot ne touche le trait d'un anneau : les libellés vivent sous le cercle", () => {
+  // 09/11/2026 — captures de Cyprien : « préparation » (anneau de l'objectif) et « Bonne forme »
+  // (score de forme) tombaient là où le cercle se resserre et touchaient le trait.
+  const bento = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  const centres = [...bento.matchAll(/<div className="absolute inset-0 flex[^"]*items-center justify-center[^"]*">([\s\S]*?)\n\s*<\/div>/g)].map((m) => m[1]);
+  assert.ok(centres.length >= 3, `${centres.length} centres d'anneau trouvés`);
+  for (const c of centres) {
+    assert.ok(!c.includes("fl.rate("), "le verdict de forme est revenu dans l'anneau");
+  }
+  // Puis retiré tout à fait (même jour, Cyprien : « ça fait bizarre ») : le J‑40 suffit.
+  assert.doesNotMatch(bento, /\bprep:|hl\.prep/, "le mot « préparation » est revenu autour de l'anneau de l'objectif");
+  assert.match(bento, /<span className="text-\[11px\] font-medium leading-none text-zinc-500">\{fl\.rate\(forme\.total\)\}<\/span>/, "le verdict de forme a disparu de sous l'anneau");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
