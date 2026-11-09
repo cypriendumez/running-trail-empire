@@ -1,0 +1,165 @@
+/**
+ * LA UNE DE LA LETTRE DU LUNDI — la backyard de Clem qui court était absente (09/11/2026).
+ *
+ * Cyprien : « pourquoi dans la newsletter il n'y a pas la backyard de Clem qui court alors que
+ * c'était l'événement français du weekend ». La une prenait les 5 articles les plus RÉCENTS
+ * d'un fil coupé à 48 : Wiz Khalifa, un fait divers à Brooklyn, un guide de chaussures, tous
+ * publiés dans la demi-heure avant l'envoi. La backyard (26 médias en une semaine) n'existait
+ * déjà plus dans le fil : Marathon Handbook avait publié sept articles le dimanche à 17 h 20.
+ *
+ * Les titres ci-dessous sont repris de la semaine réelle.
+ *
+ *   npx tsx tests/newsletter-une.test.ts
+ */
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { classerALaUne, motsDuTitre, type ArticleSemaine } from "../src/lib/news/alaune";
+
+let passed = 0; const fails: string[] = [];
+function test(nom: string, fn: () => void) {
+  try { fn(); passed++; console.log(`  ✓ ${nom}`); }
+  catch (e) { fails.push(`${nom} — ${(e as Error).message}`); console.log(`  ✗ ${nom}\n      ${(e as Error).message}`); }
+}
+const sansCommentaires = (f: string) => readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+let n = 0;
+const art = (source: string, title: string, date: string, texte?: string): ArticleSemaine =>
+  ({ source, title, date, link: `https://exemple.fr/${++n}`, texte });
+
+// ── La semaine du 9 novembre 2026, en réduction ────────────────────────────────
+const BACKYARD = [
+  art("Le Monde", "« Les 25 heures qui courent » : avec sa Backyard caritative, l'influenceur Clem qui court veut réunir stars du trail et d'Internet", "2026-11-06T07:00:00Z"),
+  art("L'Équipe", "Date, heure, diffusion... Tout savoir sur la Backyard de Clem Qui Court", "2026-11-04T13:00:00Z"),
+  // Le titre qui énumère les coureurs AVANT le départ : le plus long, donc le plus « central ».
+  art("stadion.com", "Mathieu Blanchard, Blandine L'Hirondel, Théo Detienne, Aurélien Sanchez… Qui sont les traileurs à suivre sur la backyard de Clem Qui Court ?", "2026-11-05T19:10:00Z"),
+  art("u-Trail", "EN DIRECT – Backyard de Clemquicourt : Mathieu Blanchard abandonne après 4 boucles", "2026-11-06T19:50:00Z"),
+  art("20 Minutes", "Le classement final avec le nombre de boucles du Backyard de Clem Qui Court", "2026-11-07T16:08:00Z"),
+  art("Ouest-France", "ENTRETIEN. Clem qui court : « Je veux qu'on reparte de ma backyard avec les yeux humides »", "2026-11-06T06:00:00Z"),
+  art("stadion.com", "Les 25 heures qui courent : On fait le bilan de la backyard de Clem Qui Court", "2026-11-09T17:21:00Z"),
+];
+// Un AUTRE événement qui partage le mot « backyard », et rien d'autre.
+const BREIZH = art("Le Télégramme", "Pierre Mathieux remporte la première édition de la Breizh Backyard Odyssée", "2026-11-07T20:20:00Z");
+// Le même sujet, sans le mot « backyard ».
+const EQUIPE_SANS_MOT = art("L'Équipe", "Théo Detienne vainqueur, Mathieu Blanchard abandonne, Clem qui court récolte 1,5 million d'euros", "2026-11-07T16:38:00Z");
+const BORDEAUX = [
+  art("Sud Ouest", "Marathon de Bordeaux 2026 : sept coureurs évacués à l'hôpital", "2026-11-08T18:36:00Z"),
+  art("France 3 Régions", "Avec plus de 30 000 participants, le Marathon de Bordeaux fait son grand retour", "2026-11-08T15:11:00Z"),
+  art("u-Trail", "Résultat du Marathon de Bordeaux 2026 : Jason Pointeau gagne", "2026-11-08T09:47:00Z"),
+];
+const NEW_YORK = [
+  art("Libération", "Marathon de New York : qu'est-ce que la rhabdomyolyse ?", "2026-11-05T13:54:00Z"),
+  art("Sud Ouest", "Marathon de New York : une jeune femme s'effondre", "2026-11-04T17:01:00Z"),
+];
+// Un éditeur prolifique : SEPT articles sur un même sujet, à la même minute.
+const HANDBOOK = ["Find Your Race in the", "Where the Course Got Most Crowded at the", "Where Runners' Pace Broke at the",
+  "The Field by Age, Gender and Country at the", "Who Passed the Most Runners at the", "The Push to Finish Under 3 Hours at the",
+  "The Runners Who Finished After Dark at the"].map((t) => art("Marathon Handbook", `${t} Chicago Lakefront Marathon`, "2026-11-08T17:20:00Z"));
+// Les articles qui faisaient la une : uniques, mais publiés dans la dernière demi-heure.
+const RECENTS = [
+  art("Runner's World", "From the Brooks Ghost 18 to Adidas Adizero Evo SL, These Are the 10 Best Men's Running Shoes", "2026-11-09T16:43:00Z"),
+  art("Runner's World", "Wiz Khalifa Just Ran His First 5K—and His Time Was Surprisingly Fast", "2026-11-09T16:33:00Z"),
+  art("Canadian Running", "The easy way to find your easy pace", "2026-11-09T16:30:00Z"),
+  art("Marathon Handbook", "Man Charged With Murder in Killing of Brooklyn Runner Katie Suarez", "2026-11-09T16:34:00Z"),
+  art("Ouest-France", "Running. «Il y a tellement de coureurs qu'on peut innover» : comment se créent des nouveaux concepts de course ?", "2026-11-09T16:42:00Z"),
+];
+// Du bruit : quarante articles isolés de quarante médias locaux, sans mot commun (sinon
+// « boucle » ou « ronde » deviendraient des sujets de dix médias, ce qu'ils ne sont pas).
+const BRUIT = Array.from({ length: 40 }, (_, i) => art(`Média local ${i}`, `Course à pied à Bourg${i}`, "2026-11-08T10:00:00Z"));
+
+const SEMAINE = [...RECENTS, ...BACKYARD, BREIZH, EQUIPE_SANS_MOT, ...BORDEAUX, ...NEW_YORK, ...HANDBOOK, ...BRUIT];
+
+console.log("\nLa une de la lettre du lundi");
+
+test("la backyard couverte par sept médias passe AVANT les articles les plus récents", () => {
+  const une = classerALaUne(SEMAINE, 5);
+  assert.equal(une[0].mot, "backyard", `en tête : « ${une[0].article.title} » (sujet ${une[0].mot})`);
+  assert.equal(une[0].medias, 7, "Le Monde, L'Équipe, stadion, u-Trail, 20 Minutes, Ouest-France et Le Télégramme : 7 médias");
+  const titres = une.map((s) => s.article.title);
+  assert.ok(une.slice(0, 3).every((s) => s.medias >= 2), `les trois premiers doivent être des sujets : ${titres.join(" / ")}`);
+  assert.ok(!titres.slice(0, 3).some((t) => /Wiz Khalifa/.test(t)), "Wiz Khalifa repasse devant les événements de la semaine");
+});
+
+test("l'événement qui écrase la semaine n'est pas écarté comme « mot trop commun »", () => {
+  // Un plafond compté en ARTICLES (12 %) aurait jugé « backyard » trop commun dès que
+  // l'événement dépasse un article sur huit : la une aurait perdu son sujet n° 1
+  // précisément la semaine où il était le plus gros.
+  const suivis = Array.from({ length: 30 }, (_, i) => art("stadion.com", `Backyard de Clem Qui Court : point après ${i + 1} heures`, "2026-11-07T10:00:00Z"));
+  const pool = [...SEMAINE, ...suivis];
+  const part = (BACKYARD.length + suivis.length + 1) / pool.length;
+  assert.ok(part > 0.3, `la fixture doit dépasser 30 % d'articles (${Math.round(part * 100)} %)`);
+  const [premier] = classerALaUne(pool, 1);
+  // Le MOT et le NOMBRE de médias, pas seulement le titre : sous un plafond en articles,
+  // « blanchard » (3 médias) prenait la tête avec un titre qui contient lui aussi
+  // « Backyard », et une assertion sur le titre restait verte (vu par mutation).
+  assert.equal(premier.mot, "backyard", `en tête : « ${premier.article.title} » (sujet ${premier.mot}, ${premier.medias} médias)`);
+  assert.equal(premier.medias, 7);
+  // Et les Trail Blazers de Portland ne sont pas de la course à pied.
+  const nba = ["ESPN", "BFM", "L'Équipe"].map((m) => art(m, "NBA : les Portland Trail Blazers battent les Lakers", "2026-11-09T10:00:00Z"));
+  assert.ok(!classerALaUne([...nba, ...BRUIT], 3).some((s) => /Blazers/.test(s.article.title)), "la NBA fait la une de la lettre running");
+});
+
+test("un éditeur qui publie sept articles sur un sujet compte pour UN média", () => {
+  const une = classerALaUne(SEMAINE, 5);
+  const chicago = une.find((s) => s.mot === "chicago" || s.mot === "lakefront");
+  assert.ok(!chicago || chicago.medias === 0, `Marathon Handbook seul fait un sujet de ${chicago?.medias} médias`);
+  // Bordeaux (3 médias) passe devant ; Chicago (1 média, 7 articles) n'est pas un sujet.
+  assert.ok(une.some((s) => s.mot === "bordeaux" && s.medias === 3), "Bordeaux, trois médias, a disparu de la une");
+});
+
+test("un sujet n'occupe qu'une place, même quand un titre n'emploie pas son mot", () => {
+  // Toute la semaine (`max` = tout) : le complément par récence ne doit pas ramener non
+  // plus un article du sujet. Avec 8 places, L'Équipe (samedi) n'était jamais atteinte et
+  // le test restait vert sans le rattrapage (vu par mutation).
+  const une = classerALaUne(SEMAINE, SEMAINE.length);
+  const backyard = une.filter((s) => /backyard|clem|detienne/i.test(s.article.title));
+  assert.equal(backyard.length, 1, `la backyard occupe ${backyard.length} places : ${backyard.map((s) => s.article.title).join(" / ")}`);
+  assert.ok(!une.some((s) => s.article === BREIZH), "la Breizh Backyard Odyssée doit être absorbée par le sujet backyard, pas revenir seule");
+});
+
+test("« marathon » ne réunit pas Bordeaux et New York en un seul sujet", () => {
+  const une = classerALaUne(SEMAINE, 5);
+  assert.ok(une.some((s) => s.mot === "bordeaux"), "Bordeaux absent");
+  assert.ok(une.some((s) => s.mot === "york"), "New York absent");
+  assert.ok(!motsDuTitre("Marathon de Bordeaux : résultats du semi et du 10 km").includes("marathon"));
+});
+
+test("l'article retenu pour un sujet est le bilan, pas l'annonce au titre le plus long", () => {
+  const [sujet] = classerALaUne(SEMAINE, 1);
+  assert.match(sujet.article.title, /bilan/, `retenu : « ${sujet.article.title} »`);
+});
+
+test("à égalité de place au cœur du sujet, l'article dont le flux donne le texte est préféré (il sera résumé)", () => {
+  const texte = "x".repeat(400);
+  const a = [
+    art("Média A", "Backyard de Clem Qui Court : le récit", "2026-11-09T10:00:00Z"),
+    art("Média B", "Backyard de Clem Qui Court : le classement", "2026-11-08T10:00:00Z", texte),
+  ];
+  const [s] = classerALaUne([...a, ...BRUIT], 1);
+  assert.equal(s.article.source, "Média B");
+});
+
+test("une semaine sans sujet commun : les plus récents complètent, comme avant", () => {
+  const une = classerALaUne([...RECENTS, ...BRUIT.slice(0, 5)], 5);
+  assert.equal(une.length, 5);
+  assert.ok(une.every((s) => s.medias === 0 && s.mot === ""), "un article isolé ne doit pas se présenter comme un sujet");
+  assert.match(une[0].article.title, /Brooks Ghost/, "le plus récent d'abord");
+});
+
+test("la lettre lit TOUTE la semaine pour sa une, sans le plafond de 48 du fil", () => {
+  const act = sansCommentaires("src/lib/news/actualites.ts");
+  const semaine = act.slice(act.indexOf("export async function collecterSemaine"), act.indexOf("async function fusionner"));
+  assert.ok(semaine.length > 50, "collecterSemaine a disparu");
+  assert.doesNotMatch(semaine, /slice\(/, "la semaine est de nouveau coupée");
+  assert.match(act, /export const REQUETES_SEMAINE = \[[\s\S]*?\]\.map\(\(q\) => `\$\{q\} when:7d`\)/, "les requêtes ne sont plus bornées à la semaine");
+  const nb = (act.match(/export const REQUETES_SEMAINE = \[([\s\S]*?)\]/)?.[1].match(/"/g) ?? []).length / 2;
+  assert.ok(nb >= 4, `${nb} requête(s) : une seule voit 1 article sur la backyard, « trail » en voit 12`);
+
+  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  assert.match(route, /classerALaUne\(semaine, maxUne\)/, "la une ne passe plus par le classement par médias");
+  assert.match(route, /parRubrique\[0\] = une\.map\(\(s\) => s\.article\)/, "le classement est calculé mais la une ne l'utilise pas");
+  assert.match(route, /if \(n > 0 && motsDuTitre\(it\.title\)\.some\(\(m\) => sujetsUne\.has\(m\)\)\) continue;/,
+    "un sujet de la une peut revenir dans une autre rubrique");
+});
+
+console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
+if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

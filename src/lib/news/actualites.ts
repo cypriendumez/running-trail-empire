@@ -113,16 +113,55 @@ const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,
  * à temps sont servis, les autres le seront au prochain rafraîchissement du cache.
  */
 export async function collecterActualites(cat: Cat): Promise<Item[]> {
-  const q = QUERIES[cat];
-  const gnUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=fr&gl=FR&ceid=FR:fr`;
-  const feeds = FEEDS.filter((f) => f.cats.includes(cat));
+  const merged = await fusionner([QUERIES[cat]], FEEDS.filter((f) => f.cats.includes(cat)), DELAI_TOTAL_MS);
+  const filtre = FILTRES[cat];
+  return (filtre ? merged.filter((it) => filtre.test(it.title)) : merged).slice(0, 48);
+}
+
+const urlGoogleNews = (q: string) => `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=fr&gl=FR&ceid=FR:fr`;
+
+/**
+ * Les requêtes qui couvrent LA SEMAINE pour la une de la lettre.
+ *
+ * ⚠️ Une seule requête ne suffit pas, mesuré le 09/11/2026 : Google Actualités rend au
+ * plus 100 articles par requête, et « course à pied OR trail OR marathon » n'en contenait
+ * qu'UN sur la backyard de Clem qui court, l'événement de la semaine. « trail » seul en
+ * contenait 12, « running » 5, « marathon » aucun. Chaque requête voit une autre partie
+ * de l'actualité ; leur union approche la semaine entière.
+ * `when:7d` borne la recherche à la semaine écoulée.
+ */
+export const REQUETES_SEMAINE = [
+  "course à pied", "trail", "marathon", "running", "coureur",
+  "ultra-trail OR ultramarathon OR backyard",
+].map((q) => `${q} when:7d`);
+
+/**
+ * TOUTE l'actualité des sept derniers jours, pour la une de la lettre.
+ *
+ * ⚠️ La lettre lisait le fil du site, coupé à 48 articles : lundi 9/11, le 48e datait de
+ * dimanche 9 h 42 (Marathon Handbook avait publié sept articles dans la même minute) et
+ * l'article sur la backyard, publié samedi, n'existait déjà plus pour elle. La lettre
+ * couvre une semaine : elle lit la semaine, sans plafond.
+ */
+export async function collecterSemaine(maintenant = Date.now()): Promise<Item[]> {
+  const depuis = maintenant - 7 * 24 * 3600 * 1000;
+  // Une fois par semaine, on peut attendre les flux plus longtemps que pour le fil.
+  const tout = await fusionner(REQUETES_SEMAINE, FEEDS.filter((f) => f.cats.includes("all")), DELAI_FLUX_MS + 2000);
+  return tout.filter((it) => {
+    const t = new Date(it.date).getTime();
+    return Number.isFinite(t) && t >= depuis;
+  });
+}
+
+/** Interroge Google Actualités et les flux, fusionne, dédoublonne, trie du plus récent au plus ancien. */
+async function fusionner(requetes: string[], feeds: Feed[], delaiTotal: number): Promise<Item[]> {
   const arrives: Item[][] = [];
   // Google News + flux spécialisés pertinents, en parallèle (tolérant aux pannes).
   const jobs: Promise<void>[] = [
-    fetchFeed(gnUrl).then((x) => parseRss(x)),
+    ...requetes.map((q) => fetchFeed(urlGoogleNews(q)).then((x) => parseRss(x))),
     ...feeds.map((f) => fetchFeed(f.url).then((x) => parseRss(x, f.source, f.domain, f.langue))),
   ].map((p) => p.then((items) => { arrives.push(items); }, () => undefined));
-  await Promise.race([Promise.all(jobs), new Promise((r) => setTimeout(r, DELAI_TOTAL_MS))]);
+  await Promise.race([Promise.all(jobs), new Promise((r) => setTimeout(r, delaiTotal))]);
 
   // Fusion + dédoublonnage (par lien ET par titre normalisé) + tri par date décroissante.
   const seen = new Set<string>();
@@ -137,8 +176,7 @@ export async function collecterActualites(cat: Cat): Promise<Item[]> {
     }
   }
   merged.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
-  const filtre = FILTRES[cat];
-  return (filtre ? merged.filter((it) => filtre.test(it.title)) : merged).slice(0, 48);
+  return merged;
 }
 
 /**

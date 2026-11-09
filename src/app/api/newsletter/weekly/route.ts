@@ -6,6 +6,8 @@ import { lienDesinscription } from "@/lib/newsletter/token";
 import { resumerArticles, traduireTextes, RESUMES_MAX, type ArticleResume } from "@/lib/newsletter/resume";
 import { construireEmail, estLang, type Lang, type Section, type Course } from "@/lib/newsletter/email";
 import { RUBRIQUES_LETTRE } from "@/lib/news/rubriques";
+import { collecterSemaine } from "@/lib/news/actualites";
+import { classerALaUne, motsDuTitre } from "@/lib/news/alaune";
 import { EDITEUR } from "@/lib/brand/editeur";
 import { envoyerEmail } from "@/lib/email/envoyer";
 
@@ -77,8 +79,26 @@ export async function GET(req: Request) {
   // Le sommaire vit dans `lib/news/rubriques` : la lettre ne nomme plus ses rubriques
   // à la main, elle parcourt la liste. Une rubrique inexistante y serait refusée par le
   // typage, plus seulement silencieusement remplacée par l'actualité générale.
-  const parRubrique = await Promise.all(RUBRIQUES_LETTRE.map((r) => recentsDe(r.cat)));
-  const recents = parRubrique[0];
+  let echecSemaine: string | null = null;
+  const [parRubrique, semaine] = await Promise.all([
+    Promise.all(RUBRIQUES_LETTRE.map((r) => recentsDe(r.cat))),
+    // Une panne ici ne doit pas annuler la lettre : la une retombe sur le fil, et la
+    // réponse (lue dans le journal de l'action GitHub) dit pourquoi.
+    collecterSemaine().catch((e: unknown) => { echecSemaine = e instanceof Error ? e.message : String(e); return [] as Item[]; }),
+  ]);
+
+  // ── 1 bis. LA UNE : les sujets dont le plus de médias ont parlé ────────────
+  // ⚠️ La une prenait les 5 articles les plus RÉCENTS du fil (coupé à 48). Le 9/11/2026,
+  // la backyard de Clem qui court — 26 médias en une semaine — en était absente, au
+  // profit de quatre articles américains publiés dans la demi-heure. Voir `lib/news/alaune`.
+  // Si la collecte de la semaine échoue, on retombe sur le fil, comme avant.
+  const maxUne = RUBRIQUES_LETTRE[0].max;
+  const une = semaine.length >= MINIMUM_ARTICLES ? classerALaUne(semaine, maxUne) : [];
+  if (une.length) parRubrique[0] = une.map((s) => s.article);
+  // Les mots des sujets de la une : un autre article sur le même sujet n'y revient pas
+  // par une autre rubrique (la backyard en « Trail », Bordeaux en « Élites »).
+  const sujetsUne = new Set(une.filter((s) => s.mot).map((s) => s.mot));
+  const recents = une.length ? semaine : parRubrique[0];
 
   if (recents.length < MINIMUM_ARTICLES) {
     return NextResponse.json({
@@ -129,6 +149,7 @@ export async function GET(req: Request) {
     const liens: string[] = [];
     for (const it of parRubrique[n]) {
       if (!it.link || pris.has(it.link) || vivier.length >= RESUMES_MAX) continue;
+      if (n > 0 && motsDuTitre(it.title).some((m) => sujetsUne.has(m))) continue;
       pris.add(it.link);
       liens.push(it.link);
       vivier.push(it);
@@ -259,6 +280,10 @@ export async function GET(req: Request) {
     envoye,
     destinataires: abonnes.length,
     articles: base.length,
+    // Pourquoi chaque sujet est à la une : relisible dans le journal de l'action GitHub.
+    une: une.length
+      ? une.map((s) => ({ sujet: s.mot || null, medias: s.medias, titre: s.article.title }))
+      : { repli: "fil le plus récent", articlesDeLaSemaine: semaine.length, erreur: echecSemaine },
     resumes: base.filter((a) => a.resume).length,
     // ⚠️ Sans ce champ, « resumes: 0 » ne dit pas s'il faut s'inquiéter. C'est ce
     // silence qui a laissé passer un budget de sortie trop bas pendant deux essais.
