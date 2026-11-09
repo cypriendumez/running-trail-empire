@@ -81,6 +81,9 @@ export function motsDuTitre(titre: string): string[] {
   return [...new Set(mots)];
 }
 
+/** Les titres politiques (voir le choix de l'article d'un sujet). */
+export const POLITIQUE = /candidat|[ée]lection|pr[ée]sidentielle|ministre|d[ée]put[ée]|s[ée]nateur|\bparti\b|gouvernement|politique/i;
+
 /** Un sujet n'en est un qu'à partir de deux médias : un seul, c'est un article. */
 export const MEDIAS_MIN = 2;
 /**
@@ -161,12 +164,18 @@ export function classerALaUne<T extends ArticleSemaine>(articles: T[], max: numb
     }
     const centralite = (a: T) => mots.get(a)!.reduce((s, m) => s + (m === meilleur!.mot ? 0 : mediasDuGroupe.get(m)!.size - 1), 0);
     const aTexte = (a: T) => ((a.texte ?? "").trim().length >= 320 ? 1 : 0);
+    // Un titre POLITIQUE ne représente pas un sujet de course quand le sujet en offre un
+    // autre : le 9/11/2026, Nice-Cannes (17 médias) était présenté par « David Lisnard et
+    // Christian Estrosi courent […], le candidat à l'élection présidentielle boucle… ».
+    const politique = (a: T) => (POLITIQUE.test(a.title) ? 1 : 0);
+    // Un lien direct pourra être ouvert et résumé ; un lien Google News, jamais.
+    const direct = (a: T) => (/^https?:\/\/news\.google\.com\//.test(a.link) ? 0 : 1);
     // Les articles au cœur du sujet (au moins la moitié de la meilleure centralité) ; parmi
     // eux, le plus récent. Sans ce seuil, le titre le plus long gagnait toujours : celui
     // qui énumère six coureurs AVANT le départ, pas celui qui donne le résultat.
     const cMax = Math.max(...groupe.map(centralite));
     const coeur = groupe.filter((a) => centralite(a) * 2 >= cMax);
-    coeur.sort((x, y) => aTexte(y) - aTexte(x) || temps(y) - temps(x));
+    coeur.sort((x, y) => politique(x) - politique(y) || aTexte(y) - aTexte(x) || direct(y) - direct(x) || temps(y) - temps(x));
 
     const sujet: Sujet<T> = { article: coeur[0], mot: meilleur.mot, medias: meilleur.n, membres: [...groupe] };
     choisis.push(sujet);

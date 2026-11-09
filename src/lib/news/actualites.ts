@@ -38,14 +38,20 @@ export const DELAI_TOTAL_MS = 5000;
 type Feed = { url: string; source: string; domain: string; cats: Cat[]; langue: "fr" | "en" };
 const FEEDS: Feed[] = [
   // — Francophones —
-  { url: "https://www.lepape-info.com/feed/", source: "Lepape Info", domain: "lepape-info.com", cats: ["all", "running", "marathon", "gear"], langue: "fr" },
-  { url: "https://u-run.fr/feed", source: "U-Run", domain: "u-run.fr", cats: ["all", "running", "trail", "marathon"], langue: "fr" },
-  { url: "https://www.jogging-international.net/feed", source: "Jogging International", domain: "jogging-international.net", cats: ["all", "running", "marathon"], langue: "fr" },
-  { url: "https://running-addict.fr/feed/", source: "Running Addict", domain: "running-addict.fr", cats: ["all", "running", "gear"], langue: "fr" },
+  { url: "https://www.lepape-info.com/feed/", source: "Lepape Info", domain: "lepape-info.com", cats: ["all", "running", "marathon", "gear", "conseils"], langue: "fr" },
+  { url: "https://u-run.fr/feed", source: "U-Run", domain: "u-run.fr", cats: ["all", "running", "trail", "marathon", "conseils"], langue: "fr" },
+  { url: "https://www.jogging-international.net/feed", source: "Jogging International", domain: "jogging-international.net", cats: ["all", "running", "marathon", "conseils"], langue: "fr" },
+  { url: "https://running-addict.fr/feed/", source: "Running Addict", domain: "running-addict.fr", cats: ["all", "running", "gear", "conseils"], langue: "fr" },
+  // Ajoutés le 10/11/2026 : leur flux donne le LIEN DIRECT de l'article (Google News ne
+  // donne qu'une redirection que son robots.txt interdit d'ouvrir), et leurs pages
+  // autorisent PacevoBot. Vérifié ce jour : texte lu sur les trois derniers articles de
+  // chacun. Leurs tests sont donc résumables, ceux venus de Google News ne l'étaient pas.
+  { url: "https://www.runactu.com/feed/", source: "Run Actu", domain: "runactu.com", cats: ["running", "gear"], langue: "fr" },
+  { url: "https://www.montre-cardio-gps.fr/feed/", source: "Montre cardio GPS", domain: "montre-cardio-gps.fr", cats: ["gear"], langue: "fr" },
   { url: "https://esprit-trail.com/feed/", source: "Esprit Trail", domain: "esprit-trail.com", cats: ["all", "trail", "ultra"], langue: "fr" },
   { url: "https://nakan.ch/wp/feed/", source: "Nakan", domain: "nakan.ch", cats: ["all", "trail", "running", "gear"], langue: "fr" },
   // — Internationaux —
-  { url: "https://www.runnersworld.com/rss/all.xml/", source: "Runner's World", domain: "runnersworld.com", cats: ["all", "running", "marathon", "gear"], langue: "en" },
+  { url: "https://www.runnersworld.com/rss/all.xml/", source: "Runner's World", domain: "runnersworld.com", cats: ["all", "running", "marathon", "gear", "conseils"], langue: "en" },
   { url: "https://www.irunfar.com/feed", source: "iRunFar", domain: "irunfar.com", cats: ["all", "trail", "ultra", "elite"], langue: "en" },
   { url: "https://www.trailrunnermag.com/feed", source: "Trail Runner", domain: "trailrunnermag.com", cats: ["all", "trail", "ultra", "elite"], langue: "en" },
   { url: "https://believeintherun.com/feed/", source: "Believe in the Run", domain: "believeintherun.com", cats: ["all", "gear", "running"], langue: "en" },
@@ -55,8 +61,8 @@ const FEEDS: Feed[] = [
   // et publie plusieurs fois par jour. Il remplissait les trois places de la rubrique
   // Élites avec du 1500 m, alors que cette rubrique existe pour les stars du trail.
   { url: "https://www.letsrun.com/feed/", source: "LetsRun", domain: "letsrun.com", cats: ["all", "running", "marathon"], langue: "en" },
-  { url: "https://runningmagazine.ca/feed/", source: "Canadian Running", domain: "runningmagazine.ca", cats: ["all", "running", "marathon", "elite", "gear"], langue: "en" },
-  { url: "https://marathonhandbook.com/feed/", source: "Marathon Handbook", domain: "marathonhandbook.com", cats: ["all", "running", "marathon", "nutrition"], langue: "en" },
+  { url: "https://runningmagazine.ca/feed/", source: "Canadian Running", domain: "runningmagazine.ca", cats: ["all", "running", "marathon", "elite", "gear", "conseils"], langue: "en" },
+  { url: "https://marathonhandbook.com/feed/", source: "Marathon Handbook", domain: "marathonhandbook.com", cats: ["all", "running", "marathon", "nutrition", "conseils"], langue: "en" },
   // Le blog d'Asker Jeukendrup, chercheur en nutrition sportive. Il publie peu — c'est
   // voulu de le garder : c'est la source la plus solide de la rubrique.
   { url: "https://www.mysportscience.com/blog-feed.xml", source: "MySportScience", domain: "mysportscience.com", cats: ["nutrition"], langue: "en" },
@@ -185,7 +191,18 @@ export const REQUETES_MATERIEL = [
 ].map((q) => `${q} when:7d`);
 
 export const collecterMaterielSemaine = (maintenant = Date.now()) =>
-  collecterRubriqueSemaine(REQUETES_MATERIEL, null, maintenant);
+  collecterRubriqueSemaine(REQUETES_MATERIEL, "gear", maintenant);
+
+/** Les conseils d'entraînement de la semaine : Google News + les flux qui en publient. */
+export const REQUETES_CONSEILS = [
+  "conseils course à pied", "entraînement running", "entraînement trail", "blessure coureur",
+].map((q) => `${q} when:7d`);
+
+export const collecterConseilsSemaine = (maintenant = Date.now()) =>
+  collecterRubriqueSemaine(REQUETES_CONSEILS, "conseils", maintenant);
+
+/** Un lien Google News est une redirection qu'on ne peut pas ouvrir : son article ne sera pas résumé. */
+export const lienGoogleNews = (lien: string) => /^https?:\/\/news\.google\.com\//.test(lien);
 
 /** Des requêtes Google News de la semaine (+ les flux d'une rubrique), bornées à 7 jours. */
 async function collecterRubriqueSemaine(requetes: string[], cat: Cat | null, maintenant: number): Promise<Item[]> {
@@ -198,6 +215,36 @@ async function collecterRubriqueSemaine(requetes: string[], cat: Cat | null, mai
   });
 }
 
+/**
+ * Fusion + dédoublonnage (par lien ET par titre normalisé) + tri du plus récent au plus
+ * ancien. Exportée pour être testée : c'est elle qui choisit, entre deux copies d'un même
+ * article, celle qui pourra être résumée.
+ */
+export function fusionnerListes(arrives: Item[][]): Item[] {
+  const seen = new Set<string>();
+  const parTitre = new Map<string, number>();
+  const merged: Item[] = [];
+  for (const list of [...arrives]) {
+    for (const it of list) {
+      const key = it.link.split("?")[0];
+      const tkey = norm(it.title).slice(0, 60);
+      if (!key || seen.has(key)) continue;
+      if (tkey && seen.has(tkey)) {
+        // ⚠️ Le même article arrive souvent deux fois : par Google News (lien opaque, texte
+        // inaccessible) et par le flux de l'éditeur (lien direct). On garde le direct, qui
+        // pourra être résumé, quel que soit l'ordre d'arrivée des flux.
+        const i = parTitre.get(tkey);
+        if (i !== undefined && lienGoogleNews(merged[i].link) && !lienGoogleNews(it.link)) { merged[i] = it; seen.add(key); }
+        continue;
+      }
+      seen.add(key); if (tkey) { seen.add(tkey); parTitre.set(tkey, merged.length); }
+      merged.push(it);
+    }
+  }
+  merged.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
+  return merged;
+}
+
 /** Interroge Google Actualités et les flux, fusionne, dédoublonne, trie du plus récent au plus ancien. */
 async function fusionner(requetes: string[], feeds: Feed[], delaiTotal: number): Promise<Item[]> {
   const arrives: Item[][] = [];
@@ -208,20 +255,7 @@ async function fusionner(requetes: string[], feeds: Feed[], delaiTotal: number):
   ].map((p) => p.then((items) => { arrives.push(items); }, () => undefined));
   await Promise.race([Promise.all(jobs), new Promise((r) => setTimeout(r, delaiTotal))]);
 
-  // Fusion + dédoublonnage (par lien ET par titre normalisé) + tri par date décroissante.
-  const seen = new Set<string>();
-  const merged: Item[] = [];
-  for (const list of [...arrives]) {
-    for (const it of list) {
-      const key = it.link.split("?")[0];
-      const tkey = norm(it.title).slice(0, 60);
-      if (!key || seen.has(key) || (tkey && seen.has(tkey))) continue;
-      seen.add(key); if (tkey) seen.add(tkey);
-      merged.push(it);
-    }
-  }
-  merged.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
-  return merged;
+  return fusionnerListes(arrives);
 }
 
 /**

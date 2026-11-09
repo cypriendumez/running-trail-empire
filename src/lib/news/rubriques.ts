@@ -11,7 +11,7 @@
  * Tout est donc ici, et les deux appelants importent la même chose.
  */
 
-export type Cat = "all" | "running" | "trail" | "ultra" | "marathon" | "gear" | "nutrition" | "elite";
+export type Cat = "all" | "running" | "trail" | "ultra" | "marathon" | "gear" | "nutrition" | "elite" | "conseils";
 
 /** Requête Google News par rubrique (agrège des centaines de publications). */
 export const QUERIES: Record<Cat, string> = {
@@ -25,6 +25,9 @@ export const QUERIES: Record<Cat, string> = {
   // la lettre du lundi, qui doit couvrir la nutrition et les résultats d'élite.
   nutrition: "nutrition course à pied OR alimentation coureur OR hydratation trail",
   elite: "résultats ultra-trail OR élite trail running OR record marathon",
+  // Pour la lettre seulement, comme les deux précédentes : ce que cherche un coureur qui
+  // s'entraîne avec Pacevo (voir la rubrique « Conseils » de `RUBRIQUES_LETTRE`).
+  conseils: "conseils entraînement course à pied OR plan d'entraînement running",
 };
 
 export const estCat = (v: unknown): v is Cat =>
@@ -41,6 +44,13 @@ export const estCat = (v: unknown): v is Cat =>
  * ce que l'appelant sait gérer (une rubrique vide ne s'affiche pas).
  */
 export const FILTRES: Partial<Record<Cat, RegExp>> = {
+  // ⚠️ LA RUBRIQUE QUI MANQUAIT (10/11/2026). Cyprien : « c'est les meilleurs articles que
+  // tu pourrais faire ? ça concerne vraiment mon type de client ? ». La lettre parlait
+  // d'événements, de faits divers et de matériel, jamais de ce qu'un coureur qui
+  // s'entraîne avec un coach cherche d'abord : comment progresser, récupérer, éviter la
+  // blessure. Le titre doit le dire, en français ou en anglais.
+  conseils:
+    /entra[îi]nement|conseils?\b|comment (courir|progresser|pr[ée]parer|r[ée]cup|am[ée]liorer|bien|[ée]viter|g[ée]rer|reprendre)|allure|fractionn|\bvma\b|r[ée]cup[ée]ration|blessure|tendinite|p[ée]riostite|[ée]chauffement|renforcement|[ée]tirement|sortie longue|pr[ée]parer (un|son|sa|le|la|votre|ton)|plan d.entra|\bseuil\b|endurance fondamentale|\btraining\b|how to|\btips?\b|workouts?|(easy|race|marathon|your) pace|injur|recovery|strength|stretch|tempo run|intervals?\b|long run|cadence/i,
   // ⚠️ Le vocabulaire de la nutrition CHEVAUCHE celui de la chaussure, et trois pièges
   // ont failli passer : « carb » est dans « carbon plate », « gel » est dans le GEL-Kayano
   // d'Asics, « fuel » est dans le FuelCell de New Balance — trois des modèles les plus
@@ -82,6 +92,7 @@ export const PAS_ELITE = /record de (participants|participation|fr[ée]quentatio
  */
 export const RUBRIQUES_LETTRE = [
   { cle: "une", cat: "all", max: 5 },
+  { cle: "conseils", cat: "conseils", max: 3 },
   { cle: "trail", cat: "trail", max: 3 },
   { cle: "elite", cat: "elite", max: 3 },
   { cle: "materiel", cat: "gear", max: 3 },
@@ -97,7 +108,7 @@ export const RUBRIQUES_LETTRE = [
  * Un article de la rubrique doit donc AUSSI parler de course ou d'effort.
  */
 export const CONTEXTE_COURSE =
-  /cour(se|ir|eur|euse)s?|running|runner|\btrail|marathon|ultra|endurance|sporti(f|ve)s?|\bsport\b|athl[èe]te|athlete|entra[îi]nement|training|exercise|effort|\brace\b/i;
+  /\bcour(se|ses|ir|eur|eurs|euse|euses)\b|running|runner|\btrail|marathon|ultra|endurance|sporti(f|ve)s?|\bsport\b|athl[èe]te|athlete|entra[îi]nement|training|exercise|effort|\brace\b/i;
 
 /**
  * Une promotion n'est pas un article : « ce gilet Salomon […] perd 50 € » (L'Équipe,
@@ -121,4 +132,22 @@ export const PROMO =
 export const TEST_MATERIEL = /\btests?\b|test ?:|comparatif|\bavis\b|\bessai\b|on a test|j.ai test|review|\bvs\.?\b/i;
 
 /** Hors course à pied, même quand le vocabulaire y ressemble (« un ensemble de ski technique »). */
-export const HORS_COURSE = /\bski\b|alpinisme|euroligue|\bnba\b|blazers/i;
+export const HORS_COURSE = /\bski\b|alpinisme|euroligue|\bnba\b|blazers|\bfootball\b|\brugby\b|\bxv de france\b|\btennis\b|\bhandball\b|\bcodes?\b/i;
+
+/**
+ * LA COURSE À PIED, ET RIEN D'AUTRE : pour « Conseils », plus strict que `CONTEXTE_COURSE`.
+ *
+ * ⚠️ `CONTEXTE_COURSE` contient « entraînement », « effort », « sport » : il convient à
+ * Nutrition (un aliment n'a pas d'entraînement), pas à une rubrique dont le filtre cherche
+ * justement « entraînement ». Le 10/11/2026, « William Saliba de retour à l'entraînement »
+ * (football) et « Paul Boudehent ménagé à l'entraînement » (XV de France) y entraient.
+ */
+export const COURSE_A_PIED =
+  /\bcour(se|ses|ir|eur|eurs|euse|euses)\b|running|runner|\btrail|marathon|\bultra|\bsemi\b|\bvma\b|fractionn|allure|footing|\b(5|10|21|42) ?km\b/i;
+
+/**
+ * Ce qui a le vocabulaire d'un conseil sans en être un : les classements de produits
+ * (« The Best Heart Rate Monitors Give You the Most Accurate Training Data ») et les
+ * statistiques d'une course (« Where Runners' Pace Broke at the New York City Marathon »).
+ */
+export const PAS_CONSEIL = /\bbest\b|meilleur(e)?s\b|where runners|\bfield by\b|who passed|finished (the|after)/i;

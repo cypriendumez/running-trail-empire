@@ -20,7 +20,7 @@ import { EDITEUR } from "@/lib/brand/editeur";
 /** Une rubrique de la lettre. Elle n'est rendue QUE si elle a du contenu — une section
  *  vide qui s'affiche quand même donne une lettre creuse, ce qu'on refuse par ailleurs. */
 export type Section = { cle: CleSection; articles: ArticleResume[] };
-export type CleSection = "une" | "trail" | "elite" | "materiel" | "nutrition";
+export type CleSection = "une" | "conseils" | "trail" | "elite" | "materiel" | "nutrition";
 
 /** Une course à venir, telle qu'elle sort de la base — jamais inventée. */
 export type Course = {
@@ -41,7 +41,7 @@ export const libellesSections = (lang: Lang): string[] =>
   RUBRIQUES_CITEES.map((c) => (T[lang] ?? T.fr).sections[c]);
 
 /** Les rubriques qu'on ANNONCE — dans l'ordre où elles arrivent dans la lettre. */
-const RUBRIQUES_CITEES: CleSection[] = ["une", "trail", "elite", "materiel", "nutrition"];
+const RUBRIQUES_CITEES: CleSection[] = ["une", "conseils", "trail", "elite", "materiel", "nutrition"];
 
 export const estLang = (v: unknown): v is Lang => LANGS.includes(v as Lang);
 
@@ -94,7 +94,7 @@ const T: Record<Lang, Chrome> = {
     revuePresse: (c) => `Revue de presse : chaque entrée cite le titre et l\u2019éditeur, renvoie vers son site, et le résumé est rédigé par nos soins. Aucun article ni aucune photo n\u2019est reproduit. Un éditeur peut demander le retrait de ses contenus à ${c}.`,
     pourquoi: "Tu reçois cet e-mail parce que tu t'es inscrit sur Pacevo.",
     desinscrire: "Se désinscrire en un clic",
-    sections: { une: "À la une", trail: "Trail & ultra", elite: "Élites & résultats", materiel: "Matériel & chaussures", nutrition: "Nutrition" },
+    sections: { une: "À la une", conseils: "Conseils d'entraînement", trail: "Trail & ultra", elite: "Élites & résultats", materiel: "Matériel & chaussures", nutrition: "Nutrition" },
     courses: "Les courses qui approchent",
     coursesNote: "Extraites du calendrier de Pacevo. Les modalités font foi sur le site de l'organisateur.",
     voirCourses: "Voir toutes les courses",
@@ -110,7 +110,7 @@ const T: Record<Lang, Chrome> = {
     revuePresse: (c) => `Press review: each entry cites the headline and the publisher, links to their site, and the summary is written by us. No article or photograph is reproduced. Publishers may request removal of their content at ${c}.`,
     pourquoi: "You're receiving this because you subscribed on Pacevo.",
     desinscrire: "Unsubscribe in one click",
-    sections: { une: "Headlines", trail: "Trail & ultra", elite: "Elites & results", materiel: "Gear & shoes", nutrition: "Nutrition" },
+    sections: { une: "Headlines", conseils: "Training tips", trail: "Trail & ultra", elite: "Elites & results", materiel: "Gear & shoes", nutrition: "Nutrition" },
     courses: "Races coming up",
     coursesNote: "Taken from Pacevo's race calendar. The organiser's site is the authority on entry terms.",
     voirCourses: "See all races",
@@ -126,7 +126,7 @@ const T: Record<Lang, Chrome> = {
     revuePresse: (c) => `Pressespiegel: Jeder Eintrag nennt Titel und Verlag, verlinkt auf dessen Website; die Zusammenfassung stammt von uns. Kein Artikel und kein Foto wird wiedergegeben. Verlage können die Entfernung ihrer Inhalte unter ${c} verlangen.`,
     pourquoi: "Du erhältst diese E-Mail, weil du dich auf Pacevo angemeldet hast.",
     desinscrire: "Mit einem Klick abmelden",
-    sections: { une: "Schlagzeilen", trail: "Trail & Ultra", elite: "Elite & Ergebnisse", materiel: "Ausrüstung & Schuhe", nutrition: "Ernährung" },
+    sections: { une: "Schlagzeilen", conseils: "Trainingstipps", trail: "Trail & Ultra", elite: "Elite & Ergebnisse", materiel: "Ausrüstung & Schuhe", nutrition: "Ernährung" },
     courses: "Anstehende Rennen",
     coursesNote: "Aus dem Rennkalender von Pacevo. Maßgeblich sind die Angaben des Veranstalters.",
     voirCourses: "Alle Rennen ansehen",
@@ -142,7 +142,7 @@ const T: Record<Lang, Chrome> = {
     revuePresse: (c) => `Revista de prensa: cada entrada cita el titular y el editor, enlaza a su sitio, y el resumen lo redactamos nosotros. No se reproduce ningún artículo ni fotografía. Los editores pueden solicitar la retirada de sus contenidos en ${c}.`,
     pourquoi: "Recibes este correo porque te suscribiste en Pacevo.",
     desinscrire: "Darse de baja en un clic",
-    sections: { une: "Titulares", trail: "Trail y ultra", elite: "Élites y resultados", materiel: "Material y zapatillas", nutrition: "Nutrición" },
+    sections: { une: "Titulares", conseils: "Consejos de entrenamiento", trail: "Trail y ultra", elite: "Élites y resultados", materiel: "Material y zapatillas", nutrition: "Nutrición" },
     courses: "Carreras que se acercan",
     coursesNote: "Extraídas del calendario de Pacevo. La web del organizador es la referencia para inscribirse.",
     voirCourses: "Ver todas las carreras",
@@ -158,7 +158,7 @@ const T: Record<Lang, Chrome> = {
     revuePresse: (c) => `Revista de imprensa: cada entrada cita o título e o editor, remete para o seu site, e o resumo é redigido por nós. Nenhum artigo ou fotografia é reproduzido. Os editores podem pedir a remoção dos seus conteúdos em ${c}.`,
     pourquoi: "Recebes este e-mail porque te inscreveste no Pacevo.",
     desinscrire: "Cancelar a subscrição num clique",
-    sections: { une: "Destaques", trail: "Trail e ultra", elite: "Elites e resultados", materiel: "Equipamento e sapatilhas", nutrition: "Nutrição" },
+    sections: { une: "Destaques", conseils: "Dicas de treino", trail: "Trail e ultra", elite: "Elites e resultados", materiel: "Equipamento e sapatilhas", nutrition: "Nutrição" },
     courses: "Provas que se aproximam",
     coursesNote: "Retiradas do calendário do Pacevo. O site do organizador é a referência para inscrição.",
     voirCourses: "Ver todas as provas",
