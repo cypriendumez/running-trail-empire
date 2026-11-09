@@ -22,7 +22,7 @@ des deux.*
 | Bugs Pacevo | `@Sweeper` | tous les jours, 6 h et 23 h | cloud |
 | Blog Pacevo (×2) | `@Plume` | 1er/15 à 3 h + lundi 3 h 30 | cloud |
 | Coach | `@Sparring` + `@SafeRun` | lundi 5 h | cloud |
-| Direction | `@Nexus` + `@PostMortem` + `@Greffier` (+ `@Strategos`, `@Trésorier`, `@Atlas` : branchement en attente du GO, correction 15) | vendredi 6 h | cloud |
+| Direction | `@Nexus` + `@PostMortem` + `@Greffier` (+ `@Strategos`, `@Trésorier`, `@Atlas` depuis le 09/11/2026, premier passage à prouver, correction 15) | vendredi 6 h | cloud |
 | Sécurité et veille | `@Bunker` + `@Vault` + `@Radar` + contrôle de la sauvegarde publique | le 5 du mois, 4 h | cloud |
 | Courrier | `@Concierge` | tous les jours, 8 h | Mac (écrit dans ~/Desktop/Pacevo) |
 | Sauvegarde chiffrée | `@TimeMachine` | dimanche 11 h | Mac (écrit dans ~/Desktop/Pacevo) |

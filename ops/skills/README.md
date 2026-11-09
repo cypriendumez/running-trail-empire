@@ -20,3 +20,9 @@ aux défauts réels de Pacevo) :
 Sous-agents relecteurs (`.claude/agents/`, appelés par l'outil Agent) : `relecteur-independant`,
 `chasseur-echecs-muets`, `relecteur-tests`, `verificateur-sources`, `gardien-donnees-sante`.
 Tous en lecture seule. Une routine cloud ne les voit qu'une fois commités sur `main`.
+
+Sous-agents de direction (`.claude/agents/`, depuis le 09/11/2026) : `nexus`, `atlas`, `strategos`, `chancelier`,
+`headcoach`, `architect`, `maestro`, `mercator`, `alliance`, `tresorier`, `oracle`, `conductor`. Lecture seule,
+modèle `opus` ; appelés en fin de passage par la routine de leur pôle (textes appliqués dans
+`ops/direction/routines/`) et à la demande en session (« @HeadCoach, relis la PR #N »). Organigramme, rattachements
+et statuts réels : `ops/direction/README.md`.
