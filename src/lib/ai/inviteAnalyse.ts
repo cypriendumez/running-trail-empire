@@ -5,7 +5,7 @@
 //  pour chaque niveau d'athlète, chaque formule et chaque langue, et vérifier qu'aucun
 //  « NaN », « undefined » ni chiffre absent n'y entre — sans appeler de modèle.
 // ─────────────────────────────────────────────────────────────────────────────
-import { allureTexte, dateLisible, type FaitsSeance } from "@/lib/ai/analyseSeance";
+import { allureTexte, dateLisible, TYPE_COURSE, type FaitsSeance } from "@/lib/ai/analyseSeance";
 import { FOURCHETTE_QUALITE_SEC } from "@/lib/watch/intervals";
 import { SPORT_LABEL, type Sport } from "@/lib/intervals/sport";
 
@@ -113,7 +113,10 @@ export function lignesDeFaits(f: FaitsSeance, lang: Lang, complet: boolean): str
     if (f.tempC != null) l.push(`Température ${f.tempC} °C`);
     if (f.rang) l.push(`Parmi ses séances de distance comparable : ${f.rang.place}ᵉ sur ${f.rang.total}`);
   }
-  if (f.prescrit) l.push(`Ce qui était PRESCRIT ce jour-là : ${f.prescrit.type}${f.prescrit.titre ? ` — ${f.prescrit.titre}` : ""}`);
+  // Le jour de la course visée, il n'y a pas d'entraînement prescrit : il y a la course. Le dire
+  // explicitement, sinon le modèle juge un marathon « trop intense » (25/10/2026, Lille).
+  if (f.prescrit?.type === TYPE_COURSE) l.push(`C'ÉTAIT LA COURSE VISÉE CE JOUR-LÀ${f.prescrit.titre ? ` : ${f.prescrit.titre}` : ""}. Juge-la comme une course, où un effort maximal est attendu : jamais comme un entraînement trop intense, et ne la compare à aucune séance d'entraînement prévue`);
+  else if (f.prescrit) l.push(`Ce qui était PRESCRIT ce jour-là : ${f.prescrit.type}${f.prescrit.titre ? ` — ${f.prescrit.titre}` : ""}`);
   if (f.manques.length) l.push(`CE QU'ON NE SAIT PAS (à dire, jamais à combler) : ${f.manques.join(" ; ")}`);
   return l.join("\n");
 }

@@ -184,7 +184,19 @@ export function predictRaceSec(vma: number, distanceKm: number, socle?: number |
   const vdot = vdotDeVma(vma);
   if (vdot == null) return 0;
   // L'équivalence de Daniels, puis le socle d'endurance au-delà du semi (lib/running/vdot).
-  return tempsPourVdot(vdot, distanceKm) * facteurSocle(distanceKm, socleDe(socle));
+  const s = socleDe(socle);
+  const modele = tempsPourVdot(vdot, distanceKm) * facteurSocle(distanceKm, s);
+  // ⚠️ JAMAIS PLUS LENT QU'UN CHRONO DÉJÀ COURU SUR LA DISTANCE (09/11/2026). Cyprien, J+15
+  // de son marathon de Lille en 2h41 : la carte lui prédisait 2h43. La VMA venait de ce même
+  // marathon, puis le socle (volume démontré < 100 km/sem) rajoutait jusqu'à 6 % au retour :
+  // l'aller-retour effort → VMA → prédiction rendait un temps plus lent que l'effort lui-même.
+  // Un temps réalisé dans la fenêtre de forme, à ±2 % de la distance, borne la prédiction —
+  // tel quel : à cet écart, c'est le GPS qui diffère (42,47 km mesurés pour 42,195 officiels),
+  // pas la course. Le ramener à la distance exacte rendait 2h40 pour un marathon couru en 2h41.
+  const realise = (s?.realises ?? [])
+    .filter((r) => r.km > 0 && r.sec > 0 && Math.abs(r.km - distanceKm) / distanceKm <= 0.02)
+    .map((r) => r.sec);
+  return realise.length ? Math.min(modele, ...realise) : modele;
 }
 
 /**

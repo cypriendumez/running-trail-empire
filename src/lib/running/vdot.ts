@@ -106,7 +106,15 @@ export const VOLUME_PRET_KM = 100;
 /** Ralentissement maximal sur marathon pour un athlète sans socle (≈ l'écart mesuré). */
 export const PENALITE_SOCLE_MARATHON = 0.06;
 
-export type Socle = { sortieLongueKm?: number | null; volumeHebdoKm?: number | null };
+export type Socle = {
+  sortieLongueKm?: number | null; volumeHebdoKm?: number | null;
+  /**
+   * Les chronos RÉELLEMENT courus dans la fenêtre de forme (distance, durée brute). Une
+   * prédiction ne peut pas être plus lente qu'un temps déjà réalisé sur la même distance
+   * (voir `predictRaceSec`). Facultatif : sans lui, rien ne change.
+   */
+  realises?: { km: number; sec: number }[] | null;
+};
 
 const borne = (x: number) => Math.min(1, Math.max(0, x));
 

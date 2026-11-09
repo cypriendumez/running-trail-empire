@@ -18,8 +18,10 @@ import { readFileSync } from "node:fs";
 import {
   faitsDeSeance, zonesEnMinutes, allureTexte, dateLisible, analyseTrail,
   PART_FC_DURE, PART_FC_FACILE, ECART_DISTANCE, COMPARABLES_MIN, FC_PLANCHER,
+  courseDuJour, TYPE_COURSE,
   type SeanceBrute,
 } from "../src/lib/ai/analyseSeance";
+import { inviteAnalyse } from "../src/lib/ai/inviteAnalyse";
 import { peut } from "../src/lib/billing/access";
 import { serieDeRepetitions, blocPrincipal, BLOC_MIN_SEC, type IntervalleIcu } from "../src/lib/intervals/performance";
 import { FOURCHETTE_QUALITE_SEC, FOURCHETTE_ENDURANCE_SEC, fourchetteAllure, stepsForType, parseReps } from "../src/lib/watch/intervals";
@@ -280,7 +282,7 @@ test("passé à Premium, une séance relue en Starter est relue EN ENTIER, dans 
   // Sans ça, l'abonné qui monte en gamme rouvrait ses séances et lisait pour toujours
   // l'analyse courte, mémorisée du temps de Starter.
   const src = codeAnalyse();
-  assert.match(src, /if \(memo\?\.body && \(memoComplet \|\| !complet\)\) return/, "l'analyse essentielle est resservie à Premium");
+  assert.match(src, /if \(memo\?\.body && \(memoComplet \|\| !complet\) && \(memoCourse \|\| !\(await estJourDeCourse\(supabase, user\.id, workoutId\)\)\)\) return/, "l'analyse essentielle est resservie à Premium");
   assert.match(src, /const memoComplet = memo\?\.data\?\.complete \?\? memo\?\.data\?\.longue \?\? false;/, "les analyses complètes d'avant le 30/10 seraient refaites et repayées");
   assert.match(src, /memo\?\.id\s*\?\s*await admin\.from\("notifications"\)\.update\(ligne\)\.eq\("id", memo\.id\)/, "la version complète s'ajoute au lieu de remplacer : le cache n'en lit qu'une, au hasard");
   assert.match(src, /data: \{ workout_id: workoutId, date: [^}]*complete: complet/, "la ligne ne dit plus si l'analyse est complète");
@@ -556,6 +558,28 @@ test("branchement : contexte et flux lus pour l'analyse complète seulement, le 
   assert.match(src, /fbs\.find\(\(d\) => d\.workout_id === workoutId\) \?\? \(fbs\.length === 1 && !fbs\[0\]\.workout_id \? fbs\[0\] : null\)/,
     "le ressenti d'une autre séance du même jour serait attribué à celle-ci");
   assert.match(src, /computeLoad\(charge, decaleJour\(jourSeance, -1\)\)/, "la fraîcheur n'est plus celle de la veille, avec le modèle du tableau de bord");
+});
+
+test("le jour de la course visée, la séance est jugée comme la course, pas contre l'entraînement du coach", () => {
+  // Marathon de Lille, 25/10/2026 : le coach avait publié une « Récupération » ce jour-là, et
+  // l'analyse a écrit « intensité totalement inappropriée pour une séance de récupération ».
+  const obj = { race: "sub 16 min", raceDate: "2026-12-19", distanceKm: 5,
+    precedente: { race: "Marathon International de Lille", raceDate: "2026-10-25", distanceKm: 42.2 } };
+  assert.deepEqual(courseDuJour(obj, "2026-10-25", 42.47), { nom: "Marathon International de Lille", distanceKm: 42.2 }, "le marathon n'est pas reconnu comme la course");
+  assert.equal(courseDuJour(obj, "2026-10-25", 2.1), null, "le retour au calme de 2,1 km est pris pour le marathon");
+  assert.equal(courseDuJour(obj, "2026-10-24", 42.47), null, "la veille est prise pour le jour de course");
+  assert.ok(courseDuJour(obj, "2026-12-19", 5.08), "l'objectif lui-même n'est pas reconnu");
+  assert.equal(courseDuJour(null, "2026-10-25", 42), null);
+  assert.ok(courseDuJour({ race: "Trail", raceDate: "2026-10-25" }, "2026-10-25", 18), "objectif sans distance : une vraie sortie ce jour-là est la course");
+  // L'invite dit que c'était LA course, et ne présente plus la Récup comme le prescrit.
+  const faits = faitsDeSeance({ ...SEANCE, date: "2026-10-25" }, { fcMax: 204 }, [], { type: TYPE_COURSE, titre: "Marathon International de Lille", detail: null });
+  const invite = inviteAnalyse(faits, "fr", true);
+  assert.match(invite, /C'ÉTAIT LA COURSE VISÉE CE JOUR-LÀ : Marathon International de Lille/, "l'invite ne dit pas au modèle que c'était la course");
+  assert.doesNotMatch(invite, /Ce qui était PRESCRIT ce jour-là/, "l'invite présente encore un entraînement prescrit le jour de course");
+  // La route : objectif lu avec le reste, course prioritaire sur la séance du coach, mémoire marquée.
+  const src = codeOf("src/app/api/ai/analyse-seance/route.ts");
+  assert.match(src, /course \? \{ type: TYPE_COURSE, titre: course\.nom \|\| null, detail: null \}\s*: p \?/, "la séance du coach passe encore avant la course");
+  assert.match(src, /complete: complet, lang, course: course != null \}/, "l'analyse mémorisée ne dit pas si elle a reconnu la course");
 });
 
 console.log(`\n${passed} test(s) d'analyse passé(s), ${fails.length} échec(s)`);

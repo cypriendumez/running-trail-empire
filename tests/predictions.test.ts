@@ -152,7 +152,41 @@ test("tableau de bord, score de forme et nutrition du coach lisent le socle rée
   assert.match(code("src/lib/dashboard/forme.ts"), /raceProjection\(currentVma, raceKm, objectif\.targetSeconds, null, null, \{ sortieLongueKm: longest \|\| null, volumeHebdoKm: cibleVolumeKm \}\)/);
   const f = code("src/lib/running/fitness.ts");
   assert.doesNotMatch(f, /function pctVmaBrut|return 0\.83;|return 0\.79;/, "le barème en escalier est revenu");
-  assert.match(f, /return tempsPourVdot\(vdot, distanceKm\) \* facteurSocle\(distanceKm, socleDe\(socle\)\);/);
+  assert.match(f, /const s = socleDe\(socle\);\s*const modele = tempsPourVdot\(vdot, distanceKm\) \* facteurSocle\(distanceKm, s\);/);
+});
+
+test("une prédiction n'est jamais plus lente qu'un chrono déjà couru sur la distance (marathon de Lille, 09/11/2026)", () => {
+  // Cyprien, J+15 : marathon couru en 2h41 (42,47 km au GPS), carte « 2h43 ». La VMA venait de ce
+  // marathon, puis le socle (volume démontré < 100 km/sem) rallongeait le marathon au retour.
+  const AUJ = "2026-11-09";
+  const seances = [
+    { date: "2026-10-25", sport: "Run", distance_km: 42.47, duration_seconds: 2 * 3600 + 41 * 60 + 30 },
+    { date: "2026-10-24", sport: "Run", distance_km: 5.3, duration_seconds: 29 * 60 },
+    { date: "2026-10-22", sport: "Run", distance_km: 10.2, duration_seconds: 44 * 60 },
+    // Un 4 km très rapide : ce n'est PAS un 5 km, il ne doit pas borner la prédiction du 5 km.
+    { date: "2026-10-20", sport: "Run", distance_km: 4.0, duration_seconds: 12 * 60 + 50 },
+    { date: "2026-10-12", sport: "Run", distance_km: 30, duration_seconds: 2 * 3600 + 10 * 60 },
+    // Six semaines autour de 60 km : un volume démontré sous 100 km/sem, d'où la pénalité de socle.
+    ...["2026-09-14", "2026-09-21", "2026-09-28", "2026-10-05", "2026-10-15", "2026-10-19"].flatMap((d) => [
+      { date: d, sport: "Run", distance_km: 25, duration_seconds: 2 * 3600 },
+      { date: d, sport: "Run", distance_km: 15, duration_seconds: 70 * 60 },
+      { date: d, sport: "Run", distance_km: 15, duration_seconds: 70 * 60 },
+    ]),
+  ];
+  const socle = socleDesSeances(seances, AUJ);
+  const vma = vmaFromEffort(42.47, 2 * 3600 + 41 * 60 + 30)!;
+  const sansBorne = predictRaceSec(vma, 42.195, { ...socle, realises: null });
+  const avecBorne = predictRaceSec(vma, 42.195, socle);
+  // Le temps officiel, tel quel : à ±2 % c'est le GPS qui diffère, pas la course.
+  const couru = 2 * 3600 + 41 * 60 + 30;
+  assert.ok(sansBorne > couru, `prémisse : sans borne, le modèle rend ${Math.round(sansBorne)} s, plus lent que les ${Math.round(couru)} s courues`);
+  assert.ok(Math.abs(avecBorne - couru) < 1, `marathon prédit ${Math.round(avecBorne)} s, plus lent que le chrono couru (${Math.round(couru)} s)`);
+  // La borne ne ralentit ni n'accélère les autres distances : un footing de 10,2 km en 44 min ne
+  // tire pas le 10 km vers le bas, et le 5 km reste celui du modèle.
+  assert.equal(predictRaceSec(vma, 10, socle), predictRaceSec(vma, 10, { ...socle, realises: null }));
+  assert.equal(predictRaceSec(vma, 5, socle), predictRaceSec(vma, 5, { ...socle, realises: null }));
+  // Hors de la fenêtre de forme (42 jours), le chrono ne borne plus rien.
+  assert.equal(socleDesSeances(seances, "2027-01-15").realises?.length ?? 0, 0, "un marathon vieux de trois mois borne encore la prédiction");
 });
 
 console.log(`\n${ok} test(s) de prédiction passé(s), ${ko} échec(s)`);

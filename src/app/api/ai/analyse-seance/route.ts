@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { exigeAcces } from "@/lib/billing/guard";
 import { COLONNES_ACCES, profilPeut } from "@/lib/billing/access";
 import { generateContent, budget } from "@/lib/ai/gemini";
-import { faitsDeSeance, type SeanceBrute, type ContexteSeance } from "@/lib/ai/analyseSeance";
+import { faitsDeSeance, courseDuJour, TYPE_COURSE, type SeanceBrute, type ContexteSeance, type ObjectifAvecPrecedente } from "@/lib/ai/analyseSeance";
 import { inviteAnalyse } from "@/lib/ai/inviteAnalyse";
 import { serieVfc, COLONNES_VFC } from "@/lib/health/vfc";
 import { computeLoad } from "@/lib/dashboard/charge";
@@ -77,7 +77,12 @@ export async function POST(req: Request) {
   // quand Starter recevait lui aussi la version complète.)
   const memoComplet = memo?.data?.complete ?? memo?.data?.longue ?? false;
   const resservir = () => NextResponse.json({ ok: true, texte: memo!.body, memorise: true, complete: memoComplet });
-  if (memo?.body && (memoComplet || !complet)) return resservir();
+  // ⚠️ UNE ANALYSE DU JOUR DE COURSE ÉCRITE SANS LE SAVOIR SE REFAIT, UNE FOIS (09/11/2026). Le
+  // marathon de Lille avait été jugé contre la « Récupération » publiée ce jour-là. Les analyses
+  // mémorisées avant la reconnaissance du jour de course n'ont pas `data.course` : si la séance
+  // était la course, on la relit à la place de l'ancienne (même ligne, voir plus bas).
+  const memoCourse = (memo?.data as { course?: boolean } | null | undefined)?.course === true;
+  if (memo?.body && (memoComplet || !complet) && (memoCourse || !(await estJourDeCourse(supabase, user.id, workoutId)))) return resservir();
 
   // ── 2. Verrou d'abonnement — APRÈS le cache, AVANT le modèle.
   //       Plafond du jour atteint pendant une mise à niveau : l'analyse déjà écrite reste lisible.
@@ -95,7 +100,7 @@ export async function POST(req: Request) {
   const s = seance as unknown as SeanceBrute;
 
   // ── 4. Le contexte qui rend l'analyse utile : repères, comparables, prescrit.
-  const [profilRes, baseRes, compRes, prescritRes] = await Promise.all([
+  const [profilRes, baseRes, compRes, prescritRes, objRes] = await Promise.all([
     // Les identifiants intervals.icu servent à relire les intervalles (analyse complète) ;
     // ils restent ici, côté serveur, et ne repartent jamais vers le navigateur.
     supabase.from("profiles").select("age, intervals_athlete_id, intervals_api_key").eq("id", user.id).maybeSingle(),
@@ -106,13 +111,14 @@ export async function POST(req: Request) {
       .order("date", { ascending: false }).limit(COMPARABLES_MAX),
     supabase.from("notifications").select("title,body,data").eq("user_id", user.id)
       .eq("type", "coach_session").eq("data->>date", String(s.date).slice(0, 10)).limit(1),
+    supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
   ]);
 
   // ⚠️ DES REPÈRES ILLISIBLES NE SONT PAS DES REPÈRES ABSENTS (08/11/2026). Sans la FC max de
   // référence ni les comparables, `fcMax` devenait le pic de CETTE seule sortie (dès 150 bpm)
   // et le verdict d'intensité partait faux, sans signe de dégradation ; sans le prescrit,
   // la séance était jugée comme si rien n'était prévu. On n'analyse pas à l'aveugle : 503.
-  const eRepere = profilRes.error ?? baseRes.error ?? compRes.error ?? prescritRes.error;
+  const eRepere = profilRes.error ?? baseRes.error ?? compRes.error ?? prescritRes.error ?? objRes.error;
   if (eRepere) {
     console.error("[analyse-seance] repères illisibles :", eRepere.message);
     return NextResponse.json({ error: "Analyse momentanément indisponible, réessaie dans un moment." }, { status: 503 });
@@ -174,8 +180,12 @@ export async function POST(req: Request) {
   const flux = trailLike
     ? (s.external_id && creds ? await fluxDeSeance(String(s.external_id), creds.apiKey) : "illisible" as const)
     : undefined;
+  // Le jour de la course visée, le « prescrit » EST la course : la séance du coach publiée ce
+  // jour-là (une « Récupération » le 25/10, jour du marathon de Lille) ne sert pas de référence.
+  const course = courseDuJour((objRes.data as { data?: ObjectifAvecPrecedente } | null)?.data, String(s.date).slice(0, 10), Number(s.distance_km));
   const faits = faitsDeSeance(s, { fcMax }, comparables,
-    p ? { type: p.data?.sessionType ?? null, titre: p.title ?? null, detail: p.data?.subtitle ?? p.body ?? null } : null,
+    course ? { type: TYPE_COURSE, titre: course.nom || null, detail: null }
+      : p ? { type: p.data?.sessionType ?? null, titre: p.title ?? null, detail: p.data?.subtitle ?? p.body ?? null } : null,
     intervalles, contexte, flux);
 
   // ── 5. Le modèle. Il rédige, il ne calcule pas.
@@ -205,7 +215,7 @@ export async function POST(req: Request) {
   const ligne = {
     title: `Analyse — ${String(s.date).slice(0, 10)}`,
     body: texte,
-    data: { workout_id: workoutId, date: String(s.date).slice(0, 10), complete: complet, lang },
+    data: { workout_id: workoutId, date: String(s.date).slice(0, 10), complete: complet, lang, course: course != null },
   };
   // L'analyse essentielle remplacée par la complète : la MÊME ligne, pas une seconde — la
   // lecture du cache n'en prend qu'une, au hasard de l'ordre de la base.
@@ -219,4 +229,19 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ ok: true, texte, memorise: false, tronquee: r.tronquee === true, complete: complet });
+}
+
+/**
+ * La séance était-elle la course visée ? Lu seulement pour décider si une analyse MÉMORISÉE sans
+ * le savoir doit être refaite. Une lecture ratée ne déclenche rien : on ressert l'ancienne
+ * plutôt que de repayer une analyse sur un doute.
+ */
+async function estJourDeCourse(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, workoutId: string): Promise<boolean> {
+  const [{ data: w, error: eW }, { data: o, error: eO }] = await Promise.all([
+    supabase.from("workouts").select("date,distance_km").eq("id", workoutId).eq("user_id", userId).maybeSingle(),
+    supabase.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle(),
+  ]);
+  if (eW || eO || !w) return false;
+  const seance = w as { date?: string | null; distance_km?: number | null };
+  return courseDuJour((o as { data?: ObjectifAvecPrecedente } | null)?.data, String(seance.date ?? "").slice(0, 10), Number(seance.distance_km)) != null;
 }

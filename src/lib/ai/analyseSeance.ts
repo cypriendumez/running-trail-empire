@@ -61,6 +61,33 @@ export type Reperes = { fcMax?: number | null; vma?: number | null; allureFacile
 
 export type Prescrit = { type?: string | null; titre?: string | null; detail?: string | null } | null;
 
+/** Le type de « prescrit » d'un jour de course : la course elle-même, pas un entraînement. */
+export const TYPE_COURSE = "Course";
+
+type CourseObjectif = { race?: unknown; raceDate?: unknown; distanceKm?: unknown };
+export type ObjectifAvecPrecedente = (CourseObjectif & { precedente?: CourseObjectif | null }) | null | undefined;
+
+/**
+ * LA SÉANCE ÉTAIT-ELLE LA COURSE VISÉE ? (09/11/2026)
+ *
+ * Marathon de Lille, 25/10 : le coach avait publié une « Récupération » ce jour-là, et l'analyse
+ * a jugé le marathon contre elle — « intensité totalement inappropriée pour une séance de
+ * récupération ». Le jour de l'objectif (ou de la course qu'il a remplacée), une séance à ±15 %
+ * de la distance (GPS, parcours) EST la course : on la juge comme une course.
+ * Sans distance connue pour l'objectif, une sortie d'au moins 3 km ce jour-là suffit.
+ */
+export function courseDuJour(o: ObjectifAvecPrecedente, jour: string, distanceKm: number | null | undefined): { nom: string; distanceKm: number | null } | null {
+  for (const c of [o, o?.precedente]) {
+    if (!c || String(c.raceDate ?? "").slice(0, 10) !== jour) continue;
+    const d = Number(c.distanceKm), km = Number(distanceKm);
+    if (Number.isFinite(d) && d > 0) {
+      if (!(km > 0) || Math.abs(km - d) / d > 0.15) continue;
+    } else if (!(km >= 3)) continue;
+    return { nom: String(c.race ?? "").trim(), distanceKm: Number.isFinite(d) && d > 0 ? d : null };
+  }
+  return null;
+}
+
 /**
  * LE CONTEXTE DU JOUR DE LA SÉANCE (analyse complète), relu par la route : chaque champ
  * `null` = non mesuré, et l'analyse le dit. ABSENT (`undefined`) = non demandé (Starter).
