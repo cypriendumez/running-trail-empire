@@ -55,11 +55,7 @@ test("le coach des Cours reçoit la date du jour et des délais déjà calculés
   assert.doesNotMatch(src, /le \$\{nextRace\.date\}|le \$\{obj\.raceDate\}|le \$\{plan\.race_date\}/, "une date brute à recompter est revenue");
 });
 
-test("le Kiné IA aussi : la course à venir est située dans le temps", () => {
-  const src = code("src/app/api/ai/physio/route.ts");
-  assert.match(src, /COURSE À VENIR : \$\{courseDatee\(/);
-  assert.match(src, /aujourd'hui : \$\{dateLongue\(todayStr\)\}/);
-});
+// (09/11/2026) « le Kiné IA aussi : la course à venir est située dans le temps » : test retiré avec la consultation du « kiné IA », supprimée (lib/health/kineIa).
 
 test("le plan actif est lu par sa vraie colonne (`name`, pas `goal` qui n'existe pas)", () => {
   for (const f of ["src/app/api/ai/cours/route.ts", "src/app/api/admin/coach-analyze/route.ts", "src/app/api/admin/client-detail/route.ts", "src/app/api/admin/analyze-session/route.ts"]) {

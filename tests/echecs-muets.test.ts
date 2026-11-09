@@ -79,7 +79,7 @@ testAsync("une douleur refusée par la base est dite PERDUE, et journalisée san
   assert.equal(notee, false, "une douleur refusée est annoncée comme notée");
   const j = auJournal(ops);
   assert.equal(j.length, 1, "l'échec n'atteint pas error_logs");
-  assert.equal(j[0].source, "kine");
+  assert.equal(j[0].source, "douleur");
   assert.match(j[0].message, /42501/, "la cause de la base n'est pas dans le journal");
   assert.ok(!/Genou|6\/10|kneeL/.test(j[0].message), "la zone ou l'intensité (donnée de santé) part dans le journal");
 });
@@ -109,12 +109,13 @@ testAsync("une douleur enregistrée, ou déjà notée aujourd'hui, est dite not�
   assert.ok(!deja.ops.some((o) => o.action === "insert"), "la même zone est déclarée deux fois le même jour");
 });
 
-test("le kiné transmet l'issue à l'écran, et l'écran la dit", () => {
-  const route = codeNu("src/app/api/ai/physio/route.ts");
-  assert.match(route, /douleurNotee\s*=\s*await\s+enregistrerDouleurDeclaree\(/, "la route n'appelle plus l'enregistrement qui rend son issue");
-  assert.match(route, /NextResponse\.json\(\{ reply, bilan, douleurNotee \}\)/, "l'issue n'est pas renvoyée au navigateur");
+test("la déclaration d'une douleur transmet son issue, et l'écran la dit", () => {
+  // La consultation du kiné IA est retirée (09/11/2026) : la douleur se déclare sans IA.
+  const route = codeNu("src/app/api/health/declarer/route.ts");
+  assert.match(route, /const ok = await enregistrerDouleurDeclaree\(/, "la route n'appelle plus l'enregistrement qui rend son issue");
+  assert.match(route, /if \(!ok\) return NextResponse\.json\([\s\S]{0,120}status: 503/, "une douleur perdue n'est pas renvoyée comme un échec");
   const ecran = codeNu("src/components/health/HealthCenter.tsx");
-  assert.match(ecran, /json\.douleurNotee === false\)\s*toast\.error\(tr\("chat\.painNotSaved"\)\)/, "l'écran Santé ne dit pas qu'une douleur est perdue");
+  assert.match(ecran, /if \(r\.ok\) \{ toast\.success\(tr\("k\.declOk"\)\); router\.refresh\(\); \} else toast\.error\(tr\("k\.declErr"\)\);/, "l'écran Santé ne dit pas qu'une douleur est perdue");
 });
 
 // ── 2. L'objectif de « M'entraîner pour cette course » ──────────────────────────
@@ -239,16 +240,7 @@ test("la synchro du navigateur ne crée pas de doublons, dit chaque refus et les
   assert.match(codeNu("src/lib/intervals/syncUser.ts"), /if \(!wellnessRes\.ok\) failures\.push\(/, "la synchro serveur tait un bien-être refusé");
 });
 
-test("une mémoire de consultation illisible n'est pas dupliquée", () => {
-  const route = codeNu("src/app/api/ai/physio/route.ts");
-  const i = route.indexOf("if (eLecture) {");
-  assert.ok(i > 0, "la lecture ratée de la mémoire n'est plus traitée à part");
-  const fin = route.indexOf("} else {", i);
-  assert.ok(fin > i && fin - i < 600, "la branche de la lecture ratée n'a plus de fin reconnaissable");
-  const branche = route.slice(i, fin);
-  assert.match(branche, /journaliserEchec\(/, "la lecture ratée n'est pas journalisée");
-  assert.ok(!/insert\(/.test(branche), "une lecture ratée insère encore une seconde ligne kine_chat");
-});
+// (09/11/2026) « une mémoire de consultation illisible n'est pas dupliquée » : test retiré avec la consultation du « kiné IA », supprimée (lib/health/kineIa).
 
 test("mode poids : pesées illisibles, panne du profil et garde-fou de l'IMC", () => {
   const route = codeNu("src/app/api/weight/route.ts");

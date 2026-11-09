@@ -1164,7 +1164,14 @@ test("ce que la page des tarifs promet, le verrou l'accorde vraiment", () => {
   }
   const avec = (cle: string, motif: RegExp) => cartes(cle).filter((f) => motif.test(f)).length;
   assert.equal(avec("starter", /GPX/), 5, "le GPX n'est pas annoncé dans Starter dans les 5 langues");
-  assert.equal(avec("starter", /Kin[ée]|Physio|Fisio/i), 5, "le kiné IA n'est pas annoncé dans Starter dans les 5 langues");
+  // ⚠️ LE KINÉ IA EST RETIRÉ LE 09/11/2026 (lib/health/kineIa : conditions de Gemini, titre de
+  // masseur-kinésithérapeute protégé, dispositif médical). Comme le Smart Journal ci-dessous,
+  // une fonction retirée ne se vend plus — dans AUCUNE formule ni AUCUNE langue.
+  for (const cle of ["starter", "premium"]) {
+    assert.equal(avec(cle, /Kin[ée]|Physio|Fisio/i), 0, `la formule ${cle} vend encore le kiné IA, retiré le 09/11/2026`);
+  }
+  assert.equal(cartes("starter").length, 5, "les cartes Starter sont illisibles");
+  assert.ok(!/[Kk]in[ée] ?IA|AI [Pp]hysio|KI-Physio|[Ff]isio IA|regarde tes photos|looks at your photos/.test(tarifs), "la vitrine vend encore un kiné IA ou l'analyse de photos");
   // ⚠️ L'ÉCRAN DU SMART JOURNAL A ÉTÉ RETIRÉ LE 30/09/2026 et la page le vendait encore
   // dans Premium, et dans la grille de l'accueil, trois semaines plus tard.
   assert.ok(!/Smart Journal/i.test(tarifs), "la vitrine vend le Smart Journal, dont l'écran n'existe plus");

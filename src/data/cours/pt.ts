@@ -134,7 +134,7 @@ export const CHAPTERS_PT: ChapterContent[] = [
     concepts: [
       { term: "De onde vêm as lesões?", short: "raramente da sapatilha, quase sempre da carga", def: "A esmagadora maioria das lesões do corredor são lesões de SOBRECARGA: demasiado, demasiado depressa, demasiado cedo — uma progressão de volume ou de intensidade que os tecidos não tiveram tempo de encaixar.", why: "É por isso que a regra dos +10 %/sem e as semanas aliviadas não são pormenores: são o teu primeiro seguro antilesões.", repere: "Zona de carga segura (ACWR 7 dias / 28 dias): 0,8 a 1,3" },
       { term: "Dor normal ou sinal de alerta?", def: "Normal: dores musculares difusas, incómodo que «aquece» e desaparece com o esforço, ≤ 3/10. Alerta: dor PRECISA e localizada, que AUMENTA durante o esforço, faz coxear, acorda-te de noite ou persiste mais de 48 h.", why: "Continuar a correr com um sinal de alerta transforma 10 dias de adaptação em 3 meses de paragem.", repere: "Regra simples: ≤ 3/10 estável = vigia · > 4/10 ou a crescer = para e consulta" },
-      { term: "O top 5 do corredor", def: "Periostite (bordo interno da tíbia), síndrome da banda iliotibial (face externa do joelho), tendinopatia de Aquiles, síndrome femoropatelar (frente do joelho), fasciopatia plantar (calcanhar).", why: "Cada uma tem uma assinatura e um protocolo precisos — descreve a tua dor ao Fisio IA (separador Saúde): conduz uma verdadeira consulta e dá-te o plano exato." },
+      { term: "O top 5 do corredor", def: "Periostite (bordo interno da tíbia), síndrome da banda iliotibial (face externa do joelho), tendinopatia de Aquiles, síndrome femoropatelar (frente do joelho), fasciopatia plantar (calcanhar).", why: "Cada uma tem uma assinatura e um protocolo precisos — só um médico ou um fisioterapeuta a pode reconhecer e dar-tos. Regista-a em Saúde › Dor: o teu plano fica mais leve entretanto." },
       { term: "O reforço muscular, a tua vacina", short: "2 × 20 min por semana que mudam tudo", def: "Gémeos (subidas excêntricas), médio glúteo (abduções, prancha lateral), core, isquiotibiais (Nordic). O reforço regular é A medida preventiva mais bem provada no corredor.", why: "Tecidos mais fortes encaixam mais carga: afastas o teu limiar de lesão em vez de brincares com ele.", repere: "Bastam 2 sessões de 15-20 min/sem — a regularidade conta mais do que a carga" },
       { term: "Sono e carga de vida", def: "O risco de lesão sobe nitidamente abaixo de ~7 h de sono regular. E o stress (trabalho, exames, vida pessoal) conta na carga total que o teu corpo tem de encaixar.", why: "Semana de vida carregada = semana de treino aliviada. O corpo não distingue os tipos de stress." },
       { term: "Voltar depois de uma lesão", def: "Retomar a ~50 % do volume anterior, alternando marcha/corrida se a paragem foi longa, e progredir +10 %/sem se a dor se mantiver ≤ 3/10 sem agravar no dia seguinte.", why: "A recaída clássica: voltar ao nível anterior como se nada tivesse acontecido. Os tecidos também precisam de voltar a progredir.", repere: "Critério de luz verde: a sessão do dia não piora nada nem à noite nem na manhã seguinte" },
@@ -250,7 +250,7 @@ export const EXTRAS_PT: Record<string, { objectif: string; erreurs: string[]; ac
   blessures: {
     objectif: "Distinguir uma dor normal de um sinal de alerta, e saber o que fazer nas 48 h seguintes.",
     erreurs: ["Continuar com uma dor precisa que aumenta a correr.", "Voltar depois de uma lesão ao volume de antes.", "Procurar a causa na sapatilha quando foi a carga que mudou."],
-    action: { text: "Um incómodo? Descreve-o ao Fisio IA (zona, momento, intensidade em 10): ele orienta, adapta a tua carga — e diz-te quando consultar.", href: "/dashboard/health", label: "Falar com o Fisio IA" },
+    action: { text: "Um incómodo? Regista-o em Saúde › Dor (zona, intensidade em 10): o teu plano fica mais leve. Se durar ou piorar, consulta um profissional de saúde.", href: "/dashboard/health", label: "Registar uma dor" },
   },
   plan: {
     objectif: "Perceber porque é que o teu plano tem esta forma (blocos, descargas, afinação) e o que o faz mudar.",
@@ -284,7 +284,7 @@ export const CHAPTERS_PT_SUPP: ChapterContent[] = [
       { term: "O volume que ele te dá", short: "a mediana, não a média", def: "O volume semanal de partida é a MEDIANA das semanas que realmente correste (uma paragem de 15 dias não esmaga o número), depois sobe no máximo 10 % por semana, com uma descarga de quatro em quatro semanas.", why: "Uma progressão de mais de ~30 % de uma semana para a outra está associada a bastante mais lesões por sobrecarga." },
       { term: "O orçamento de qualidade", short: "quantas sessões duras", def: "O número de sessões duras da semana (VAM, limiar, subidas) depende da tua fadiga real — carga aguda contra crónica — não do calendário. Fadiga alta = 0 ou 1 sessão dura, e o coach di-lo.", why: "«O coach ignora a minha maratona» é quase sempre um orçamento de qualidade a zero sobre uma fadiga real: o plano está certo, espera que recuperes." },
       { term: "Porque é que o plano muda", short: "três gatilhos", def: "O plano é recalculado quando chega uma sessão do teu relógio, quando registas uma sensação e quando o teu objetivo muda. Cada mudança é explicada na caixa «Porquê este plano» do calendário.", why: "Um plano que não se mexe quando estás doente, lesionado ou em forma não é um coach, é um calendário." },
-      { term: "O que o coach não faz", def: "Não diagnostica, não substitui médico nem fisioterapeuta, e não te inscreve numa prova: o PPS (passe de prevenção de saúde) continua a ser da tua responsabilidade. O Fisio IA orienta e adapta a carga; diz-te quando consultar.", why: "Uma ferramenta que pretendesse «autorizar-te» a correr mentiria. Dá-te referências, a decisão continua a ser tua — e de um profissional quando é preciso." },
+      { term: "O que o coach não faz", def: "Não diagnostica, não substitui médico nem fisioterapeuta, e não te inscreve numa prova: o PPS (passe de prevenção de saúde) continua a ser da tua responsabilidade. Uma dor registada torna a tua carga mais leve, e o ecrã diz-te quando consultar.", why: "Uma ferramenta que pretendesse «autorizar-te» a correr mentiria. Dá-te referências, a decisão continua a ser tua — e de um profissional quando é preciso." },
     ],
   },
   {
@@ -368,6 +368,6 @@ export const UI_PT: CoursUI = {
   practice: {
     ghost: "Ghost Runner", ghostDesc: "Põe os teus ritmos em prática: orientação por voz em direto, ao ritmo ou ao cardio.",
     dash: "Painel de controlo", dashDesc: "Encontra a TUA carga (CTL/ATL/TSB), a tua VFC e as tuas zonas — as noções do curso, com os teus dados.",
-    sante: "Saúde e Fisio IA", santeDesc: "Uma dor? O fisioterapeuta IA conduz uma verdadeira consulta e adapta a tua carga.",
+    sante: "Saúde e dores", santeDesc: "Uma dor? Regista-a: o teu plano fica mais leve e o ecrã diz-te quando consultar.",
   },
 };

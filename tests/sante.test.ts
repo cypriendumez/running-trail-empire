@@ -68,22 +68,7 @@ test("le contact d'urgence est VRAIMENT enregistré, et l'échec est dit", () =>
   assert.match(codeNu("src/app/dashboard/settings/page.tsx"), /\.eq\("type", "user_settings"\)/, "la page ne relit plus les réglages enregistrés");
 });
 
-test("la consultation survit à un rechargement, et peut être remise à zéro", () => {
-  const page = codeNu("src/app/dashboard/health/page.tsx");
-  assert.match(page, /\.eq\("type", "kine_chat"\)/, "la page ne relit plus le fil de consultation");
-  assert.match(page, /filInitial=\{fil\}/, "le fil relu n'est plus passé au composant");
-  const src = codeNu(CENTRE);
-  assert.match(src, /filInitial\.length > 0 \? filInitial : \[\{ role: "model", text: tr\("chat\.seed"\) \}\]/, "le composant repart d'un fil vide");
-  assert.match(src, /fetch\("\/api\/health\/consultation", \{ method: "DELETE" \}\)/, "« Nouvelle consultation » n'efface plus rien côté serveur");
-  const route = codeNu("src/app/api/ai/physio/route.ts");
-  assert.match(route, /type: "kine_chat"/, "la route n'écrit plus la mémoire de consultation");
-  assert.match(route, /console\.error\("\[kiné\] consultation non mémorisée/, "un échec d'écriture de la mémoire passerait inaperçu");
-  // Les photos ne partent JAMAIS dans la mémoire : seul le texte est conservé.
-  const iFil = route.indexOf("const fil =");
-  assert.ok(iFil > 0, "le bloc de mémoire de consultation a disparu");
-  const bloc = route.slice(iFil, route.indexOf("return NextResponse.json({ reply"));
-  assert.ok(!/photo/.test(bloc), "la mémoire de consultation embarque la photo, qui ne doit RIEN laisser derrière elle");
-});
+// (09/11/2026) « la consultation survit à un rechargement, et peut être remise à zéro » : test retiré avec la consultation du « kiné IA », supprimée (lib/health/kineIa).
 
 test("le bilan structuré : extrait, validé, borné — et un bloc coupé n'atterrit pas à l'écran", () => {
   const ok = `Voici mon analyse.\n\n\`\`\`bilan\n{"hypotheses":[{"nom":"Syndrome de l'essuie-glace","probabilite":"haute"},{"nom":"Tendinopathie","probabilite":"FAIBLE"}],"urgence":false,"exercices":[{"nom":"Side-plank","dosage":"3 × 30 s","frequence":"1 j/2"}],"charge":"−30 % cette semaine","reprise":"quand la descente est indolore"}\n\`\`\``;
@@ -111,40 +96,17 @@ test("le bilan structuré : extrait, validé, borné — et un bloc coupé n'att
   assert.equal(gros?.urgence, false, "« urgence » n'est vrai que pour le booléen true");
 });
 
-test("le protocole part dans le calendrier : 6 notes, un jour sur deux, jamais aujourd'hui", () => {
-  const dates = datesProtocole("2026-09-22");
-  assert.deepEqual(dates, ["2026-09-23", "2026-09-25", "2026-09-27", "2026-09-30", "2026-10-02", "2026-10-04"]);
-  assert.ok(!dates.includes("2026-09-22"), "le protocole commence le jour même de la consultation");
-  assert.deepEqual(datesProtocole("pas une date"), [], "une date invalide produit des notes invalides");
-  const note = noteProtocole("Genou droit", [{ nom: "Side-plank", dosage: "3 × 30 s", frequence: "1 j/2" }]);
-  assert.match(note, /^Protocole kiné — Genou droit\n• Side-plank : 3 × 30 s \(1 j\/2\)$/);
-  assert.ok(noteProtocole(null, Array.from({ length: 9 }, () => ({ nom: "x".repeat(200), dosage: "y".repeat(200), frequence: "" }))).length <= 1000, "la note de calendrier n'est plus bornée");
-  // La route revalide ce que le navigateur envoie, et lit son erreur.
-  const api = codeNu("src/app/api/health/protocole/route.ts");
-  assert.match(api, /validerBilan\(\{ exercices: corps\.exercices/, "la route écrit dans le calendrier sans revalider les exercices");
-  assert.match(api, /type: "client_note"/, "les notes ne sont plus des notes de calendrier");
-  assert.match(api, /if \(error\) return NextResponse\.json\(\{ error: "Le calendrier n'a pas pu être écrit" \}/, "une écriture refusée passerait pour un succès");
-  assert.match(codeNu(CENTRE), /fetch\("\/api\/health\/protocole"/, "le bouton « programmer » n'appelle plus la route");
-});
+// (09/11/2026) « le protocole part dans le calendrier : 6 notes, un jour sur deux, jamais aujourd'hui » : test retiré avec la consultation du « kiné IA », supprimée (lib/health/kineIa).
 
-test("le kiné réclame le bilan, avec assez de jetons pour l'écrire", () => {
-  const route = codeNu("src/app/api/ai/physio/route.ts");
-  assert.match(route, /BILAN STRUCTURÉ \(OBLIGATOIRE/, "l'invite ne demande plus de bilan structuré");
-  assert.match(route, /extraireBilan\(out\.text\)/, "la réponse n'est plus découpée");
-  // La réponse porte aussi `douleurNotee` depuis le 08/11/2026 (tests/echecs-muets.test.ts).
-  assert.match(route, /NextResponse\.json\(\{ reply, bilan(, douleurNotee)? \}\)/, "le bilan n'est plus renvoyé au navigateur");
-  // ⚠️ Le bilan vient EN DERNIER : mesuré le 22/09/2026, 1900 jetons de réponse le
-  // coupaient en plein JSON. Le budget de réponse doit rester large.
-  const m = route.match(/budget\((\d+), (\d+)\)/);
-  assert.ok(m, "le budget de jetons du kiné a disparu");
-  assert.ok(Number(m![2]) >= 2400, `budget de réponse ${m![2]} : trop court, le bilan sera coupé`);
-});
+// (09/11/2026) « le kiné réclame le bilan, avec assez de jetons pour l'écrire » : test retiré avec la consultation du « kiné IA », supprimée (lib/health/kineIa).
 
-test("sur téléphone : la consultation d'abord, le schéma corporel repliable, les onglets qui défilent", () => {
+test("sur téléphone : l'avertissement d'abord, le schéma corporel repliable, les onglets qui défilent", () => {
   const src = codeNu(CENTRE);
   assert.ok(!/className="grid grid-cols-12 gap-4">\s*\n\s*\{\/\* Schéma corporel/.test(src), "la grille à 12 colonnes est revenue sur l'onglet Kiné");
   assert.match(src, /className="grid grid-cols-1 gap-4 lg:grid-cols-12"/, "l'onglet Kiné n'est plus sur une colonne sous lg");
-  assert.match(src, /className="order-1 bento-card flex flex-col lg:order-none lg:col-span-7"/, "le chat n'est plus en premier sur téléphone");
+  // La consultation est retirée (09/11/2026) : l'encadré « Pacevo n'est pas un professionnel
+  // de santé » prend sa place, en premier sur téléphone.
+  assert.match(src, /className="order-1 bento-card space-y-3 lg:order-none lg:col-span-7"/, "l'avertissement santé n'est plus en premier sur téléphone");
   assert.match(src, /className="order-2 space-y-4 lg:order-none lg:col-span-5"/, "le schéma corporel n'est plus en second sur téléphone");
   assert.match(src, /setSchemaOuvert\(\(v\) => !v\)/, "le schéma corporel ne se replie plus");
   assert.match(src, /schemaOuvert \? "" : "hidden lg:block"/, "le schéma reste déplié sur téléphone (un écran entier avant le chat)");
@@ -193,13 +155,12 @@ test("le Profil n'a plus d'interrupteur qui ne commande rien", () => {
 
 test("les libellés Santé ajoutés existent dans les cinq langues", () => {
   const src = readFileSync(CENTRE, "utf8");
-  const cles = ["chat.new", "chat.newConfirm", "chat.resumed", "chat.newFail", "bilan.title", "bilan.hyp", "bilan.urgent", "bilan.exos", "bilan.charge", "bilan.reprise", "bilan.plan", "bilan.planned", "bilan.planFail", "bilan.voirCal",
-    "bilan.proba.haute", "bilan.proba.moyenne", "bilan.proba.faible"];
+  // La consultation et son bilan sont retirés (09/11/2026) : les libellés de la déclaration.
+  const cles = ["k.declarer", "k.declOk", "k.declErr", "k.seuil", "k.avisTitre", "k.avis", "k.alerte"];
   for (const k of cles) {
     const n = [...src.matchAll(new RegExp(`"${k.replace(/\./g, "\\.")}":`, "g"))].length;
     assert.equal(n, LANGUES.length, `« ${k} » présent ${n} fois, attendu ${LANGUES.length}`);
   }
-  assert.ok(src.includes('"bilan.planned": "{n}') || /"bilan\.planned": "[^"]*\{n\}/.test(src), "« bilan.planned » ne porte plus le nombre de séances");
   // Le contact d'urgence et la nutrition, eux aussi, en cinq langues.
   for (const f of [CONTACT, "src/components/health/NutritionCourse.tsx"]) {
     const x = readFileSync(f, "utf8");

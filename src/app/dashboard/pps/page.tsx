@@ -16,7 +16,7 @@ import { PpsVerifier } from "@/components/pps/PpsVerifier";
 import { PPS_T } from "@/lib/pps/ppsI18n";
 import { PPS_URL, PPS_PRIX_EUR, PPS_VALIDITE_MOIS, type PpsStatus } from "@/lib/pps/status";
 import { normLang } from "@/lib/i18n/translations";
-import { ShieldCheck, ExternalLink, Award, Baby, ArrowRight } from "lucide-react";
+import { ShieldCheck, ExternalLink, Award, ArrowRight } from "lucide-react";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { estOfficielle } from "@/lib/coach/prochaineCourse";
 
@@ -126,9 +126,6 @@ export default async function PpsPage() {
           <div className="mt-3 space-y-2">
             <p className="flex gap-2.5 text-[13px] leading-relaxed text-zinc-600">
               <Award className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />{t.licencie}
-            </p>
-            <p className="flex gap-2.5 text-[13px] leading-relaxed text-zinc-600">
-              <Baby className="mt-0.5 h-4 w-4 flex-shrink-0 text-sky-600" />{t.mineur}
             </p>
           </div>
         </div>

@@ -34,4 +34,4 @@ disponible, canicule.
 3. Ajoute un profil manquant de la matrice par passage (n° 2, 5, 6, 7 d'abord), avec des candidats réels (jamais une liste vide) et une mutation qui le fait rougir.
 4. Un plan absurde → PR « Coach : … » avec le test qui le prouve. **Niveau 2** : aucune fusion sans le « GO » de Cyprien.
 
-`@SafeRun` rejoue ensuite : aucune réponse de Kiné IA ni du plan ne pose de diagnostic, la mention « consulte un médecin ou un kinésithérapeute » est présente dès qu'une douleur est déclarée.
+`@SafeRun` rejoue ensuite : aucune réponse d'IA ni du plan ne pose de diagnostic (le Kiné IA est retiré depuis le 09/11/2026 : s'il réapparaît, c'est un défaut), la mention « consulte un médecin ou un kinésithérapeute » est présente dès qu'une douleur est déclarée.

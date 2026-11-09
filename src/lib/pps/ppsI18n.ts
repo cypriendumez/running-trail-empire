@@ -21,7 +21,6 @@ export type TextesPps = {
   quiTitre: string;
   qui: string;
   licencie: string;
-  mineur: string;
   /** Les 4 étapes du parcours officiel. */
   etapes: string[];
   etapesTitre: string;
@@ -87,7 +86,6 @@ export const PPS_T: Record<Lang, TextesPps> = {
     quiTitre: "Qui doit le faire",
     qui: "Tout coureur MAJEUR NON LICENCIÉ qui s'inscrit à une course chronométrée en France — route comme trail, du 10 km à l'ultra.",
     licencie: "Licencié FFA : ta licence en tient lieu, tu n'as rien à faire.",
-    mineur: "Mineur : pas de pass payant, mais un questionnaire de santé gratuit à remplir avec un parent, à refaire pour chaque course.",
     etapesTitre: "Comment l'obtenir",
     etapes: [
       "Crée ton compte sur la plateforme de la fédération.",
@@ -145,7 +143,6 @@ export const PPS_T: Record<Lang, TextesPps> = {
     quiTitre: "Who needs one",
     qui: "Every ADULT runner WITHOUT A FEDERATION LICENCE entering a timed race in France — road and trail alike, from 10 km to ultra.",
     licencie: "FFA licence holder: your licence covers it, there is nothing to do.",
-    mineur: "Under 18: no paid pass, but a free health questionnaire to fill in with a parent, redone for each race.",
     etapesTitre: "How to get it",
     etapes: [
       "Create your account on the federation's platform.",
@@ -203,7 +200,6 @@ export const PPS_T: Record<Lang, TextesPps> = {
     quiTitre: "Wer ihn braucht",
     qui: "Jede ERWACHSENE Läuferin und jeder erwachsene Läufer OHNE VERBANDSLIZENZ, die oder der sich in Frankreich für einen Wettkampf mit Zeitmessung anmeldet — Straße wie Trail, von 10 km bis Ultra.",
     licencie: "Mit FFA-Lizenz: Die Lizenz deckt das ab, du musst nichts tun.",
-    mineur: "Minderjährige: kein kostenpflichtiger Pass, sondern ein kostenloser Gesundheitsfragebogen zusammen mit einem Elternteil, für jeden Wettkampf neu.",
     etapesTitre: "So bekommst du ihn",
     etapes: [
       "Lege dein Konto auf der Plattform des Verbands an.",
@@ -261,7 +257,6 @@ export const PPS_T: Record<Lang, TextesPps> = {
     quiTitre: "Quién debe hacerlo",
     qui: "Todo corredor MAYOR DE EDAD SIN LICENCIA que se inscriba en una carrera cronometrada en Francia — asfalto o trail, del 10 km al ultra.",
     licencie: "Con licencia FFA: tu licencia lo cubre, no tienes que hacer nada.",
-    mineur: "Menores: sin pase de pago, pero un cuestionario de salud gratuito a rellenar con un progenitor, en cada carrera.",
     etapesTitre: "Cómo obtenerlo",
     etapes: [
       "Crea tu cuenta en la plataforma de la federación.",
@@ -319,7 +314,6 @@ export const PPS_T: Record<Lang, TextesPps> = {
     quiTitre: "Quem tem de o fazer",
     qui: "Todo o corredor MAIOR DE IDADE SEM LICENÇA que se inscreva numa corrida cronometrada em França — estrada ou trail, dos 10 km ao ultra.",
     licencie: "Com licença FFA: a licença cobre-o, não tens nada a fazer.",
-    mineur: "Menores: sem passe pago, mas um questionário de saúde gratuito a preencher com um progenitor, em cada corrida.",
     etapesTitre: "Como obtê-lo",
     etapes: [
       "Cria a tua conta na plataforma da federação.",

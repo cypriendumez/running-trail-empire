@@ -296,17 +296,7 @@ async function main() {
     assert.match(codeNu("src/components/parcours/ParcoursBrowser.tsx"), /if \(dl \|\| !exportGpx\) return;/, "le téléchargement de parcours ne vérifie plus le droit");
   });
 
-  await test("un compte gratuit qui écrit au kiné voit une sortie, pas « essai_expire »", () => {
-    const hc = codeNu("src/components/health/HealthCenter.tsx");
-    // Le statut se lit AVANT le corps : un 402 ne doit jamais finir dans la conversation.
-    assert.ok(hc.indexOf("res.status === 402") > 0 && hc.indexOf("res.status === 402") < hc.indexOf("await res.json()"),
-      "le refus de formule n'est plus intercepté avant d'être affiché tel quel");
-    assert.match(hc, /json\.error === "quota_ia_atteint" \? tr\("chat\.quota"\)/, "le plafond du jour s'affiche de nouveau en code brut");
-    const brut = readFileSync("src/components/health/HealthCenter.tsx", "utf8");
-    for (const cle of ["chat.verrou", "chat.verrouCta", "chat.quota"]) {
-      assert.equal((brut.match(new RegExp(`"${cle.replace(".", "\\.")}":`, "g")) ?? []).length, 5, `« ${cle} » manque à une langue`);
-    }
-  });
+  // (09/11/2026) « un compte gratuit qui écrit au kiné voit une sortie, pas « essai_expire » » : test retiré avec la consultation du « kiné IA », supprimée (lib/health/kineIa).
 }
 
 main().then(() => {

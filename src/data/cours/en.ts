@@ -134,7 +134,7 @@ export const CHAPTERS_EN: ChapterContent[] = [
     concepts: [
       { term: "Where do injuries come from?", short: "rarely the shoe, almost always the load", def: "The overwhelming majority of running injuries are OVERLOAD injuries: too much, too fast, too soon — a progression in volume or intensity the tissues haven't had time to absorb.", why: "That's why the +10%/week rule and down weeks are not details: they're your first injury insurance.", repere: "Safe load zone (ACWR 7 d / 28 d): 0.8 to 1.3" },
       { term: "Normal pain or warning sign?", def: "Normal: diffuse soreness, a niggle that \"warms up\" and disappears with effort, ≤ 3/10. Warning: pain that is PRECISE and localised, INCREASES during the effort, makes you limp, wakes you at night, or lasts more than 48 h.", why: "Running through a warning sign turns 10 days of adaptation into 3 months off.", repere: "Simple rule: ≤ 3/10 and stable = monitor · > 4/10 or rising = stop and get checked" },
-      { term: "The runner's top 5", def: "Shin splints (inner edge of the tibia), IT band syndrome (outer side of the knee), Achilles tendinopathy, patellofemoral pain syndrome (front of the knee), plantar fasciopathy (heel).", why: "Each has a precise signature and protocol — describe your pain to the AI physio (Health tab): it runs a real consultation and gives you the exact plan." },
+      { term: "The runner's top 5", def: "Shin splints (inner edge of the tibia), IT band syndrome (outer side of the knee), Achilles tendinopathy, patellofemoral pain syndrome (front of the knee), plantar fasciopathy (heel).", why: "Each has a precise signature and protocol — only a doctor or a physiotherapist can recognise it and give you them. Log it in Health › Pain: your plan lightens in the meantime." },
       { term: "Strength work, your vaccine", short: "2 × 20 min a week that change everything", def: "Calves (eccentric raises), glute medius (abductions, side planks), core, hamstrings (Nordic curls). Regular strength work is THE best-proven preventive measure in runners.", why: "Stronger tissues absorb more load: you push your injury threshold higher instead of gambling with it.", repere: "2 sessions of 15-20 min/week are enough — consistency beats load" },
       { term: "Sleep & life load", def: "Injury risk climbs sharply below ~7 h of regular sleep. And stress (work, exams, personal life) counts toward the total load your body has to absorb.", why: "A heavy life week = a lighter training week. The body doesn't distinguish between types of stress." },
       { term: "Returning after an injury", def: "Restart at ~50% of your previous volume, alternating walk/run if the layoff was long, and progress by +10%/week as long as pain stays ≤ 3/10 with no worsening the next day.", why: "The classic relapse: restarting at your old level as if nothing had happened. Tissues need to re-progress too.", repere: "Green-light criterion: today's session makes nothing worse that evening or the next morning" },
@@ -250,7 +250,7 @@ export const EXTRAS_EN: Record<string, { objectif: string; erreurs: string[]; ac
   blessures: {
     objectif: "Tell a normal ache from a warning sign, and know what to do in the following 48 h.",
     erreurs: ["Carrying on with a precise pain that grows while running.", "Coming back after an injury at the previous volume.", "Blaming the shoe when it's the load that moved."],
-    action: { text: "A niggle? Describe it to the AI Physio (area, when, intensity out of 10): it guides you, adapts your load — and tells you when to see someone.", href: "/dashboard/health", label: "Talk to the AI Physio" },
+    action: { text: "A niggle? Log it in Health › Pain (area, intensity out of 10): your plan lightens. If it lasts or gets worse, see a health professional.", href: "/dashboard/health", label: "Log a pain" },
   },
   plan: {
     objectif: "Understand why your plan has this shape (blocks, deloads, taper) and what makes it change.",
@@ -284,7 +284,7 @@ export const CHAPTERS_EN_SUPP: ChapterContent[] = [
       { term: "The volume it gives you", short: "the median, not the mean", def: "The starting weekly volume is the MEDIAN of the weeks you actually ran (a 15-day break doesn't crush the number), then it rises by at most 10 % a week, with a deload every four weeks.", why: "A progression above ~30 % from one week to the next is associated with markedly more overload injuries." },
       { term: "The quality budget", short: "how many hard sessions", def: "The number of hard sessions in the week (MAS, threshold, hills) depends on your real fatigue — acute against chronic load — not on the calendar. High fatigue = 0 or 1 hard session, and the coach says so.", why: "'The coach ignores my marathon' is almost always a quality budget at zero on real fatigue: the plan is right, it is waiting for you to recover." },
       { term: "Why the plan changes", short: "three triggers", def: "The plan is recomputed when a session arrives from your watch, when you log how you felt, and when your goal changes. Every change is explained in the calendar's 'Why this plan' box.", why: "A plan that doesn't move when you're ill, injured or in great shape isn't a coach, it's a calendar." },
-      { term: "What the coach doesn't do", def: "It doesn't diagnose, doesn't replace a doctor or a physio, and doesn't enter you in a race: the PPS (health prevention pass) stays your responsibility. The AI Physio guides and adapts the load; it tells you when to consult.", why: "A tool claiming to 'clear' you to run would be lying. It gives you reference points; the decision stays yours — and a professional's when needed." },
+      { term: "What the coach doesn't do", def: "It doesn't diagnose, doesn't replace a doctor or a physio, and doesn't enter you in a race: the PPS (health prevention pass) stays your responsibility. A logged pain lightens your load, and the screen tells you when to see someone.", why: "A tool claiming to 'clear' you to run would be lying. It gives you reference points; the decision stays yours — and a professional's when needed." },
     ],
   },
   {
@@ -368,6 +368,6 @@ export const UI_EN: CoursUI = {
   practice: {
     ghost: "Ghost Runner", ghostDesc: "Put your paces into practice: live voice guidance, by pace or by heart rate.",
     dash: "Dashboard", dashDesc: "Find YOUR load (CTL/ATL/TSB), your HRV and your zones — the course concepts, on your own data.",
-    sante: "Health & AI Physio", santeDesc: "In pain? The AI physio runs a real consultation and adjusts your load.",
+    sante: "Health & pain", santeDesc: "In pain? Log it: your plan lightens, and the screen tells you when to see someone.",
   },
 };

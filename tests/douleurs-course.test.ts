@@ -139,19 +139,18 @@ test("un état envoyé par un client n'est accepté que s'il est connu", () => {
 });
 
 test("les deux sources de course sont réunies là où elles étaient séparées", () => {
-  for (const f of ["src/app/api/ai/physio/route.ts", "src/app/api/ai/cours/route.ts"]) {
+  for (const f of ["src/app/api/ai/cours/route.ts"]) { // physio : retiré avec le kiné IA (09/11/2026)
     const src = codeNu(f);
     assert.match(src, /prochaineCourse\(/, `${f} choisit encore sa course tout seul : il ignorera l'objectif déclaré`);
     assert.match(src, /eq\("type", "race_objective"\)/, `${f} ne lit plus l'objectif déclaré`);
   }
 });
 
-test("le coach et le kiné ignorent une douleur résolue", () => {
+test("le coach ignore une douleur résolue", () => {
   const coach = codeNu("src/lib/ai/coachContext.ts");
   assert.match(coach, /libellesActifs\(/, "le coach ne passe plus par le filtre des douleurs : une douleur résolue briderait encore le plan");
   assert.match(coach, /\.select\("id, ?data"\)[\s\S]{0,120}"pain_report"/, "le coach ne lit plus l'identifiant des douleurs : impossible de les rattacher à leur état");
-  const kine = codeNu("src/app/api/ai/physio/route.ts");
-  assert.match(kine, /actives\(|libellesActifs\(/, "le kiné ressort encore une douleur que l'athlète a déclarée passée");
+  // Le kiné IA, qui les relisait aussi, est retiré (09/11/2026).
 });
 
 test("changer l'état d'une douleur replanifie tout de suite", () => {

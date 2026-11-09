@@ -17,6 +17,10 @@ import { urlJournalisable } from "../src/lib/journal/urlJournal";
 import { sansAdresse, MASQUE } from "../src/lib/journal/sansAdresse";
 import { parseGPX } from "../src/lib/intervals/gpx";
 import { coursesExistantes } from "../src/lib/races/existantes";
+import { estMajeur, ageEntier, AGE_MINIMUM } from "../src/lib/legal/age";
+import { KINE_IA_ACTIF } from "../src/lib/health/kineIa";
+import { enregistrerDouleurDeclaree } from "../src/lib/health/douleurDeclaree";
+import { SEUIL_DOULEUR_DECLAREE } from "../src/lib/health/seuilDouleur";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -668,6 +672,111 @@ test("lot 3 : le dépôt public ne porte plus les lieux de séances réelles", (
   const generiques = new Set(["Randonnée", "Randonnée en vallée", "Randonnée en montagne", "Course à pied"]);
   assert.deepEqual(noms.filter((n) => !generiques.has(n)), [], "le fichier de test publie de nouveau le nom réel d'une séance (souvent un lieu)");
   assert.ok(!/cypriendumez@outlook\.fr/.test(readFileSync("docs/intervals-icu-dependance.md", "utf8")), "la documentation publie de nouveau l'adresse personnelle");
+});
+
+// ── Légalité (09/11/2026) : 18 ans minimum, plus de « kiné IA » ─────────────────────
+test("Pacevo est réservé aux majeurs : la règle, l'inscription et les textes légaux", () => {
+  assert.equal(AGE_MINIMUM, 18);
+  for (const [v, attendu] of [[18, true], ["18", true], [" 18 ", true], [45, true], [17, false], ["17", false], [15, false], ["", false], [null, false], ["abc", false], [150, false],
+    // Ce qui est contrôlé est ce qui est écrit (relecture du 09/11/2026) : « 1e2 » valait 100
+    // pour le contrôle et 1 en base ; « 18.9 » passait et 18 s'écrivait.
+    ["1e2", false], ["18.9", false], [18.5, false], ["0x20", false]] as const) {
+    assert.equal(estMajeur(v), attendu, `estMajeur(${JSON.stringify(v)})`);
+  }
+  assert.equal(ageEntier("1e2"), null);
+  assert.equal(ageEntier(" 42 "), 42);
+  for (const f of ["src/app/onboarding/page.tsx", "src/components/profile/ProfileSettings.tsx"]) {
+    const src = codeNu(f);
+    assert.match(src, /age: ageEntier\((profile|form)\.age\),/, `${f} écrit de nouveau une autre valeur que celle qu'il contrôle`);
+    assert.ok(!/age: parseInt\(/.test(src), `${f} écrit de nouveau l'âge par parseInt`);
+  }
+  const ob = codeNu("src/app/onboarding/page.tsx");
+  assert.match(ob, /\[!!profile\.age && !estMajeur\(profile\.age\), `\$\{cid\}-age`, tr\("ageMin"\)\]/, "l'inscription accepte de nouveau un âge de moins de 18 ans");
+  assert.match(ob, /min=\{AGE_MINIMUM\}/, "le champ de l'âge descend de nouveau sous 18 ans");
+  assert.equal(readFileSync("src/app/onboarding/onboardingI18n.ts", "utf8").split("ageMin: \"").length - 1, 5, "le message des 18 ans manque dans une langue");
+  const legal = readFileSync("src/app/legalI18n.ts", "utf8");
+  assert.ok(!/15 ans|aged 15|ab 15 Jahren|unter 15|15 años|15 anos/.test(legal), "les textes légaux acceptent de nouveau les 15-17 ans");
+  assert.equal((legal.match(/\(18 ans ou plus\)|\(18 or over\)|\(ab 18 Jahren\)|\(18 años o más\)|\(18 anos ou mais\)/g) ?? []).length, 10, "CGU et confidentialité ne disent pas « 18 ans » dans les 5 langues (2 × 5)");
+});
+
+test("le « kiné IA » est SUPPRIMÉ partout : routes, écran, vitrine, cours, aide, consignes des IA", () => {
+  assert.equal(KINE_IA_ACTIF, false, "le kiné IA est rallumé : il faut un avis juridique, un autre fournisseur et un autre cadre, pas ce booléen");
+  // Les deux routes ne font plus que refuser : ni consigne, ni appel au modèle, ni écriture.
+  for (const f of ["src/app/api/ai/physio/route.ts", "src/app/api/health/protocole/route.ts"]) {
+    const src = codeNu(f);
+    assert.match(src, /return NextResponse\.json\(\{ error: KINE_IA_RETIRE \}, \{ status: 410 \}\);/, `${f} répond de nouveau autre chose que « retiré »`);
+    assert.ok(!/generateContent|systemPrompt|\.insert\(|\.upsert\(|exigeAcces/.test(src), `${f} appelle de nouveau le modèle ou écrit en base`);
+    assert.ok(!/Léa Moreau|kinésithérapeute du sport|diagnostic différentiel/i.test(readFileSync(f, "utf8")), `${f} publie de nouveau la consigne de la « kinésithérapeute »`);
+  }
+  // L'écran : plus de consultation, plus de photo, plus de protocole ; la déclaration sans IA.
+  const hc = codeNu("src/components/health/HealthCenter.tsx");
+  assert.ok(!/api\/ai\/physio|api\/health\/protocole|api\/health\/consultation|createElement\("canvas"\)|protocolFor\(/.test(hc), "l'écran Santé appelle de nouveau la consultation, envoie une photo ou prescrit un protocole");
+  assert.ok(!/kiné du sport|sports physio|Sportphysio/i.test(readFileSync("src/components/health/HealthCenter.tsx", "utf8")), "l'écran se présente de nouveau comme un kiné");
+  assert.match(hc, /fetch\("\/api\/health\/declarer"/, "la douleur ne peut plus être déclarée sans l'IA");
+  assert.match(hc, /disabled=\{declEnCours \|\| painLevel < SEUIL_DOULEUR_DECLAREE\}/, "une gêne sous le seuil peut de nouveau être déclarée");
+  for (const k of ["k.declarer", "k.seuil", "k.avisTitre", "k.avis", "k.alerte"]) assert.equal(hc.split(`"${k}": "`).length - 1, 5, `${k} manque dans une langue`);
+  const ongletsEtTitres = [...hc.matchAll(/"(tab\.kine|h\.subtitle|k\.hint)": "([^"]*)"/g)].map((m) => m[2]).join(" | ");
+  assert.ok(!/[Kk]in[ée]|[Pp]hysio|[Ff]isio/.test(ongletsEtTitres), `l'onglet ou son titre parle encore de kiné : ${ongletsEtTitres.slice(0, 160)}`);
+  // La page ne relit plus la consultation.
+  assert.ok(!/"kine_chat"/.test(codeNu("src/app/dashboard/health/page.tsx")), "la page Santé relit de nouveau la consultation");
+  // La déclaration sans IA : ouverte à tous, seuil, et son échec est dit.
+  const decl = codeNu("src/app/api/health/declarer/route.ts");
+  assert.ok(!/exigeAcces|generateContent/.test(decl), "déclarer une douleur exige de nouveau un abonnement ou appelle un modèle");
+  assert.match(decl, /if \(painLevel < SEUIL_DOULEUR_DECLAREE\) \{\s*return NextResponse\.json\([\s\S]{0,200}status: 422/, "une gêne sous le seuil est de nouveau enregistrée");
+  assert.match(decl, /if \(!ok\) return NextResponse\.json\([\s\S]{0,120}status: 503/, "une douleur non enregistrée se tait de nouveau");
+  // Plus aucune promesse de « kiné IA » là où un coureur la lit.
+  const visibles = ["src/components/landing/landingI18n.ts", "src/data/cours/fr.ts", "src/data/cours/en.ts", "src/data/cours/de.ts", "src/data/cours/es.ts", "src/data/cours/pt.ts", "src/app/legalI18n.ts"];
+  for (const f of visibles) assert.ok(!/[Kk]in[ée] ?IA|AI [Pp]hysio|KI-Physio|[Ff]isio IA|fisioterapeuta IA|Léa Moreau|regarde tes photos/.test(readFileSync(f, "utf8")), `${f} promet encore un kiné IA`);
+  const aide = readFileSync("src/data/helpKb.ts", "utf8");
+  assert.ok(!/\["(Kiné IA|AI Physio|KI-Physio|Fisio IA)"/.test(aide), "l'aide nomme encore un onglet « kiné IA »");
+  // L'aide alimente l'assistant : hors de la phrase qui dit le retrait, aucune promesse de
+  // consultation, de photo, de bilan ni de protocole (2e relecture du 09/11/2026).
+  // (Les deux phrases qui disent le retrait ne contiennent aucune de ces promesses.)
+  assert.ok(!/vraie consultation|photos acceptées|Nouvelle consultation|un BILAN|programme le protocole/.test(aide), "l'aide promet encore une consultation, une photo, un bilan ou un protocole");
+  const fiche = aide.split("\n").find((l) => l.includes('path: "/dashboard/health"')) ?? "";
+  const quoi = /what: "((?:[^"\\]|\\.)*)"/.exec(fiche)?.[1] ?? "";
+  assert.ok(/a été retirée le 09\/11\/2026/.test(quoi) && /« Enregistrer cette douleur »/.test(quoi), "la description de la fiche Santé ne dit plus la déclaration ni le retrait");
+  assert.ok(!/"protocole"|"bilan"|"exercices"/.test(fiche), "la fiche Santé remonte de nouveau sur « protocole », « bilan » ou « exercices »");
+  // Les autres IA : orientation seule, aucun conseil de santé (conditions du modèle).
+  const cours = readFileSync("src/app/api/ai/cours/route.ts", "utf8"), support = readFileSync("src/app/api/ai/support/route.ts", "utf8");
+  assert.ok(!/premiers réflexes \(réduire la charge\)|le Kiné IA y mène une vraie consultation/.test(cours), "l'IA des cours donne de nouveau des conseils face à une douleur");
+  assert.match(cours, /tu ne donnes AUCUN conseil de santé/, "l'IA des cours n'a plus la consigne d'orientation seule");
+  assert.ok(!/ce qu'un non-médecin peut honnêtement\s+dire|renvoie vers Santé › Kiné IA/.test(support), "l'assistant donne de nouveau des conseils face à une douleur");
+  assert.match(support, /AUCUN conseil de santé/, "l'assistant n'a plus la consigne d'orientation seule");
+  assert.ok(!/prévention des blessures|signal d'alerte|la réponse est le repos|santé du coureur/.test(cours), "la consigne des cours donne de nouveau un conseil ou une compétence de santé");
+  // Une déclaration replanifie tout de suite, comme « ça va mieux / ça empire ».
+  const replan = decl.search(/if \(!eCreds\) \{\s*await autoCoachForUser\(admin, \{/);
+  assert.ok(replan > decl.search(/if \(!ok\) return/), "la déclaration ne replanifie plus : l'écran promet un plan allégé qui ne bouge pas");
+});
+
+testAsync("une douleur se déclare à partir de 4/10, et une seconde plus forte le même jour relève le niveau", async () => {
+  assert.equal(SEUIL_DOULEUR_DECLAREE, 4);
+  const ligne = { id: "p1", data: { zone: "Genou gauche", slot: "face:kneeL", level: 3, date: "2026-11-09" } };
+  const { client, ops } = fauxClient((op) => op.table === "notifications" && op.action === "select" ? { data: [ligne] } : { data: null, error: null });
+  const decl = { userId: "u", zone: "Genou gauche", zoneKey: "face:kneeL", painLevel: 8, today: "2026-11-09" };
+  assert.equal(await enregistrerDouleurDeclaree(client, decl, client), true);
+  const maj = ops.filter((o) => o.table === "notifications" && o.action === "update");
+  assert.equal(maj.length, 1, "une douleur plus forte le même jour n'est pas prise en compte (« 3 puis 8 » reste à 3)");
+  assert.equal((maj[0].valeur as { data: { level: number } }).data.level, 8);
+  assert.ok(!ops.some((o) => o.action === "insert" && o.table === "notifications"), "une seconde ligne est créée pour la même zone le même jour");
+  // Une déclaration plus faible ne baisse pas le niveau du jour (« ça va mieux » a son bouton).
+  const f2 = fauxClient((op) => op.table === "notifications" && op.action === "select" ? { data: [{ ...ligne, data: { ...ligne.data, level: 8 } }] } : { data: null, error: null });
+  assert.equal(await enregistrerDouleurDeclaree(f2.client, { ...decl, painLevel: 5 }, f2.client), true);
+  assert.ok(!f2.ops.some((o) => o.action === "update" || o.action === "insert"), "une déclaration plus faible baisse le niveau du jour");
+  // Déclarée « passée » puis revenue le même jour : rouverte, elle pèse de nouveau sur le plan.
+  const f3 = fauxClient((op) => op.table === "notifications" && op.action === "select" ? { data: [{ ...ligne, data: { ...ligne.data, level: 8, etat: "resolu" } }] } : { data: null, error: null });
+  assert.equal(await enregistrerDouleurDeclaree(f3.client, { ...decl, painLevel: 5 }, f3.client), true);
+  const rouverte = f3.ops.filter((o) => o.action === "update")[0]?.valeur as { data: { etat: string; level: number } } | undefined;
+  assert.ok(rouverte, "une douleur passée qui revient n'est pas rouverte (elle ne pèse plus, l'écran dit pourtant « enregistrée »)");
+  assert.equal(rouverte!.data.etat, "actif");
+  assert.equal(rouverte!.data.level, 5, "la douleur rouverte ne repart pas à l'intensité déclarée");
+});
+
+test("l'âge ne descend pas sous 18 ans dans les Réglages non plus", () => {
+  const src = codeNu("src/components/profile/ProfileSettings.tsx");
+  const garde = src.search(/if \(form\.age\.trim\(\) && !estMajeur\(form\.age\)\) \{ toast\.error\(tr\("t\.ageMin"\)\); return; \}/);
+  assert.ok(garde > 0 && garde < src.search(/age: ageEntier\(form\.age\)/), "les Réglages enregistrent de nouveau un âge de moins de 18 ans");
+  assert.equal(readFileSync("src/components/profile/ProfileSettings.tsx", "utf8").split('"t.ageMin": "').length - 1, 5, "le message des 18 ans manque dans une langue");
 });
 
 enAttente.then(() => {

@@ -161,23 +161,7 @@ test("une ligne inexploitable ne devient pas une donnée", () => {
   assert.equal(resumeDouleurs([]), "", "un suivi vide produit du texte au lieu de rien");
 });
 
-test("le kiné IA lit vraiment l'historique et le garage", () => {
-  // ⚠️ ON VISE LES SITES QUI PRODUISENT L'EFFET, PAS LES IMPORTS. Une fonction importée
-  // mais jamais appelée laisserait ce test au vert avec un kiné toujours amnésique.
-  const src = readFileSync("src/app/api/ai/physio/route.ts", "utf8")
-    .split("\n").filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*") && !l.trim().startsWith("/*")).join("\n");
-  assert.ok(/from\("notifications"\)[\s\S]{0,400}?"pain_report"[\s\S]{0,200}?gte\(/.test(src),
-    "la route ne lit plus les douleurs passées (seulement celles du jour)");
-  assert.ok(src.includes("suiviParZone("), "le suivi n'est pas calculé");
-  const iSuivi = src.indexOf("resumeSuivi");
-  const iInvite = src.indexOf("const systemPrompt");
-  assert.ok(iSuivi > 0 && src.indexOf("resumeSuivi", iInvite) > iInvite, "le suivi n'est pas repris dans l'invite");
-  assert.ok(/from\("shoes"\)/.test(src), "le garage n'est pas lu");
-  assert.ok(src.indexOf("chaussures", iInvite) > iInvite, "les chaussures n'atteignent pas l'invite");
-  // Et l'absence de donnée doit être DITE, pas comblée.
-  assert.ok(src.includes("aucun antécédent enregistré"), "un historique vide laisse un blanc dans l'invite");
-  assert.ok(src.includes("kilométrage non renseigné"), "un kilométrage absent serait lu comme une paire neuve");
-});
+// (09/11/2026) « le kiné IA lit vraiment l'historique et le garage » : test retiré avec la consultation du « kiné IA », supprimée (lib/health/kineIa).
 
 // ── Budget de génération ────────────────────────────────────────────────────────
 test("le raisonnement ne mange plus le budget de la réponse", () => {
@@ -196,7 +180,7 @@ test("aucun appel IA de l'athlète ne laisse la réponse à l'étroit", () => {
   // coupée se lit comme un avis terminé. `budget(r, n)` rend l'erreur impossible ;
   // un réglage écrit à la main doit prouver qu'il laisse de la place.
   const MINIMUM = 600;
-  for (const f of ["src/app/api/ai/physio/route.ts", "src/app/api/ai/cours/route.ts"]) {
+  for (const f of ["src/app/api/ai/cours/route.ts"]) { // physio : retiré avec le kiné IA (09/11/2026)
     const src = readFileSync(f, "utf8")
       .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
     const parBudget = /\.\.\.budget\(\s*(\d+)\s*,\s*(\d+)\s*\)/.exec(src);
@@ -216,12 +200,7 @@ test("une réponse coupée est signalée, jamais servie comme une conclusion", (
   for (const c of [{ finishReason: "STOP" }, {}, null, undefined, "MAX_TOKENS"]) {
     assert.equal(estTronquee(c), false, `${JSON.stringify(c)} est pris pour une troncature`);
   }
-  // Et le kiné doit RÉAGIR au drapeau : le détecter sans rien en faire ne change rien
-  // pour l'athlète, qui lirait toujours une demi-phrase comme un avis terminé.
-  const src = readFileSync("src/app/api/ai/physio/route.ts", "utf8");
-  const i = src.indexOf("out.tronquee");
-  assert.ok(i > 0, "le kiné ignore le drapeau de troncature");
-  assert.ok(/Réponse interrompue/.test(src.slice(i, i + 300)), "le kiné ne dit pas que la réponse est incomplète");
+  // Le kiné IA, qui réagissait au drapeau, est retiré (09/11/2026).
 });
 
 // ── Erreurs du fournisseur ──────────────────────────────────────────────────────

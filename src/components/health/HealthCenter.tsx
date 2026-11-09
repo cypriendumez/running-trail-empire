@@ -1,17 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback , useId } from "react";
+import { useState, useEffect, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, Utensils, Stethoscope, AlertTriangle, Phone, Send, Loader2, Scale, Camera, X, Activity, ClipboardList, CalendarPlus, RotateCcw, ChevronDown, Lock, MessageCircle } from "lucide-react";
-import Link from "next/link";
+import { Heart, Utensils, AlertTriangle, Phone, Loader2, Scale, Activity, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { SEUIL_DOULEUR_DECLAREE } from "@/lib/health/seuilDouleur";
 import { NutritionCourse } from "@/components/health/NutritionCourse";
 import type { CourseNutri } from "@/lib/health/coursesNutrition";
 import { WeightMode } from "@/components/health/WeightMode";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { RichText } from "@/components/ui/RichText";
 import type { SuiviZone, Tendance } from "@/lib/health/douleurs";
-import type { Bilan } from "@/lib/health/bilan";
 
 // ── i18n local (5 langues) — la page Santé naît traduite. ───────────────────────
 type Tr = (k: string, p?: Record<string, string | number>) => string;
@@ -20,180 +19,80 @@ function fill(s: string, p?: Record<string, string | number>) {
 }
 const H: Record<string, Record<string, string>> = {
   fr: {
-    "h.enPanne": "Tes douleurs déclarées n'ont pas pu être chargées. Cet historique paraît vide, mais rien n'est perdu — réessaie dans un instant.", "h.title": "Santé et performance", "h.subtitle": "Ton kiné IA, ta nutrition de course et ton poids — au même endroit.",
-    "tab.kine": "Kiné IA", "tab.nutrition": "Nutrition", "tab.poids": "Poids",
+    "h.enPanne": "Tes douleurs déclarées n'ont pas pu être chargées. Cet historique paraît vide, mais rien n'est perdu — réessaie dans un instant.", "h.title": "Santé et performance", "h.subtitle": "Tes douleurs suivies, ta nutrition de course et ton poids — au même endroit.",
+    "tab.kine": "Douleurs", "k.declarer": "Enregistrer cette douleur", "k.seuil": "En dessous de 4/10, une gêne légère ne modifie pas ton plan : rien n'est enregistré.", "k.declOk": "Douleur enregistrée : ton plan réduit l'intensité.", "k.declErr": "Douleur non enregistrée, réessaie dans un instant.", "k.avisTitre": "Pacevo n'est pas un professionnel de santé", "k.avis": "Une douleur déclarée allège ton plan (moins d'intensité) le temps qu'elle passe. Pacevo ne pose aucun diagnostic et ne propose aucun soin : pour savoir ce que tu as et comment le soigner, consulte un médecin ou un masseur-kinésithérapeute.", "k.alerte": "Consulte sans attendre si la douleur t'empêche de marcher, te réveille la nuit, s'accompagne d'un gonflement, d'une rougeur ou de fièvre, ou s'aggrave malgré le repos. En cas d'urgence : 15 ou 112.", "tab.nutrition": "Nutrition", "tab.poids": "Poids",
     "k.where": "Où as-tu mal ?", "view.face": "Face", "view.dos": "Dos",
-    "k.hint": "Touche une zone sur le corps ou dans la liste, ajuste la douleur, puis demande au kiné.",
+    "k.hint": "Touche une zone sur le corps ou dans la liste, ajuste l'intensité, puis enregistre-la : ton plan s'adapte.",
     "k.pain": "Douleur", "k.painLight": "Gêne légère", "k.painHard": "Très douloureux",
-    "k.ask": "Demander au kiné IA", "k.noZone": "Aucune zone sélectionnée",
-    "k.protoExpress": "Protocole express", "k.protoWait": "Protocole d'attente — pour un plan précis, décris ta douleur au kiné IA ci-contre.",
-    "k.suivi": "Suivi de tes douleurs", "k.suiviNone": "Aucune douleur déclarée ces 60 derniers jours.", "k.suiviSince": "depuis {n} j", "k.suiviToday": "aujourd'hui", "k.suiviAgo": "il y a {n} j", "trend.amelioration": "en amélioration", "trend.aggravation": "en aggravation", "trend.stable": "stable", "trend.inconnue": "1re déclaration", "chat.starters": "Pour démarrer", "chat.s1": "J'ai une douleur qui revient à chaque sortie longue.", "chat.s2": "Comment adapter ma semaine avec cette douleur ?", "chat.s3": "Quels exercices de prévention pour mes tendons ?",
-    "chat.title": "Kiné IA", "chat.sub": "Réponses personnalisées selon ta charge & ta récup",
-    "chat.seed": "Bonjour, je suis votre kiné du sport. Décrivez-moi ce que vous ressentez — zone, depuis quand, à l'effort ou au repos — ou cliquez une zone sur le schéma, et je vous aide.",
-    "chat.thinking": "Le kiné réfléchit…", "chat.placeholder": "Ex : douleur au genou après mes sorties longues…", "chat.photoAdd": "Ajouter une photo", "chat.photoRemove": "Retirer la photo", "chat.photoReady": "Photo prête. Elle est analysée puis oubliée : rien n'est enregistré. Cadre serré sur la zone, en pleine lumière.", "chat.photoBadType": "Image illisible. Formats acceptés : JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Peux-tu regarder cette photo ?",
-    "chat.disclaimer": "Conseils informatifs — ne remplacent pas un avis médical. Douleur forte / persistante → consultez.",
-    "chat.errNoReply": "Je n'ai pas pu répondre, réessayez.", "chat.errConn": "Connexion impossible au kiné IA. Réessayez.", "chat.painNotSaved": "Ta douleur n'a pas pu être enregistrée : ton coach ne la connaît pas encore. Signale-la de nouveau dans un moment.",
-    "chat.verrou": "Le kiné IA fait partie des formules Starter et Premium.", "chat.verrouCta": "Voir les formules", "chat.quota": "Tu as utilisé tes échanges avec l'IA pour aujourd'hui : ils reviennent demain.",
-    "k.askPrompt": "J'ai une douleur au niveau : {zone} (intensité {n}/10). Qu'est-ce que ça peut être, et que dois-je faire concrètement ?",
+    "k.noZone": "Aucune zone sélectionnée",
+    "k.suivi": "Suivi de tes douleurs", "k.suiviNone": "Aucune douleur déclarée ces 60 derniers jours.", "k.suiviSince": "depuis {n} j", "k.suiviToday": "aujourd'hui", "k.suiviAgo": "il y a {n} j", "trend.amelioration": "en amélioration", "trend.aggravation": "en aggravation", "trend.stable": "stable", "trend.inconnue": "1re déclaration", "chat.s1": "J'ai une douleur qui revient à chaque sortie longue.", "chat.s2": "Comment adapter ma semaine avec cette douleur ?", "chat.s3": "Quels exercices de prévention pour mes tendons ?",
     "k.annuler": "Annuler", "k.etatQ": "{z} — où en es-tu ?", "k.mieux": "Ça va mieux", "k.pire": "Ça empire", "k.passe": "C'est passé", "k.etatOk": "C'est noté — ton coach en tient compte.", "k.etatPasse": "Noté : cette douleur ne bride plus ton plan.", "k.etatErr": "Mise à jour impossible. Réessaie.",
-    "chat.new": "Nouvelle consultation", "chat.newConfirm": "Effacer la conversation ? Tes douleurs déclarées restent dans ton suivi.", "chat.resumed": "Consultation précédente reprise — le kiné se souvient de vos échanges.", "chat.newFail": "Effacement impossible, réessaie.",
     "k.mapOpen": "Où as-tu mal ? Montrer le schéma", "k.mapClose": "Masquer le schéma", "k.zoneChip": "{zone} · {n}/10",
-    "bilan.title": "Bilan de la consultation", "bilan.hyp": "Hypothèses", "bilan.urgent": "Drapeau rouge : consulte rapidement un médecin. Le kiné IA ne remplace pas un avis médical.", "bilan.exos": "Exercices", "bilan.charge": "Charge", "bilan.reprise": "Reprise",
-    "bilan.plan": "Programmer 2 semaines dans mon calendrier", "bilan.planned": "{n} séances ajoutées au calendrier (un jour sur deux).", "bilan.planFail": "Le calendrier n'a pas pu être écrit.", "bilan.voirCal": "Voir le calendrier",
     "bilan.proba.haute": "probable", "bilan.proba.moyenne": "possible", "bilan.proba.faible": "peu probable",
     "grp.upper": "Haut du corps", "grp.trunk": "Tronc", "grp.pelvis": "Bassin", "grp.thighs": "Cuisses", "grp.knees": "Genoux", "grp.legs": "Jambes", "grp.feet": "Pieds",
     "zf.head": "Tête", "zf.neck": "Cou / cervicales", "zf.shoulderL": "Épaule gauche", "zf.shoulderR": "Épaule droite", "zf.armL": "Bras gauche", "zf.armR": "Bras droit", "zf.chest": "Poitrine", "zf.abs": "Abdominaux / core", "zf.hipL": "Hanche / aine gauche", "zf.hipR": "Hanche / aine droite", "zf.thighL": "Quadriceps gauche", "zf.thighR": "Quadriceps droit", "zf.kneeL": "Genou gauche", "zf.kneeR": "Genou droit", "zf.shinL": "Tibia gauche", "zf.shinR": "Tibia droit", "zf.ankleL": "Cheville gauche", "zf.ankleR": "Cheville droite", "zf.footL": "Pied gauche", "zf.footR": "Pied droit",
     "zd.head": "Nuque", "zd.neck": "Cervicales", "zd.shoulderL": "Trapèze gauche", "zd.shoulderR": "Trapèze droit", "zd.armL": "Triceps gauche", "zd.armR": "Triceps droit", "zd.chest": "Haut du dos", "zd.abs": "Bas du dos / lombaires", "zd.hipL": "Fessier gauche", "zd.hipR": "Fessier droit", "zd.thighL": "Ischio-jambier gauche", "zd.thighR": "Ischio-jambier droit", "zd.kneeL": "Arrière-genou gauche", "zd.kneeR": "Arrière-genou droit", "zd.shinL": "Mollet gauche", "zd.shinR": "Mollet droit", "zd.ankleL": "Tendon d'Achille gauche", "zd.ankleR": "Tendon d'Achille droit", "zd.footL": "Talon gauche", "zd.footR": "Talon droit",
-    "ex.knee.1n": "Squat isométrique au mur", "ex.knee.1d": "Dos au mur, cuisses ~parallèles — maintien 45 s", "ex.knee.2n": "Pont fessier + abduction", "ex.knee.2d": "Bridge au sol, ouvre les genoux en haut", "ex.knee.3n": "Step-down contrôlé", "ex.knee.3d": "Descente lente d'une marche, genou aligné",
-    "ex.shin.1n": "Relevés de pointes (tibial ant.)", "ex.shin.1d": "Monte les pointes lentement, talons au sol", "ex.shin.2n": "Étirement mollet au mur", "ex.shin.2d": "Jambe arrière tendue, talon au sol — 30 s", "ex.shin.3n": "Automassage du tibia", "ex.shin.3d": "Foam roller doux le long du tibia (60 s/côté)",
-    "ex.calf.1n": "Mollets excentriques (marche)", "ex.calf.1d": "Montée 2 pieds, descente lente sur 1 pied", "ex.calf.2n": "Isométrie sur pointe", "ex.calf.2d": "Sur la pointe de pied, maintien 30 s", "ex.calf.3n": "Étirement soléaire genou fléchi", "ex.calf.3d": "Au mur, genou légèrement plié — 30 s",
-    "ex.ischio.1n": "Nordic hamstring (assisté)", "ex.ischio.1d": "Descente lente contrôlée, freine la chute", "ex.ischio.2n": "Pont fessier 1 jambe", "ex.ischio.2d": "Bascule le bassin, jambe libre tendue", "ex.ischio.3n": "Étirement ischios doux", "ex.ischio.3d": "Jambe tendue, dos droit, sans à-coup",
-    "ex.back.1n": "Cat-Cow", "ex.back.1d": "À quatre pattes, enroule puis cambre en douceur", "ex.back.2n": "Gainage frontal", "ex.back.2d": "Planche — dos neutre, 30 s", "ex.back.3n": "Étirement psoas (fente basse)", "ex.back.3d": "Bascule le bassin — 30 s par côté",
-    "ex.foot.1n": "Roulage voûte plantaire", "ex.foot.1d": "Balle / bouteille froide sous le pied — 60 s", "ex.foot.2n": "Renfo pieds (towel curls)", "ex.foot.2d": "Attrape une serviette avec les orteils", "ex.foot.3n": "Mollets excentriques", "ex.foot.3d": "Descente lente sur une marche",
-    "ex.hip.1n": "Clamshell (coquille)", "ex.hip.1d": "Sur le côté, ouvre le genou, bassin stable", "ex.hip.2n": "Abduction debout (élastique)", "ex.hip.2d": "Écarte la jambe, gainage actif", "ex.hip.3n": "Étirement fléchisseurs / adducteurs", "ex.hip.3d": "30 s par côté, sans douleur",
-    "ex.quad.1n": "Squat tempo", "ex.quad.1d": "Descente lente 3 s, remontée contrôlée", "ex.quad.2n": "Étirement quadriceps debout", "ex.quad.2d": "Talon vers la fesse, bassin rétroversé", "ex.quad.3n": "Fentes avant", "ex.quad.3d": "Genou aligné — 10 par jambe",
-    "ex.def.1n": "Mobilité articulaire douce", "ex.def.1d": "Amplitudes progressives, sans douleur", "ex.def.2n": "Protocole PEACE & LOVE", "ex.def.2d": "Protège, élève, charge progressive, vascularise",
-  },
+    },
   en: {
-    "h.enPanne": "Your reported pains could not be loaded. This history looks empty, but nothing is lost — try again in a moment.", "h.title": "Health and performance", "h.subtitle": "Your AI physio, your race nutrition and your weight — all in one place.",
-    "tab.kine": "AI Physio", "tab.nutrition": "Nutrition", "tab.poids": "Weight",
+    "h.enPanne": "Your reported pains could not be loaded. This history looks empty, but nothing is lost — try again in a moment.", "h.title": "Health and performance", "h.subtitle": "Your pain log, your race nutrition and your weight — all in one place.",
+    "tab.kine": "Pain", "k.declarer": "Save this pain", "k.seuil": "Below 4/10, a slight discomfort doesn't change your plan: nothing is saved.", "k.declOk": "Pain saved: your plan lowers the intensity.", "k.declErr": "Pain not saved, try again in a moment.", "k.avisTitre": "Pacevo is not a health professional", "k.avis": "A declared pain lightens your plan (less intensity) while it lasts. Pacevo makes no diagnosis and offers no treatment: to know what you have and how to treat it, see a doctor or a physiotherapist.", "k.alerte": "See someone without delay if the pain stops you walking, wakes you at night, comes with swelling, redness or fever, or gets worse despite rest. Emergency: 112.", "tab.nutrition": "Nutrition", "tab.poids": "Weight",
     "k.where": "Where does it hurt?", "view.face": "Front", "view.dos": "Back",
-    "k.hint": "Tap a zone on the body or in the list, adjust the pain, then ask the physio.",
+    "k.hint": "Tap a zone on the body or in the list, set the intensity, then save it: your plan adapts.",
     "k.pain": "Pain", "k.painLight": "Mild discomfort", "k.painHard": "Very painful",
-    "k.ask": "Ask the AI physio", "k.noZone": "No zone selected",
-    "k.protoExpress": "Express protocol", "k.protoWait": "Stopgap protocol — for a precise plan, describe your pain to the AI physio on the right.",
-    "k.suivi": "Your pain history", "k.suiviNone": "No pain reported in the last 60 days.", "k.suiviSince": "for {n} d", "k.suiviToday": "today", "k.suiviAgo": "{n} d ago", "trend.amelioration": "improving", "trend.aggravation": "worsening", "trend.stable": "stable", "trend.inconnue": "1st report", "chat.starters": "Get started", "chat.s1": "I get a recurring pain on every long run.", "chat.s2": "How should I adjust my week with this pain?", "chat.s3": "Which prevention exercises for my tendons?",
-    "chat.title": "AI Physio", "chat.sub": "Answers tailored to your load & recovery",
-    "chat.seed": "Hello, I'm your sports physio. Tell me what you feel — area, since when, on exertion or at rest — or click a zone on the diagram, and I'll help.",
-    "chat.thinking": "The physio is thinking…", "chat.placeholder": "E.g. knee pain after my long runs…", "chat.photoAdd": "Add a photo", "chat.photoRemove": "Remove photo", "chat.photoReady": "Photo ready. It is analysed then forgotten: nothing is stored. Frame the area closely, in good light.", "chat.photoBadType": "Unreadable image. Accepted: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Could you look at this photo?",
-    "chat.disclaimer": "Informational advice — not a substitute for medical care. Severe / persistent pain → see a doctor.",
-    "chat.errNoReply": "I couldn't reply, please try again.", "chat.errConn": "Couldn't connect to the AI physio. Try again.", "chat.painNotSaved": "Your pain couldn't be saved: your coach doesn't know about it yet. Report it again in a moment.",
-    "chat.verrou": "The AI physio is part of the Starter and Premium plans.", "chat.verrouCta": "See the plans", "chat.quota": "You've used today's AI exchanges: they come back tomorrow.",
-    "k.askPrompt": "I have pain in: {zone} (intensity {n}/10). What could it be, and what should I concretely do?",
+    "k.noZone": "No zone selected",
+    "k.suivi": "Your pain history", "k.suiviNone": "No pain reported in the last 60 days.", "k.suiviSince": "for {n} d", "k.suiviToday": "today", "k.suiviAgo": "{n} d ago", "trend.amelioration": "improving", "trend.aggravation": "worsening", "trend.stable": "stable", "trend.inconnue": "1st report", "chat.s1": "I get a recurring pain on every long run.", "chat.s2": "How should I adjust my week with this pain?", "chat.s3": "Which prevention exercises for my tendons?",
     "k.annuler": "Undo", "k.etatQ": "{z} — how is it now?", "k.mieux": "Getting better", "k.pire": "Getting worse", "k.passe": "It's gone", "k.etatOk": "Noted — your coach takes it into account.", "k.etatPasse": "Noted: this pain no longer holds your plan back.", "k.etatErr": "Couldn't update. Try again.",
-    "chat.new": "New consultation", "chat.newConfirm": "Clear the conversation? Your reported pains stay in your history.", "chat.resumed": "Previous consultation resumed — the physio remembers your exchanges.", "chat.newFail": "Couldn't clear, try again.",
     "k.mapOpen": "Where does it hurt? Show the body map", "k.mapClose": "Hide the body map", "k.zoneChip": "{zone} · {n}/10",
-    "bilan.title": "Consultation summary", "bilan.hyp": "Hypotheses", "bilan.urgent": "Red flag: see a doctor promptly. The AI physio is no substitute for medical advice.", "bilan.exos": "Exercises", "bilan.charge": "Load", "bilan.reprise": "Return",
-    "bilan.plan": "Schedule 2 weeks in my calendar", "bilan.planned": "{n} sessions added to the calendar (every other day).", "bilan.planFail": "The calendar couldn't be written.", "bilan.voirCal": "See the calendar",
     "bilan.proba.haute": "likely", "bilan.proba.moyenne": "possible", "bilan.proba.faible": "unlikely",
     "grp.upper": "Upper body", "grp.trunk": "Trunk", "grp.pelvis": "Pelvis", "grp.thighs": "Thighs", "grp.knees": "Knees", "grp.legs": "Legs", "grp.feet": "Feet",
     "zf.head": "Head", "zf.neck": "Neck / cervical", "zf.shoulderL": "Left shoulder", "zf.shoulderR": "Right shoulder", "zf.armL": "Left arm", "zf.armR": "Right arm", "zf.chest": "Chest", "zf.abs": "Abs / core", "zf.hipL": "Left hip / groin", "zf.hipR": "Right hip / groin", "zf.thighL": "Left quadriceps", "zf.thighR": "Right quadriceps", "zf.kneeL": "Left knee", "zf.kneeR": "Right knee", "zf.shinL": "Left shin", "zf.shinR": "Right shin", "zf.ankleL": "Left ankle", "zf.ankleR": "Right ankle", "zf.footL": "Left foot", "zf.footR": "Right foot",
     "zd.head": "Nape", "zd.neck": "Cervical", "zd.shoulderL": "Left trapezius", "zd.shoulderR": "Right trapezius", "zd.armL": "Left triceps", "zd.armR": "Right triceps", "zd.chest": "Upper back", "zd.abs": "Lower back / lumbar", "zd.hipL": "Left glute", "zd.hipR": "Right glute", "zd.thighL": "Left hamstring", "zd.thighR": "Right hamstring", "zd.kneeL": "Left popliteal", "zd.kneeR": "Right popliteal", "zd.shinL": "Left calf", "zd.shinR": "Right calf", "zd.ankleL": "Left Achilles tendon", "zd.ankleR": "Right Achilles tendon", "zd.footL": "Left heel", "zd.footR": "Right heel",
-    "ex.knee.1n": "Wall isometric squat", "ex.knee.1d": "Back to wall, thighs ~parallel — hold 45 s", "ex.knee.2n": "Glute bridge + abduction", "ex.knee.2d": "Bridge on floor, open knees at top", "ex.knee.3n": "Controlled step-down", "ex.knee.3d": "Slow step-down, knee aligned",
-    "ex.shin.1n": "Toe raises (tibialis ant.)", "ex.shin.1d": "Raise toes slowly, heels on the ground", "ex.shin.2n": "Wall calf stretch", "ex.shin.2d": "Back leg straight, heel down — 30 s", "ex.shin.3n": "Shin self-massage", "ex.shin.3d": "Gentle foam roller along the shin (60 s/side)",
-    "ex.calf.1n": "Eccentric calf raises (step)", "ex.calf.1d": "Up on 2 feet, slow down on 1 foot", "ex.calf.2n": "Isometric on toes", "ex.calf.2d": "On tiptoes, hold 30 s", "ex.calf.3n": "Soleus stretch, knee bent", "ex.calf.3d": "At the wall, knee slightly bent — 30 s",
-    "ex.ischio.1n": "Nordic hamstring (assisted)", "ex.ischio.1d": "Slow controlled descent, brake the fall", "ex.ischio.2n": "Single-leg glute bridge", "ex.ischio.2d": "Tilt the pelvis, free leg straight", "ex.ischio.3n": "Gentle hamstring stretch", "ex.ischio.3d": "Leg straight, back tall, no jerking",
-    "ex.back.1n": "Cat-Cow", "ex.back.1d": "On all fours, round then arch gently", "ex.back.2n": "Front plank", "ex.back.2d": "Plank — neutral back, 30 s", "ex.back.3n": "Psoas stretch (low lunge)", "ex.back.3d": "Tilt the pelvis — 30 s per side",
-    "ex.foot.1n": "Arch rolling", "ex.foot.1d": "Ball / cold bottle under the foot — 60 s", "ex.foot.2n": "Foot strengthening (towel curls)", "ex.foot.2d": "Grab a towel with your toes", "ex.foot.3n": "Eccentric calf raises", "ex.foot.3d": "Slow descent on a step",
-    "ex.hip.1n": "Clamshell", "ex.hip.1d": "On your side, open the knee, pelvis stable", "ex.hip.2n": "Standing abduction (band)", "ex.hip.2d": "Move the leg out, active core", "ex.hip.3n": "Hip flexor / adductor stretch", "ex.hip.3d": "30 s per side, pain-free",
-    "ex.quad.1n": "Tempo squat", "ex.quad.1d": "Slow descent 3 s, controlled rise", "ex.quad.2n": "Standing quad stretch", "ex.quad.2d": "Heel to glute, pelvis tucked", "ex.quad.3n": "Forward lunges", "ex.quad.3d": "Knee aligned — 10 per leg",
-    "ex.def.1n": "Gentle joint mobility", "ex.def.1d": "Progressive range of motion, pain-free", "ex.def.2n": "PEACE & LOVE protocol", "ex.def.2d": "Protect, elevate, progressive load, perfuse",
-  },
+    },
   de: {
-    "h.enPanne": "Deine gemeldeten Schmerzen konnten nicht geladen werden. Der Verlauf wirkt leer, es ist aber nichts verloren — versuch es gleich nochmal.", "h.title": "Gesundheit und Leistung", "h.subtitle": "Dein KI-Physio, deine Wettkampfernährung und dein Gewicht — alles an einem Ort.",
-    "tab.kine": "KI-Physio", "tab.nutrition": "Ernährung", "tab.poids": "Gewicht",
+    "h.enPanne": "Deine gemeldeten Schmerzen konnten nicht geladen werden. Der Verlauf wirkt leer, es ist aber nichts verloren — versuch es gleich nochmal.", "h.title": "Gesundheit und Leistung", "h.subtitle": "Deine erfassten Schmerzen, deine Wettkampfernährung und dein Gewicht — alles an einem Ort.",
+    "tab.kine": "Schmerzen", "k.declarer": "Diesen Schmerz speichern", "k.seuil": "Unter 4/10 ändert ein leichtes Ziehen deinen Plan nicht: Es wird nichts gespeichert.", "k.declOk": "Schmerz gespeichert: dein Plan senkt die Intensität.", "k.declErr": "Schmerz nicht gespeichert, versuche es gleich noch einmal.", "k.avisTitre": "Pacevo ist keine medizinische Fachkraft", "k.avis": "Ein gemeldeter Schmerz macht deinen Plan leichter (weniger Intensität), solange er anhält. Pacevo stellt keine Diagnose und bietet keine Behandlung an: Um zu wissen, was du hast und wie es behandelt wird, geh zu einer Ärztin, einem Arzt oder in die Physiotherapie.", "k.alerte": "Geh sofort zum Arzt, wenn der Schmerz dich am Gehen hindert, dich nachts weckt, mit Schwellung, Rötung oder Fieber einhergeht oder trotz Ruhe schlimmer wird. Notfall: 112.", "tab.nutrition": "Ernährung", "tab.poids": "Gewicht",
     "k.where": "Wo tut es weh?", "view.face": "Vorne", "view.dos": "Hinten",
-    "k.hint": "Tippe eine Zone am Körper oder in der Liste an, stelle die Schmerzen ein und frage den Physio.",
+    "k.hint": "Tippe eine Zone am Körper oder in der Liste an, stelle die Stärke ein und speichere sie: dein Plan passt sich an.",
     "k.pain": "Schmerz", "k.painLight": "Leichtes Unbehagen", "k.painHard": "Sehr schmerzhaft",
-    "k.ask": "KI-Physio fragen", "k.noZone": "Keine Zone ausgewählt",
-    "k.protoExpress": "Express-Protokoll", "k.protoWait": "Überbrückungs-Protokoll — für einen genauen Plan beschreibe deine Schmerzen rechts dem KI-Physio.",
-    "k.suivi": "Verlauf deiner Schmerzen", "k.suiviNone": "In den letzten 60 Tagen keine Schmerzen gemeldet.", "k.suiviSince": "seit {n} T", "k.suiviToday": "heute", "k.suiviAgo": "vor {n} T", "trend.amelioration": "bessert sich", "trend.aggravation": "verschlechtert sich", "trend.stable": "stabil", "trend.inconnue": "1. Meldung", "chat.starters": "Zum Einstieg", "chat.s1": "Bei jedem langen Lauf kommt derselbe Schmerz zurück.", "chat.s2": "Wie passe ich meine Woche mit diesem Schmerz an?", "chat.s3": "Welche Präventionsübungen für meine Sehnen?",
-    "chat.title": "KI-Physio", "chat.sub": "Antworten passend zu deiner Belastung & Erholung",
-    "chat.seed": "Hallo, ich bin dein Sportphysio. Beschreibe mir, was du spürst — Bereich, seit wann, bei Belastung oder in Ruhe — oder klicke eine Zone im Schema an, und ich helfe dir.",
-    "chat.thinking": "Der Physio überlegt…", "chat.placeholder": "Z. B. Knieschmerzen nach langen Läufen…", "chat.photoAdd": "Foto hinzufügen", "chat.photoRemove": "Foto entfernen", "chat.photoReady": "Foto bereit. Es wird analysiert und dann verworfen: nichts wird gespeichert. Bereich nah und gut ausgeleuchtet aufnehmen.", "chat.photoBadType": "Bild nicht lesbar. Erlaubt: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Kannst du dir dieses Foto ansehen?",
-    "chat.disclaimer": "Informative Hinweise — kein Ersatz für ärztlichen Rat. Starke / anhaltende Schmerzen → zum Arzt.",
-    "chat.errNoReply": "Ich konnte nicht antworten, bitte erneut versuchen.", "chat.errConn": "Keine Verbindung zum KI-Physio. Versuche es erneut.", "chat.painNotSaved": "Dein Schmerz konnte nicht gespeichert werden: Dein Coach weiß noch nichts davon. Melde ihn gleich noch einmal.",
-    "chat.verrou": "Die KI-Physio ist Teil der Tarife Starter und Premium.", "chat.verrouCta": "Tarife ansehen", "chat.quota": "Deine KI-Dialoge für heute sind aufgebraucht: morgen gibt es neue.",
-    "k.askPrompt": "Ich habe Schmerzen im Bereich: {zone} (Intensität {n}/10). Was könnte es sein, und was soll ich konkret tun?",
+    "k.noZone": "Keine Zone ausgewählt",
+    "k.suivi": "Verlauf deiner Schmerzen", "k.suiviNone": "In den letzten 60 Tagen keine Schmerzen gemeldet.", "k.suiviSince": "seit {n} T", "k.suiviToday": "heute", "k.suiviAgo": "vor {n} T", "trend.amelioration": "bessert sich", "trend.aggravation": "verschlechtert sich", "trend.stable": "stabil", "trend.inconnue": "1. Meldung", "chat.s1": "Bei jedem langen Lauf kommt derselbe Schmerz zurück.", "chat.s2": "Wie passe ich meine Woche mit diesem Schmerz an?", "chat.s3": "Welche Präventionsübungen für meine Sehnen?",
     "k.annuler": "Rückgängig", "k.etatQ": "{z} — wie ist es jetzt?", "k.mieux": "Wird besser", "k.pire": "Wird schlimmer", "k.passe": "Ist weg", "k.etatOk": "Notiert — dein Coach berücksichtigt es.", "k.etatPasse": "Notiert: dieser Schmerz bremst deinen Plan nicht mehr.", "k.etatErr": "Aktualisierung nicht möglich. Versuch es nochmal.",
-    "chat.new": "Neue Konsultation", "chat.newConfirm": "Gespräch löschen? Deine gemeldeten Schmerzen bleiben in deinem Verlauf.", "chat.resumed": "Vorherige Konsultation fortgesetzt — der Physio erinnert sich an eure Gespräche.", "chat.newFail": "Löschen nicht möglich, bitte erneut versuchen.",
     "k.mapOpen": "Wo tut es weh? Körperschema zeigen", "k.mapClose": "Körperschema ausblenden", "k.zoneChip": "{zone} · {n}/10",
-    "bilan.title": "Bilanz der Konsultation", "bilan.hyp": "Hypothesen", "bilan.urgent": "Rote Flagge: Geh zeitnah zum Arzt. Der KI-Physio ersetzt keinen ärztlichen Rat.", "bilan.exos": "Übungen", "bilan.charge": "Belastung", "bilan.reprise": "Wiedereinstieg",
-    "bilan.plan": "2 Wochen in meinen Kalender eintragen", "bilan.planned": "{n} Einheiten in den Kalender eingetragen (jeden zweiten Tag).", "bilan.planFail": "Der Kalender konnte nicht geschrieben werden.", "bilan.voirCal": "Kalender ansehen",
     "bilan.proba.haute": "wahrscheinlich", "bilan.proba.moyenne": "möglich", "bilan.proba.faible": "unwahrscheinlich",
     "grp.upper": "Oberkörper", "grp.trunk": "Rumpf", "grp.pelvis": "Becken", "grp.thighs": "Oberschenkel", "grp.knees": "Knie", "grp.legs": "Unterschenkel", "grp.feet": "Füße",
     "zf.head": "Kopf", "zf.neck": "Hals / Nacken", "zf.shoulderL": "Linke Schulter", "zf.shoulderR": "Rechte Schulter", "zf.armL": "Linker Arm", "zf.armR": "Rechter Arm", "zf.chest": "Brust", "zf.abs": "Bauch / Core", "zf.hipL": "Linke Hüfte / Leiste", "zf.hipR": "Rechte Hüfte / Leiste", "zf.thighL": "Linker Quadrizeps", "zf.thighR": "Rechter Quadrizeps", "zf.kneeL": "Linkes Knie", "zf.kneeR": "Rechtes Knie", "zf.shinL": "Linkes Schienbein", "zf.shinR": "Rechtes Schienbein", "zf.ankleL": "Linker Knöchel", "zf.ankleR": "Rechter Knöchel", "zf.footL": "Linker Fuß", "zf.footR": "Rechter Fuß",
     "zd.head": "Nacken", "zd.neck": "Halswirbelsäule", "zd.shoulderL": "Linker Trapezius", "zd.shoulderR": "Rechter Trapezius", "zd.armL": "Linker Trizeps", "zd.armR": "Rechter Trizeps", "zd.chest": "Oberer Rücken", "zd.abs": "Unterer Rücken / Lende", "zd.hipL": "Linker Gesäßmuskel", "zd.hipR": "Rechter Gesäßmuskel", "zd.thighL": "Linker hinterer Oberschenkel", "zd.thighR": "Rechter hinterer Oberschenkel", "zd.kneeL": "Linke Kniekehle", "zd.kneeR": "Rechte Kniekehle", "zd.shinL": "Linke Wade", "zd.shinR": "Rechte Wade", "zd.ankleL": "Linke Achillessehne", "zd.ankleR": "Rechte Achillessehne", "zd.footL": "Linke Ferse", "zd.footR": "Rechte Ferse",
-    "ex.knee.1n": "Isometrische Wand-Kniebeuge", "ex.knee.1d": "Rücken zur Wand, Oberschenkel ~parallel — 45 s halten", "ex.knee.2n": "Glute Bridge + Abduktion", "ex.knee.2d": "Bridge am Boden, Knie oben öffnen", "ex.knee.3n": "Kontrollierter Step-down", "ex.knee.3d": "Langsam von einer Stufe, Knie ausgerichtet",
-    "ex.shin.1n": "Fußspitzen heben (Tibialis ant.)", "ex.shin.1d": "Spitzen langsam heben, Fersen am Boden", "ex.shin.2n": "Waden-Dehnung an der Wand", "ex.shin.2d": "Hinteres Bein gestreckt, Ferse am Boden — 30 s", "ex.shin.3n": "Schienbein-Selbstmassage", "ex.shin.3d": "Sanfte Foam-Roller entlang des Schienbeins (60 s/Seite)",
-    "ex.calf.1n": "Exzentrische Wadenheber (Stufe)", "ex.calf.1d": "Auf 2 Füßen hoch, langsam auf 1 Fuß runter", "ex.calf.2n": "Isometrie auf Zehenspitzen", "ex.calf.2d": "Auf Zehenspitzen, 30 s halten", "ex.calf.3n": "Soleus-Dehnung, Knie gebeugt", "ex.calf.3d": "An der Wand, Knie leicht gebeugt — 30 s",
-    "ex.ischio.1n": "Nordic Hamstring (unterstützt)", "ex.ischio.1d": "Langsam kontrolliert absenken, Fall bremsen", "ex.ischio.2n": "Einbeinige Glute Bridge", "ex.ischio.2d": "Becken kippen, freies Bein gestreckt", "ex.ischio.3n": "Sanfte Hamstring-Dehnung", "ex.ischio.3d": "Bein gestreckt, Rücken gerade, ohne Ruck",
-    "ex.back.1n": "Cat-Cow", "ex.back.1d": "Im Vierfüßlerstand, sanft rund und hohl", "ex.back.2n": "Frontaler Unterarmstütz", "ex.back.2d": "Plank — neutraler Rücken, 30 s", "ex.back.3n": "Psoas-Dehnung (tiefer Ausfallschritt)", "ex.back.3d": "Becken kippen — 30 s pro Seite",
-    "ex.foot.1n": "Fußgewölbe ausrollen", "ex.foot.1d": "Ball / kalte Flasche unter dem Fuß — 60 s", "ex.foot.2n": "Fußkräftigung (Handtuch-Curls)", "ex.foot.2d": "Mit den Zehen ein Handtuch greifen", "ex.foot.3n": "Exzentrische Wadenheber", "ex.foot.3d": "Langsam von einer Stufe absenken",
-    "ex.hip.1n": "Clamshell (Muschel)", "ex.hip.1d": "Seitlich, Knie öffnen, Becken stabil", "ex.hip.2n": "Stehende Abduktion (Band)", "ex.hip.2d": "Bein nach außen, aktiver Core", "ex.hip.3n": "Hüftbeuger- / Adduktoren-Dehnung", "ex.hip.3d": "30 s pro Seite, schmerzfrei",
-    "ex.quad.1n": "Tempo-Kniebeuge", "ex.quad.1d": "Langsam runter 3 s, kontrolliert hoch", "ex.quad.2n": "Stehende Quadrizeps-Dehnung", "ex.quad.2d": "Ferse zum Gesäß, Becken gekippt", "ex.quad.3n": "Ausfallschritte nach vorn", "ex.quad.3d": "Knie ausgerichtet — 10 pro Bein",
-    "ex.def.1n": "Sanfte Gelenkmobilität", "ex.def.1d": "Progressive Bewegungsamplitude, schmerzfrei", "ex.def.2n": "PEACE & LOVE Protokoll", "ex.def.2d": "Schützen, hochlagern, progressiv belasten, durchbluten",
-  },
+    },
   es: {
-    "h.enPanne": "Tus dolores declarados no se han podido cargar. Este historial parece vacío, pero no se ha perdido nada — inténtalo de nuevo en un momento.", "h.title": "Salud y rendimiento", "h.subtitle": "Tu fisio IA, tu nutrición de carrera y tu peso — todo en un solo lugar.",
-    "tab.kine": "Fisio IA", "tab.nutrition": "Nutrición", "tab.poids": "Peso",
+    "h.enPanne": "Tus dolores declarados no se han podido cargar. Este historial parece vacío, pero no se ha perdido nada — inténtalo de nuevo en un momento.", "h.title": "Salud y rendimiento", "h.subtitle": "Tus dolores registrados, tu nutrición de carrera y tu peso, en un mismo lugar.",
+    "tab.kine": "Dolor", "k.declarer": "Guardar este dolor", "k.seuil": "Por debajo de 4/10, una molestia leve no cambia tu plan: no se guarda nada.", "k.declOk": "Dolor guardado: tu plan reduce la intensidad.", "k.declErr": "Dolor no guardado, inténtalo de nuevo en un momento.", "k.avisTitre": "Pacevo no es un profesional sanitario", "k.avis": "Un dolor declarado aligera tu plan (menos intensidad) mientras dure. Pacevo no hace ningún diagnóstico ni propone ningún tratamiento: para saber qué tienes y cómo tratarlo, consulta a un médico o a un fisioterapeuta.", "k.alerte": "Consulta sin esperar si el dolor te impide caminar, te despierta por la noche, va acompañado de hinchazón, enrojecimiento o fiebre, o empeora pese al reposo. Urgencias: 112.", "tab.nutrition": "Nutrición", "tab.poids": "Peso",
     "k.where": "¿Dónde te duele?", "view.face": "Frente", "view.dos": "Espalda",
-    "k.hint": "Toca una zona del cuerpo o de la lista, ajusta el dolor y pregunta al fisio.",
+    "k.hint": "Toca una zona en el cuerpo o en la lista, ajusta la intensidad y guárdala: tu plan se adapta.",
     "k.pain": "Dolor", "k.painLight": "Molestia leve", "k.painHard": "Muy doloroso",
-    "k.ask": "Preguntar al fisio IA", "k.noZone": "Ninguna zona seleccionada",
-    "k.protoExpress": "Protocolo exprés", "k.protoWait": "Protocolo de espera — para un plan preciso, describe tu dolor al fisio IA a la derecha.",
-    "k.suivi": "Seguimiento de tus dolores", "k.suiviNone": "Ningún dolor declarado en los últimos 60 días.", "k.suiviSince": "desde hace {n} d", "k.suiviToday": "hoy", "k.suiviAgo": "hace {n} d", "trend.amelioration": "mejorando", "trend.aggravation": "empeorando", "trend.stable": "estable", "trend.inconnue": "1.ª declaración", "chat.starters": "Para empezar", "chat.s1": "Tengo un dolor que vuelve en cada tirada larga.", "chat.s2": "¿Cómo adapto mi semana con este dolor?", "chat.s3": "¿Qué ejercicios de prevención para mis tendones?",
-    "chat.title": "Fisio IA", "chat.sub": "Respuestas adaptadas a tu carga y recuperación",
-    "chat.seed": "Hola, soy tu fisio del deporte. Cuéntame qué sientes — zona, desde cuándo, en esfuerzo o en reposo — o haz clic en una zona del esquema, y te ayudo.",
-    "chat.thinking": "El fisio está pensando…", "chat.placeholder": "Ej.: dolor de rodilla tras mis tiradas largas…", "chat.photoAdd": "Añadir una foto", "chat.photoRemove": "Quitar la foto", "chat.photoReady": "Foto lista. Se analiza y se descarta: no se guarda nada. Encuadra la zona de cerca y con buena luz.", "chat.photoBadType": "Imagen ilegible. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "¿Puedes mirar esta foto?",
-    "chat.disclaimer": "Consejos informativos — no sustituyen un consejo médico. Dolor fuerte / persistente → consulta.",
-    "chat.errNoReply": "No he podido responder, inténtalo de nuevo.", "chat.errConn": "No se pudo conectar con el fisio IA. Inténtalo de nuevo.", "chat.painNotSaved": "No se pudo guardar tu dolor: tu coach aún no lo conoce. Vuelve a indicarlo en un momento.",
-    "chat.verrou": "El fisio IA forma parte de los planes Starter y Premium.", "chat.verrouCta": "Ver los planes", "chat.quota": "Has usado tus intercambios con la IA de hoy: vuelven mañana.",
-    "k.askPrompt": "Tengo dolor en: {zone} (intensidad {n}/10). ¿Qué puede ser y qué debo hacer concretamente?",
+    "k.noZone": "Ninguna zona seleccionada",
+    "k.suivi": "Seguimiento de tus dolores", "k.suiviNone": "Ningún dolor declarado en los últimos 60 días.", "k.suiviSince": "desde hace {n} d", "k.suiviToday": "hoy", "k.suiviAgo": "hace {n} d", "trend.amelioration": "mejorando", "trend.aggravation": "empeorando", "trend.stable": "estable", "trend.inconnue": "1.ª declaración", "chat.s1": "Tengo un dolor que vuelve en cada tirada larga.", "chat.s2": "¿Cómo adapto mi semana con este dolor?", "chat.s3": "¿Qué ejercicios de prevención para mis tendones?",
     "k.annuler": "Deshacer", "k.etatQ": "{z}: ¿cómo va?", "k.mieux": "Va mejor", "k.pire": "Va peor", "k.passe": "Ya pasó", "k.etatOk": "Anotado: tu entrenador lo tiene en cuenta.", "k.etatPasse": "Anotado: este dolor ya no frena tu plan.", "k.etatErr": "No se pudo actualizar. Reinténtalo.",
-    "chat.new": "Nueva consulta", "chat.newConfirm": "¿Borrar la conversación? Tus dolores declarados siguen en tu historial.", "chat.resumed": "Consulta anterior retomada — el fisio recuerda vuestros intercambios.", "chat.newFail": "No se pudo borrar, inténtalo de nuevo.",
     "k.mapOpen": "¿Dónde te duele? Mostrar el esquema", "k.mapClose": "Ocultar el esquema", "k.zoneChip": "{zone} · {n}/10",
-    "bilan.title": "Balance de la consulta", "bilan.hyp": "Hipótesis", "bilan.urgent": "Bandera roja: consulta pronto a un médico. El fisio IA no sustituye un consejo médico.", "bilan.exos": "Ejercicios", "bilan.charge": "Carga", "bilan.reprise": "Vuelta",
-    "bilan.plan": "Programar 2 semanas en mi calendario", "bilan.planned": "{n} sesiones añadidas al calendario (un día sí, otro no).", "bilan.planFail": "No se pudo escribir en el calendario.", "bilan.voirCal": "Ver el calendario",
     "bilan.proba.haute": "probable", "bilan.proba.moyenne": "posible", "bilan.proba.faible": "poco probable",
     "grp.upper": "Tren superior", "grp.trunk": "Tronco", "grp.pelvis": "Pelvis", "grp.thighs": "Muslos", "grp.knees": "Rodillas", "grp.legs": "Piernas", "grp.feet": "Pies",
     "zf.head": "Cabeza", "zf.neck": "Cuello / cervicales", "zf.shoulderL": "Hombro izquierdo", "zf.shoulderR": "Hombro derecho", "zf.armL": "Brazo izquierdo", "zf.armR": "Brazo derecho", "zf.chest": "Pecho", "zf.abs": "Abdominales / core", "zf.hipL": "Cadera / ingle izquierda", "zf.hipR": "Cadera / ingle derecha", "zf.thighL": "Cuádriceps izquierdo", "zf.thighR": "Cuádriceps derecho", "zf.kneeL": "Rodilla izquierda", "zf.kneeR": "Rodilla derecha", "zf.shinL": "Espinilla izquierda", "zf.shinR": "Espinilla derecha", "zf.ankleL": "Tobillo izquierdo", "zf.ankleR": "Tobillo derecho", "zf.footL": "Pie izquierdo", "zf.footR": "Pie derecho",
     "zd.head": "Nuca", "zd.neck": "Cervicales", "zd.shoulderL": "Trapecio izquierdo", "zd.shoulderR": "Trapecio derecho", "zd.armL": "Tríceps izquierdo", "zd.armR": "Tríceps derecho", "zd.chest": "Espalda alta", "zd.abs": "Espalda baja / lumbares", "zd.hipL": "Glúteo izquierdo", "zd.hipR": "Glúteo derecho", "zd.thighL": "Isquiotibial izquierdo", "zd.thighR": "Isquiotibial derecho", "zd.kneeL": "Hueco poplíteo izquierdo", "zd.kneeR": "Hueco poplíteo derecho", "zd.shinL": "Gemelo izquierdo", "zd.shinR": "Gemelo derecho", "zd.ankleL": "Tendón de Aquiles izquierdo", "zd.ankleR": "Tendón de Aquiles derecho", "zd.footL": "Talón izquierdo", "zd.footR": "Talón derecho",
-    "ex.knee.1n": "Sentadilla isométrica en pared", "ex.knee.1d": "Espalda en la pared, muslos ~paralelos — mantén 45 s", "ex.knee.2n": "Puente de glúteo + abducción", "ex.knee.2d": "Puente en el suelo, abre las rodillas arriba", "ex.knee.3n": "Step-down controlado", "ex.knee.3d": "Bajada lenta de un escalón, rodilla alineada",
-    "ex.shin.1n": "Elevación de puntas (tibial ant.)", "ex.shin.1d": "Sube las puntas despacio, talones en el suelo", "ex.shin.2n": "Estiramiento de gemelo en pared", "ex.shin.2d": "Pierna atrás estirada, talón en el suelo — 30 s", "ex.shin.3n": "Automasaje de la espinilla", "ex.shin.3d": "Foam roller suave a lo largo de la espinilla (60 s/lado)",
-    "ex.calf.1n": "Gemelos excéntricos (escalón)", "ex.calf.1d": "Sube con 2 pies, baja lento con 1 pie", "ex.calf.2n": "Isometría en puntas", "ex.calf.2d": "De puntillas, mantén 30 s", "ex.calf.3n": "Estiramiento de sóleo, rodilla flexionada", "ex.calf.3d": "En la pared, rodilla ligeramente doblada — 30 s",
-    "ex.ischio.1n": "Nordic hamstring (asistido)", "ex.ischio.1d": "Bajada lenta controlada, frena la caída", "ex.ischio.2n": "Puente de glúteo a una pierna", "ex.ischio.2d": "Bascula la pelvis, pierna libre estirada", "ex.ischio.3n": "Estiramiento suave de isquios", "ex.ischio.3d": "Pierna estirada, espalda recta, sin tirones",
-    "ex.back.1n": "Cat-Cow (gato-vaca)", "ex.back.1d": "A cuatro patas, redondea y arquea con suavidad", "ex.back.2n": "Plancha frontal", "ex.back.2d": "Plancha — espalda neutra, 30 s", "ex.back.3n": "Estiramiento de psoas (zancada baja)", "ex.back.3d": "Bascula la pelvis — 30 s por lado",
-    "ex.foot.1n": "Rodar el arco plantar", "ex.foot.1d": "Pelota / botella fría bajo el pie — 60 s", "ex.foot.2n": "Fortalecer pies (towel curls)", "ex.foot.2d": "Agarra una toalla con los dedos del pie", "ex.foot.3n": "Gemelos excéntricos", "ex.foot.3d": "Bajada lenta en un escalón",
-    "ex.hip.1n": "Clamshell (almeja)", "ex.hip.1d": "De lado, abre la rodilla, pelvis estable", "ex.hip.2n": "Abducción de pie (banda)", "ex.hip.2d": "Separa la pierna, core activo", "ex.hip.3n": "Estiramiento de flexores / aductores", "ex.hip.3d": "30 s por lado, sin dolor",
-    "ex.quad.1n": "Sentadilla tempo", "ex.quad.1d": "Bajada lenta 3 s, subida controlada", "ex.quad.2n": "Estiramiento de cuádriceps de pie", "ex.quad.2d": "Talón al glúteo, pelvis retroversa", "ex.quad.3n": "Zancadas frontales", "ex.quad.3d": "Rodilla alineada — 10 por pierna",
-    "ex.def.1n": "Movilidad articular suave", "ex.def.1d": "Amplitudes progresivas, sin dolor", "ex.def.2n": "Protocolo PEACE & LOVE", "ex.def.2d": "Protege, eleva, carga progresiva, vasculariza",
-  },
+    },
   pt: {
-    "h.enPanne": "As tuas dores declaradas não puderam ser carregadas. Este histórico parece vazio, mas nada se perdeu — tenta novamente daqui a pouco.", "h.title": "Saúde e desempenho", "h.subtitle": "O teu fisio IA, a tua nutrição de prova e o teu peso — tudo no mesmo sítio.",
-    "tab.kine": "Fisio IA", "tab.nutrition": "Nutrição", "tab.poids": "Peso",
+    "h.enPanne": "As tuas dores declaradas não puderam ser carregadas. Este histórico parece vazio, mas nada se perdeu — tenta novamente daqui a pouco.", "h.title": "Saúde e desempenho", "h.subtitle": "As tuas dores registadas, a tua nutrição de prova e o teu peso, no mesmo sítio.",
+    "tab.kine": "Dor", "k.declarer": "Guardar esta dor", "k.seuil": "Abaixo de 4/10, um incómodo ligeiro não altera o teu plano: nada é guardado.", "k.declOk": "Dor guardada: o teu plano reduz a intensidade.", "k.declErr": "Dor não guardada, tenta novamente daqui a pouco.", "k.avisTitre": "O Pacevo não é um profissional de saúde", "k.avis": "Uma dor declarada alivia o teu plano (menos intensidade) enquanto durar. O Pacevo não faz nenhum diagnóstico nem propõe nenhum tratamento: para saberes o que tens e como tratar, consulta um médico ou um fisioterapeuta.", "k.alerte": "Consulta sem esperar se a dor te impedir de andar, te acordar à noite, vier com inchaço, vermelhidão ou febre, ou piorar apesar do repouso. Emergência: 112.", "tab.nutrition": "Nutrição", "tab.poids": "Peso",
     "k.where": "Onde te dói?", "view.face": "Frente", "view.dos": "Costas",
-    "k.hint": "Toca numa zona do corpo ou na lista, ajusta a dor e pergunta ao fisio.",
+    "k.hint": "Toca numa zona do corpo ou da lista, ajusta a intensidade e guarda-a: o teu plano adapta-se.",
     "k.pain": "Dor", "k.painLight": "Desconforto ligeiro", "k.painHard": "Muito doloroso",
-    "k.ask": "Perguntar ao fisio IA", "k.noZone": "Nenhuma zona selecionada",
-    "k.protoExpress": "Protocolo expresso", "k.protoWait": "Protocolo de espera — para um plano preciso, descreve a tua dor ao fisio IA à direita.",
-    "k.suivi": "Acompanhamento das tuas dores", "k.suiviNone": "Nenhuma dor declarada nos últimos 60 dias.", "k.suiviSince": "há {n} d", "k.suiviToday": "hoje", "k.suiviAgo": "há {n} d", "trend.amelioration": "a melhorar", "trend.aggravation": "a piorar", "trend.stable": "estável", "trend.inconnue": "1.ª declaração", "chat.starters": "Para começar", "chat.s1": "Tenho uma dor que volta em cada treino longo.", "chat.s2": "Como adapto a minha semana com esta dor?", "chat.s3": "Que exercícios de prevenção para os meus tendões?",
-    "chat.title": "Fisio IA", "chat.sub": "Respostas adaptadas à tua carga e recuperação",
-    "chat.seed": "Olá, sou o teu fisio do desporto. Conta-me o que sentes — zona, desde quando, em esforço ou em repouso — ou clica numa zona no esquema, e eu ajudo.",
-    "chat.thinking": "O fisio está a pensar…", "chat.placeholder": "Ex.: dor no joelho após os meus treinos longos…", "chat.photoAdd": "Adicionar uma foto", "chat.photoRemove": "Remover a foto", "chat.photoReady": "Foto pronta. É analisada e depois descartada: nada é guardado. Enquadra a zona de perto e com boa luz.", "chat.photoBadType": "Imagem ilegível. Formatos: JPEG, PNG, WebP, GIF.", "chat.photoOnly": "Podes olhar para esta foto?",
-    "chat.disclaimer": "Conselhos informativos — não substituem aconselhamento médico. Dor forte / persistente → consulta.",
-    "chat.errNoReply": "Não consegui responder, tenta novamente.", "chat.errConn": "Não foi possível ligar ao fisio IA. Tenta novamente.", "chat.painNotSaved": "Não foi possível guardar a tua dor: o teu coach ainda não a conhece. Volta a indicá-la daqui a pouco.",
-    "chat.verrou": "O fisio IA faz parte dos planos Starter e Premium.", "chat.verrouCta": "Ver os planos", "chat.quota": "Usaste as tuas trocas com a IA de hoje: voltam amanhã.",
-    "k.askPrompt": "Tenho dor em: {zone} (intensidade {n}/10). O que pode ser e o que devo fazer concretamente?",
+    "k.noZone": "Nenhuma zona selecionada",
+    "k.suivi": "Acompanhamento das tuas dores", "k.suiviNone": "Nenhuma dor declarada nos últimos 60 dias.", "k.suiviSince": "há {n} d", "k.suiviToday": "hoje", "k.suiviAgo": "há {n} d", "trend.amelioration": "a melhorar", "trend.aggravation": "a piorar", "trend.stable": "estável", "trend.inconnue": "1.ª declaração", "chat.s1": "Tenho uma dor que volta em cada treino longo.", "chat.s2": "Como adapto a minha semana com esta dor?", "chat.s3": "Que exercícios de prevenção para os meus tendões?",
     "k.annuler": "Anular", "k.etatQ": "{z} — como está agora?", "k.mieux": "Está melhor", "k.pire": "Está pior", "k.passe": "Já passou", "k.etatOk": "Registado — o teu treinador tem isso em conta.", "k.etatPasse": "Registado: esta dor já não trava o teu plano.", "k.etatErr": "Não foi possível atualizar. Tenta de novo.",
-    "chat.new": "Nova consulta", "chat.newConfirm": "Apagar a conversa? As tuas dores declaradas ficam no teu histórico.", "chat.resumed": "Consulta anterior retomada — o fisio lembra-se das vossas trocas.", "chat.newFail": "Não foi possível apagar, tenta de novo.",
     "k.mapOpen": "Onde te dói? Mostrar o esquema", "k.mapClose": "Esconder o esquema", "k.zoneChip": "{zone} · {n}/10",
-    "bilan.title": "Balanço da consulta", "bilan.hyp": "Hipóteses", "bilan.urgent": "Bandeira vermelha: consulta rapidamente um médico. O fisio IA não substitui um parecer médico.", "bilan.exos": "Exercícios", "bilan.charge": "Carga", "bilan.reprise": "Retoma",
-    "bilan.plan": "Programar 2 semanas no meu calendário", "bilan.planned": "{n} sessões adicionadas ao calendário (dia sim, dia não).", "bilan.planFail": "Não foi possível escrever no calendário.", "bilan.voirCal": "Ver o calendário",
     "bilan.proba.haute": "provável", "bilan.proba.moyenne": "possível", "bilan.proba.faible": "pouco provável",
     "grp.upper": "Tronco superior", "grp.trunk": "Tronco", "grp.pelvis": "Bacia", "grp.thighs": "Coxas", "grp.knees": "Joelhos", "grp.legs": "Pernas", "grp.feet": "Pés",
     "zf.head": "Cabeça", "zf.neck": "Pescoço / cervicais", "zf.shoulderL": "Ombro esquerdo", "zf.shoulderR": "Ombro direito", "zf.armL": "Braço esquerdo", "zf.armR": "Braço direito", "zf.chest": "Peito", "zf.abs": "Abdominais / core", "zf.hipL": "Anca / virilha esquerda", "zf.hipR": "Anca / virilha direita", "zf.thighL": "Quadríceps esquerdo", "zf.thighR": "Quadríceps direito", "zf.kneeL": "Joelho esquerdo", "zf.kneeR": "Joelho direito", "zf.shinL": "Canela esquerda", "zf.shinR": "Canela direita", "zf.ankleL": "Tornozelo esquerdo", "zf.ankleR": "Tornozelo direito", "zf.footL": "Pé esquerdo", "zf.footR": "Pé direito",
     "zd.head": "Nuca", "zd.neck": "Cervicais", "zd.shoulderL": "Trapézio esquerdo", "zd.shoulderR": "Trapézio direito", "zd.armL": "Tríceps esquerdo", "zd.armR": "Tríceps direito", "zd.chest": "Parte superior das costas", "zd.abs": "Lombar / parte inferior das costas", "zd.hipL": "Glúteo esquerdo", "zd.hipR": "Glúteo direito", "zd.thighL": "Isquiotibial esquerdo", "zd.thighR": "Isquiotibial direito", "zd.kneeL": "Cavado poplíteo esquerdo", "zd.kneeR": "Cavado poplíteo direito", "zd.shinL": "Gémeo esquerdo", "zd.shinR": "Gémeo direito", "zd.ankleL": "Tendão de Aquiles esquerdo", "zd.ankleR": "Tendão de Aquiles direito", "zd.footL": "Calcanhar esquerdo", "zd.footR": "Calcanhar direito",
-    "ex.knee.1n": "Agachamento isométrico na parede", "ex.knee.1d": "Costas na parede, coxas ~paralelas — mantém 45 s", "ex.knee.2n": "Ponte de glúteo + abdução", "ex.knee.2d": "Ponte no chão, abre os joelhos em cima", "ex.knee.3n": "Step-down controlado", "ex.knee.3d": "Descida lenta de um degrau, joelho alinhado",
-    "ex.shin.1n": "Elevação de pontas (tibial ant.)", "ex.shin.1d": "Sobe as pontas devagar, calcanhares no chão", "ex.shin.2n": "Alongamento de gémeo na parede", "ex.shin.2d": "Perna de trás esticada, calcanhar no chão — 30 s", "ex.shin.3n": "Automassagem da canela", "ex.shin.3d": "Foam roller suave ao longo da canela (60 s/lado)",
-    "ex.calf.1n": "Gémeos excêntricos (degrau)", "ex.calf.1d": "Sobe com 2 pés, desce devagar com 1 pé", "ex.calf.2n": "Isometria em pontas", "ex.calf.2d": "Em bicos de pés, mantém 30 s", "ex.calf.3n": "Alongamento do sóleo, joelho fletido", "ex.calf.3d": "Na parede, joelho ligeiramente dobrado — 30 s",
-    "ex.ischio.1n": "Nordic hamstring (assistido)", "ex.ischio.1d": "Descida lenta controlada, trava a queda", "ex.ischio.2n": "Ponte de glúteo a uma perna", "ex.ischio.2d": "Báscula a bacia, perna livre esticada", "ex.ischio.3n": "Alongamento suave de isquiotibiais", "ex.ischio.3d": "Perna esticada, costas direitas, sem solavancos",
-    "ex.back.1n": "Cat-Cow (gato-vaca)", "ex.back.1d": "De quatro apoios, arredonda e arqueia com suavidade", "ex.back.2n": "Prancha frontal", "ex.back.2d": "Prancha — costas neutras, 30 s", "ex.back.3n": "Alongamento do psoas (afundo baixo)", "ex.back.3d": "Báscula a bacia — 30 s por lado",
-    "ex.foot.1n": "Rolar o arco plantar", "ex.foot.1d": "Bola / garrafa fria sob o pé — 60 s", "ex.foot.2n": "Reforço dos pés (towel curls)", "ex.foot.2d": "Agarra uma toalha com os dedos do pé", "ex.foot.3n": "Gémeos excêntricos", "ex.foot.3d": "Descida lenta num degrau",
-    "ex.hip.1n": "Clamshell (concha)", "ex.hip.1d": "De lado, abre o joelho, bacia estável", "ex.hip.2n": "Abdução em pé (elástico)", "ex.hip.2d": "Afasta a perna, core ativo", "ex.hip.3n": "Alongamento de flexores / adutores", "ex.hip.3d": "30 s por lado, sem dor",
-    "ex.quad.1n": "Agachamento tempo", "ex.quad.1d": "Descida lenta 3 s, subida controlada", "ex.quad.2n": "Alongamento de quadríceps em pé", "ex.quad.2d": "Calcanhar ao glúteo, bacia em retroversão", "ex.quad.3n": "Afundos frontais", "ex.quad.3d": "Joelho alinhado — 10 por perna",
-    "ex.def.1n": "Mobilidade articular suave", "ex.def.1d": "Amplitudes progressivas, sem dor", "ex.def.2n": "Protocolo PEACE & LOVE", "ex.def.2d": "Protege, eleva, carga progressiva, vasculariza",
-  },
+    },
 };
 
 // Zones cliquables : mêmes emplacements en vue Face / Dos, libellés via clés i18n.
@@ -215,22 +114,6 @@ const VIEW_ZONES: Record<"face" | "dos", Record<string, Zone>> = {
   face: Object.fromEntries(SLOTS.map(({ slot, group }) => [slot, { labelKey: `zf.${slot}`, groupKey: group }])),
   dos: Object.fromEntries(SLOTS.map(({ slot, group }) => [slot, { labelKey: `zd.${slot}`, groupKey: group }])),
 };
-
-// Protocole de rééducation express — match sur le libellé FR (stable), exos en clés i18n.
-type Exo = { nameKey: string; sets: number; reps: number; descKey: string };
-function protocolFor(frLabel: string): Exo[] {
-  const l = frLabel.toLowerCase();
-  const ex = (cat: string, specs: [number, number][]) => specs.map(([sets, reps], i) => ({ nameKey: `ex.${cat}.${i + 1}n`, sets, reps, descKey: `ex.${cat}.${i + 1}d` }));
-  if (/genou|poplit|rotul/.test(l)) return ex("knee", [[4, 45], [3, 15], [3, 12]]);
-  if (/tibia|périost|periost/.test(l)) return ex("shin", [[3, 20], [3, 30], [2, 60]]);
-  if (/mollet|achille/.test(l)) return ex("calf", [[3, 15], [4, 30], [3, 30]]);
-  if (/ischio/.test(l)) return ex("ischio", [[3, 6], [3, 12], [3, 30]]);
-  if (/dos|lombaire/.test(l)) return ex("back", [[3, 10], [3, 30], [2, 30]]);
-  if (/fascia|pied|talon/.test(l)) return ex("foot", [[2, 60], [3, 15], [3, 15]]);
-  if (/hanche|fessier|aine|adduct/.test(l)) return ex("hip", [[3, 15], [3, 15], [2, 30]]);
-  if (/quadriceps/.test(l)) return ex("quad", [[3, 12], [3, 30], [3, 10]]);
-  return ex("def", [[2, 10], [1, 1]]);
-}
 
 // Géométrie de la silhouette (viewBox 200×470, symétrique) — partagée Face/Dos.
 const SHAPES: { slot: string; tag: "ellipse" | "rect"; p: Record<string, number> }[] = [
@@ -284,16 +167,14 @@ const TON_TENDANCE: Record<Tendance, string> = {
 // fin de séance le remplace. Le contact d'urgence a déménagé dans Paramètres › Sécurité,
 // le partage de position en direct reste sur la Carte.
 type Tab = "kine" | "nutrition" | "poids";
-type ChatMsg = { role: "user" | "model"; text: string; photo?: string };
 
-export function HealthCenter({ suivi = [], etats = [], enPanne = false, filInitial = [], coursesNutrition = [], poidsKg = null }: {
+export function HealthCenter({ suivi = [], etats = [], enPanne = false, coursesNutrition = [], poidsKg = null }: {
   suivi?: SuiviZone[];
   /** Pour chaque zone, la déclaration la plus récente et son état déclaré. */
   etats?: { cle: string; id: string; etat: string }[];
   /** La lecture des douleurs a ÉCHOUÉ : l'historique est vide par accident. */
   enPanne?: boolean;
   /** La consultation précédente, relue côté serveur (type `kine_chat`). */
-  filInitial?: { role: "user" | "model"; text: string }[];
   /** Les prochaines courses et leur durée prédite, pour la nutrition (lib/health/coursesNutrition). */
   coursesNutrition?: CourseNutri[];
   poidsKg?: number | null;
@@ -342,152 +223,28 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [painLevel, setPainLevel] = useState(5);
 
-  // ── Chat kiné IA ──────────────────────────────────────────────
-  // ⚠️ LA CONSULTATION REPREND OÙ ELLE S'EST ARRÊTÉE (22/09/2026). Avant, le fil vivait
-  // dans l'état du composant : changer d'onglet suffisait à faire « oublier » au kiné
-  // tout ce qu'on venait de lui décrire. Le serveur rend les 40 derniers messages.
-  // Le serveur a refusé le kiné IA pour cette formule (402) : on montre la sortie.
-  const [verrou, setVerrou] = useState(false);
-  const [messages, setMessages] = useState<ChatMsg[]>(
-    filInitial.length > 0 ? filInitial : [{ role: "model", text: tr("chat.seed") }],
-  );
-  /** Le dernier bilan structuré rendu par le kiné (hypothèses, exercices, charge). */
-  const [bilan, setBilan] = useState<Bilan | null>(null);
-  const [planEnCours, setPlanEnCours] = useState(false);
   /** Sur téléphone, le schéma corporel s'ouvre à la demande : il prenait tout l'écran. */
   const [schemaOuvert, setSchemaOuvert] = useState(false);
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  /** Photo en attente, en data-URL. Elle ne quitte le navigateur qu'à l'envoi, et n'est
-   *  jamais stockée côté serveur — voir le commentaire de /api/ai/physio. */
-  const [photo, setPhoto] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  /**
-   * Redimensionne la photo AVANT tout envoi : une photo de téléphone pèse 3 à 8 Mo, ce
-   * qui ferait un corps de requête de 10 Mo en base64 pour aucun gain — au-delà de
-   * ~1280 px, un modèle de vision ne voit rien de plus. On tombe à ~200 Ko.
-   * Le redimensionnement passe par un canvas, ce qui SUPPRIME au passage les métadonnées
-   * EXIF de la photo d'origine : sur une image de santé, la géolocalisation du cliché
-   * n'a aucune raison de partir avec.
-   */
-  const attachPhoto = useCallback((file: File) => {
-    if (!file.type.startsWith("image/")) { toast.error(tr("chat.photoBadType")); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 1280;
-        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { toast.error(tr("chat.photoBadType")); return; }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        setPhoto(canvas.toDataURL("image/jpeg", 0.82));
-      };
-      img.onerror = () => toast.error(tr("chat.photoBadType"));
-      img.src = String(reader.result);
-    };
-    reader.onerror = () => toast.error(tr("chat.photoBadType"));
-    reader.readAsDataURL(file);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang]);
 
   const zoneMap = VIEW_ZONES[view];
   const selectedZone = selectedSlot ? zoneMap[selectedSlot] : null;
-  // Match du protocole sur le libellé FR (stable, quelle que soit la langue d'affichage).
-  const rehabProtocol = selectedZone ? protocolFor(H.fr[selectedZone.labelKey] ?? "") : [];
 
 
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, sending]);
-
-  const send = useCallback(async (text: string) => {
-    const msg = text.trim();
-    // Une photo seule est un message valable : « regarde ça » se passe de mots.
-    if ((!msg && !photo) || sending) return;
-    const history = messages;
-    const sentPhoto = photo;
-    setMessages((m) => [...m, { role: "user", text: msg, photo: sentPhoto ?? undefined }]);
-    setInput("");
-    setPhoto(null);
-    setSending(true);
+  // ── DÉCLARER UNE DOULEUR, SANS IA (09/11/2026, lib/health/kineIa) ─────────────────
+  // La consultation du « kiné IA » est retirée ; la déclaration, elle, reste : c'est elle qui
+  // allège le plan. Zone et intensité, rien d'autre — ni diagnostic, ni traitement.
+  const router = useRouter();
+  const [declEnCours, setDeclEnCours] = useState(false);
+  const declarer = async () => {
+    if (!selectedZone || !selectedSlot || declEnCours) return;
+    setDeclEnCours(true);
     try {
-      const res = await fetch("/api/ai/physio", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: msg || (sentPhoto ? tr("chat.photoOnly") : ""),
-          zone: selectedSlot ? tr(VIEW_ZONES[view][selectedSlot]?.labelKey ?? "") || null : null,
-          // Le libellé part pour être lu par le modèle et réaffiché ; la CLÉ part pour
-          // être la seule chose sur laquelle on regroupe l'historique.
-          // ⚠️ LA VUE FAIT PARTIE DE LA CLÉ. Le même repère désigne deux parties du corps
-          // selon la face : `kneeL` est le genou de face et le creux poplité de dos
-          // (`zf.kneeL` / `zd.kneeL`). Une clé sans la vue aurait confondu les deux et
-          // surligné la mauvaise zone sur la silhouette.
-          zoneKey: selectedSlot ? `${view}:${selectedSlot}` : null,
-          painLevel: selectedSlot ? painLevel : null,
-          // L'historique n'emporte que du texte : les photos ne sont pas rejouées à
-          // chaque tour (poids inutile, et rien n'est conservé côté serveur).
-          history: history.map((h) => ({ role: h.role, text: h.text })),
-          photo: sentPhoto ? { data: sentPhoto } : null,
-        }),
-      });
-      // ⚠️ 402 = LA FORMULE NE COUVRE PAS LE KINÉ IA, ce n'est pas une panne. Le refus
-      // s'affichait tel quel dans la conversation : « ⚠️ essai_expire », un code interne
-      // lu par un compte gratuit. On le dit en clair, avec la sortie (voir `verrou`).
-      if (res.status === 402) { setVerrou(true); return; }
-      const json = await res.json();
-      // Les deux codes du plafond quotidien (`lib/billing/guard`) sont des CLÉS, pas des
-      // phrases : on les traduit au lieu de les afficher.
-      const erreur = json.error === "quota_ia_atteint" ? tr("chat.quota")
-        : json.error === "quota_indisponible" ? tr("chat.errNoReply")
-        : json.error || tr("chat.errNoReply");
-      if (json.reply) { setMessages((m) => [...m, { role: "model", text: json.reply }]); setBilan(json.bilan ?? null); }
-      // La douleur déclarée n'a pas atteint le coach (`douleurNotee: false`, journalisé côté
-      // serveur) : le kiné a répondu, mais l'athlète doit savoir que rien n'est noté.
-      if (json.douleurNotee === false) toast.error(tr("chat.painNotSaved"));
-      else setMessages((m) => [...m, { role: "model", text: "" + erreur }]);
-    } catch {
-      setMessages((m) => [...m, { role: "model", text: "" + tr("chat.errConn") }]);
-    } finally {
-      setSending(false);
-    }
-  }, [messages, sending, selectedSlot, view, painLevel, lang, photo]);
-
-
-  /** « Nouvelle consultation » : le fil est effacé côté serveur AVANT l'écran. */
-  async function nouvelleConsultation() {
-    if (!window.confirm(tr("chat.newConfirm"))) return;
-    try {
-      const r = await fetch("/api/health/consultation", { method: "DELETE" });
-      if (!r.ok) { toast.error(tr("chat.newFail")); return; }
-      setMessages([{ role: "model", text: tr("chat.seed") }]);
-      setBilan(null);
-    } catch { toast.error(tr("chat.newFail")); }
-  }
-
-  /** Le protocole du bilan → six notes dans le calendrier (deux semaines). */
-  async function programmerProtocole() {
-    if (!bilan?.exercices.length || planEnCours) return;
-    setPlanEnCours(true);
-    try {
-      const r = await fetch("/api/health/protocole", {
+      const r = await fetch("/api/health/declarer", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ zone: selectedZone ? tr(selectedZone.labelKey) : null, exercices: bilan.exercices }),
+        body: JSON.stringify({ zone: tr(selectedZone.labelKey), zoneKey: `${view}:${selectedSlot}`, painLevel }),
       });
-      const j = await r.json().catch(() => ({}));
-      if (r.ok) toast.success(tr("bilan.planned", { n: j.n ?? 0 }));
-      else toast.error(j.error || tr("bilan.planFail"));
-    } catch { toast.error(tr("bilan.planFail")); }
-    setPlanEnCours(false);
-  }
-
-  const askAboutZone = () => {
-    if (!selectedZone) return;
-    send(tr("k.askPrompt", { zone: tr(selectedZone.labelKey), n: painLevel }));
+      if (r.ok) { toast.success(tr("k.declOk")); router.refresh(); } else toast.error(tr("k.declErr"));
+    } catch { toast.error(tr("k.declErr")); } finally { setDeclEnCours(false); }
   };
 
   return (
@@ -515,7 +272,7 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
           375 px, et `flex-wrap` les cassait sur deux lignes au-dessus du contenu. */}
       <div className="-mx-1 flex gap-1 overflow-x-auto rounded-2xl bg-zinc-100/80 p-1 ring-1 ring-zinc-200/60 [scrollbar-width:none] sm:mx-0 sm:w-fit sm:overflow-visible">
         {([
-          { v: "kine", l: tr("tab.kine"), icon: Stethoscope },
+          { v: "kine", l: tr("tab.kine"), icon: Activity },
           { v: "nutrition", l: tr("tab.nutrition"), icon: Utensils },
           { v: "poids", l: tr("tab.poids"), icon: Scale },
         ] as const).map((t) => {
@@ -630,9 +387,12 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                     <input id={`${cid}-r0`} type="range" min={1} max={10} value={painLevel} onChange={(e) => setPainLevel(+e.target.value)}
                       className="w-full" style={{ accentColor: teinteDouleur(painLevel) }} />
                     <div className="flex justify-between text-[11px] text-zinc-400 mt-0.5"><span>{tr("k.painLight")}</span><span>{tr("k.painHard")}</span></div>
-                    <button onClick={askAboutZone} className="btn-brand w-full justify-center mt-3 text-sm">
-                      <MessageCircle className="w-4 h-4" strokeWidth={1.5} /> {tr("k.ask")}
-                    </button>
+                    <>
+                      <button onClick={declarer} disabled={declEnCours || painLevel < SEUIL_DOULEUR_DECLAREE} className="btn-brand w-full justify-center mt-3 text-sm disabled:opacity-50">
+                        {declEnCours ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" strokeWidth={1.5} />} {tr("k.declarer")}
+                      </button>
+                      {painLevel < SEUIL_DOULEUR_DECLAREE && <p className="mt-2 text-center text-[11px] text-zinc-500">{tr("k.seuil")}</p>}
+                    </>
                   </div>
                 ) : (
                   <p className="text-xs text-zinc-400 text-center mt-3 pt-3 border-t border-zinc-100">{tr("k.noZone")}</p>
@@ -726,193 +486,21 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, filIniti
                 )}
               </div>
 
-              {/* Protocole express */}
-              {selectedZone && (
-                <div className="bento-card">
-                  <h3 className="font-semibold text-zinc-900 mb-3 text-sm">{tr("k.protoExpress")} — {tr(selectedZone.labelKey)}</h3>
-                  <div className="space-y-2">
-                    {rehabProtocol.map((ex, i) => (
-                      <div key={i} className="flex items-start gap-2.5 p-2.5 bg-zinc-50 rounded-xl">
-                        <div className="w-6 h-6 bg-zinc-900 text-white rounded-lg flex items-center justify-center text-xs font-semibold flex-shrink-0">{i + 1}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-zinc-900 text-sm">{tr(ex.nameKey)}</div>
-                          <div className="text-xs text-zinc-500">{tr(ex.descKey)}</div>
-                          <div className="flex gap-1.5 mt-1">
-                            <span className="text-[11px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{ex.sets} × {ex.reps}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-3">{tr("k.protoWait")}</p>
-                </div>
-              )}
             </div>
 
-            {/* Chat kiné IA */}
-            <div className="order-1 bento-card flex flex-col lg:order-none lg:col-span-7" style={{ minHeight: 520 }}>
-              <div className="flex items-center gap-2 pb-3 border-b border-zinc-100">
-                <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0"><Stethoscope className="w-5 h-5 text-emerald-600" /></div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-zinc-900 text-sm">{tr("chat.title")}</div>
-                  <div className="truncate text-xs text-zinc-400">{tr("chat.sub")}</div>
+            {/* Ce que Pacevo est et n'est pas : la consultation du « kiné IA » est retirée (lib/health/kineIa). */}
+            <div className="order-1 bento-card space-y-3 lg:order-none lg:col-span-7">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100"><AlertTriangle className="h-5 w-5 text-amber-600" strokeWidth={1.5} /></span>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-zinc-900">{tr("k.avisTitre")}</h3>
+                  <p className="mt-1 text-sm text-zinc-600">{tr("k.avis")}</p>
                 </div>
-                {/* La consultation est mémorisée : il faut donc pouvoir en ouvrir une neuve. */}
-                {messages.length > 1 && (
-                  <button type="button" onClick={nouvelleConsultation} title={tr("chat.new")} aria-label={tr("chat.new")}
-                    className="flex flex-shrink-0 items-center gap-1.5 rounded-full border border-zinc-200 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-600 transition-colors hover:border-emerald-300 hover:text-emerald-700">
-                    <RotateCcw className="h-3.5 w-3.5" /><span className="hidden sm:inline">{tr("chat.new")}</span>
-                  </button>
-                )}
               </div>
-              {/* Dire que le fil vient d'avant évite de croire à un bug d'affichage. */}
-              {filInitial.length > 0 && messages.length > 1 && (
-                <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-[11px] leading-relaxed text-emerald-800">{tr("chat.resumed")}</p>
-              )}
-
-              <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-3" style={{ maxHeight: 440 }}>
-                {messages.map((m, i) => (
-                  <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[85%] overflow-hidden rounded-2xl text-sm leading-relaxed ${
-                      m.role === "user" ? "bg-zinc-900 text-white rounded-br-md" : "bg-zinc-100 text-zinc-800 rounded-bl-md"
-                    }`}>
-                      {/* La photo n'est affichée QUE localement : elle n'a été ni stockée
-                          ni renvoyée par le serveur, elle vit dans l'état du composant. */}
-                      {m.photo && <img src={m.photo} alt="" className="max-h-52 w-full object-cover" />}
-                      {/* ⚠️ LA RÉPONSE DU MODÈLE EST STRUCTURÉE, ON L'AFFICHAIT BRUTE. L'invite
-                          du kiné demande « titres courts / puces » ; sondé le 02/09/2026,
-                          le modèle renvoie bien du gras, des titres et des puces. En
-                          `whitespace-pre-wrap`, l'athlète lisait « ### Pour mieux
-                          comprendre » et « *   **Déclencheur :** ». Le message de
-                          l'athlète, lui, reste brut : il a tapé du texte, pas du balisage. */}
-                      {m.text && (m.role === "model"
-                        ? <RichText texte={m.text} className="px-3.5 py-2.5 text-zinc-800" />
-                        : <div className="whitespace-pre-wrap px-3.5 py-2.5">{m.text}</div>)}
-                    </div>
-                  </div>
-                ))}
-                {/* Une consultation commence par une phrase, pas par une page blanche. */}
-                {messages.length <= 1 && !sending && (
-                  <div className="pt-1">
-                    <div className="mb-2 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{tr("chat.starters")}</div>
-                    <div className="flex flex-wrap gap-2">
-                      {(["chat.s1", "chat.s2", "chat.s3"] as const).map((k) => (
-                        <button key={k} onClick={() => send(tr(k))}
-                          className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-left text-[13px] text-zinc-600 transition-colors hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-zinc-900">
-                          {tr(k)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {sending && (
-                  <div className="flex justify-start">
-                    <div className="bg-zinc-100 text-zinc-500 px-3.5 py-2.5 rounded-2xl rounded-bl-md text-sm flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" /> {tr("chat.thinking")}
-                    </div>
-                  </div>
-                )}
-                {verrou && (
-                  <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-3.5 py-3">
-                    <Lock className="h-4 w-4 flex-shrink-0 text-zinc-500" />
-                    <p className="min-w-0 flex-1 text-sm text-zinc-700">{tr("chat.verrou")}</p>
-                    <Link href="/pricing" className="flex-shrink-0 rounded-xl bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-zinc-800">
-                      {tr("chat.verrouCta")}
-                    </Link>
-                  </div>
-                )}
+              <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-800">
+                <Phone className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <p>{tr("k.alerte")}</p>
               </div>
-
-              {/* Photo en attente d'envoi */}
-              {photo && (
-                <div className="mt-3 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-2.5">
-                  <img src={photo} alt="" className="h-14 w-14 flex-shrink-0 rounded-xl object-cover" />
-                  <p className="flex-1 text-xs leading-relaxed text-emerald-900">{tr("chat.photoReady")}</p>
-                  <button type="button" onClick={() => setPhoto(null)} aria-label={tr("chat.photoRemove")}
-                    className="flex-shrink-0 rounded-lg p-1.5 text-emerald-700 transition-colors hover:bg-emerald-100">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-
-              <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="pt-3 border-t border-zinc-100 flex items-center gap-2">
-                {/* `capture` fait ouvrir l'appareil photo directement sur mobile. */}
-                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" capture="environment"
-                  className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) attachPhoto(f); e.target.value = ""; }} />
-                <button type="button" onClick={() => fileRef.current?.click()} disabled={sending} title={tr("chat.photoAdd")} aria-label={tr("chat.photoAdd")}
-                  className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-zinc-200 text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-700 disabled:opacity-40">
-                  <Camera className="h-4 w-4" />
-                </button>
-                <input value={input} onChange={(e) => setInput(e.target.value)} disabled={sending}
-                  placeholder={tr("chat.placeholder")}
-                  className="flex-1 px-4 py-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400" />
-                <button type="submit" disabled={sending || (!input.trim() && !photo)}
-                  className="w-11 h-11 flex items-center justify-center rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 transition-colors flex-shrink-0">
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
-              <p className="text-[11px] text-zinc-400 mt-2">{tr("chat.disclaimer")}</p>
-
-              {/* ── LE BILAN DE LA CONSULTATION ──────────────────────────────────
-                  Une consultation se terminait par un mur de texte : hypothèses,
-                  exercices et consignes se perdaient dedans, et rien n'en sortait. Le
-                  modèle rend désormais un bilan structuré (bloc ```bilan, validé champ
-                  par champ côté serveur) — affiché ici, et surtout PROGRAMMABLE : le
-                  protocole part dans le calendrier, six séances sur deux semaines. */}
-              {bilan && (
-                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
-                  <div className="flex items-center gap-2">
-                    <ClipboardList className="h-4 w-4 text-emerald-700" aria-hidden />
-                    <h4 className="text-sm font-semibold text-emerald-900">{tr("bilan.title")}</h4>
-                  </div>
-                  {bilan.urgence && (
-                    <p className="mt-2 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] font-semibold leading-relaxed text-rose-800">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />{tr("bilan.urgent")}
-                    </p>
-                  )}
-                  {bilan.hypotheses.length > 0 && (
-                    <div className="mt-3">
-                      <div className="text-[11px] font-semibold text-emerald-800/70 first-letter:uppercase">{tr("bilan.hyp")}</div>
-                      <ul className="mt-1 space-y-1">
-                        {bilan.hypotheses.map((h) => (
-                          <li key={h.nom} className="flex items-center gap-2 text-[13px] text-zinc-800">
-                            <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${h.probabilite === "haute" ? "bg-emerald-600 text-white" : h.probabilite === "moyenne" ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-600"}`}>
-                              {tr(`bilan.proba.${h.probabilite}`)}
-                            </span>
-                            {h.nom}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {bilan.exercices.length > 0 && (
-                    <div className="mt-3">
-                      <div className="text-[11px] font-semibold text-emerald-800/70 first-letter:uppercase">{tr("bilan.exos")}</div>
-                      <ul className="mt-1 space-y-1">
-                        {bilan.exercices.map((e) => (
-                          <li key={e.nom} className="text-[13px] text-zinc-800">
-                            <b className="font-semibold">{e.nom}</b> — {e.dosage}{e.frequence ? ` · ${e.frequence}` : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {(bilan.charge || bilan.reprise) && (
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      {bilan.charge && <p className="rounded-xl bg-white/70 px-3 py-2 text-[13px] leading-relaxed text-zinc-700"><b className="text-emerald-800">{tr("bilan.charge")} : </b>{bilan.charge}</p>}
-                      {bilan.reprise && <p className="rounded-xl bg-white/70 px-3 py-2 text-[13px] leading-relaxed text-zinc-700"><b className="text-emerald-800">{tr("bilan.reprise")} : </b>{bilan.reprise}</p>}
-                    </div>
-                  )}
-                  {bilan.exercices.length > 0 && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <button type="button" onClick={programmerProtocole} disabled={planEnCours} className="btn-brand justify-center text-sm disabled:opacity-60">
-                        {planEnCours ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarPlus className="h-4 w-4" />}{tr("bilan.plan")}
-                      </button>
-                      <Link href="/dashboard/calendrier" className="text-sm font-semibold text-emerald-700 underline-offset-2 hover:underline">{tr("bilan.voirCal")}</Link>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </motion.div>
         )}

@@ -14,6 +14,7 @@ import { EtapeMontre } from "./EtapeMontre";
 import type { MarqueId } from "./marquesMontre";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthLabel } from "@/data/healthCatalog";
 import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
+import { AGE_MINIMUM, ageEntier, estMajeur } from "@/lib/legal/age";
 
 /**
  * LE QUESTIONNAIRE D'INSCRIPTION — refondu le 11/10/2026.
@@ -222,6 +223,8 @@ export default function OnboardingPage() {
     const m: [boolean, string, string][] =
       s === "profile" ? [
         [!profile.age, `${cid}-age`, tr("age")],
+        // Réservé aux personnes majeures (lib/legal/age : conditions de Gemini, 09/11/2026).
+        [!!profile.age && !estMajeur(profile.age), `${cid}-age`, tr("ageMin")],
         [!profile.height_cm, `${cid}-taille`, sansUnite(tr("height"))],
         [!profile.weight_kg, `${cid}-poids`, sansUnite(tr("weight"))],
         [!profile.gender, `${cid}-genre`, tr("gender")],
@@ -274,7 +277,7 @@ export default function OnboardingPage() {
     if (!user) { router.push("/login"); return; }
 
     const { error: profileError } = await supabase.from("profiles").update({
-      age: parseInt(profile.age),
+      age: ageEntier(profile.age), // la valeur contrôlée par `estMajeur`, pas un autre parseInt
       height_cm: parseInt(profile.height_cm),
       weight_kg: parseFloat(profile.weight_kg),
       gender: profile.gender,
@@ -471,7 +474,7 @@ export default function OnboardingPage() {
           <div className="mt-8 divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
             <div className="grid grid-cols-3 gap-3 px-5 py-6 sm:gap-4 sm:px-7">
               <Mesure id={`${cid}-age`} label={tr("age")} unite={tr("uAns")} valeur={profile.age}
-                onChange={(v) => setProfile(p => ({ ...p, age: v }))} placeholder="30" min={10} max={99} />
+                onChange={(v) => setProfile(p => ({ ...p, age: v }))} placeholder="30" min={AGE_MINIMUM} max={99} />
               <Mesure id={`${cid}-taille`} label={sansUnite(tr("height"))} unite={tr("uCm")} valeur={profile.height_cm}
                 onChange={(v) => setProfile(p => ({ ...p, height_cm: v }))} placeholder="175" min={140} max={220} />
               <Mesure id={`${cid}-poids`} label={sansUnite(tr("weight"))} unite={tr("uKg")} valeur={profile.weight_kg}

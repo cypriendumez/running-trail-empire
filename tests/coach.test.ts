@@ -1342,51 +1342,10 @@ test("un fichier tronqué ne passe pas", () => {
 });
 
 console.log("\nPHOTOS KINÉ — rien n'est stocké, et le modèle est cadré");
-test("la photo ne touche aucun stockage", () => {
-  // Une photo de cheville gonflée dans un bucket PUBLIC (ce que fait /api/upload) resterait
-  // accessible à vie sans authentification. Ne rien garder règle accès ET rétention.
-  //
-  // Les COMMENTAIRES sont retirés avant l'analyse : la première version de ce test
-  // échouait sur le commentaire qui explique justement pourquoi on ne stocke rien — il y
-  // cite « /api/upload » et « getPublicUrl ». Un test qui lit la prose et pas le code se
-  // déclenche sur des mots, pas sur des faits.
-  const code = readFileSync("src/app/api/ai/physio/route.ts", "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
-  assert.ok(!/storage|getPublicUrl|createAdminClient/.test(code), "la route kiné ne doit rien écrire ni publier");
-  // La route enregistre bien UNE chose : le signalement de douleur (zone + intensité),
-  // fonctionnalité antérieure qui fait remonter la douleur jusqu'au coach. On vérifie donc
-  // le CONTENU des écritures, pas leur existence — interdire tout `insert` aurait fait
-  // échouer le test sur une écriture parfaitement légitime.
-  const payloads = [...code.matchAll(/\.(insert|upsert)\(([\s\S]{0,400}?)\)/g)].map((m) => m[2]);
-  assert.ok(payloads.length > 0, "le signalement de douleur doit toujours être enregistré");
-  for (const pl of payloads) {
-    assert.ok(!/photo|b64|imagePart|inline_data|base64/i.test(pl), `une écriture embarque la photo : ${pl.slice(0, 60)}`);
-  }
-  assert.ok(/inline_data/.test(code), "la photo doit partir en inline_data, pas par une URL");
-});
-test("le modèle reçoit les limites de ce qu'une photo permet", () => {
-  const src = readFileSync("src/app/api/ai/physio/route.ts", "utf8");
-  assert.ok(/CE QU'UNE PHOTO NE PERMET PAS/.test(src), "sans ce cadre, une image rend le modèle affirmatif à tort");
-  // La phlébite est le drapeau rouge qui compte ici : un mollet gonflé d'un seul côté
-  // ressemble à une contracture et se rééduque… jusqu'à l'embolie pulmonaire.
-  assert.ok(/PHLÉBITE/.test(src), "le drapeau rouge vasculaire doit être explicite");
-  assert.ok(/floue|trop sombre/.test(src), "une image inexploitable doit être signalée, pas interprétée");
-});
-test("un refus du filtre de sécurité ne se déguise pas en surcharge", () => {
-  // Gemini refuse souvent les images corporelles et renvoie du VIDE. Sans ce cas,
-  // l'utilisateur lisait « le kiné est très sollicité » et réessayait sans fin.
-  const src = readFileSync("src/app/api/ai/physio/route.ts", "utf8");
-  assert.ok(/filtre de sécurité sur les images corporelles/.test(src));
-  assert.ok(/status: 422/.test(src), "le refus doit être distinct du 503 de saturation");
-});
-test("la photo est redimensionnée côté client, EXIF compris", () => {
-  // 3 à 8 Mo par photo de téléphone, et des coordonnées GPS dans les métadonnées d'une
-  // image de santé. Le passage par canvas règle les deux.
-  const src = readFileSync("src/components/health/HealthCenter.tsx", "utf8");
-  assert.ok(/createElement\("canvas"\)/.test(src), "aucun redimensionnement avant envoi");
-  assert.ok(/EXIF/.test(src), "la suppression des métadonnées doit être documentée, pas accidentelle");
-});
+// (09/11/2026) « la photo ne touche aucun stockage » : test retiré avec la consultation du « kiné IA », supprimée (lib/health/kineIa).
+// (09/11/2026) « le modèle reçoit les limites de ce qu'une photo permet » : test retiré avec la consultation du « kiné IA », supprimée (lib/health/kineIa).
+// (09/11/2026) « un refus du filtre de sécurité ne se déguise pas en surcharge » : test retiré avec la consultation du « kiné IA », supprimée (lib/health/kineIa).
+// (09/11/2026) « la photo est redimensionnée côté client, EXIF compris » : test retiré avec la consultation du « kiné IA », supprimée (lib/health/kineIa).
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ASSISTANT DE SUPPORT
@@ -3653,7 +3612,7 @@ test("les six écrans passent par la MÊME clé de créneau", () => {
   // le calendrier montrerait deux séances, le tableau de bord une seule.
   for (const f of [
     "src/app/dashboard/page.tsx", "src/app/dashboard/calendrier/page.tsx",
-    "src/app/api/ai/cours/route.ts", "src/app/api/ai/physio/route.ts",
+    "src/app/api/ai/cours/route.ts", // physio : retiré avec le kiné IA (09/11/2026)
   ]) {
     const src = codeOf(f);
     assert.ok(/slotKey\(/.test(src), `${f} n'utilise pas la clé de créneau partagée`);
@@ -5738,7 +5697,8 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // une description de douleur de 4 000 caractères repartait en entier à CHAQUE tour.
     // Mesuré : jusqu'à 10 000 jetons d'historique par question — plus que le contexte
     // complet de l'athlète, et payés à chaque fois.
-    for (const d of ["physio", "cours", "support"]) {
+    // `physio` : retiré avec le kiné IA (09/11/2026), sa route ne renvoie plus que 410.
+    for (const d of ["cours", "support"]) {
       const src = codeOf(`src/app/api/ai/${d}/route.ts`);
       const m = src.match(/history[^\n]*\)\.slice\(-(\d+)\)/);
       assert.ok(m, `${d} : l'historique n'est plus borné en nombre de messages`);

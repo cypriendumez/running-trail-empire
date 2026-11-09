@@ -22,15 +22,13 @@ export default async function HealthPage() {
   let suivi: ReturnType<typeof suiviParZone> = [];
   const etats: { cle: string; id: string; etat: string }[] = [];
   let enPanne = false;
-  let fil: { role: "user" | "model"; text: string }[] = [];
   let coursesNutrition: CourseNutri[] = [];
   let poidsKg: number | null = null;
   if (user) {
-    // La consultation en cours (mémoire du kiné, /api/ai/physio) et, pour la nutrition, les
-    // courses à venir et de quoi PRÉDIRE leur durée — la même VMA effective que le coach
+    // Pour la nutrition, les courses à venir et de quoi PRÉDIRE leur durée — la même VMA effective que le coach
     // (`effectiveVma`, seule définition de l'app) : lus ensemble, en une vague.
-    const [filRes, objRes, planRes, profilRes, baseRes, seancesRes] = await Promise.all([
-      supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "kine_chat").limit(1).maybeSingle(),
+    // La consultation du « kiné IA » n'est plus lue : elle est retirée (lib/health/kineIa).
+    const [objRes, planRes, profilRes, baseRes, seancesRes] = await Promise.all([
       supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
       supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "planned_race").order("created_at", { ascending: false }).limit(50),
       supabase.from("profiles").select("pace_curve,garmin_vo2max,weight_kg").eq("id", user.id).single(),
@@ -53,10 +51,6 @@ export default async function HealthPage() {
     );
     const p = Number(profilRes.data?.weight_kg);
     poidsKg = Number.isFinite(p) && p > 0 ? p : null;
-    const brut = (filRes.data?.data as { messages?: unknown } | null)?.messages;
-    fil = (Array.isArray(brut) ? brut : [])
-      .filter((m): m is { role: "user" | "model"; text: string } => !!m && typeof m === "object" && ((m as { role?: string }).role === "user" || (m as { role?: string }).role === "model") && typeof (m as { text?: unknown }).text === "string")
-      .slice(-40);
     /**
      * ⚠️ « AUCUNE DOULEUR » N'EST PAS « ON N'A PAS PU LIRE ».
      *
@@ -93,5 +87,5 @@ export default async function HealthPage() {
     enPanne = estUnePanne({ error });
     if (enPanne) console.error("[santé] douleurs illisibles :", error?.message);
   }
-  return <HealthCenter suivi={suivi} etats={etats} enPanne={enPanne} filInitial={fil} coursesNutrition={coursesNutrition} poidsKg={poidsKg} />;
+  return <HealthCenter suivi={suivi} etats={etats} enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} />;
 }

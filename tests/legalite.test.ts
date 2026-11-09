@@ -164,8 +164,9 @@ const LANGUES = ["fr", "en", "de", "es", "pt"] as const;
       assert.match(sec(7), /13/, `${l} §7 : durée de conservation de l'audience absente`);
     }
     // La date suit le DERNIER changement du texte : 01/10/2026 (ce bloc), puis 08/11/2026
-    // (Have I Been Pwned nommé, sécurité des mots de passe). Texte modifié → date avancée ici.
-    assert.match(lire("src/app/confidentialite/page.tsx"), /date="08\/11\/2026"/);
+    // (Have I Been Pwned nommé, sécurité des mots de passe), puis 09/11/2026 (Pacevo réservé aux
+    // majeurs, kiné IA retiré). Texte modifié → date avancée ici.
+    assert.match(lire("src/app/confidentialite/page.tsx"), /date="09\/11\/2026"/);
   });
 
   // ── 5. LE REFUS DE LA MESURE D'AUDIENCE EXISTE ──────────────────────────────
