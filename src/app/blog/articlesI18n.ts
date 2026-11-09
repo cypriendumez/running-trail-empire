@@ -36,6 +36,67 @@ export type TraductionArticle = {
 /** langue → slug → texte traduit. Partiel : ce qui manque retombe sur le français. */
 export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticle>>> = {
   en: {
+    "courir-dans-le-froid-et-la-nuit": {
+      chapo:
+        "Over a marathon, air temperature weighs more than any other climatic parameter, and it is above the optimum that speeds fall and withdrawal rates rise. Of the cold side, this literature says nothing. What it does document in winter lies elsewhere: your airways, and, once darkness falls, being recognised by a driver.",
+      avertissement:
+        "This article discusses exercise-induced asthma and the airways. It is neither a diagnostic tool nor a substitute for medical advice. A cough that settles in after cold-weather runs, a wheeze or breathing discomfort during effort should be shown to a doctor, and treatment is decided with them — not with a blog article.",
+      blocs: [
+        {
+          h: "What temperature actually does to a race",
+          p: [
+            "Let us start with what the literature measures. The study by El Helou and colleagues (2012) analysed 1,791,972 finisher performances across six major European and American marathons between 2001 and 2010, recording temperature, humidity, dew point, pressure and four pollutants.",
+            "Their conclusion: it is air temperature that weighs most on running capacity, and the relationship follows a quadratic model. There is therefore an optimal temperature, specific to each performance level, above which speed falls and withdrawals rise.",
+            "Mind what it does not say. Its abstract describes the degradation only ABOVE the optimum: it says nothing about the cold side, in either direction. So do not conclude that cold has no effect on your pace. The two subjects specific to winter lie elsewhere: what you breathe, and the way you are seen.",
+          ],
+        },
+        {
+          h: "Cold, dry air and your airways",
+          p: [
+            "First, an order of magnitude. The systematic review by Rodriguez Bauza and Silveyra (2020) pools 60 studies covering 7,501 adult athletes and reports a 23% prevalence of exercise-induced bronchoconstriction — nearly one athlete in four.",
+            "Its abstract says nothing about cold or about running: it reports a prevalence among athletes. Take from it that the ground is there, nothing more — it is the next publication that makes the link with winter.",
+            "The review by Hanstock and colleagues (2020) names the culprit. Asthma is described there as the \"occupational disease\" of cross-country skiers, acknowledged in the 1990s and attributed to repeated exposure to cold AND DRY air, at high ventilation rates.",
+            "Two words in that sentence matter. DRY air, on the same footing as cold air: degrees are not the only thing at work. And the ventilation RATE, which the abstract ties to the cold. The illustration is ours, not the study's: an easy jog at 2 °C does not ventilate like 6×1000 m at −5 °C.",
+          ],
+        },
+        {
+          h: "What a mask changes, with the numbers",
+          p: [
+            "A heat-and-moisture-exchanging device is worn over the mouth. Stenfors and colleagues (2022) tested one in a randomised cross-over design on 23 trained, healthy people at −15 °C: 30 minutes of warm-up, then a 4-minute self-paced maximal time trial.",
+            "The post-exercise drop in forced expiratory volume in one second is markedly smaller with the device: −0.5% (standard deviation 1.9) versus −2.7% (2.7) without, p = 0.002. Club cell protein, measured in plasma, rises by a median of 27% (interquartile 9 to 38) with the mask, against 121% (55 to 162) without, p < 0.001.",
+            "Airway and general symptoms were also reduced, in healthy subjects. Gauge the reach of this: the trial tests one specific device, at −15 °C, on a four-minute maximal effort. It says nothing about a neck gaiter, nor about an easy outing at 3 °C.",
+          ],
+        },
+        {
+          h: "At night: being visible is not being recognised",
+          p: [
+            "Wood, Tyrrell and Carberry (2005) had 10 younger and 10 older drivers drive a closed circuit at night: four pedestrian outfits, two headlamp beam settings, glare or no glare. The instruction: report as soon as you recognise someone.",
+            "In the most challenging condition — low beams, black clothing, glare — drivers recognised only 5% of pedestrians; with retroreflective markings depicting the motion of the body and no glare, 100%. Mean recognition distances, in the absence of glare, run from 0.0 m (older drivers, low beam, black clothing) to 220 m (younger drivers, high beam, the so-called biomotion configuration). Zero metres means what it says.",
+            "Wood's review (2023) explains why. Markings placed on the MOVEABLE JOINTS create a sense of biological motion that makes a PERSON perceptible, and at far greater distances than the same markings placed on the torso, as on a high-visibility vest. The benefit holds in cluttered environments, under glare, and for drivers of different ages and visual characteristics.",
+            "A yellow vest says \"something is shining\". Markings on what bends say \"a human being is moving there\" — the image is ours. This work deals with pedestrians and cyclists, not runners: the transposition is ours too. Put your retroreflective material on the joints that MOVE, not on the torso alone.",
+          ],
+        },
+        {
+          h: "What the studies do not show",
+          p: [
+            "The mask is not a demonstrated preventive measure IN HEALTHY ATHLETES. Hanstock notes that these devices prevent exercise-induced bronchoconstriction in people who already have the condition; their preventive value in healthy athletes remains to be established, and the trial's authors say so themselves. What is measured there is an acute response after a single bout of exercise.",
+            "The literature has in fact described this problem better than it has solved it: Hanstock notes that more than 25 years after this occupational disease was acknowledged, the prevalence of asthma among Scandinavian skiers is unchanged.",
+            "Finally, the distances above come from a closed circuit and hold for that protocol. The 2023 review also covers open-road studies, and cyclists and roadworkers as much as pedestrians.",
+          ],
+        },
+        {
+          h: "What Pacevo does with cold",
+          p: [
+            "Below 20 °C, the coach applies no HEAT penalty to your pace, and above 5 °C it attaches no temperature note to your session at all: you will see nothing, and that is normal. Between 0 and 5 °C a note appears — a longer, covered warm-up. Below 0 °C it changes in nature: 20 minutes of warm-up minimum, no short intervals from cold, and a warning about the airways in dry, freezing weather.",
+            "A precautionary rule, not a measurement: none of the publications cited here quantifies the warm-up that protects.",
+            "Cold itself does not move a session. The plan only shifts a quality session for a gain of at least 10 s/km, at most two days later, and it computes that cost by ADDING heat and wind. Below 20 °C heat contributes nothing; a cold AND windy day, however, can cross the threshold — that will be the wind, not the thermometer.",
+            "There is finally a seasonal correction on your heart rate zones. When the week's forecast where you run averages below 8 °C and the app finds no heart rate peak from the same period last year, it lowers by 5 bpm the max HR reference used to compute them — never below a rate actually reached in the past six weeks.",
+            "That 5 comes from none of the publications above, and it has to be said: it is a cautious estimate, replaced by the heart rate peak of a winter already on record.",
+            "What it does not do: it has no idea whether you run in the dark. Nothing your watch sends up tells it the light was gone, so no visibility instruction will come out of the plan.",
+          ],
+        },
+      ],
+    },
     "deficit-energetique-relatif-reds-coureur": {
       chapo:
         "The most important subject on this blog, and the least told. When what you eat no longer covers what you spend, performance isn't the first thing to go — bone, hormones and immunity are.",
