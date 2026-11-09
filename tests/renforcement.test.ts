@@ -6,8 +6,9 @@
  * ratio vertical, NI la cadence, NI les zones déclarées fragiles : deux coureurs aux
  * fragilités opposées recevaient le même gainage.
  *
- * Trois règles gouvernent l'ajout d'un axe, et ce fichier les fige :
- * aucun axe sans MESURE, deux axes au maximum, et la douleur avant la performance.
+ * Trois règles gouvernent l'ajout d'un axe, et ce fichier les fige : aucun axe sans MESURE,
+ * deux axes au maximum, et — depuis le 09/11/2026 — AUCUN exercice ciblé déclenché par une
+ * douleur déclarée (c'était un soin : lib/coach/renforcement, règle 3 ; lib/health/kineIa).
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -56,38 +57,35 @@ test("une cadence basse fait travailler la fréquence", () => {
   assert.deepEqual(axesRenforcement({ ratioVertical: 7, cadence: 166 }), [], "juste au-dessus : rien à signaler");
 });
 
-test("chaque zone déclarée trouve son axe, quel que soit le mot employé", () => {
-  for (const [zone, attendu] of [
-    ["genou droit", "genou_hanche"], ["syndrome de l'essuie-glace (ITBS)", "genou_hanche"],
-    ["douleur de hanche", "genou_hanche"], ["tendon d'Achille", "mollet_achille"],
-    ["mollet gauche", "mollet_achille"], ["fasciite plantaire", "mollet_achille"],
-    ["ischio-jambiers", "chaine_posterieure"], ["lombaires", "chaine_posterieure"],
-  ] as const) {
-    assert.deepEqual(axesRenforcement({ zones: [zone] }), [attendu], `« ${zone} » mal orientée`);
+test("une douleur déclarée n'appelle AUCUN exercice ciblé, quel que soit le mot employé", () => {
+  // Excentriques « pour le tendon d'Achille », abducteurs « parce que le moyen fessier laisse le
+  // genou partir en dedans » : un traitement et une cause pour une blessure que personne n'a
+  // examinée. La douleur allège le plan ; le soin relève d'un professionnel de santé.
+  for (const zone of ["genou droit", "syndrome de l'essuie-glace (ITBS)", "douleur de hanche", "tendon d'Achille",
+    "mollet gauche", "fasciite plantaire", "ischio-jambiers", "lombaires"]) {
+    assert.deepEqual(axesRenforcement({ zones: [zone] }), [], `« ${zone} » déclenche de nouveau un exercice ciblé`);
   }
+  const src = readFileSync("src/lib/ai/planI18n.ts", "utf8");
+  assert.ok(!/genou_hanche|mollet_achille|chaine_posterieure|seul protocole|only protocol/.test(src), "un texte d'exercice ciblé sur une douleur est revenu dans le plan");
 });
 
 console.log("\nLES DEUX GARDE-FOUS");
-
-test("la DOULEUR passe avant la métrique", () => {
-  // Une zone déclarée fragile prime sur n'importe quelle mesure de foulée.
+test("une douleur ne remplace ni ne précède une MESURE : seules les métriques produisent un axe", () => {
   const a = axesRenforcement({ ratioVertical: 12, cadence: 155, zones: ["tendon d'Achille"] });
-  assert.equal(a[0], "mollet_achille", `l'ordre est ${a.join("/")} : la douleur n'est plus prioritaire`);
+  assert.deepEqual(a, ["raideur", "cadence"], `l'ordre est ${a.join("/")} : une douleur produit de nouveau un axe`);
 });
-
 test("jamais plus de deux axes", () => {
   assert.equal(AXES_MAX, 2, "une séance qui corrige tout ne corrige rien");
   const a = axesRenforcement({ ratioVertical: 12, cadence: 150, zones: ["genou", "mollet", "ischio"] });
   assert.equal(a.length, 2, `${a.length} axes prescrits : l'athlète abandonnera devant la liste`);
-  assert.deepEqual(a, ["genou_hanche", "mollet_achille"], "les deux retenus doivent être les douleurs");
 });
 
 console.log("\nBRANCHEMENT");
 
 test("le plan ajoute l'axe, et JAMAIS pendant l'affûtage", () => {
   const src = codeOf("src/lib/ai/autoPlan.ts");
-  assert.match(src, /const axes = ctx\.cycle\.taper \? \[\] : axesRenforcement\(\{/,
-    "du travail supplémentaire est ajouté en affûtage, où tout l'objectif est de garder du jus");
+  assert.match(src, /const axes = ctx\.cycle\.taper \|\| douleur \? \[\] : axesRenforcement\(\{/,
+    "du travail supplémentaire est ajouté en affûtage (où tout l'objectif est de garder du jus) ou sur une douleur active");
   assert.match(src, /PLAN_T\[l\]\.renfoAxe\[a\]/, "l'axe n'est plus rendu dans le texte de la séance");
   // Base, développement, spécifique — et la reprise d'après-course (fondations), depuis le
   // 05/11/2026. La récupération proprement dite (`renfoRecup`) et l'affûtage n'en ont pas.
@@ -102,12 +100,15 @@ test("le contexte expose des MÉDIANES, pas des valeurs isolées", () => {
   assert.match(src, /v\.length >= 5 \? v\[Math\.floor\(v\.length \/ 2\)\] : null/,
     "les mesures de foulée ne sont plus médianes, ou le minimum de séances a sauté");
   assert.match(src, /zonesFragiles: Array\.isArray\(p\?\.injury_zones\)/, "les zones déclarées ne remontent plus");
+  // Les douleurs actives sont CELLES qui passent le jour au rouge (même liste `pains`).
+  assert.match(src, /douleursActives: pains,/, "les douleurs actives ne remontent plus au plan : le renforcement ignore de nouveau la douleur");
 });
 
-test("les cinq langues portent les cinq axes", () => {
+test("les cinq langues portent les deux axes de foulée", () => {
   const i18n = readFileSync("src/lib/ai/planI18n.ts", "utf8");
   assert.equal(i18n.split("renfoAxe:").length - 1, 6, "renfoAxe : 5 langues + le type attendus");
-  for (const axe of ["genou_hanche", "mollet_achille", "chaine_posterieure", "raideur", "cadence"])
+  // Les trois axes « douleur » sont retirés le 09/11/2026 (voir plus haut).
+  for (const axe of ["raideur", "cadence"])
     assert.equal(i18n.split(`${axe}:`).length - 1, 5, `${axe} absent de certaines langues`);
 });
 

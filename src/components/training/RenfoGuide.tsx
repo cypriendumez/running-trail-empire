@@ -28,7 +28,7 @@ const PROGRAMS: Program[] = [
       ] },
       { groupK: "renfo.none.b3.group", color: "#ea580c", introK: "renfo.none.b3.intro", ex: [
         { nameK: "renfo.none.b3.e1.name", emoji: "", doseK: "renfo.none.b3.e1.dose", cueK: "renfo.none.b3.e1.cue", yt: "extensions mollets coureur" },
-        { nameK: "renfo.none.b3.e2.name", emoji: "", doseK: "renfo.none.b3.e2.dose", cueK: "renfo.none.b3.e2.cue", yt: "excentrique tendon achille" },
+        { nameK: "renfo.none.b3.e2.name", emoji: "", doseK: "renfo.none.b3.e2.dose", cueK: "renfo.none.b3.e2.cue", yt: "montée mollet descente une jambe" },
       ] },
       { groupK: "renfo.none.b4.group", color: "#0284c7", introK: "renfo.none.b4.intro", ex: [
         { nameK: "renfo.none.b4.e1.name", emoji: "", doseK: "renfo.none.b4.e1.dose", cueK: "renfo.none.b4.e1.cue", yt: "proprioception cheville coureur" },

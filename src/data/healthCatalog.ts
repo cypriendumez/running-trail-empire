@@ -5,6 +5,15 @@
 //
 // Règle d'or : la santé prime sur la performance. Chaque consigne dit ce que le coach
 // DOIT faire ou éviter, jamais un simple constat.
+//
+// ⚠️ CES CONSIGNES RÈGLENT LA CHARGE, RIEN D'AUTRE (09/11/2026). Elles prescrivaient des
+// exercices de soin (« renforcement excentrique du mollet 2×/semaine », « nordic curls »),
+// affirmaient des causes (« c'est la cause réelle »), des examens (ferritine, imagerie) et
+// des gestes médicaux (bronchodilatateur, glycémie, rééducation du périnée), qui partaient
+// tels quels dans l'invite de Gemini. Les conditions de Gemini interdisent l'avis médical ;
+// soigner une blessure relève d'un professionnel de santé (voir `lib/health/kineIa.ts`).
+// Une consigne dit QUOI alléger ou éviter, et QUAND orienter vers un médecin.
+// `tests/audit-routes.test.ts` refuse le vocabulaire du soin dans ce fichier.
 
 export type HealthItem = {
   slug: string;
@@ -17,31 +26,31 @@ export type HealthItem = {
 // ── Pathologies déclarées ────────────────────────────────────────────────────
 export const HEALTH_CONDITIONS: HealthItem[] = [
   { slug: "asthme", label: { fr: "Asthme / asthme d'effort", en: "Asthma / exercise-induced", de: "Asthma / Belastungsasthma", es: "Asma / asma de esfuerzo", pt: "Asma / asma de esforço" },
-    coach: "ASTHME D'EFFORT : échauffement RALLONGÉ et très progressif (20 min minimum — un démarrage brutal déclenche le bronchospasme), évite le fractionné court par temps froid et sec (le pire déclencheur) ou fais-le en intérieur, et rappelle-lui d'avoir son bronchodilatateur sur lui. Une gêne respiratoire qui persiste après l'effort = on arrête la séance, pas on la finit." },
+    coach: "ASTHME D'EFFORT : échauffement RALLONGÉ et très progressif (20 min minimum), fractionné court évité par temps froid et sec ou fait en intérieur. Une gêne respiratoire pendant ou après l'effort = on arrête la séance, pas on la finit. Le suivi de l'asthme relève de son médecin." },
   { slug: "cardiaque", label: { fr: "Antécédent cardiaque", en: "Heart condition history", de: "Herz-Vorgeschichte", es: "Antecedente cardíaco", pt: "Antecedente cardíaco" },
-    coach: "⚠️ ANTÉCÉDENT CARDIAQUE : ne prescris AUCUNE séance maximale (VMA à 100 % et au-delà, test d'effort, sprints all-out) sans avis médical explicite. Reste en Z1-Z3, privilégie le volume facile et le seuil bas. Toute douleur thoracique, palpitation, essoufflement anormal ou malaise → ARRÊT immédiat et consultation. Dis-le-lui clairement plutôt que de contourner." },
+    coach: "⚠️ ANTÉCÉDENT CARDIAQUE : AUCUNE séance maximale (VMA à 100 % et au-delà, test d'effort, sprints all-out) sans accord explicite de son médecin. Reste en Z1-Z3, privilégie le volume facile et le seuil bas. Douleur thoracique, palpitations, essoufflement anormal ou malaise → arrêt immédiat et avis médical (15 ou 112 en urgence). Dis-le-lui clairement plutôt que de contourner." },
   { slug: "hypertension", label: { fr: "Hypertension", en: "High blood pressure", de: "Bluthochdruck", es: "Hipertensión", pt: "Hipertensão" },
-    coach: "HYPERTENSION : l'endurance en Z2 est bénéfique et doit être la base. Évite les efforts en apnée/blocage respiratoire (renfo très lourd, côtes ultra-raides en force max) qui font grimper la pression. Attention aux bêtabloquants s'il en prend : ils écrasent la FC → les zones cardiaques deviennent fausses, pilote alors à la sensation (RPE) et à l'allure." },
+    coach: "HYPERTENSION : l'endurance en Z2 sert de base. Évite les efforts en blocage respiratoire (charges très lourdes, côtes en force maximale). Si un médicament modifie sa FC, les zones cardiaques deviennent fausses : pilote alors à la sensation (RPE) et à l'allure. Le reste relève de son médecin." },
   { slug: "diabete", label: { fr: "Diabète", en: "Diabetes", de: "Diabetes", es: "Diabetes", pt: "Diabetes" },
-    coach: "DIABÈTE : glycémie à contrôler avant/après séance, sucres rapides toujours sur soi. Les séances longues et le fractionné modifient la glycémie dans des sens opposés (hypo à retardement possible jusqu'à plusieurs heures après) — privilégie la régularité et les horaires stables plutôt que des séances imprévisibles. Surveillance des pieds impérative (ampoules et plaies cicatrisent mal)." },
+    coach: "DIABÈTE : privilégie la régularité et des horaires stables plutôt que des séances imprévisibles, et un ravitaillement prévu sur les sorties longues. La gestion du diabète autour de l'effort (traitement, apports) relève de son médecin : tu n'en donnes aucune consigne." },
   { slug: "anemie", label: { fr: "Anémie / carence en fer", en: "Anaemia / iron deficiency", de: "Anämie / Eisenmangel", es: "Anemia / falta de hierro", pt: "Anemia / falta de ferro" },
-    coach: "CARENCE EN FER : c'est LA cause d'une stagnation inexpliquée avec FC anormalement haute en facile. Tant que le fer n'est pas corrigé, une charge élevée ne produira pas d'adaptation — allège, privilégie le volume facile et pousse-le à faire contrôler ferritine + hémoglobine. Ne mets pas sa fatigue sur le compte d'un manque de motivation." },
+    coach: "CARENCE EN FER déclarée : allège, privilégie le volume facile, et ne mets pas sa fatigue sur le compte d'un manque de motivation. Le bilan et sa correction relèvent de son médecin." },
   { slug: "thyroide", label: { fr: "Trouble thyroïdien", en: "Thyroid disorder", de: "Schilddrüsenstörung", es: "Trastorno tiroideo", pt: "Distúrbio da tiroide" },
-    coach: "THYROÏDE : le métabolisme, la FC de repos et la récupération sont perturbés — les repères habituels (VFC, FC repos) sont moins fiables. Fie-toi davantage au ressenti (RPE) et aux allures tenues. Progression plus lente à assumer, sans culpabiliser l'athlète." },
+    coach: "THYROÏDE : les repères habituels (VFC, FC repos) sont moins fiables. Fie-toi davantage au ressenti (RPE) et aux allures tenues. Progression plus lente à assumer, sans culpabiliser l'athlète." },
   { slug: "apnee", label: { fr: "Apnée du sommeil", en: "Sleep apnoea", de: "Schlafapnoe", es: "Apnea del sueño", pt: "Apneia do sono" },
-    coach: "APNÉE DU SOMMEIL : la récupération nocturne est fortement dégradée même quand la durée de sommeil paraît correcte — un score de sommeil « correct » n'est PAS fiable ici. Espace davantage les séances dures (72 h plutôt que 48 h) et limite l'accumulation de charge." },
+    coach: "APNÉE DU SOMMEIL : un score de sommeil « correct » n'est PAS un repère fiable ici. Espace davantage les séances dures (72 h plutôt que 48 h) et limite l'accumulation de charge." },
   { slug: "migraines", label: { fr: "Migraines", en: "Migraines", de: "Migräne", es: "Migrañas", pt: "Enxaquecas" },
-    coach: "MIGRAINES : déshydratation, chaleur, hypoglycémie et efforts maximaux sont des déclencheurs classiques. Hydratation et ravitaillement stricts sur les sorties longues, évite le fractionné en pleine chaleur. Une séance annulée pour cause de crise n'est pas un échec du plan." },
+    coach: "MIGRAINES : hydratation et ravitaillement stricts sur les sorties longues, pas de fractionné en pleine chaleur. Une séance annulée lors d'une crise n'est pas un échec du plan." },
   { slug: "digestif", label: { fr: "Troubles digestifs", en: "Digestive issues", de: "Verdauungsprobleme", es: "Problemas digestivos", pt: "Problemas digestivos" },
-    coach: "TROUBLES DIGESTIFS : la nutrition de course doit être TESTÉE à l'entraînement, jamais découverte le jour J. Introduis les glucides progressivement (commence à 30 g/h), évite les fibres et les produits laitiers avant séance, et privilégie les séances qualité à distance des repas." },
+    coach: "TROUBLES DIGESTIFS : la nutrition de course doit être TESTÉE à l'entraînement, jamais découverte le jour J ; les glucides s'introduisent progressivement, et les séances qualité se placent à distance des repas." },
   { slug: "allergies", label: { fr: "Allergies / rhinite", en: "Allergies / rhinitis", de: "Allergien / Rhinitis", es: "Alergias / rinitis", pt: "Alergias / rinite" },
-    coach: "ALLERGIES : en saison pollinique, décale les séances en fin de journée (pics polliniques le matin) et privilégie l'intérieur ou les bords d'eau pour les grosses séances. Une performance dégradée en avril-juin peut venir de là, pas d'un manque de forme." },
+    coach: "ALLERGIES : en saison pollinique, les grosses séances peuvent se décaler en fin de journée ou en intérieur. Une performance dégradée en avril-juin peut venir de là, pas d'un manque de forme." },
   { slug: "covid_long", label: { fr: "Covid long / fatigue post-virale", en: "Long Covid / post-viral fatigue", de: "Long Covid / postvirale Fatigue", es: "Covid persistente / fatiga posviral", pt: "Covid longa / fadiga pós-viral" },
-    coach: "⚠️ FATIGUE POST-VIRALE : le malaise post-effort est le risque n°1 — pousser aggrave durablement l'état. Reprise TRÈS progressive, uniquement en Z1-Z2, aucune intensité tant que la VFC n'est pas remontée à sa base. Si l'athlète se sent plus mal 24-48 h APRÈS une séance, c'est le signal d'alarme : réduis immédiatement." },
+    coach: "⚠️ FATIGUE POST-VIRALE : reprise TRÈS progressive, uniquement en Z1-Z2, aucune intensité tant que la VFC n'est pas remontée à sa base. Si l'athlète se sent plus mal 24-48 h APRÈS une séance, réduis immédiatement et oriente-le vers son médecin." },
   { slug: "grossesse", label: { fr: "Grossesse / post-partum", en: "Pregnancy / postpartum", de: "Schwangerschaft / postpartal", es: "Embarazo / posparto", pt: "Gravidez / pós-parto" },
-    coach: "GROSSESSE / POST-PARTUM : suivi médical indispensable, tu ne remplaces pas un avis obstétrical. Pilote à la sensation et à la conversation, PAS à la FC (elle est faussée). Pas d'effort maximal, pas de surchauffe. En post-partum : rééducation du périnée AVANT le retour à la course à impact, puis reprise très progressive." },
+    coach: "GROSSESSE / POST-PARTUM : le suivi médical décide, tu ne remplaces pas un avis obstétrical. Pilote à la sensation et à la conversation, PAS à la FC (elle est faussée). Pas d'effort maximal, pas de surchauffe. En post-partum : retour à la course seulement avec l'accord de sa sage-femme ou de son médecin, puis reprise très progressive." },
   { slug: "surpoids", label: { fr: "Surpoids", en: "Overweight", de: "Übergewicht", es: "Sobrepeso", pt: "Excesso de peso" },
-    coach: "SURPOIDS : les contraintes articulaires à l'impact sont majorées → privilégie le volume en marche rapide/vélo/elliptique au début, la fréquence plutôt que la durée, et surveille genoux/tibias/pieds. Ne parle JAMAIS de poids en termes de performance ou d'esthétique : parle santé, régularité et plaisir." },
+    coach: "SURPOIDS : au début, privilégie le volume en marche rapide, vélo ou elliptique, la fréquence plutôt que la durée, et une progression lente. Ne parle JAMAIS de poids en termes de performance ou d'esthétique : parle régularité et plaisir." },
 ];
 
 // ── Zones de blessure récurrentes ────────────────────────────────────────────
@@ -49,21 +58,21 @@ export const HEALTH_CONDITIONS: HealthItem[] = [
 // signalées au jour le jour arrivent séparément via le feedback de séance.
 export const INJURY_ZONES: HealthItem[] = [
   { slug: "achille", label: { fr: "Tendon d'Achille / mollet", en: "Achilles / calf", de: "Achillessehne / Wade", es: "Tendón de Aquiles / gemelo", pt: "Tendão de Aquiles / gémeo" },
-    coach: "ACHILLE/MOLLET fragile : progression du VOLUME avant tout ajout d'intensité, pas de côtes ni de pliométrie sur une semaine chargée, drop des chaussures stable (un changement de drop est un déclencheur classique). Renforcement excentrique du mollet 2×/semaine en PRÉVENTIF, même sans douleur. Sur sable : très prudent, c'est la surface qui sollicite le plus l'Achille." },
+    coach: "ACHILLE/MOLLET (antécédent) : progression du VOLUME avant tout ajout d'intensité, pas de côtes ni de pliométrie sur une semaine chargée, pas de changement brusque de chaussures, prudence sur le sable." },
   { slug: "genou", label: { fr: "Genou / syndrome de l'essuie-glace", en: "Knee / IT band", de: "Knie / Tractus iliotibialis", es: "Rodilla / cintilla iliotibial", pt: "Joelho / banda iliotibial" },
-    coach: "GENOU/ITB fragile : limite les longues descentes et les dévers, augmente la cadence (viser 175-180 spm réduit nettement la charge articulaire), et renforce fessiers + moyen glutéal 2×/semaine — c'est la cause réelle derrière la plupart des douleurs latérales de genou. Évite les augmentations brutales de sortie longue." },
+    coach: "GENOU/ITB (antécédent) : limite les longues descentes et les dévers, pas d'augmentation brutale de la sortie longue." },
   { slug: "tibia", label: { fr: "Tibia / périostite", en: "Shin / shin splints", de: "Schienbein / Shin Splints", es: "Tibia / periostitis", pt: "Tíbia / periostite" },
-    coach: "PÉRIOSTITE : surfaces dures et augmentations rapides de volume sont les déclencheurs. Plafonne la progression à +5 %/semaine, alterne les surfaces (sentier, piste), vérifie l'usure des chaussures, et bascule sur du croisé (vélo, aqua-jogging) au moindre signal plutôt que d'attendre." },
+    coach: "TIBIA (antécédent de périostite) : progression plafonnée à +5 %/semaine, alterne les surfaces (sentier, piste), vérifie l'usure des chaussures, et bascule sur du croisé (vélo, aqua-jogging) au moindre signal plutôt que d'attendre." },
   { slug: "ischio", label: { fr: "Ischio-jambiers", en: "Hamstrings", de: "Oberschenkelrückseite", es: "Isquiotibiales", pt: "Isquiotibiais" },
-    coach: "ISCHIOS fragiles : jamais de sprint ni d'allure spécifique sur un échauffement écourté — c'est là que ça claque. Lignes droites progressives obligatoires avant toute séance rapide, nordic curls / renforcement excentrique 2×/semaine, et prudence sur le fractionné en fin de séance quand la fatigue dégrade la foulée." },
+    coach: "ISCHIOS (antécédent) : jamais de sprint ni d'allure spécifique sur un échauffement écourté, lignes droites progressives avant toute séance rapide, prudence sur le fractionné en fin de séance quand la fatigue dégrade la foulée." },
   { slug: "hanche", label: { fr: "Hanche / psoas", en: "Hip / psoas", de: "Hüfte / Psoas", es: "Cadera / psoas", pt: "Anca / psoas" },
-    coach: "HANCHE/PSOAS : mobilité des fléchisseurs et gainage à intégrer systématiquement, prudence sur le fractionné court (les changements de rythme sollicitent fort le psoas) et sur les longues positions assises avant séance." },
+    coach: "HANCHE/PSOAS (antécédent) : prudence sur le fractionné court et les changements de rythme brusques." },
   { slug: "pied", label: { fr: "Pied / fasciite plantaire", en: "Foot / plantar fasciitis", de: "Fuß / Plantarfasziitis", es: "Pie / fascitis plantar", pt: "Pé / fascite plantar" },
-    coach: "PIED/FASCIITE : douleur typiquement maximale au réveil et aux premiers pas. Mobilité plantaire et renforcement du pied quotidiens, évite les surfaces très dures et le pieds-nus/minimaliste en phase sensible. Le sable sec est à proscrire ici." },
+    coach: "PIED (antécédent de fasciite plantaire) : évite les surfaces très dures, le sable sec, et la course pieds nus ou en minimaliste." },
   { slug: "dos", label: { fr: "Dos / lombaires", en: "Back / lower back", de: "Rücken / Lendenwirbel", es: "Espalda / lumbares", pt: "Costas / lombares" },
-    coach: "DOS/LOMBAIRES : gainage complet non négociable (2-3×/semaine), prudence sur les sorties longues avec sac et sur les descentes prolongées. Évite le renfo lourd en flexion de rachis." },
+    coach: "DOS/LOMBAIRES (antécédent) : prudence sur les sorties longues avec sac et sur les descentes prolongées, pas de charge lourde en flexion du dos." },
   { slug: "fracture_fatigue", label: { fr: "Antécédent de fracture de fatigue", en: "Past stress fracture", de: "Frühere Ermüdungsfraktur", es: "Fractura de estrés previa", pt: "Fratura de stress anterior" },
-    coach: "⚠️ ANTÉCÉDENT DE FRACTURE DE FATIGUE : c'est l'antécédent le plus lourd de conséquence. Progression STRICTEMENT ≤ +5 %/semaine, jamais deux semaines de hausse consécutives sans semaine allégée, et surveille la disponibilité énergétique (une alimentation insuffisante est le facteur de risque n°1, avant même la charge). Toute douleur osseuse localisée et ponctuelle (qu'on peut désigner du doigt) → arrêt de la course et imagerie, pas d'attentisme." },
+    coach: "⚠️ ANTÉCÉDENT DE FRACTURE DE FATIGUE : c'est l'antécédent le plus lourd de conséquence. Progression STRICTEMENT ≤ +5 %/semaine, jamais deux semaines de hausse consécutives sans semaine allégée. Toute douleur osseuse localisée → arrêt de la course et avis médical, pas d'attentisme." },
 ];
 
 /** Libellé traduit d'une entrée (repli sur le français si la langue manque). */

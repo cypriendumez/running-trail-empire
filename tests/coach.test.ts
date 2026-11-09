@@ -4427,6 +4427,41 @@ test("le renforcement ne disparaît pas chez ceux qui en ont le plus besoin", ()
   }
 });
 
+// Constaté le 09/11/2026 (relecture) : l'écran Santé promet « ton plan s'allège », mais la
+// séance de renforcement restait celle d'un coureur sans douleur (montées de mollets, fentes,
+// nordic curls) et pouvait même AJOUTER des bonds. Pacevo ne choisit pas d'exercice de soin :
+// rien n'est ajouté, et la séance dit d'épargner la zone et quand consulter.
+test("une douleur active : le renforcement n'ajoute rien et dit d'épargner la zone, en 5 langues", () => {
+  const foulee = { forme: { ratioVertical: 12, cadence: 150 } };
+  const sans = buildWeekPlan(ctx(foulee as never)).find((d) => d.type === "Renfo");
+  assert.ok(sans && /EN PLUS/.test(sans.detail), "témoin : sans douleur, la foulée mesurée n'ajoute plus d'axe (le test ne prouverait rien)");
+  assert.ok(!/DOULEUR SIGNALÉE/.test(sans!.detail), "la consigne de douleur s'affiche sans douleur");
+  const avec = buildWeekPlan(ctx({ ...foulee, douleursActives: ["Genou gauche"] } as never)).find((d) => d.type === "Renfo");
+  assert.ok(avec, "plus de séance de renforcement quand une douleur est active");
+  assert.doesNotMatch(avec!.detail, /EN PLUS/, "une douleur active reçoit encore des exercices en plus");
+  assert.match(avec!.detail, /saute tout exercice qui sollicite la zone douloureuse/, "la séance ne dit plus d'épargner la zone douloureuse");
+  assert.match(avec!.detail, /consulte un médecin ou un masseur-kinésithérapeute/, "la séance n'oriente plus vers un professionnel");
+  for (const l of ["en", "de", "es", "pt"] as const) {
+    const d = avec!.i18n?.[l]?.detail ?? "";
+    assert.ok(d.includes("⚠️") && !d.includes("🎯"), `${l} : la consigne de douleur manque, ou un axe est encore ajouté`);
+  }
+  // LES DEUX AUTRES CHEMINS du renforcement, oubliés au premier passage (rejeu du moteur réel,
+  // 09/11/2026) : le renfo GREFFÉ sur un footing quand aucun jour n'est libre, et celui du
+  // débutant en marche-course.
+  const douleur = { douleursActives: ["Genou gauche"] };
+  const chaqueJour = { availability: { daysPerWeek: 7, days: [0, 1, 2, 3, 4, 5, 6] }, volume: { weekKm: 70, avg4wkKm: 68, targetKm: 70, longRunKm: 21 } };
+  const greffe = buildWeekPlan(ctx({ ...chaqueJour, ...douleur } as never)).find((d) => d.type === "Renfo");
+  assert.ok(greffe && greffe.moment === "soir", "témoin : sans jour libre, le renfo n'est plus greffé sur un footing (le test ne prouverait rien)");
+  assert.match(greffe!.detail, /DOULEUR SIGNALÉE/, "le renfo greffé sur un footing ignore la douleur active");
+  assert.ok((greffe!.i18n?.es?.detail ?? "").includes("⚠️"), "es : le renfo greffé ignore la douleur active");
+  const mc = { marcheCourse: { etape: 1, total: 11, seance: { reps: 8, courseMin: 1, marcheMin: 2 } } };
+  const debutant = buildWeekPlan(ctx({ ...mc, ...douleur } as never)).find((d) => d.type === "Renfo");
+  assert.ok(debutant && buildWeekPlan(ctx(mc as never)).some((d) => d.type === "Marche/course"), "témoin : le programme marche-course ne s'ouvre plus (le test ne prouverait rien)");
+  assert.match(debutant!.detail, /DOULEUR SIGNALÉE/, "le renfo du débutant en marche-course ignore la douleur active");
+  assert.ok((debutant!.i18n?.pt?.detail ?? "").includes("⚠️"), "pt : le renfo du débutant ignore la douleur active");
+  assert.ok(!/DOULEUR SIGNALÉE/.test(buildWeekPlan(ctx(mc as never)).find((d) => d.type === "Renfo")?.detail ?? ""), "la consigne de douleur s'affiche au débutant sans douleur");
+});
+
 test("seule une séance NOUVELLE déclenche un e-mail", () => {
   // Le filet de nuit repasse à 3 h 30 sans qu'il se soit rien produit : écrire à cette
   // heure-là pour dire « ton plan est à jour » serait du bruit qui réveille.

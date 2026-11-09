@@ -288,6 +288,10 @@ export type AthleteContext = {
   forme: { ratioVertical: number | null; cadence: number | null } | null;
   /** Zones déclarées fragiles par l'athlète (profil santé). */
   zonesFragiles: string[];
+  /** Douleurs ACTIVES (déclarées dans Santé, ou signalées après une séance) : celles qui
+   *  passent le jour au rouge. Le renforcement les lit (rien d'ajouté, zone épargnée).
+   *  Optionnel : un contexte sérialisé avant le 09/11/2026 ne l'a pas. */
+  douleursActives?: string[];
   /** Disponibilités déclarées : nb de séances de course/semaine et jours praticables (0 = dim). */
   availability: { daysPerWeek: number; days: number[] };
   /** Prévisions RÉELLES à 7 jours (Open-Meteo) — vide si la position est inconnue. */
@@ -2320,7 +2324,8 @@ PENTE RÉELLE DE L'ATHLÈTE : PAS ENCORE MESURABLE (trop peu de sorties faciles 
 RÉALISME DE L'OBJECTIF (dis-le-lui FRANCHEMENT — ne fais pas comme si le plan préparait la course)
 ${objectiveWarnings.map((w) => `- ${w}`).join("\n")}
 ` : ""}
-SANTÉ & ANTÉCÉDENTS (contraintes médicales — elles PRIMENT sur l'objectif de performance)
+SANTÉ & ANTÉCÉDENTS (contraintes d'entraînement — elles PRIMENT sur l'objectif de performance)
+- Ces consignes règlent la CHARGE d'entraînement, rien d'autre : tu ne poses aucun diagnostic, tu ne prescris ni exercice de soin, ni traitement, ni examen. Toute question médicale → un médecin ou un masseur-kinésithérapeute.
 ${cond.rules.length ? cond.rules.map((r) => `- ${r}`).join("\n")
   : p?.health_declared ? "- Aucune pathologie — l'athlète l'a CONFIRMÉ explicitement, tu peux t'y fier."
   : "- ⚠️ Section santé JAMAIS renseignée (ce n'est pas « rien à signaler », c'est « on ne sait pas ») : reste un cran prudent sur l'intensité et invite-le à la remplir."}
@@ -2518,6 +2523,7 @@ ${catalog}`;
       return r == null && c == null ? null : { ratioVertical: r, cadence: c };
     })(),
     zonesFragiles: Array.isArray(p?.injury_zones) ? (p.injury_zones as string[]).filter((z) => typeof z === "string") : [],
+    douleursActives: pains,
     availability: { daysPerWeek: availDaysPerWeek, days: availDays },
     forecast,
     altitude: { elevationM, lossPct: altLoss },

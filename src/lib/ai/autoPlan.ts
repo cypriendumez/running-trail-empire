@@ -125,6 +125,15 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // montre en envoyait 15, avec un corps de séance réduit de 25 à 10 min. Deux séances
   // différentes pour le même jour.
   const { warm, cool } = ctx.warmCool;
+  // ── UNE DOULEUR ACTIVE (déclarée dans Santé, ou signalée après une séance) ────────
+  // Constaté le 09/11/2026 (relecture) : l'écran Santé promet « ton plan s'allège », mais
+  // le renforcement restait celui d'un coureur sans douleur — montées de mollets, fentes,
+  // nordic curls — et pouvait même AJOUTER des bonds. Pacevo ne choisit pas d'exercice de
+  // soin (lib/health/kineIa) : rien n'est ajouté, et CHAQUE séance de renforcement (les
+  // trois chemins : semaine normale, marche-course, renfo greffé sur un footing) dit de
+  // sauter ce qui sollicite la zone, et quand consulter.
+  const douleur = (ctx.douleursActives?.length ?? 0) > 0;
+  const gardeDouleur = (l: Lang) => (douleur ? PLAN_T[l].renfoDouleur : "");
   // Allure visée le jour J, quand un objectif chiffré existe.
   const goalPace = ctx.objective?.targetPace ?? null;
   // Même position de cycle que la qualité : 0-2 montée, 3 assimilation.
@@ -305,7 +314,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     const renfo = libres.find((i) => !poses.includes(i + 1)) ?? libres[0];
     if (renfo != null) put(renfo, {
       type: "Renfo", title: (l) => PLAN_T[l].renfoTitre,
-      detail: (l) => PLAN_T[l].renfoDebutant, why: (l) => PLAN_T[l].renfoDebutantWhy,
+      detail: (l) => PLAN_T[l].renfoDebutant + gardeDouleur(l), why: (l) => PLAN_T[l].renfoDebutantWhy,
       tags: tags("Renfo", "Prévention"),
     });
     for (let i = 0; i <= 6; i++) put(i, {
@@ -750,23 +759,25 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
       // fragilités opposées recevaient le même gainage. On ajoute UN axe (deux au
       // plus), et seulement quand la mesure existe — une valeur absente n'est pas
       // une valeur normale. Rien pendant l'affûtage : on n'y ajoute pas de travail.
-      const axes = ctx.cycle.taper ? [] : axesRenforcement({
+      // Douleur active : aucun axe en plus, et la consigne (`gardeDouleur`, en tête).
+      const axes = ctx.cycle.taper || douleur ? [] : axesRenforcement({
         ratioVertical: ctx.forme?.ratioVertical ?? null,
         cadence: ctx.forme?.cadence ?? null,
         zones: ctx.zonesFragiles ?? [],
       });
       const enPlus = axes.map((a) => PLAN_T[l].renfoAxe[a] ?? "").join("");
+      const garde = gardeDouleur(l);
       // APRÈS UNE COURSE COURUE, tant que l'intensité attend : ni sauts ni excentrique, quelle
       // que soit la phase de l'objectif suivant — « fentes sautées, bondissements, nordic
       // curls » arrivaient à J+12 du marathon de Lille (Cyprien, 05/11/2026). Pendant la
       // reprise, les fondations ; le renforcement spécifique attend la fin de la récupération.
       const recup = ctx.recuperation;
-      if (recup && recup.phase !== "reprise") return PLAN_T[l].renfoRecup;
-      if (recup) return PLAN_T[l].renfoBase(sets) + enPlus;
-      if (phase === "affûtage" || ctx.cycle.taper) return PLAN_T[l].renfoAffutage;
-      if (phase === "Base") return PLAN_T[l].renfoBase(sets) + enPlus;
-      if (phase === "Spécifique") return PLAN_T[l].renfoSpecifique(sets) + enPlus;
-      return PLAN_T[l].renfoDeveloppement(sets, sets > 3) + enPlus;
+      if (recup && recup.phase !== "reprise") return PLAN_T[l].renfoRecup + garde;
+      if (recup) return PLAN_T[l].renfoBase(sets) + enPlus + garde;
+      if (phase === "affûtage" || ctx.cycle.taper) return PLAN_T[l].renfoAffutage + garde;
+      if (phase === "Base") return PLAN_T[l].renfoBase(sets) + enPlus + garde;
+      if (phase === "Spécifique") return PLAN_T[l].renfoSpecifique(sets) + enPlus + garde;
+      return PLAN_T[l].renfoDeveloppement(sets, sets > 3) + enPlus + garde;
     },
     why: (l) => PLAN_T[l].renfoWhy,
     tags: tags("Renfo", "Prévention"),
@@ -1067,7 +1078,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
       // ⚠️ La version ALLÉGÉE, volontairement. Ce renforcement-là s'ajoute à un footing
       // le même jour : y mettre de la force lourde ferait deux séances dures en une
       // journée, ce que le plan passe son temps à éviter ailleurs.
-      detail: PLAN_T[l].renfoAffutage,
+      detail: PLAN_T[l].renfoAffutage + gardeDouleur(l),
       why: PLAN_T[l].renfoWhy,
       tags: [PLAN_T[l].tags["Renfo"], PLAN_T[l].tags["Prévention"]],
     });

@@ -21,6 +21,8 @@ import { estMajeur, ageEntier, AGE_MINIMUM } from "../src/lib/legal/age";
 import { KINE_IA_ACTIF } from "../src/lib/health/kineIa";
 import { enregistrerDouleurDeclaree } from "../src/lib/health/douleurDeclaree";
 import { SEUIL_DOULEUR_DECLAREE } from "../src/lib/health/seuilDouleur";
+import { HEALTH_CONDITIONS, INJURY_ZONES } from "../src/data/healthCatalog";
+import { T as T_UI } from "../src/lib/i18n/translations";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -727,6 +729,12 @@ test("le « kiné IA » est SUPPRIMÉ partout : routes, écran, vitrine, cours, 
   // Plus aucune promesse de « kiné IA » là où un coureur la lit.
   const visibles = ["src/components/landing/landingI18n.ts", "src/data/cours/fr.ts", "src/data/cours/en.ts", "src/data/cours/de.ts", "src/data/cours/es.ts", "src/data/cours/pt.ts", "src/app/legalI18n.ts"];
   for (const f of visibles) assert.ok(!/[Kk]in[ée] ?IA|AI [Pp]hysio|KI-Physio|[Ff]isio IA|fisioterapeuta IA|Léa Moreau|regarde tes photos/.test(readFileSync(f, "utf8")), `${f} promet encore un kiné IA`);
+  // Le quiz enseignait une règle de rééducation (« ≤ 3-4/10 ») : remplacé par une question
+  // d'orientation (09/11/2026), dans les cinq langues.
+  for (const l of ["fr", "en", "de", "es", "pt"]) {
+    const c = readFileSync(`src/data/cours/${l}.ts`, "utf8");
+    assert.ok(!/quantification du stress|stress quantification|Stressquantifizierung|cuantificación del estrés|quantificação do stress/.test(c), `cours ${l} : le quiz de rééducation est revenu`);
+  }
   const aide = readFileSync("src/data/helpKb.ts", "utf8");
   assert.ok(!/\["(Kiné IA|AI Physio|KI-Physio|Fisio IA)"/.test(aide), "l'aide nomme encore un onglet « kiné IA »");
   // L'aide alimente l'assistant : hors de la phrase qui dit le retrait, aucune promesse de
@@ -770,6 +778,47 @@ testAsync("une douleur se déclare à partir de 4/10, et une seconde plus forte 
   assert.ok(rouverte, "une douleur passée qui revient n'est pas rouverte (elle ne pèse plus, l'écran dit pourtant « enregistrée »)");
   assert.equal(rouverte!.data.etat, "actif");
   assert.equal(rouverte!.data.level, 5, "la douleur rouverte ne repart pas à l'intensité déclarée");
+});
+
+// Constaté le 09/11/2026 (relecture) : les consignes santé partaient telles quelles dans
+// l'invite de Gemini et prescrivaient des soins (« renforcement excentrique du mollet
+// 2×/semaine », « nordic curls »), des causes (« c'est la cause réelle »), des examens
+// (ferritine, imagerie) et des gestes médicaux (bronchodilatateur, glycémie, périnée).
+test("les consignes santé du coach règlent la charge : ni soin, ni cause, ni examen, ni geste médical", () => {
+  const SOIN = /excentrique|nordic|renforc|gainage|mobilit|imagerie|ferritine|h[ée]moglobine|bronchodilat|glyc[ée]mie|sucres rapides|p[ée]rin[ée]e|b[êe]tabloquant|\bcause|facteur de risque|d[ée]clencheu/i;
+  assert.ok(HEALTH_CONDITIONS.length >= 13 && INJURY_ZONES.length >= 8, "le catalogue santé a perdu des entrées");
+  for (const item of [...HEALTH_CONDITIONS, ...INJURY_ZONES]) {
+    const m = item.coach.match(SOIN);
+    assert.ok(!m, `« ${item.slug} » prescrit de nouveau un soin ou affirme une cause (« ${m?.[0]} »)`);
+  }
+  // L'invite cadre la section : la charge, et l'orientation pour tout le reste.
+  const src = codeNu("src/lib/ai/coachContext.ts");
+  const sante = src.indexOf("SANTÉ & ANTÉCÉDENTS (");
+  const cadre = src.indexOf("tu ne poses aucun diagnostic, tu ne prescris ni exercice de soin, ni traitement, ni examen. Toute question médicale → un médecin ou un masseur-kinésithérapeute.");
+  assert.ok(sante > 0 && cadre > sante && cadre < src.indexOf("${cond.rules.length", sante), "l'invite ne dit plus au coach qu'il règle la charge et oriente pour le reste");
+});
+
+test("la fiche « reprendre après une blessure » renvoie au professionnel, sans règle de reprise par la douleur", () => {
+  const PRO: Record<string, [string, RegExp]> = {
+    fr: ["Reprendre après une blessure", /professionnel de santé/], en: ["Returning after an injury", /health professional/],
+    de: ["Nach einer Verletzung wieder einsteigen", /medizinische Fachperson/], es: ["Volver tras una lesión", /profesional sanitario/],
+    pt: ["Voltar depois de uma lesão", /profissional de saúde/],
+  };
+  for (const [l, [terme, pro]] of Object.entries(PRO)) {
+    const ligne = readFileSync(`src/data/cours/${l}.ts`, "utf8").split("\n").find((x) => x.includes(`term: "${terme}"`)) ?? "";
+    assert.ok(ligne, `${l} : la fiche de reprise a disparu`);
+    assert.doesNotMatch(ligne, /\d\s*%|\d\s*\/\s*10/, `${l} : la fiche enseigne de nouveau une règle de reprise chiffrée (volume, seuil de douleur)`);
+    assert.match(ligne, pro, `${l} : la fiche ne renvoie plus vers un professionnel de santé`);
+  }
+});
+
+test("le guide de renforcement ne promet plus de prévenir une blessure du tendon", () => {
+  for (const l of ["fr", "en", "de", "es", "pt"] as const) {
+    const d = T_UI[l] as Record<string, string>;
+    const textes = `${d["renfo.none.b3.intro"]} ${d["renfo.none.b3.e2.name"]} ${d["renfo.none.b3.e2.cue"]}`;
+    assert.ok(d["renfo.none.b3.e2.cue"], `${l} : consigne de l'exercice absente`);
+    assert.doesNotMatch(textes, /\+\+\+|achill|aquiles|blessure|injury|verletzung|lesi[óo]n|les[ãa]o|tendon|sehne|tend[óã]o/i, `${l} : le guide reparle de prévention d'une blessure du tendon`);
+  }
 });
 
 test("l'âge ne descend pas sous 18 ans dans les Réglages non plus", () => {
