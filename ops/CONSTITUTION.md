@@ -22,15 +22,17 @@ des deux.*
 | Bugs Pacevo | `@Sweeper` | tous les jours, 6 h et 23 h | cloud |
 | Blog Pacevo (×2) | `@Plume` | 1er/15 à 3 h + lundi 3 h 30 | cloud |
 | Coach | `@Sparring` + `@SafeRun` | lundi 5 h | cloud |
-| Direction | `@Nexus` + `@PostMortem` + `@Greffier` | vendredi 6 h | cloud |
+| Direction | `@Nexus` + `@PostMortem` + `@Greffier` (+ `@Strategos`, `@Trésorier`, `@Atlas` : branchement en attente du GO, correction 15) | vendredi 6 h | cloud |
 | Sécurité et veille | `@Bunker` + `@Vault` + `@Radar` + contrôle de la sauvegarde publique | le 5 du mois, 4 h | cloud |
 | Courrier | `@Concierge` | tous les jours, 8 h | Mac (écrit dans ~/Desktop/Pacevo) |
 | Sauvegarde chiffrée | `@TimeMachine` | dimanche 11 h | Mac (écrit dans ~/Desktop/Pacevo) |
 
 10. **`@TimeMachine` « chaque nuit à 3 h »** : il n'y a rien à vérifier chaque nuit. La sauvegarde publique (GitHub) est hebdomadaire ; depuis le 08/11/2026, une sauvegarde **privée et chiffrée** de toute la base (données des coureurs comprises) tourne chaque dimanche sur le Mac (`npm run sauvegarde:privee`). Le « test de restauration sur base isolée » exigerait un second projet Supabase : remplacé par une relecture complète de l'archive (déchiffrement + recomptage).
 11. **Réseau des routines** : `pacevo.fr`, `pacevo.app` et les sites des concurrents et des marques de montres sont autorisés dans l'environnement cloud « Default » (fait par Cyprien le 08/11/2026, prouvé). Ce réglage ne se change pas par l'API.
-12. **Horaires** : les routines cloud partagent la limite d'usage des 5 heures avec les sessions de Cyprien. Elles tournent donc la nuit, pas aux heures du texte (« 10 h par défaut »). Un passage de moins de 30 secondes est un refus pour limite atteinte.
+12. **Horaires** : les routines cloud partagent la limite d'usage des 5 heures avec les sessions de Cyprien. Elles tournent donc la nuit, pas aux heures du texte (« 10 h par défaut »). Un passage très court PEUT être un refus pour limite atteinte, mais aussi un vrai « RAS » (09/11/2026) : lire `get_run_log` avant de conclure.
 13. **Lancement** : le texte dit « janvier 2027 ». Décision du 08/11/2026 : premières ventes en **avril 2027**, début d'activité de la micro-entreprise le 1er avril 2027.
+14. **Décompte** : l'introduction du texte annonce « 24 en Vague 2 et 22 en ATTENTE » ; son propre tableau (sections 6 et 8) en donne **22 en Vague 2 et 24 en ATTENTE**. C'est le tableau qui fait foi (recompté le 09/11/2026).
+15. **Direction (09/11/2026)** : le texte compte 70 unités ; la direction en ajoute 11 (n°71 à 81) : `@Atlas`, directeur adjoint des opérations (bras gauche de `@Nexus`, promu directeur général délégué et directeur des opérations, bras droit de Cyprien), et dix directeurs de pôle, un par pôle A à J (`@Strategos`, `@Chancelier`, `@HeadCoach`, `@Architect`, `@Maestro`, `@Mercator`, `@Alliance`, `@Trésorier`, `@Oracle`, `@Conductor`). Organigramme, rattachements et statuts réels : `ops/direction/README.md` (gardé par `tests/organigramme.test.ts`) ; fiches : `.claude/agents/` ; textes à ajouter aux routines : `ops/direction/routines/`. Chaîne : agent → directeur de pôle → `@Atlas` → `@Nexus` → Cyprien. Les directeurs relisent et consolident dans les routines existantes, dans le même passage que leur agent (aucune routine ni quota en plus, correction 9) ; ils ne fusionnent, ne déploient, n'envoient, ne paient et ne signent rien : le GO reste à Cyprien (correction 7). Un directeur sans routine qui appelle son sous-agent est « défini », pas actif.
 
 ---
 

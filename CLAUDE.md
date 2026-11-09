@@ -10,7 +10,7 @@ Pile : Next.js 16 (App Router, React 19, Turbopack), TypeScript, Tailwind 3 ; Su
 
 ## Équipe d'agents (`ops/`)
 
-Cyprien pilote une équipe d'agents (routines cloud et sessions) décrite dans `ops/CONSTITUTION.md` : ses « corrections en vigueur » priment sur le texte, et ce fichier-ci prime sur les deux. Toute routine ou session d'agent lit d'abord `ops/STATE.md` (ce qui tourne vraiment, ce qui est bloqué) et `ops/memory/LESSONS_LEARNED.md`. « `@Nexus point` » = résumer `ops/STATE.md`. Le dépôt est public : mails, compta, papiers et briefings restent dans `~/Desktop/Pacevo/`, jamais dans git.
+Cyprien pilote une équipe d'agents (routines cloud et sessions) décrite dans `ops/CONSTITUTION.md` : ses « corrections en vigueur » priment sur le texte, et ce fichier-ci prime sur les deux. Toute routine ou session d'agent lit d'abord `ops/STATE.md` (ce qui tourne vraiment, ce qui est bloqué) et `ops/memory/LESSONS_LEARNED.md`. « `@Nexus point` » = résumer `ops/STATE.md`. Le dépôt est public : mails, compta, papiers et briefings restent dans `~/Desktop/Pacevo/`, jamais dans git. Direction (09/11/2026) : `@Atlas` et dix directeurs de pôle relisent le travail de leurs agents dans les routines existantes ; organigramme et rattachements dans `ops/direction/README.md`, fiches dans `.claude/agents/`.
 
 ## Règles (chacune née d'un défaut réel)
 

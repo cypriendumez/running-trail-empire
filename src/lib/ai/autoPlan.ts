@@ -19,6 +19,7 @@ import { choisirJourQualite } from "@/lib/coach/meteoPlacement";
 import { fenetreRespectee } from "@/lib/coach/qualiteRecente";
 import { repartirFootings, varianteFooting } from "@/lib/coach/footings";
 import { manqueDeVolume } from "@/lib/coach/ecartVolume";
+import { joursSansIntensite } from "@/lib/coach/apresCourse";
 import { axesRenforcement } from "@/lib/coach/renforcement";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
@@ -135,7 +136,11 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   const douleur = (ctx.douleursActives?.length ?? 0) > 0;
   const gardeDouleur = (l: Lang) => (douleur ? PLAN_T[l].renfoDouleur : "");
   // Allure visée le jour J, quand un objectif chiffré existe.
-  const goalPace = ctx.objective?.targetPace ?? null;
+  // ⚠️ `targetPace` est ENREGISTRÉ AVEC SON UNITÉ (« 4'13/km », `fmtObjectivePace`), et les
+  // gabarits du plan ajoutent « /km » : la sortie longue spécifique et le jour de course
+  // affichaient « 4'13/km/km » (@Sparring, profil marathonien sub-3 h, 09/11/2026).
+  // `coachContext` retirait déjà l'unité pour ses propres séances ; on fait de même ici.
+  const goalPace = ctx.objective?.targetPace ? ctx.objective.targetPace.replace(/\s*\/?\s*km\s*$/i, "").trim() || null : null;
   // Même position de cycle que la qualité : 0-2 montée, 3 assimilation.
   const blockWeekRenfo = (() => { const d = new Date(start); const on = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = on.getUTCDay() || 7; on.setUTCDate(on.getUTCDate() + 4 - day); const ys = new Date(Date.UTC(on.getUTCFullYear(), 0, 1)); return Math.ceil(((on.getTime() - ys.getTime()) / 86400000 + 1) / 7) % 4; })();
   // Avant une séance de qualité, l'échauffement est allongé (mise en action progressive).
@@ -355,7 +360,7 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
       // Le NOM DE LA COURSE est un nom propre : il traverse les cinq langues tel quel.
       title: (l) => PLAN_T[l].courseTitre(o?.race ?? null),
       // Une course A du calendrier n'a pas de chrono visé : chaîne vide → aucune allure écrite.
-      detail: (l) => PLAN_T[l].courseDetail(o?.targetPace || null),
+      detail: (l) => PLAN_T[l].courseDetail(goalPace),
       why: (l) => PLAN_T[l].courseWhy(o?.targetTime || null),
       tags: (l) => [PLAN_T[l].tags["Course"], o?.distanceKm ? PLAN_T[l].tagKm(nRaw(o.distanceKm, l)) : PLAN_T[l].tags["Objectif"]],
     });
@@ -563,9 +568,19 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     if (t == null || t < 28) return false;
     return dates.some((_, j) => j !== i && canRun(j) && okSpacing(j) && (tempOf(j) ?? 99) < t - 3);
   };
+  // ── APRÈS LA COURSE, LA MÊME RÈGLE QUE LE LENDEMAIN DE LA SYNCHRO ───────────────
+  //  Seules 48 h séparaient la course de la qualité suivante, AVANT comme APRÈS : à J−3 d'un
+  //  marathon, le plan posait un seuil 5×10 min à J+3 (@Sparring, profil sub-3 h, 09/11/2026),
+  //  et l'envoyait à la montre. Une fois la course courue et synchronisée, `lib/coach/apresCourse`
+  //  interdit pourtant toute intensité pendant un jour par 3 km (Daniels) : 14 jours après un
+  //  marathon, 3 après un 10 km. Le plan d'avant la course dit désormais la même chose que celui
+  //  d'après. Distance inconnue : on ne suppose rien, les 48 h restent la seule règle.
+  const distanceCourse = raceIdx < 0 ? null : courseB ? cs!.distanceKm : ctx.objective?.distanceKm ?? null;
+  const reposApresCourse = distanceCourse != null && distanceCourse > 0
+    ? Math.max(3, joursSansIntensite(distanceCourse) + 1) : 3;
   const okSpacing = (i: number) => placed.every((p) => Math.abs(p - i) >= gapDays)
     && (longIdx < 0 || Math.abs(i - longIdx) >= 2)
-    && (raceIdx < 0 || Math.abs(i - raceIdx) >= 3)    // rien de dur dans les 48 h autour de la course
+    && (raceIdx < 0 || (i < raceIdx ? raceIdx - i >= 3 : i - raceIdx >= reposApresCourse))    // rien de dur dans les 48 h avant la course
     && fenetreRespectee(i, [...qualitePassee, ...qualitePosee], plafondQualite);
   // Le VOLUME plafonne aussi le nombre de qualités : une séance complète (20 min
   // d'échauffement + corps + 10 min de retour au calme) pèse ~11 km. En dessous de
@@ -774,6 +789,10 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
       const recup = ctx.recuperation;
       if (recup && recup.phase !== "reprise") return PLAN_T[l].renfoRecup + garde;
       if (recup) return PLAN_T[l].renfoBase(sets) + enPlus + garde;
+      // APRÈS LA COURSE DE LA SEMAINE, avant même qu'elle soit synchronisée : le même renfo de
+      // récupération que le plan reconstruit ensuite (sans sauts ni excentrique). Le plan bâti à
+      // J−3 d'un marathon proposait sinon des bondissements à J+3 (@Sparring, 09/11/2026).
+      if (raceIdx >= 0 && renfoIdx > raceIdx) return PLAN_T[l].renfoRecup + garde;
       if (phase === "affûtage" || ctx.cycle.taper) return PLAN_T[l].renfoAffutage + garde;
       if (phase === "Base") return PLAN_T[l].renfoBase(sets) + enPlus + garde;
       if (phase === "Spécifique") return PLAN_T[l].renfoSpecifique(sets) + enPlus + garde;
@@ -903,11 +922,34 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
     // Le matin AVANT le soir : les écrans trient par date, et deux séances de même
     // date doivent s'afficher dans l'ordre où elles se courent.
     if (doubles.length) {
-      return annoncerEcart(menagerArticulations(sortir([...week, ...doubles])));
+      return orienterDouleur(annoncerEcart(menagerArticulations(sortir([...week, ...doubles]))));
     }
   }
 
-  return annoncerEcart(menagerArticulations(sortir(week)));
+  return orienterDouleur(annoncerEcart(menagerArticulations(sortir(week))));
+
+  /**
+   * DOULEUR ACTIVE, SEMAINE SANS RENFORCEMENT : LE RENVOI MÉDICAL NE DOIT PAS DISPARAÎTRE.
+   * Depuis le 09/11/2026, la consigne « si elle persiste, consulte » n'était portée que par le
+   * renforcement (`gardeDouleur`). Une semaine sans renfo (un seul jour disponible, aucun jour
+   * libre) servait un plan allégé pour une douleur… sans jamais orienter vers un médecin ni un
+   * kinésithérapeute (@SafeRun, 09/11/2026). On l'ajoute au « pourquoi » du premier jour couru,
+   * jamais au détail : la montre analyse le détail, pas le pourquoi.
+   */
+  function orienterDouleur(jours: PlanDay[]): PlanDay[] {
+    if (!douleur || jours.some((d) => d.type === "Renfo")) return jours;
+    const i = Math.max(0, jours.findIndex((d) => !/Repos/i.test(d.type)));
+    const jour = jours[i];
+    if (!jour) return jours;
+    const i18n = { ...(jour.i18n ?? {}) } as Partial<Record<Lang, PlanDayText>>;
+    for (const l of AUTRES_LANGUES) {
+      const t = i18n[l];
+      if (t) i18n[l] = { ...t, why: `${t.why ?? ""}${PLAN_T[l].douleurOrientation}` };
+    }
+    const copie = [...jours];
+    copie[i] = { ...jour, why: `${jour.why ?? ""}${PLAN_T.fr.douleurOrientation}`, i18n };
+    return copie;
+  }
 
   /**
    * ── MÉNAGER LES ARTICULATIONS (mode perte de poids) ────────────────────────
@@ -1073,12 +1115,14 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
       && !joursDoubles.has(d.date) && !veilleDeDur(d.date));
     if (!hote) return jours;
 
+    // Après la course de la semaine : le renfo de récupération, sans sauts (voir plus haut).
+    const apresLaCourse = raceIdx >= 0 && hote.date > iso(dates[raceIdx]);
     const rendu = (l: Lang): PlanDayText => ({
       title: PLAN_T[l].renfoTitre,
       // ⚠️ La version ALLÉGÉE, volontairement. Ce renforcement-là s'ajoute à un footing
       // le même jour : y mettre de la force lourde ferait deux séances dures en une
       // journée, ce que le plan passe son temps à éviter ailleurs.
-      detail: PLAN_T[l].renfoAffutage + gardeDouleur(l),
+      detail: (apresLaCourse ? PLAN_T[l].renfoRecup : PLAN_T[l].renfoAffutage) + gardeDouleur(l),
       why: PLAN_T[l].renfoWhy,
       tags: [PLAN_T[l].tags["Renfo"], PLAN_T[l].tags["Prévention"]],
     });
