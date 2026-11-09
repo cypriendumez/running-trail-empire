@@ -21,7 +21,8 @@ const DUREE_MAX_MS = 20_000;
 
 /** Un échec qui porte le statut HTTP de sa source (0 : délai, réseau, tracé incomplet). */
 export class ErreurSource extends Error {
-  constructor(message: string, readonly status: number, readonly source: "api-osm" | "overpass") { super(message); }
+  /** `principal` : l'erreur porte sur la relation (ou le chemin) DEMANDÉ, pas sur une de ses étapes. */
+  constructor(message: string, readonly status: number, readonly source: "api-osm" | "overpass", readonly principal = false) { super(message); }
 }
 
 /**
@@ -29,7 +30,9 @@ export class ErreurSource extends Error {
  * Ce n'est PAS une panne passagère — « réessaie dans quelques minutes » serait faux.
  */
 export function refusDefinitif(e: unknown): boolean {
-  return causes(e).some((c) => c instanceof ErreurSource && c.source === "api-osm" && (c.status === 404 || c.status === 410));
+  // Seulement sur l'objet DEMANDÉ : une étape supprimée d'un long sentier n'est pas le sentier supprimé
+  // (relecture du 09/11/2026) — Overpass, lui, peut encore rendre le reste.
+  return causes(e).some((c) => c instanceof ErreurSource && c.source === "api-osm" && c.principal && (c.status === 404 || c.status === 410));
 }
 
 
@@ -45,7 +48,7 @@ export function causes(e: unknown): unknown[] {
 const signalDe = (commun?: AbortSignal) => (commun ? AbortSignal.any([AbortSignal.timeout(DELAI_MS), commun]) : AbortSignal.timeout(DELAI_MS));
 
 interface OsmGeomPt { lat: number; lon: number }
-interface OsmWay { type: "way"; geometry?: OsmGeomPt[] }
+interface OsmWay { type: "way"; id?: number; geometry?: OsmGeomPt[] }
 interface OsmRelation { type: "relation"; members?: Array<{ type: string; geometry?: OsmGeomPt[] }> }
 type OsmEl = OsmWay | OsmRelation | { type: string };
 
@@ -64,10 +67,22 @@ function segmentsOverpass(elements: OsmEl[]): [number, number][][] {
   // Avec ">>", Overpass renvoie TOUS les tronçons (y compris ceux des
   // sous-relations) comme éléments "way" autonomes → on ne lit que ceux-là
   // (gère les super-relations, sans double comptage).
-  for (const el of elements) {
-    if (el.type === "way") addWay((el as OsmWay).geometry);
+  const vus = new Set<number>();
+  for (const el of parIdentifiant(elements.filter((x): x is OsmWay => x.type === "way"))) {
+    if (el.id != null) { if (vus.has(el.id)) continue; vus.add(el.id); }
+    addWay(el.geometry);
   }
   return segs;
+}
+
+/**
+ * LE MÊME ORDRE, QUELLE QUE SOIT LA SOURCE (relecture du 09/11/2026). Le chaînage dépend de l'ordre
+ * des tronçons (chaîne de départ, et la plus longue en cas d'égalité) : l'API officielle et Overpass ne
+ * les rendent pas dans le même ordre, et la plus rapide décidait du tracé gardé 30 jours en cache.
+ * Triés par identifiant OSM, les deux rendent la même chaîne.
+ */
+function parIdentifiant<T extends { id?: number }>(liste: T[]): T[] {
+  return [...liste].sort((a, b) => (a.id ?? Number.MAX_SAFE_INTEGER) - (b.id ?? Number.MAX_SAFE_INTEGER));
 }
 
 // Les membres d'une relation OSM ne sont PAS ordonnés bout-à-bout, et une route
@@ -182,15 +197,15 @@ type ElementApi = { type: string; id: number; lat?: number; lon?: number; nodes?
 
 /** L'API officielle d'OpenStreetMap : la relation (ou le chemin) avec tous ses nœuds. */
 export async function depuisApiOsm(type: "relation" | "way", id: string, commun?: AbortSignal): Promise<[number, number][]> {
-  const lire = async (t: string, i: string | number): Promise<ElementApi[]> => {
+  const lire = async (t: string, i: string | number, principal = false): Promise<ElementApi[]> => {
     const r = await fetch(`${API_OSM}/${t}/${i}/full.json`, {
       headers: { "User-Agent": UA_PACEVOBOT, Accept: "application/json" },
       signal: signalDe(commun),
     }).catch((e) => { throw new ErreurSource(`API OSM : ${(e as Error).name}`, 0, "api-osm"); });
-    if (!r.ok) throw new ErreurSource(`API OSM ${r.status}`, r.status, "api-osm");
+    if (!r.ok) throw new ErreurSource(`API OSM ${r.status}`, r.status, "api-osm", principal);
     return ((await r.json()) as { elements?: ElementApi[] }).elements ?? [];
   };
-  const tous = await lire(type, id);
+  const tous = await lire(type, id, true);
   // Super-relation : TOUS les niveaux de sous-relations, comme `>>` chez Overpass, sans troncature.
   if (type === "relation") {
     const lues = new Set<number>([Number(id)]);
@@ -216,8 +231,9 @@ export async function depuisApiOsm(type: "relation" | "way", id: string, commun?
   for (const e of tous) if (e.type === "node" && e.lat != null && e.lon != null) noeuds.set(e.id, [e.lon, e.lat]);
   const segs: [number, number][][] = [];
   const vus = new Set<number>();
-  for (const e of tous) {
-    if (e.type !== "way" || vus.has(e.id)) continue;
+  // Par identifiant de chemin : le même ordre que chez Overpass (voir `parIdentifiant`).
+  for (const e of parIdentifiant(tous.filter((x) => x.type === "way"))) {
+    if (vus.has(e.id)) continue;
     vus.add(e.id);
     const g = (e.nodes ?? []).map((n) => noeuds.get(n));
     // Un nœud manquant = un tracé troué : on le refuse plutôt que de le montrer raccourci.
@@ -261,7 +277,10 @@ export async function geometrieParcours(type: "relation" | "way", id: string): P
   const fin = new AbortController();
   const butoir = setTimeout(() => fin.abort(), DUREE_MAX_MS);
   try {
-    return await Promise.any([valable(depuisApiOsm(type, id, fin.signal)), valable(depuisOverpass(type, id, fin.signal))]);
+    // Parcours SUPPRIMÉ d'OpenStreetMap (l'API officielle le dit en 0,3 s) : on n'attend pas les 12 s
+    // d'un Overpass en panne pour l'annoncer — tout s'arrête, le refus remonte aussitôt.
+    const api = depuisApiOsm(type, id, fin.signal).catch((e) => { if (refusDefinitif(e)) fin.abort(); throw e; });
+    return await Promise.any([valable(api), valable(depuisOverpass(type, id, fin.signal))]);
   } finally {
     clearTimeout(butoir);
     fin.abort();

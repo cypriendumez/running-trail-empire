@@ -13,7 +13,10 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import { geometrieParcours, depuisApiOsm, refusDefinitif, causes, ErreurSource } from "../src/lib/parcours/geometrie";
+import { geometrieParcours, depuisApiOsm, depuisOverpass, refusDefinitif, causes, ErreurSource } from "../src/lib/parcours/geometrie";
+import { tracePartiel, longueurKm, PART_MIN } from "../src/lib/parcours/trace";
+import { estDuCatalogue } from "../src/lib/parcours/catalogue";
+import os from "os";
 
 let passed = 0; const fails: string[] = [];
 // ⚠️ UNE LIMITE PAR TEST, ET ELLE GARDE LE PROGRAMME EN VIE. Les délais réseau (`AbortSignal.timeout`)
@@ -165,8 +168,21 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
     assert.equal((await geometrieParcours("relation", "100")).length, 2, "la chaîne principale n'est plus rendue");
     // Le navigateur compare à la distance AFFICHÉE : ~10 km gardés pour 20 annoncés = fragment.
     const nav = codeNu("src/components/parcours/ParcoursBrowser.tsx");
-    assert.match(nav, /return coords\.length < 4 \|\| km < 0\.4 \|\| \(distanceAnnonceeKm > 0 && km < distanceAnnonceeKm \* 0\.75\);/, "un morceau de parcours passe pour le tracé complet");
     assert.equal((nav.match(/if \(tracePartiel\((coordinates|coords), p\.distance_km\)\)/g) ?? []).length, 2, "la carte ou l'export GPX ne vérifie plus la longueur du tracé");
+  });
+
+  await test("le contrôle « tracé partiel », seuil par seuil (4 points, 400 m, 75 % de la distance affichée)", () => {
+    // Une ligne droite d'est en ouest : n points régulièrement espacés sur `km` kilomètres.
+    const ligne = (km: number, n = 10): [number, number][] => Array.from({ length: n }, (_, i) => [5 + (km / 80.6) * (i / (n - 1)), 43.5]);
+    const dix = ligne(10);
+    assert.ok(Math.abs(longueurKm(dix) - 10) < 0.2, `longueur de la ligne d'essai : ${longueurKm(dix)}`);
+    assert.equal(tracePartiel(dix, 10), false, "un tracé conforme à la distance affichée est refusé");
+    assert.equal(tracePartiel(dix, 10 / PART_MIN - 0.5), false, "juste au-dessus des 75 % : refusé à tort");
+    assert.equal(tracePartiel(dix, 10 / PART_MIN + 0.5), true, "juste sous les 75 % : un fragment passe");
+    assert.equal(tracePartiel(dix, 0), false, "sans distance affichée, la longueur seule ne doit pas refuser");
+    assert.equal(tracePartiel(ligne(10, 3), 10), true, "moins de 4 points passe pour un tracé");
+    assert.equal(tracePartiel(ligne(0.3), 0), true, "moins de 400 m passe pour un tracé");
+    assert.equal(PART_MIN, 0.75);
   });
 
   await test("les causes d'Overpass (une par miroir) remontent à plat, statuts compris", async () => {
@@ -196,17 +212,85 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
     assert.ok(max <= 10, `${max} requêtes simultanées vers OpenStreetMap`);
   });
 
+  await test("parcours supprimé d'OpenStreetMap : annoncé tout de suite, sans attendre un Overpass muet", async () => {
+    reseau(() => ({ status: 410 }), "jamais");
+    const t0 = Date.now();
+    const e = await geometrieParcours("relation", "100").then(() => null, (x) => x);
+    assert.ok(e && refusDefinitif(e), "le refus définitif est perdu");
+    assert.ok(Date.now() - t0 < 2000, `${Date.now() - t0} ms : on a attendu Overpass pour annoncer un parcours supprimé`);
+  });
+
+  await test("une ÉTAPE supprimée d'un long sentier n'est pas le sentier supprimé", async () => {
+    reseau((url) => (url.includes("/201/") ? { status: 404 } : { status: 200, body: url.includes("/202/") ? ETAPE2 : SUPER }), { status: 502 });
+    const e = await geometrieParcours("relation", "200").then(() => null, (x) => x);
+    assert.ok(e, "précondition : les deux sources échouent");
+    assert.equal(refusDefinitif(e), false, "une étape supprimée fait annoncer tout le sentier comme supprimé");
+  });
+
+  await test("le même tracé quelle que soit la source et l'ordre d'arrivée des tronçons", async () => {
+    // Deux morceaux de MÊME longueur séparés de 20 km : l'ordre décidait lequel était gardé.
+    // Des coordonnées EXACTES en binaire (5,125 − 5 = 5,5 − 5,375) : une égalité parfaite, sinon le plus
+    // long gagne quel que soit l'ordre et le test ne prouve rien (vu en l'éprouvant par mutation).
+    const pts = { 1: [5.0, 43.5], 2: [5.125, 43.5], 3: [5.375, 43.5], 4: [5.5, 43.5] } as Record<number, [number, number]>;
+    const ways = [{ id: 11, nodes: [3, 4] }, { id: 10, nodes: [1, 2] }];
+    const api = (ordre: typeof ways) => ({ elements: [
+      ...Object.entries(pts).map(([k, [lon, lat]]) => n(Number(k), lon, lat)),
+      ...ordre.map((w) => ({ type: "way", ...w })),
+      { type: "relation", id: 100, members: ordre.map((w) => ({ type: "way", ref: w.id })) },
+    ] });
+    const overpass = (ordre: typeof ways) => ({ elements: ordre.map((w) => ({ type: "way", id: w.id, geometry: w.nodes.map((k) => ({ lon: pts[k][0], lat: pts[k][1] })) })) });
+    reseau(() => ({ status: 200, body: api(ways) }), { status: 502 });
+    const a1 = await depuisApiOsm("relation", "100");
+    reseau(() => ({ status: 200, body: api([...ways].reverse()) }), { status: 502 });
+    const a2 = await depuisApiOsm("relation", "100");
+    reseau(() => ({ status: 502 }), { status: 200, body: overpass(ways) });
+    const o1 = await depuisOverpass("relation", "100");
+    reseau(() => ({ status: 502 }), { status: 200, body: overpass([...ways].reverse()) });
+    const o2 = await depuisOverpass("relation", "100");
+    assert.equal(longueurKm(a1.slice(0, 2)), longueurKm([[5.375, 43.5], [5.5, 43.5]]), "précondition : les deux morceaux ont exactement la même longueur");
+    assert.deepEqual(a2, a1, "l'API officielle rend un autre morceau selon l'ordre des tronçons");
+    assert.deepEqual(o1, a1, "Overpass et l'API officielle ne gardent pas le même morceau");
+    assert.deepEqual(o2, a1, "Overpass rend un autre morceau selon l'ordre des tronçons");
+  });
+
+  await test("un catalogue illisible n'est ni pris pour vide, ni retenu", () => {
+    const ici = process.cwd();
+    process.chdir(os.tmpdir()); // pas de data/ ici : lecture impossible
+    try {
+      assert.equal(estDuCatalogue("relation", "6105302"), null, "un catalogue illisible passe pour un catalogue lu (vide)");
+    } finally { process.chdir(ici); }
+    assert.equal(estDuCatalogue("relation", "6105302"), true, "l'échec de lecture est retenu : plus aucun parcours mort ne sera jamais signalé");
+  });
+
+  await test("seuls les parcours du catalogue Pacevo peuvent être journalisés « supprimés »", () => {
+    assert.equal(estDuCatalogue("relation", "6105302"), true, "« (Sentier marron) » n'est pas reconnu au catalogue");
+    assert.equal(estDuCatalogue("relation", "123"), false, "un identifiant inventé passe pour un parcours du catalogue");
+    assert.equal(estDuCatalogue("way", "6105302"), false, "le type n'est pas vérifié : un chemin passe pour la relation");
+    const conf = codeNu("next.config.ts");
+    assert.match(conf, /"\/api\/parcours\/geometry": \["\.\/data\/parcours_certifies\.min\.json\.gz"\]/, "le catalogue n'est plus embarqué dans la route du tracé : rien ne serait plus journalisé en production");
+  });
+
   globalThis.fetch = vrai;
 
   await test("la route : connectée seulement, cache persistant, 503 sans rien mettre en cache", () => {
     const route = codeNu("src/app/api/parcours/geometry/route.ts");
     assert.match(route, /const denied = await denyIfAnonymous\(\);/, "la route s'ouvre aux anonymes (quotas d'OpenStreetMap)");
-    assert.match(route, /const geometrieEnCache = unstable_cache\(geometrieParcours, \["parcours-geometrie-v1"\], \{ revalidate: 60 \* 60 \* 24 \* 30 \}\);/, "plus de cache persistant : chaque redémarrage reperd les tracés");
+    // « v2 » depuis le chaînage dans un ordre fixe : avec « v1 », 30 jours de tracés chaînés selon l'ancien ordre.
+    assert.match(route, /const geometrieEnCache = unstable_cache\(geometrieParcours, \["parcours-geometrie-v2"\], \{ revalidate: 60 \* 60 \* 24 \* 30 \}\);/, "plus de cache persistant, ou cache resté sur l'ancienne version des tracés");
+    // Un parcours supprimé d'OSM est listé dans /admin (pour le retirer du catalogue).
+    assert.match(route, /if \(refusDefinitif\(e\)\) \{[\s\S]{0,600}const auCatalogue = estDuCatalogue\(type, id\);\s*if \(auCatalogue\) await journaliserEchecUneFois\(null, \{[\s\S]{0,200}message: `Parcours supprimé d'OpenStreetMap : \$\{type\} \$\{id\}`/,
+      "un parcours mort n'est plus listé dans /admin, ou n'importe quel identifiant inventé peut remplir error_logs");
+    assert.match(route, /else if \(auCatalogue === null\) await journaliserEchecUneFois\(null, \{[\s\S]{0,200}message: "Catalogue des parcours illisible/,
+      "un catalogue illisible fait taire la liste des parcours morts sans laisser de trace");
+    assert.match(route, /: c instanceof SyntaxError \? "réponse illisible"/, "une page HTML illisible remet un extrait variable dans le message du journal");
+    // Une erreur sans statut HTTP garde son libellé : « délai » et « tracé troué » ne se confondent plus.
+    assert.match(route, /c\.status \? `\$\{c\.source\}:\$\{c\.status\}` : `\$\{c\.source\}:\$\{c\.message/, "toutes les erreurs sans réponse HTTP redeviennent « api-osm:0 » dans le journal");
     assert.match(route, /const coords = await geometrieEnCache\(type, id\);/, "la route n'interroge plus le cache persistant");
     assert.match(route, /status: 503, headers: \{ "Retry-After": "60" \}/, "un échec n'est plus dit comme tel");
     const lib = codeNu("src/lib/parcours/geometrie.ts");
-    assert.match(lib, /return await Promise\.any\(\[valable\(depuisApiOsm\(type, id, fin\.signal\)\), valable\(depuisOverpass\(type, id, fin\.signal\)\)\]\);/, "les deux sources ne partent plus en même temps");
-    assert.match(route, /if \(refusDefinitif\(e\)\) return NextResponse\.json\(\{[^}]*definitif: true \}, \{ status: 404 \}\);/, "un parcours retiré d'OpenStreetMap redevient « réessaie dans quelques minutes »");
+    assert.match(lib, /return await Promise\.any\(\[valable\(api\), valable\(depuisOverpass\(type, id, fin\.signal\)\)\]\);/, "les deux sources ne partent plus en même temps");
+    assert.match(route, /message: `Tracé de parcours indisponible : \$\{cause\}`/, "le journal redevient une seule ligne par jour, quelle que soit la cause");
+    assert.match(route, /return NextResponse\.json\(\{ error: "Ce parcours n'a plus de tracé sur OpenStreetMap\.", definitif: true \}, \{ status: 404 \}\);/, "un parcours retiré d'OpenStreetMap redevient « réessaie dans quelques minutes »");
     assert.match(route, /await journaliserEchecUneFois\(null, \{\s*source: "parcours-geometrie"/, "une panne durable d'OpenStreetMap n'arrive plus à /admin");
     assert.match(route, /const statuts = causes\(e\)\.map\(/, "les statuts d'Overpass sont de nouveau perdus dans le journal");
     assert.match(route, /export const maxDuration = 30;/, "sans durée maximale, Vercel coupe la fonction avant le 503 et le journal");
@@ -226,6 +310,9 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
     // Chaque échec dit SA cause : session expirée, parcours retiré, panne.
     assert.equal((nav.match(/if \(res\?\.status === 401\) \{ toast\.error\(L\["t\.sessionExpiree"\], \{ id: tid \}\); return; \}/g) ?? []).length, 2, "une session expirée est de nouveau prise pour une panne d'OpenStreetMap");
     assert.match(nav, /if \(res\?\.status === 404\) \{ toast\.error\(L\["t\.gpxNa"\], \{ id: tid \}\); return; \}/, "un parcours retiré est de nouveau annoncé « réessaie plus tard »");
+    // « Réessaie dans quelques minutes » pour une panne seulement ; un 400 ou un 500 a son message.
+    assert.match(nav, /if \(res && !res\.ok && res\.status !== 503\) \{ toast\.error\(L\["t\.traceErr"\], \{ id: tid \}\); return; \}/, "une erreur non passagère est annoncée « réessaie dans quelques minutes »");
+    assert.match(nav, /if \(res && !res\.ok && res\.status !== 503 && res\.status !== 404\) \{ toast\.error\(L\["t\.gpxFail"\], \{ id: tid \}\); return; \}/, "export GPX : une erreur non passagère est annoncée comme une panne");
   });
 
   resume = true;

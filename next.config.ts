@@ -45,6 +45,8 @@ const nextConfig: NextConfig = {
   },
   outputFileTracingIncludes: {
     "/api/parcours": ["./data/parcours_certifies.min.json.gz"],
+    // La route du tracé vérifie qu'un parcours « supprimé d'OSM » est bien au catalogue avant de le journaliser.
+    "/api/parcours/geometry": ["./data/parcours_certifies.min.json.gz"],
   },
   images: {
     // ⚠️ NEXT 16 N'ACCEPTE QUE LES QUALITÉS DÉCLARÉES ICI. Sans cette liste, un
