@@ -160,6 +160,8 @@ export function TopBar({ profile, avatarColor, notifsMasquees: masqueesInitiales
         <div className="flex h-9 items-center gap-2 px-3 bg-zinc-50 rounded-lg border border-zinc-200/80 focus-within:bg-white focus-within:border-zinc-300 focus-within:ring-2 focus-within:ring-zinc-900/5 transition-colors">
           {searching ? <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" /> : <Search className="w-4 h-4 text-zinc-400" />}
           <input
+            name="recherche"
+            autoComplete="off"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onFocus={() => { if (raceHits.length || parcoursHits.length) setOpenSearch(true); }}

@@ -240,6 +240,22 @@ void (async () => {
     assert.ok(code("src/components/settings/SettingsView.tsx").includes("actuel: pwdActuel"), "les réglages n'envoient pas le mot de passe actuel");
   });
 
+  await test("Réglages → Sécurité : Chrome ne colle plus l'adresse dans la recherche du haut de page", () => {
+    // Vu le 09/11/2026 : le champ « mot de passe actuel » fait chercher à Chrome un identifiant
+    // juste avant ; faute d'en trouver un, il prenait la recherche de la barre du haut.
+    const reglages = code("src/components/settings/SettingsView.tsx");
+    const iIdentifiant = reglages.indexOf('autoComplete="username"');
+    const iActuel = reglages.indexOf('autoComplete="current-password"');
+    assert.ok(iActuel >= 0, "le champ du mot de passe actuel a disparu");
+    assert.ok(iIdentifiant >= 0 && iIdentifiant < iActuel, 'aucun champ autoComplete="username" avant le mot de passe actuel');
+    assert.ok(/autoComplete="username" value=\{email\} readOnly hidden/.test(reglages), "l'identifiant caché ne porte pas l'adresse du compte, en lecture seule et caché");
+    // L'élément entier, attributs dans n'importe quel ordre (`[^>]` s'arrêterait sur le `=>` d'un gestionnaire).
+    const barre = code("src/components/layout/TopBar.tsx");
+    const iRecherche = barre.indexOf('name="recherche"');
+    const champ = iRecherche < 0 ? "" : barre.slice(barre.lastIndexOf("<input", iRecherche), barre.indexOf("/>", iRecherche));
+    assert.ok(champ.includes('autoComplete="off"'), 'la recherche du haut de page n\'est pas marquée autoComplete="off"');
+  });
+
   await test("« mot de passe oublié » et confirmation : limités PAR ADRESSE, empreinte seule stockée", () => {
     // Fenêtre COURTE et message propre (relecture du 08/11) : un tiers peut épuiser le compteur
     // d'une adresse ; à l'heure, il privait la personne de « mot de passe oublié » pendant 1 h.

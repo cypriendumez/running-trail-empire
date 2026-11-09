@@ -383,6 +383,11 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
             <>
               <Card title={t("set.pwd.title")} desc={t("set.pwd.desc")}>
                 <div className="max-w-sm space-y-4">
+                  {/* Identifiant CACHÉ juste avant le mot de passe actuel (09/11/2026) : sans lui, Chrome
+                      prend la recherche du haut de page pour le champ « identifiant » et y colle
+                      l'adresse du compte (vu sur la capture de Cyprien). Forme recommandée par Chromium
+                      pour un changement de mot de passe. */}
+                  {aUnMdp && <input type="email" name="username" autoComplete="username" value={email} readOnly hidden aria-hidden="true" tabIndex={-1} />}
                   {aUnMdp && (
                     <Field label={M.actuel}><div className="relative"><Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-300" /><input type="password" value={pwdActuel} onChange={(e) => setPwdActuel(e.target.value)} className={inputCls + " pl-9"} placeholder="••••••••" autoComplete="current-password" /></div></Field>
                   )}
