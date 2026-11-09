@@ -66,7 +66,7 @@ et de `ops/STATE.md`.
 | 16 | @Funnel | E. Produit, design, mobile | @Maestro | EN ATTENTE (une vingtaine de questionnaires commencés) | aucune routine |
 | 17 | @Lab | E. Produit, design, mobile | @Maestro | EN ATTENTE (trafic suffisant pour un test significatif) | aucune routine |
 | 18 | @Polyglot | E. Produit, design, mobile | @Maestro | VAGUE 2 | aucune routine : à chaque version, au plus une fois par semaine |
-| 19 | @Gazette | E. Produit, design, mobile | @Maestro | EN ATTENTE (bêta ou première version publique) | aucune routine |
+| 19 | @Gazette | E. Produit, design, mobile | @Maestro | DÉFINI, routine demandée le 10/11/2026 (premier passage à prouver) ; notes de version EN ATTENTE | routine cloud Gazette, dimanche 22 h 30 : édition de la lettre du lundi en PR, visa @Maestro, Cyprien fusionne |
 | 20 | @Starter | F. Marketing et acquisition | @Mercator | VAGUE 2 | aucune routine ; à la demande en session |
 | 21 | @Plume | F. Marketing et acquisition | @Mercator | ACTIF | routines cloud Blog : article le 1er et le 15 à 3 h, sujets le lundi à 3 h 30 |
 | 22 | @Programmatic | F. Marketing et acquisition | @Mercator | VAGUE 2 | aucune routine |

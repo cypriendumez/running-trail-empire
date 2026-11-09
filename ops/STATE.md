@@ -26,6 +26,7 @@ avec les sessions de Cyprien ; en journée, 8 passages sur 10 étaient refusés 
 | Blog Pacevo, sujets | `@Plume` (+ visa `@Mercator` depuis le 09/11, à prouver) | lundi 3 h 30 | Sonnet 5 |
 | Coach Pacevo | `@Sparring`, `@SafeRun` (+ visa `@HeadCoach` depuis le 09/11, à prouver) | lundi 5 h | Opus 5.5 |
 | Direction Pacevo | `@Nexus`, `@PostMortem`, `@Greffier` (+ `@Strategos`, `@Trésorier`, `@Atlas` depuis le 09/11, à prouver) | vendredi 6 h | Sonnet 5.5 |
+| Gazette Pacevo, édition de la lettre (demandée le 10/11, 1er passage à prouver) | `@Gazette` (+ visa `@Maestro`) : une PR, Cyprien fusionne | dimanche 22 h 30 | Opus 5.5 |
 | Sécurité et veille Pacevo | `@Bunker`, `@Vault`, `@Radar` (+ contrôle de la sauvegarde publique ; + visas `@Architect` et `@Mercator` depuis le 09/11, à prouver) | le 5 du mois, 4 h | Sonnet 5.5 |
 
 **Tâches locales (Mac de Cyprien, app Claude)** : elles écrivent dans `~/Desktop/Pacevo/`, ce

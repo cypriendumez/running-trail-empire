@@ -17,6 +17,7 @@ tranche). Après un premier passage réussi et prouvé, le statut du directeur p
 | `blog-sujets.md` | Blog Pacevo, sujets (cloud, lundi 3 h 30) | `mercator` |
 | `direction.md` | Direction Pacevo (cloud, vendredi 6 h) | `strategos`, `tresorier`, `atlas`, `nexus` |
 | `courrier-local.md` | Courrier du matin (tâche locale du Mac, 8 h) | `chancelier` |
+| `gazette.md` | Gazette Pacevo, édition de la lettre (cloud, dimanche 22 h 30, demandée le 10/11/2026) | `maestro` |
 
 Le gabarit commun de l'étape (repris dans chaque fichier) :
 
