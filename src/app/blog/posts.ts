@@ -76,6 +76,11 @@ export const POSTS = [
   // conteneur — impossible donc de découvrir puis d'auditer un identifiant inédit.
   // Celui-ci a été retéléchargé au format servi et regardé avant d'être écrit ici.
   { id: 13, key: "p13", cat: "HEALTH", img: "https://images.unsplash.com/photo-1592859600972-1b0834d83747?w=600&h=450&fit=crop&q=80", featured: false },
+  // Ajoutés le 09/11/2026 par la routine de veille. Photos prises dans la RÉSERVE
+  // (`src/app/blog/reservePhotos.ts`), déjà auditées — regardées à nouveau au format
+  // servi avant cet ajout pour confirmer leur motif.
+  { id: 14, key: "p14", cat: "GEAR", img: "https://images.unsplash.com/photo-1700745286959-8658de43a15c?w=600&h=450&fit=crop&q=80", featured: false },
+  { id: 15, key: "p15", cat: "GEAR", img: "https://images.unsplash.com/photo-1761660227670-28922e2a69dc?w=600&h=450&fit=crop&q=80", featured: false },
 ];
 
 /** Largeur servie aux moteurs et aux réseaux ; 1200 px est le minimum conseillé par Google. */
