@@ -59,8 +59,15 @@ export const FILTRES: Partial<Record<Cat, RegExp>> = {
   gear:
     /chaussure|\bshoes?\b|sneaker|basket|montre|\bwatch\b|cardio|capteur|\btests?\b|comparatif|mat[ée]riel|[ée]quipement|\bgear\b|review|semelle|midsole|outsole|\bdrop\b|carbon plate|\bfoam\b|\bsacs?\b|b[âa]tons?\b|veste|nike|adidas|asics|hoka|salomon|saucony|brooks|new balance|altra|la sportiva|nnormal|mizuno|\bpuma\b|garmin|coros|suunto|polar|merrell|inov-?8|dynafit|topo athletic|scarpa|vaporfly|alphafly|kayano|nimbus|speedgoat/i,
   elite:
-    /jornet|walmsley|dauwalter|kipchoge|record|championnat|mondiaux|world championship|vainqueur|remporte|\bwins\b|victoire|podium|r[ée]sultats?|results|utmb|western states|golden trail|diamond league|olympi|champion/i,
+    /jornet|walmsley|dauwalter|kipchoge|record|championnat|mondiaux|world championship|vainqueur|remporte|\bwins?\b|\bwon\b|s.impose|\bgagne|triomphe|victoire|podium|r[ée]sultats?|results|utmb|western states|golden trail|diamond league|olympi|champion/i,
 };
+
+/**
+ * Ce qui ressemble à un résultat sans en être un : le « record » d'une course qui
+ * accueille plus de monde que l'an passé. Vu la semaine du 9/11/2026 (« la 25e édition
+ * bat son record de participants », « une troisième édition record ») dans « Élites ».
+ */
+export const PAS_ELITE = /record de (participants|participation|fr[ée]quentation|coureurs|dossards)|[ée]dition record/i;
 
 /**
  * LE SOMMAIRE DE LA LETTRE DU LUNDI, dans l'ordre d'affichage.
