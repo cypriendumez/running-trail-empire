@@ -32,7 +32,7 @@ Catégories possibles pour la carte : `AI`, `TRAINING`, `NUTRITION`, `HEALTH`, `
 - [ ] Le syndrome de l'essuie-glace et les autres blessures du coureur : facteurs de risque établis — `HEALTH`
 - [ ] Cadence et foulée : ce que les 180 pas/min ont de vrai et de faux — `TRAINING`
 - [ ] Entraînement en côte : ce qu'il change à la foulée et à l'économie de course — `TRAINING`
-- [ ] Courir dans le froid et la nuit : ce que la littérature dit vraiment (échauffement, visibilité, voies respiratoires) — `HEALTH`
+- [x] Courir dans le froid et la nuit : ce que la littérature dit vraiment (échauffement, visibilité, voies respiratoires) — `HEALTH` (`courir-dans-le-froid-et-la-nuit`)
 - [ ] Caféine avant la course : dose, délai, effets, et à qui ça ne convient pas — `NUTRITION`
 - [ ] Courir à jeun : ce que la littérature mesure vraiment (et ce qu'elle ne mesure pas) — `NUTRITION`
 - [ ] Bâtons en trail : gain d'économie mesuré, et le coût qu'on oublie — `GEAR`

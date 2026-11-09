@@ -1,7 +1,7 @@
 import type { Lang } from "@/lib/i18n/translations";
 
 export const BLOG_CATS = ["ALL", "AI", "TRAINING", "NUTRITION", "HEALTH", "RACES", "GEAR"] as const;
-export const POST_KEYS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12", "p13", "p14", "p15"] as const;
+export const POST_KEYS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12", "p13", "p14", "p15", "p16"] as const;
 
 export type BlogDict = {
   heroEyebrow: string; heroTitleA: string; heroAccent: string; heroSubtitle: string;
@@ -32,6 +32,7 @@ const fr: BlogDict = {
     p13: { title: "Reprendre après une blessure : ce que la progression doit respecter", excerpt: "La règle des 10 % a été testée dans un essai randomisé : elle n'a rien prévenu. Ce que la littérature documente vraiment avant le premier footing, et dans quel ordre progresser." },
     p14: { title: "GPS en forêt et de nuit : pourquoi ta montre se trompe, et ce qui compte à la place", excerpt: "Une étude de validation mesure une erreur de distance de 3,2 % à 6,1 % selon les montres GPS, nettement moins précise en forêt qu'à ciel ouvert. Ce qu'elle a vraiment mesuré, et le repère qui reste fiable quand l'allure affichée ne l'est plus." },
     p15: { title: "Plaque carbone en trail : ce qu'elle doit à la route, ce qu'elle ne prouve pas encore", excerpt: "2026 a vu une vague de chaussures de trail à plaque carbone. Le mécanisme qu'elles invoquent est bien documenté sur route ; son effet sur terrain technique ne l'est pas encore. Voici la différence." },
+    p16: { title: "Courir dans le froid et la nuit : voies respiratoires et visibilité", excerpt: "Ce que l'hiver met en jeu, côté littérature : tes voies respiratoires, et, la nuit, le fait d'être reconnu par un conducteur. Ce que six publications mesurent — et ce qu'elles ne disent pas." },
   },
 };
 
@@ -56,6 +57,7 @@ const en: BlogDict = {
     p13: { title: "Coming back from injury: what a sound progression respects", excerpt: "The 10% rule was tested in a randomised trial and prevented nothing. What the literature actually documents before your first run back, and in which order to progress." },
     p14: { title: "GPS in forests and at night: why your watch gets it wrong, and what to trust instead", excerpt: "A validation study measures a distance error of 3.2% to 6.1% depending on the GPS watch, clearly less accurate in forest than in open sky. What it actually measured, and the cue that still holds when the displayed pace doesn't." },
     p15: { title: "Carbon plates in trail shoes: what they owe to the road, what they haven't yet proven", excerpt: "2026 saw a wave of carbon-plated trail shoes. The mechanism they invoke is well documented on the road; its effect on technical terrain isn't yet. Here's the difference." },
+    p16: { title: "Running in the cold and the dark: airways and being seen", excerpt: "What winter puts at stake, as far as the literature goes: your airways, and, after dark, being recognised by a driver. What six publications measure — and what they do not say." },
   },
 };
 
@@ -80,6 +82,7 @@ const de: BlogDict = {
     p13: { title: "Nach einer Verletzung zurückkommen: was die Steigerung einhalten muss", excerpt: "Die 10-%-Regel wurde in einer randomisierten Studie geprüft und verhinderte nichts. Was die Literatur vor dem ersten Lauf wirklich belegt — und in welcher Reihenfolge man steigert." },
     p14: { title: "GPS im Wald und nachts: warum deine Uhr sich irrt, und worauf du stattdessen vertraust", excerpt: "Eine Validierungsstudie misst je nach GPS-Uhr einen Distanzfehler von 3,2 % bis 6,1 % — im Wald deutlich ungenauer als bei freiem Himmel. Was sie wirklich gemessen hat, und welcher Anhaltspunkt verlässlich bleibt, wenn das angezeigte Tempo es nicht mehr ist." },
     p15: { title: "Carbonplatte im Trailschuh: was sie der Straße verdankt, was sie noch nicht beweist", excerpt: "2026 brachte eine Welle von Trailschuhen mit Carbonplatte. Der Mechanismus, den sie anführen, ist auf der Straße gut belegt; seine Wirkung auf technischem Gelände ist es noch nicht. Der Unterschied." },
+    p16: { title: "Laufen bei Kälte und Dunkelheit: Atemwege und Sichtbarkeit", excerpt: "Was im Winter laut Literatur auf dem Spiel steht: deine Atemwege — und nachts, von Fahrenden erkannt zu werden. Was sechs Publikationen messen — und was sie nicht sagen." },
   },
 };
 
@@ -104,6 +107,7 @@ const es: BlogDict = {
     p13: { title: "Volver tras una lesión: lo que la progresión debe respetar", excerpt: "La regla del 10 % se probó en un ensayo aleatorizado y no previno nada. Lo que la literatura documenta de verdad antes de la primera carrera, y en qué orden progresar." },
     p14: { title: "GPS en bosque y de noche: por qué tu reloj se equivoca, y qué fiarse en su lugar", excerpt: "Un estudio de validación mide un error de distancia de entre el 3,2 % y el 6,1 % según el reloj GPS, claramente menos preciso en bosque que a cielo abierto. Lo que midió realmente, y la referencia que sigue siendo fiable cuando el ritmo mostrado no lo es." },
     p15: { title: "Placa de carbono en trail: lo que debe a la carretera, lo que aún no demuestra", excerpt: "2026 trajo una ola de zapatillas de trail con placa de carbono. El mecanismo que invocan está bien documentado en carretera; su efecto en terreno técnico todavía no. Aquí está la diferencia." },
+    p16: { title: "Correr con frío y de noche: vías respiratorias y visibilidad", excerpt: "Lo que el invierno pone en juego, según la literatura: tus vías respiratorias y, de noche, que un conductor te reconozca. Lo que miden seis publicaciones — y lo que no dicen." },
   },
 };
 
@@ -128,6 +132,7 @@ const pt: BlogDict = {
     p13: { title: "Voltar depois de uma lesão: o que a progressão tem de respeitar", excerpt: "A regra dos 10 % foi testada num ensaio aleatorizado e não preveniu nada. O que a literatura documenta mesmo antes do primeiro treino, e em que ordem progredir." },
     p14: { title: "GPS na floresta e de noite: porque o teu relógio se engana, e no que confiar em vez disso", excerpt: "Um estudo de validação mede um erro de distância entre 3,2 % e 6,1 % consoante o relógio GPS, claramente menos preciso na floresta do que a céu aberto. O que mediu realmente, e a referência que continua fiável quando o ritmo mostrado já não é." },
     p15: { title: "Placa de carbono em trail: o que deve à estrada, o que ainda não prova", excerpt: "2026 trouxe uma vaga de sapatilhas de trail com placa de carbono. O mecanismo que invocam está bem documentado na estrada; o seu efeito em terreno técnico ainda não. Eis a diferença." },
+    p16: { title: "Correr com frio e à noite: vias respiratórias e visibilidade", excerpt: "O que o inverno põe em jogo, segundo a literatura: as tuas vias respiratórias e, à noite, seres reconhecido por um condutor. O que seis publicações medem — e o que não dizem." },
   },
 };
 

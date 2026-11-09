@@ -1173,6 +1173,104 @@ export const ARTICLES: Article[] = [
     ],
   },
 
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    slug: "courir-dans-le-froid-et-la-nuit",
+    cle: "p16",
+    maj: "9 novembre 2026",
+    chapo:
+      "Sur un marathon, la température de l'air pèse plus que tout autre paramètre climatique, et c'est au-dessus de l'optimum que les vitesses baissent et que les abandons augmentent. Le versant froid, elle ne le décrit pas. Ce qu'elle documente en hiver est ailleurs : tes voies respiratoires, et, une fois la nuit tombée, le fait d'être reconnu par un conducteur.",
+    avertissement:
+      "Cet article parle d'asthme d'effort et de voies respiratoires. Il n'est ni un outil de diagnostic ni un substitut à un avis médical. Une toux qui s'installe après les sorties par temps froid, un sifflement ou une gêne respiratoire à l'effort se montrent à un médecin, et un traitement se décide avec lui — pas avec un article de blog.",
+    blocs: [
+      {
+        h: "Ce que la température fait vraiment à une course",
+        p: [
+          "Commençons par ce que la littérature mesure. L'étude d'El Helou et ses collègues (2012) a analysé 1 791 972 performances de finishers sur six grands marathons européens et américains entre 2001 et 2010, en relevant température, humidité, point de rosée, pression et quatre polluants.",
+          "Sa conclusion : c'est la température de l'air qui pèse le plus sur la capacité de course, et la relation suit un modèle quadratique. Il existe donc une température optimale, propre à chaque niveau, au-dessus de laquelle la vitesse baisse et les abandons augmentent.",
+          "Attention à ce qu'elle ne dit pas. Son résumé ne décrit la dégradation qu'AU-DESSUS de l'optimum. Un optimum suppose pourtant que la vitesse baisse aussi en dessous : ce versant froid, le résumé ne le décrit ni ne le chiffre. N'en conclus donc pas que le froid serait sans effet sur ton allure. Les deux sujets propres à l'hiver sont ailleurs : ce que tu respires, et la façon dont on te voit.",
+        ],
+      },
+      {
+        h: "Le froid, l'air sec et tes voies respiratoires",
+        p: [
+          "D'abord un ordre de grandeur. La revue de Rodriguez Bauza et Silveyra (2020) rassemble 60 études portant sur 7 501 athlètes adultes et rapporte une prévalence de 23 % de bronchoconstriction induite par l'exercice — près d'un sur quatre.",
+          "Son résumé ne dit rien du froid ni de la course : il rapporte une prévalence chez des athlètes. Le terrain existe, rien de plus — c'est la publication suivante qui fait le lien avec l'hiver.",
+          "La revue de Hanstock et ses collègues (2020) nomme le coupable. L'asthme y est décrit comme la « maladie professionnelle » des skieurs de fond, reconnue dans les années 1990 et attribuée à l'exposition répétée à un air froid ET SEC, à débit ventilatoire élevé.",
+          "Deux mots de cette phrase comptent. L'air SEC, au même titre que l'air froid : les degrés ne sont pas seuls en cause. Et le DÉBIT ventilatoire, que le résumé associe au froid. L'illustration est de nous, pas de l'étude : un footing à 2 °C ne ventile pas comme un 6×1000 m à −5 °C.",
+        ],
+      },
+      {
+        h: "Ce qu'un masque change, chiffres en main",
+        p: [
+          "Un dispositif d'échange de chaleur et d'humidité se porte devant la bouche. Stenfors et ses collègues (2022) l'ont testé en croisé randomisé sur 23 personnes entraînées et en bonne santé, à −15 °C : 30 minutes d'échauffement, puis 4 minutes de contre-la-montre à allure libre maximale.",
+          "La chute du volume expiratoire maximal en une seconde après l'effort est nettement moindre avec le dispositif : −0,5 % (écart-type 1,9) contre −2,7 % (2,7) sans, p = 0,002. La protéine des cellules Club, mesurée dans le plasma, monte de 27 % en médiane (interquartile 9 à 38) avec le masque, contre 121 % (55 à 162) sans, p < 0,001.",
+          "Les symptômes respiratoires et généraux étaient eux aussi réduits, chez des sujets sains. Mesure la portée : un dispositif précis, à −15 °C, sur un effort maximal de quatre minutes. Rien sur un tour de cou, ni sur une sortie tranquille à 3 °C.",
+        ],
+      },
+      {
+        h: "La nuit : être vu ne suffit pas, il faut être reconnu",
+        p: [
+          "Wood, Tyrrell et Carberry (2005) ont fait conduire 10 jeunes conducteurs et 10 plus âgés sur un circuit fermé, de nuit : quatre tenues de piéton, deux réglages de phares, éblouissement ou non. Consigne : signaler dès qu'on reconnaît quelqu'un.",
+          "Dans la condition la plus défavorable — feux de croisement, vêtements noirs, éblouissement — les conducteurs n'ont reconnu que 5 % des piétons ; avec des bandes rétroréfléchissantes dessinant le mouvement du corps et sans éblouissement, 100 %. Les distances moyennes de reconnaissance, en l'absence d'éblouissement, vont de 0,0 m (conducteurs âgés, feux de croisement, vêtements noirs) à 220 m (conducteurs jeunes, pleins phares, configuration dite biomotion). Zéro mètre veut dire ce qu'il dit.",
+          "La revue de Wood (2023) explique pourquoi. Des bandes posées sur les ARTICULATIONS MOBILES créent une impression de mouvement biologique qui fait percevoir une PERSONNE, et à des distances bien plus grandes que les mêmes bandes posées sur le torse, comme sur un gilet de haute visibilité. Le bénéfice tient en environnement encombré, sous éblouissement, et chez des conducteurs d'âges et de vues différents.",
+          "Le gilet jaune dit « quelque chose brille ». Des bandes sur ce qui plie disent « un être humain avance là » — l'image est de nous. Ces travaux portent sur des piétons et des cyclistes, pas sur des coureurs : la transposition est de nous aussi. Place ton rétroréfléchissant sur les articulations qui BOUGENT, pas sur le seul buste.",
+        ],
+      },
+      {
+        h: "Ce que les études ne montrent pas",
+        p: [
+          "Le masque n'est pas une prévention démontrée CHEZ LE SPORTIF SAIN. Hanstock rappelle que ces dispositifs préviennent la bronchoconstriction d'effort chez des personnes déjà atteintes ; leur intérêt préventif chez des athlètes sains reste à établir, et les auteurs de l'essai le disent eux-mêmes. Ce qui y est mesuré, c'est une réponse aiguë après un seul effort.",
+          "La littérature a d'ailleurs mieux décrit ce problème qu'elle ne l'a résolu : Hanstock relève que plus de 25 ans après la reconnaissance de cette maladie professionnelle, la prévalence de l'asthme chez les skieurs scandinaves est inchangée.",
+          "Enfin, les distances ci-dessus viennent d'un circuit fermé et valent pour ce protocole. La revue de 2023, elle, couvre aussi des études sur route ouverte, et des cyclistes et des travailleurs de la route autant que des piétons.",
+        ],
+      },
+      {
+        h: "Ce que Pacevo fait du froid",
+        p: [
+          "Sous 20 °C, le coach n'applique aucune pénalité de CHALEUR sur ton allure, et au-dessus de 5 °C il ne colle aucune consigne de température à ta séance : tu ne verras rien, et c'est normal. Entre 0 et 5 °C, une consigne apparaît — échauffement rallongé et couvert. Sous 0 °C elle change de nature : 20 minutes d'échauffement au minimum, pas de fractionné court à froid, et une mise en garde sur les voies respiratoires par temps sec et glacial.",
+          "Règle de prudence, pas mesure : aucune publication citée ne chiffre l'échauffement qui protège.",
+          "Ces seuils portent sur la température MAXIMALE prévue pour la journée, pas sur celle de l'heure où tu cours : une sortie de nuit à 2 °C, un jour où le thermomètre est monté à 9 °C, ne recevra aucune consigne de froid.",
+          "Le froid, lui, ne déplace pas une séance. Le plan ne décale un entraînement de qualité que pour un gain d'au moins 10 s/km, au plus deux jours plus tard, et il calcule ce surcoût en ADDITIONNANT chaleur et vent. Sous 20 °C la chaleur n'y contribue pour rien ; un jour froid ET venteux peut en revanche franchir le seuil — ce sera le vent, pas le thermomètre.",
+          "Il y a enfin une correction de saison sur tes zones cardiaques. Quand les prévisions de la semaine, là où tu cours, donnent une moyenne sous 8 °C et que l'app ne trouve aucun pic cardiaque à la même période l'an dernier, elle abaisse de 5 bpm la référence de FC max qui les calcule — jamais sous une fréquence réellement atteinte ces six dernières semaines.",
+          "Ce 5 ne vient d'aucune des publications ci-dessus, et il faut le dire : c'est une estimation prudente, que remplace le pic cardiaque d'un hiver déjà enregistré.",
+          "Ce qu'elle ne fait pas : elle ignore si tu cours de nuit. Rien de ce que remonte ta montre ne lui dit s'il faisait noir, donc aucune consigne de visibilité ne sortira du plan.",
+        ],
+      },
+    ],
+    sources: [
+      {
+        label:
+          "El Helou N et al. Impact of environmental parameters on marathon running performance. PLoS One, 2012",
+        url: "https://pubmed.ncbi.nlm.nih.gov/22649525/",
+      },
+      {
+        label:
+          "Rodriguez Bauza DE, Silveyra P. Sex Differences in Exercise-Induced Bronchoconstriction in Athletes: A Systematic Review and Meta-Analysis. Int J Environ Res Public Health, 2020",
+        url: "https://pubmed.ncbi.nlm.nih.gov/33027929/",
+      },
+      {
+        label:
+          "Hanstock HG et al. Exercise in Sub-zero Temperatures and Airway Health: Implications for Athletes With Special Focus on Heat-and-Moisture-Exchanging Breathing Devices. Front Sports Act Living, 2020",
+        url: "https://pubmed.ncbi.nlm.nih.gov/33345026/",
+      },
+      {
+        label:
+          "Stenfors N et al. A breathing mask attenuates acute airway responses to exercise in sub-zero environment in healthy subjects. Eur J Appl Physiol, 2022",
+        url: "https://pubmed.ncbi.nlm.nih.gov/35391634/",
+      },
+      {
+        label:
+          "Wood JM, Tyrrell RA, Carberry TP. Limitations in drivers' ability to recognize pedestrians at night. Hum Factors, 2005",
+        url: "https://pubmed.ncbi.nlm.nih.gov/16435703/",
+      },
+      {
+        label:
+          "Wood JM. Improving the conspicuity and safety of pedestrians and cyclists on night-time roads. Clin Exp Optom, 2023",
+        url: "https://pubmed.ncbi.nlm.nih.gov/36774920/",
+      },
+    ],
+  },
 ];
 
 /** Clé d'article → slug, pour que l'index sache quelles cartes sont cliquables. */
