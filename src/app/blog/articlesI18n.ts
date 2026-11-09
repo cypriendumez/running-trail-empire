@@ -38,7 +38,7 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
   en: {
     "courir-dans-le-froid-et-la-nuit": {
       chapo:
-        "Over a marathon, air temperature weighs more than any other climatic parameter, and it is above the optimum that speeds fall and withdrawal rates rise. Of the cold side, this literature says nothing. What it does document in winter lies elsewhere: your airways, and, once darkness falls, being recognised by a driver.",
+        "Over a marathon, air temperature weighs more than any other climatic parameter, and it is above the optimum that speeds fall and withdrawal rates rise. The cold side, it does not describe. What it does document in winter lies elsewhere: your airways, and, once darkness falls, being recognised by a driver.",
       avertissement:
         "This article discusses exercise-induced asthma and the airways. It is neither a diagnostic tool nor a substitute for medical advice. A cough that settles in after cold-weather runs, a wheeze or breathing discomfort during effort should be shown to a doctor, and treatment is decided with them — not with a blog article.",
       blocs: [
@@ -47,7 +47,7 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
           p: [
             "Let us start with what the literature measures. The study by El Helou and colleagues (2012) analysed 1,791,972 finisher performances across six major European and American marathons between 2001 and 2010, recording temperature, humidity, dew point, pressure and four pollutants.",
             "Their conclusion: it is air temperature that weighs most on running capacity, and the relationship follows a quadratic model. There is therefore an optimal temperature, specific to each performance level, above which speed falls and withdrawals rise.",
-            "Mind what it does not say. Its abstract describes the degradation only ABOVE the optimum: it says nothing about the cold side, in either direction. So do not conclude that cold has no effect on your pace. The two subjects specific to winter lie elsewhere: what you breathe, and the way you are seen.",
+            "Mind what it does not say. Its abstract describes the degradation only ABOVE the optimum. Yet an optimum implies that speed also falls below it: that cold side, the abstract neither describes nor quantifies. So do not conclude that cold has no effect on your pace. The two subjects specific to winter lie elsewhere: what you breathe, and the way you are seen.",
           ],
         },
         {
@@ -89,6 +89,7 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
           p: [
             "Below 20 °C, the coach applies no HEAT penalty to your pace, and above 5 °C it attaches no temperature note to your session at all: you will see nothing, and that is normal. Between 0 and 5 °C a note appears — a longer, covered warm-up. Below 0 °C it changes in nature: 20 minutes of warm-up minimum, no short intervals from cold, and a warning about the airways in dry, freezing weather.",
             "A precautionary rule, not a measurement: none of the publications cited here quantifies the warm-up that protects.",
+            "These thresholds apply to the day's forecast MAXIMUM temperature, not to the temperature at the hour you run: a night run at 2 °C, on a day that climbed to 9 °C, will get no cold note.",
             "Cold itself does not move a session. The plan only shifts a quality session for a gain of at least 10 s/km, at most two days later, and it computes that cost by ADDING heat and wind. Below 20 °C heat contributes nothing; a cold AND windy day, however, can cross the threshold — that will be the wind, not the thermometer.",
             "There is finally a seasonal correction on your heart rate zones. When the week's forecast where you run averages below 8 °C and the app finds no heart rate peak from the same period last year, it lowers by 5 bpm the max HR reference used to compute them — never below a rate actually reached in the past six weeks.",
             "That 5 comes from none of the publications above, and it has to be said: it is a cautious estimate, replaced by the heart rate peak of a winter already on record.",

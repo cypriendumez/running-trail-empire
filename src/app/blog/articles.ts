@@ -1179,7 +1179,7 @@ export const ARTICLES: Article[] = [
     cle: "p16",
     maj: "9 novembre 2026",
     chapo:
-      "Sur un marathon, la température de l'air pèse plus que tout autre paramètre climatique, et c'est au-dessus de l'optimum que les vitesses baissent et que les abandons augmentent. Du versant froid, cette littérature ne dit rien. Ce qu'elle documente en hiver est ailleurs : tes voies respiratoires, et, une fois la nuit tombée, le fait d'être reconnu par un conducteur.",
+      "Sur un marathon, la température de l'air pèse plus que tout autre paramètre climatique, et c'est au-dessus de l'optimum que les vitesses baissent et que les abandons augmentent. Le versant froid, elle ne le décrit pas. Ce qu'elle documente en hiver est ailleurs : tes voies respiratoires, et, une fois la nuit tombée, le fait d'être reconnu par un conducteur.",
     avertissement:
       "Cet article parle d'asthme d'effort et de voies respiratoires. Il n'est ni un outil de diagnostic ni un substitut à un avis médical. Une toux qui s'installe après les sorties par temps froid, un sifflement ou une gêne respiratoire à l'effort se montrent à un médecin, et un traitement se décide avec lui — pas avec un article de blog.",
     blocs: [
@@ -1188,7 +1188,7 @@ export const ARTICLES: Article[] = [
         p: [
           "Commençons par ce que la littérature mesure. L'étude d'El Helou et ses collègues (2012) a analysé 1 791 972 performances de finishers sur six grands marathons européens et américains entre 2001 et 2010, en relevant température, humidité, point de rosée, pression et quatre polluants.",
           "Sa conclusion : c'est la température de l'air qui pèse le plus sur la capacité de course, et la relation suit un modèle quadratique. Il existe donc une température optimale, propre à chaque niveau, au-dessus de laquelle la vitesse baisse et les abandons augmentent.",
-          "Attention à ce qu'elle ne dit pas. Son résumé ne décrit la dégradation qu'AU-DESSUS de l'optimum : il ne dit rien du versant froid, ni dans un sens ni dans l'autre. N'en conclus donc pas que le froid serait sans effet sur ton allure. Les deux sujets propres à l'hiver sont ailleurs : ce que tu respires, et la façon dont on te voit.",
+          "Attention à ce qu'elle ne dit pas. Son résumé ne décrit la dégradation qu'AU-DESSUS de l'optimum. Un optimum suppose pourtant que la vitesse baisse aussi en dessous : ce versant froid, le résumé ne le décrit ni ne le chiffre. N'en conclus donc pas que le froid serait sans effet sur ton allure. Les deux sujets propres à l'hiver sont ailleurs : ce que tu respires, et la façon dont on te voit.",
         ],
       },
       {
@@ -1230,6 +1230,7 @@ export const ARTICLES: Article[] = [
         p: [
           "Sous 20 °C, le coach n'applique aucune pénalité de CHALEUR sur ton allure, et au-dessus de 5 °C il ne colle aucune consigne de température à ta séance : tu ne verras rien, et c'est normal. Entre 0 et 5 °C, une consigne apparaît — échauffement rallongé et couvert. Sous 0 °C elle change de nature : 20 minutes d'échauffement au minimum, pas de fractionné court à froid, et une mise en garde sur les voies respiratoires par temps sec et glacial.",
           "Règle de prudence, pas mesure : aucune publication citée ne chiffre l'échauffement qui protège.",
+          "Ces seuils portent sur la température MAXIMALE prévue pour la journée, pas sur celle de l'heure où tu cours : une sortie de nuit à 2 °C, un jour où le thermomètre est monté à 9 °C, ne recevra aucune consigne de froid.",
           "Le froid, lui, ne déplace pas une séance. Le plan ne décale un entraînement de qualité que pour un gain d'au moins 10 s/km, au plus deux jours plus tard, et il calcule ce surcoût en ADDITIONNANT chaleur et vent. Sous 20 °C la chaleur n'y contribue pour rien ; un jour froid ET venteux peut en revanche franchir le seuil — ce sera le vent, pas le thermomètre.",
           "Il y a enfin une correction de saison sur tes zones cardiaques. Quand les prévisions de la semaine, là où tu cours, donnent une moyenne sous 8 °C et que l'app ne trouve aucun pic cardiaque à la même période l'an dernier, elle abaisse de 5 bpm la référence de FC max qui les calcule — jamais sous une fréquence réellement atteinte ces six dernières semaines.",
           "Ce 5 ne vient d'aucune des publications ci-dessus, et il faut le dire : c'est une estimation prudente, que remplace le pic cardiaque d'un hiver déjà enregistré.",
