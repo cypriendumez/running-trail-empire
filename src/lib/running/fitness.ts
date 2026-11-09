@@ -1,4 +1,4 @@
-import { jourLocal, ecartJours } from "@/lib/streak/compute";
+import { jourLocal, ecartJours, MIN_JOURS_CHARGE } from "@/lib/streak/compute";
 // ─────────────────────────────────────────────────────────────────────────────
 //  Modèle de forme : VMA, VO2max (multi-sources, façon Garmin) et prédictions de
 //  chrono par distance. Calculs purs, réutilisables (profil, onboarding, IA).
@@ -278,7 +278,12 @@ export function chargesQuotidiennes(
   return out;
 }
 
-export type LoadRisk = { acwr: number; monotony: number; deload: boolean; level: "ok" | "vigilance" | "deload"; reason: string };
+export type LoadRisk = {
+  acwr: number; monotony: number; deload: boolean; level: "ok" | "vigilance" | "deload"; reason: string;
+  /** La base chronique suffit-elle pour qu'un ratio veuille dire quelque chose ? (≥ MIN_JOURS_CHARGE
+   *  journées actives sur 28). Sans elle, `acwr` vaut 0 et ne se lit PAS comme une sous-charge. */
+  base?: boolean;
+};
 export function loadRisk(
   workouts: { date: string; type?: string | null; duration_seconds?: number | null; tss?: number | null }[],
   // Le jour de référence (défaut : aujourd'hui à Paris). La page détaillée passe le SIEN : sans
@@ -297,7 +302,14 @@ export function loadRisk(
   const q = chargesQuotidiennes(workouts, 28, aujourdhui);
   const tss7 = q.slice(0, 7).reduce((a, b) => a + b, 0);
   const tss28 = q.reduce((a, b) => a + b, 0);
-  const acwr = tss28 > 0 ? Math.round((tss7 / (tss28 / 4)) * 100) / 100 : 0;
+  // ⚠️ PAS DE RATIO SANS BASE CHRONIQUE (audit du 09/11/2026). Deux séances dans la semaine d'un
+  //    nouvel inscrit donnaient 4,00 : « Risque élevé », et le bandeau rouge de décharge en tête
+  //    du tableau de bord (« charge aiguë +300 % vs ta moyenne ») — alors que le coach, lui
+  //    (`acwrAu`), refuse ce ratio sous MIN_JOURS_CHARGE journées actives sur 28. Même règle ici :
+  //    une division par une base maigre n'est pas une surcharge.
+  const joursActifs = q.filter((v) => v > 0).length;
+  const base = tss28 > 0 && joursActifs >= MIN_JOURS_CHARGE;
+  const acwr = base ? Math.round((tss7 / (tss28 / 4)) * 100) / 100 : 0;
   const daily = q.slice(0, 7);
   const mean = daily.reduce((a, b) => a + b, 0) / 7;
   const sd = Math.sqrt(daily.reduce((a, b) => a + (b - mean) ** 2, 0) / 7) || 1;
@@ -307,7 +319,7 @@ export function loadRisk(
   const reason = acwr > 1.5 ? `charge aiguë +${Math.round((acwr - 1) * 100)} % vs ta moyenne (risque blessure)`
     : monotony > 2.2 ? "entraînement trop monotone (varie l'intensité, ajoute un vrai repos)"
     : acwr > 1.3 ? "charge en hausse — surveille la récupération" : "";
-  return { acwr, monotony, deload, level, reason };
+  return { acwr, monotony, deload, level, reason, base };
 }
 
 // Meilleure VMA estimée depuis l'historique : UNIQUEMENT des efforts réellement

@@ -24,6 +24,8 @@ import { PLAN_T } from "../src/lib/ai/planI18n";
 import { derniereAnalyse, lienSeance } from "../src/lib/dashboard/derniereAnalyse";
 import { zoneDominante } from "../src/lib/dashboard/zones";
 import { etapesSeance } from "../src/lib/dashboard/etapes";
+import { loadRisk } from "../src/lib/running/fitness";
+import { MIN_JOURS_CHARGE } from "../src/lib/streak/compute";
 import { seancesSansRessenti } from "../src/lib/dashboard/ressenti";
 import { computeDistancePRs, NOMS_DISTANCE } from "../src/lib/dashboard/records";
 import { validerConseils, appliquerConseils, inviteRelecture } from "../src/lib/ai/relectureSemaine";
@@ -529,6 +531,68 @@ test("section Activité : pas d'écart de VFC périmé, pastille grise sans mesu
     assert.match(d["dash.records.sub"], /\{date\}/, `dash.records.sub sans {date} en ${l}`);
     assert.doesNotMatch(d["dash.records.sub"], /récentes|recent|letzten|recientes/i, `dash.records.sub redevient vague en ${l}`);
   }
+});
+
+// ── AUDIT DU 09/11/2026 — pertinence des modules et défauts trouvés en exerçant la page ──
+console.log("\nAUDIT DU 09/11/2026");
+
+test("charge aiguë / chronique : pas de « risque élevé » sans base, et 0,00 avec base = sous-charge", () => {
+  const AUJ = "2026-11-09";
+  const s = (d: string) => ({ date: d, type: "Run", duration_seconds: 3000, tss: 60 });
+  const jour = (n: number) => { const x = new Date(`${AUJ}T12:00:00Z`); x.setUTCDate(x.getUTCDate() - n); return x.toISOString().slice(0, 10); };
+  // Nouvel inscrit : deux séances cette semaine. Avant : 4,00, décharge, bandeau rouge « +300 % ».
+  const neuf = loadRisk([s(jour(1)), s(jour(3))], AUJ);
+  assert.equal(neuf.acwr, 0, `nouvel inscrit : ratio ${neuf.acwr} sur une base de 2 jours`);
+  assert.equal(neuf.deload, false, "nouvel inscrit : bandeau de décharge sur deux séances");
+  assert.equal(neuf.base, false);
+  // Coureur régulier (12 jours actifs), plus rien depuis 9 jours : la base existe, 0,00 est une mesure.
+  const pause = loadRisk(Array.from({ length: 12 }, (_, i) => s(jour(9 + i))), AUJ);
+  assert.ok(12 >= MIN_JOURS_CHARGE);
+  assert.equal(pause.base, true, "base chronique non reconnue après 12 jours actifs");
+  assert.equal(pause.acwr, 0);
+  // Même coureur, régulier jusqu'à hier : le ratio se calcule.
+  assert.ok(loadRisk(Array.from({ length: 12 }, (_, i) => s(jour(1 + 2 * i))), AUJ).acwr > 0, "ratio nul pour un coureur régulier");
+  const b = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  assert.match(b, /\{acwr > 0 \|\| loadRisk\?\.base \? \(\(\) => \{/, "la carte annonce « plus de séances nécessaires » à un coureur qui a une base");
+  assert.match(codeNu("src/lib/indicateurs/fiches.ts"), /if \(!\(r\.acwr > 0\) && !r\.base\) return \{ \.\.\.base, vide/, "la page détaillée dit « vide » quand la carte dit « sous-charge »");
+});
+
+test("fraîcheur : « affûtage optimal » seulement dans les 21 jours avant la course", () => {
+  const w = codeNu("src/components/dashboard/TaperingWidget.tsx");
+  assert.match(w, /tsb > 25 && !isTaperingWindow \? \{ labelK: "tap\.status\.detraining"/, "+36 hors affûtage n'est plus signalé comme une forme qui s'érode");
+  assert.match(w, /labelK: isTaperingWindow \? "tap\.status\.optimal" : "tap\.status\.fresh"/, "« Affûtage optimal » s'affiche loin de toute course");
+  for (const l of ["fr", "en", "de", "es", "pt"] as const) {
+    const d = T[l] as Record<string, string>;
+    assert.ok(d["tap.status.fresh"] && d["tap.status.detraining"], `statuts de fraîcheur manquants en ${l}`);
+  }
+});
+
+test("pas de module en double : « Cette semaine » et la pastille de série retirés", () => {
+  const b = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  // « Forme du jour » reste : Cyprien a demandé de la garder (09/11/2026, « Garde-les »).
+  assert.match(b, /key: "ready"/, "« Forme du jour » a disparu alors que Cyprien a demandé de la garder");
+  assert.doesNotMatch(b, /t\("dash\.summary\.title"\)/, "« Cette semaine » est revenue : même fenêtre et mêmes chiffres qu'« Activité 7 jours »");
+  const entete = b.slice(b.indexOf("<h1"), b.indexOf("<WeatherChip />"));
+  assert.doesNotMatch(entete, /streak\.current/, "la pastille de série est revenue dans l'en-tête : la carte Série est juste dessous");
+  // Une semaine sans course se DIT, au lieu de sept barres vides.
+  assert.match(b, /\{weekSummary\.sessions === 0 \? \(/, "« Activité 7 jours » redessine sept barres vides sans rien dire");
+  for (const l of ["fr", "en", "de", "es", "pt"] as const) {
+    const d = T[l] as Record<string, string>;
+    assert.ok(d["dash.weekly.vide"] && /\{d\}/.test(d["dash.weekly.derniere"] ?? ""), `semaine vide non traduite en ${l}`);
+  }
+});
+
+test("« Dernière séance » et « Analyse IA » montrent la même séance quand elles tombent le même jour", () => {
+  const b = codeNu("src/components/dashboard/BentoDashboard.tsx");
+  assert.match(b, /const w0 = analyse && workouts\[0\] && String\(analyse\.seance\.date\)\.slice\(0, 10\) === String\(workouts\[0\]\.date\)\.slice\(0, 10\)/,
+    "« Dernière séance » reprend la première séance arrivée, pas la séance principale du jour");
+  // Le 25/10 : marathon (42,5 km, analysé) puis retour au calme (2,1 km) arrivé après.
+  const seances = [
+    { id: "calme", date: "2026-10-25T11:40:00", distance_km: 2.1, title: "Lille Course à pied" },
+    { id: "marathon", date: "2026-10-25T09:00:00", distance_km: 42.5, title: "Lille Course à pied" },
+  ];
+  const a = derniereAnalyse(seances as never, [{ body: "Analyse", data: { workout_id: "marathon" } }] as never);
+  assert.equal(a?.seance.id, "marathon", "l'analyse ne retient plus la séance principale du jour");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

@@ -34,8 +34,14 @@ export function TaperingWidget({ workouts, raceDate, aujourdhui }: TaperingWidge
   // LA CHARTE (DESIGN.md, 07/11/2026) : surfaces neutres, la couleur ne marque que le SENS
   // (fraîcheur positive ou négative, état). Les trois aplats pastel bleu/orange/vert et le
   // bandeau coloré faisaient de cette carte la seule « arc-en-ciel » du tableau de bord.
+  // ⚠️ « AFFÛTAGE OPTIMAL » SEULEMENT À L'APPROCHE D'UNE COURSE (audit du 09/11/2026). Le libellé
+  //    tombait dès +10 de fraîcheur, quel que soit le calendrier : à +36, quinze jours sans courir
+  //    et quarante jours avant la course, la carte félicitait d'un affûtage. Hors des 21 jours qui
+  //    précèdent la course, +10 à +25 c'est « frais » ; au-delà de +25 (seuil « transition » de
+  //    Coggan/TrainingPeaks), la forme s'érode — on le dit, en orange.
   const tsbStatus =
-    tsb >= 10 ? { labelK: "tap.status.optimal", color: "text-emerald-700", bar: "bg-emerald-500", dot: "bg-emerald-500" }
+    tsb > 25 && !isTaperingWindow ? { labelK: "tap.status.detraining", color: "text-amber-700", bar: "bg-amber-400", dot: "bg-amber-400" }
+    : tsb >= 10 ? { labelK: isTaperingWindow ? "tap.status.optimal" : "tap.status.fresh", color: "text-emerald-700", bar: "bg-emerald-500", dot: "bg-emerald-500" }
     : tsb >= 0 ? { labelK: "tap.status.rising", color: "text-emerald-700", bar: "bg-emerald-400", dot: "bg-emerald-400" }
     : tsb >= -10 ? { labelK: "tap.status.balanced", color: "text-amber-700", bar: "bg-amber-400", dot: "bg-amber-400" }
     : { labelK: "tap.status.overload", color: "text-rose-700", bar: "bg-rose-500", dot: "bg-rose-500" };

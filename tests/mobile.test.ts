@@ -218,7 +218,8 @@ test("les modules du tableau de bord vont du plus important au moins important",
   assert.ok(src.indexOf("<ProfileCompletionBanner") > src.indexOf('className="flex min-w-0 flex-col"'), "la bannière de profil repasse au-dessus de « Bonjour » et repousse la séance");
   const rail = src.slice(src.indexOf("<aside"), src.indexOf("</aside>"));
   const r = (x: string) => rail.indexOf(x);
-  const reperes = ["{analyse && (", 'dash.summary.title', 'disc.hasData', "{rl.records}", "<BilanSemaine"];
+  // « Cette semaine » a quitté le rail (audit du 09/11/2026) : ses chiffres sont dans « Activité 7 jours ».
+  const reperes = ["{analyse && (", 'disc.hasData', "{rl.records}", "<BilanSemaine"];
   const absents = reperes.filter((x) => r(x) < 0);
   assert.deepEqual(absents, [], `rail : repères introuvables ${absents.join(", ")}`);
   for (let i = 1; i < reperes.length; i++) assert.ok(r(reperes[i - 1]) < r(reperes[i]), `rail : « ${reperes[i - 1]} » doit précéder « ${reperes[i]} »`);
