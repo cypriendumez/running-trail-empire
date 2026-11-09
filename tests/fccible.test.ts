@@ -172,7 +172,7 @@ test("chaque footing de la semaine a sa propre intention", () => {
 });
 
 test("aucune intensité ajoutée quand ce serait une faute", () => {
-  for (const garde of [{ taper: true }, { semaineCourse: true }, { sansHistorique: true }])
+  for (const garde of [{ taper: true }, { semaineCourse: true }, { sansHistorique: true }, { douleur: true }])
     for (const rang of [0, 1, 2])
       assert.equal(varianteFooting(rang, 3, garde), "base", `${JSON.stringify(garde)} rang ${rang}`);
   assert.equal(varianteFooting(0, 1, {}), "base", "un seul footing : rien à varier");
@@ -204,6 +204,8 @@ test("le plan varie ses footings", () => {
   // en remplacer une seule laisse ce test au vert (défaut trouvé par mutation).
   const n = (src.match(/varianteFooting\(rang, easySlots\.length, gardes\)/g) ?? []).length;
   assert.equal(n, 2, `${n} appel(s) à varianteFooting : le titre et le détail doivent tous deux en dépendre`);
+  // 09/11/2026 : seuil retiré pour une périostite, ses lignes droites revenaient en fin de footing.
+  assert.match(src, /const gardes = \{[^}]*\bdouleur\b[^}]*\};/, "la douleur en cours ne garde plus les footings de toute accélération");
   assert.doesNotMatch(src, /for \(const i of easySlots\) put\(i, \{\n\s*type: "Endurance", title: \(l\) => PLAN_T\[l\]\.enduranceTitre,/,
     "l'ancienne boucle qui posait la même séance partout est revenue");
 });
