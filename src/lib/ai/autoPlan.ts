@@ -839,7 +839,9 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // Le départ appartient à l'athlète, pas au plan : la course reste la séance du jour, et le
   // signal rouge s'ajoute à son « pourquoi » — l'écouter à l'échauffement, renoncer s'il s'aggrave.
   // Le DÉTAIL (lu par la montre) ne change pas.
-  if (week[0].type === "Course" && lvl === "rouge") {
+  // Course DÉJÀ COURUE ce jour-là (synchronisée le matin) : « ne prends pas le départ » n'aurait
+  // plus de sens — on n'ajoute rien (relecture du 09/11/2026).
+  if (week[0].type === "Course" && lvl === "rouge" && !hardToday) {
     week[0] = reecrire(week[0], (l, avant) => ({ ...avant, why: `${avant.why}${PLAN_T[l].courseFeuRouge(motifs(l, 2))}` }));
   } else if ((lvl === "rouge" || hardToday) && week[0].type !== "Repos" && week[0].type !== "Course") {
     week[0] = reecrire({ ...week[0], type: "Récup" }, (l) => ({

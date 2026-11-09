@@ -321,13 +321,16 @@ test("un jour de course n'est jamais entouré de séances dures", () => {
 test("le jour de la course, un feu rouge n'efface pas la course : il s'ajoute à son pourquoi", () => {
   // Marathon de Lille, 25/10/2026 : douleur déclarée (mollet, tendon d'Achille) → le coach a publié
   // « Récupération — 25 min en Z1 » le matin même, à la place du marathon.
-  const jour = new Date().toISOString().slice(0, 10);
+  // Le jour LOCAL, celui du plan (pas la date UTC, qui recule d'un jour entre minuit et 1 h à Paris).
+  const jour = jourLocal();
   const objectif = { race: "Marathon de Lille", distanceKm: 42.2, raceDate: jour, targetSeconds: 9600, targetTime: "2h40", targetPace: "3'47" };
   const rouge = buildWeekPlan(ctx({ objective: objectif, daysToRace: 0, weeksToRace: 0, readiness: { level: "rouge", ...motifs("douleur en cours (Tendon d'Achille)"), advice: "" } } as never), new Date());
   assert.equal(rouge[0].type, "Course", `jour de course sous feu rouge : ${rouge[0].type} à la place de la course`);
   assert.match(rouge[0].why, /Feu rouge ce matin : douleur en cours \(Tendon d'Achille\)/, "le signal rouge n'est pas dit le jour de course");
   assert.match(rouge[0].why, /ne prends pas le départ/, "aucune consigne de renoncer si la douleur s'aggrave");
-  for (const l of ["en", "de", "es", "pt"] as const) assert.ok((rouge[0].i18n?.[l]?.why ?? "").length > (rouge[0].why.length / 2), `pourquoi non traduit en ${l}`);
+  // L'avertissement lui-même, dans chaque langue — pas seulement un « pourquoi » de longueur plausible.
+  const FEU_ROUGE = { en: /Red flag this morning: .*don't start/, de: /Rotes Signal heute Morgen: .*geh nicht an den Start/, es: /Señal roja esta mañana: .*no tomes la salida/, pt: /Sinal vermelho esta manhã: .*não alinhes à partida/ } as const;
+  for (const l of ["en", "de", "es", "pt"] as const) assert.match(rouge[0].i18n?.[l]?.why ?? "", FEU_ROUGE[l], `avertissement du jour de course absent en ${l}`);
   // Le DÉTAIL, lu par la montre, est celui d'une course ordinaire.
   const vert = buildWeekPlan(ctx({ objective: objectif, daysToRace: 0, weeksToRace: 0 } as never), new Date());
   assert.equal(rouge[0].detail, vert[0].detail, "le feu rouge modifie le texte lu par la montre le jour de course");
@@ -336,6 +339,10 @@ test("le jour de la course, un feu rouge n'efface pas la course : il s'ajoute à
   // une « Récupération — tu as déjà fait une séance dure » qui réécrirait l'histoire du jour.
   const apres = buildWeekPlan(ctx({ objective: objectif, daysToRace: 0, weeksToRace: 0, lastHardDaysAgo: 0 } as never), new Date());
   assert.equal(apres[0].type, "Course", `course synchronisée le matin : ${apres[0].type} à la place de la course`);
+  // …et sous feu rouge, pas de « ne prends pas le départ » pour une course déjà courue.
+  const apresRouge = buildWeekPlan(ctx({ objective: objectif, daysToRace: 0, weeksToRace: 0, lastHardDaysAgo: 0, readiness: { level: "rouge", ...motifs("douleur en cours (Tendon d'Achille)"), advice: "" } } as never), new Date());
+  assert.equal(apresRouge[0].type, "Course");
+  assert.doesNotMatch(apresRouge[0].why, /ne prends pas le départ/, "« ne prends pas le départ » pour une course déjà courue");
 });
 
 console.log("\nBOUT EN BOUT — site et montre disent la même chose");
@@ -4452,11 +4459,16 @@ test("le renforcement ne disparaît pas chez ceux qui en ont le plus besoin", ()
 // nordic curls) et pouvait même AJOUTER des bonds. Pacevo ne choisit pas d'exercice de soin :
 // rien n'est ajouté, et la séance dit d'épargner la zone et quand consulter.
 test("une douleur active : le renforcement n'ajoute rien et dit d'épargner la zone, en 5 langues", () => {
+  // ⚠️ UN LUNDI FIGÉ (09/11/2026). Construit « à partir d'aujourd'hui », le plan laissait un jour
+  // libre au renforcement le lundi, et pas le mardi : le renfo était alors greffé sur un footing
+  // (« ENTRETIEN seulement », sans axe de foulée) et le témoin rougissait UN JOUR SUR SEPT — vu en
+  // rejouant la suite sous TZ=Pacific/Auckland, où l'on était déjà mardi.
+  const LUNDI = new Date("2026-11-09T12:00:00");
   const foulee = { forme: { ratioVertical: 12, cadence: 150 } };
-  const sans = buildWeekPlan(ctx(foulee as never)).find((d) => d.type === "Renfo");
+  const sans = buildWeekPlan(ctx(foulee as never), LUNDI).find((d) => d.type === "Renfo");
   assert.ok(sans && /EN PLUS/.test(sans.detail), "témoin : sans douleur, la foulée mesurée n'ajoute plus d'axe (le test ne prouverait rien)");
   assert.ok(!/DOULEUR SIGNALÉE/.test(sans!.detail), "la consigne de douleur s'affiche sans douleur");
-  const avec = buildWeekPlan(ctx({ ...foulee, douleursActives: ["Genou gauche"] } as never)).find((d) => d.type === "Renfo");
+  const avec = buildWeekPlan(ctx({ ...foulee, douleursActives: ["Genou gauche"] } as never), LUNDI).find((d) => d.type === "Renfo");
   assert.ok(avec, "plus de séance de renforcement quand une douleur est active");
   assert.doesNotMatch(avec!.detail, /EN PLUS/, "une douleur active reçoit encore des exercices en plus");
   assert.match(avec!.detail, /saute tout exercice qui sollicite la zone douloureuse/, "la séance ne dit plus d'épargner la zone douloureuse");

@@ -18,7 +18,7 @@ import { activerPush } from "@/lib/push/client";
 import { PWA_I18N } from "@/components/pwa/pwaI18n";
 import { AUTH } from "@/components/auth/authI18n";
 import { ReglesMotDePasse, messageRefusMotDePasse } from "@/components/auth/ReglesMotDePasse";
-import { Turnstile, CLE_TURNSTILE, type TurnstileRef } from "@/components/auth/Turnstile";
+import { Turnstile, CLE_TURNSTILE, TOAST_CAPTCHA, type TurnstileRef } from "@/components/auth/Turnstile";
 import { DeuxFacteurs } from "./DeuxFacteurs";
 import { verifierRegles } from "@/lib/auth/reglesMotDePasse";
 import { deconnexion } from "@/lib/auth/deconnexion";
@@ -242,7 +242,7 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
     if (aUnMdp && !pwdActuel) return toast.error(M.actuelRequis);
     // CAPTCHA (en sommeil sans clé) : la vérification du mot de passe actuel est une connexion
     // GoTrue, qui exige un jeton dès que la protection est activée chez Supabase.
-    if (aUnMdp && CLE_TURNSTILE && !captchaMdp) return toast.error(captchaHs ? AUTH_L.captcha.indisponible : AUTH_L.captcha.attente, { duration: 8000 });
+    if (aUnMdp && CLE_TURNSTILE && !captchaMdp) return toast.error(captchaHs ? AUTH_L.captcha.indisponible : AUTH_L.captcha.attente, { id: TOAST_CAPTCHA, duration: 8000 });
     setSavingPwd(true);
     const rep = await fetch("/api/auth/mot-de-passe", {
       method: "POST", headers: { "Content-Type": "application/json" },

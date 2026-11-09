@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { toast } from "sonner";
 
 /**
  * LE WIDGET CLOUDFLARE TURNSTILE (anti-robots), en sommeil sans clé.
@@ -43,6 +44,15 @@ function chargerScript(): Promise<ApiTurnstile> {
 export type TurnstileRef = { reinitialiser: () => void };
 
 /**
+ * L'identifiant de LA notification « vérification anti-robot en cours » (09/11/2026, capture de
+ * Cyprien sur iPhone). Touchée du doigt, une notification Sonner met son compte à rebours en pause
+ * et ne le reprend jamais sur téléphone : celle-ci restait collée sur le tableau de bord après la
+ * connexion. Un seul identifiant pour les quatre pages (connexion, inscription, oubli, Réglages) :
+ * elles ne s'empilent plus, et le widget la retire lui-même dès que son jeton arrive.
+ */
+export const TOAST_CAPTCHA = "captcha-attente";
+
+/**
  * `onErreur` : le script ne se charge pas (bloqueur de publicité, réseau d'entreprise) ou le widget
  * échoue. Sans jeton, la connexion est refusée par GoTrue : l'écran doit DIRE pourquoi, au lieu de
  * répéter « patiente » sans fin (relecture du 08/11/2026).
@@ -72,7 +82,8 @@ export const Turnstile = forwardRef<TurnstileRef, { onJeton: (jeton: string | nu
           sitekey: CLE_TURNSTILE,
           appearance: "interaction-only",
           language: langue ?? "auto",
-          callback: (jeton: string) => rappel.current(jeton),
+          // Le jeton est là : l'attente annoncée n'a plus lieu d'être, on retire son message.
+          callback: (jeton: string) => { toast.dismiss(TOAST_CAPTCHA); rappel.current(jeton); },
           "expired-callback": () => rappel.current(null),
           "error-callback": () => { rappel.current(null); erreur.current?.(); },
         });

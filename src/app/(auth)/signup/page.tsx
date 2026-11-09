@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState , useId} from "react";
-import { Turnstile, CLE_TURNSTILE, type TurnstileRef } from "@/components/auth/Turnstile";
+import { Turnstile, CLE_TURNSTILE, TOAST_CAPTCHA, type TurnstileRef } from "@/components/auth/Turnstile";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2, Check } from "lucide-react";
@@ -103,7 +103,7 @@ export default function SignupPage() {
     e.preventDefault();
     if (form.password !== form.confirmPassword) { toast.error(L.pwMismatch); return; }
     if (verifierRegles(form.password, form.email).length) { toast.error(M.faible); return; }
-    if (CLE_TURNSTILE && !captcha) { toast.error(captchaHs ? C.indisponible : C.attente, { duration: 8000 }); return; }
+    if (CLE_TURNSTILE && !captcha) { toast.error(captchaHs ? C.indisponible : C.attente, { id: TOAST_CAPTCHA, duration: 8000 }); return; }
     setLoading(true);
     // ⚠️ ON N'APPELLE PLUS `supabase.auth.signUp()` DIRECTEMENT, et ce n'est pas un
     // détail : cet appel déclenche l'e-mail par DÉFAUT de Supabase — « Confirm your
