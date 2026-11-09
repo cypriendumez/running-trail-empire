@@ -168,9 +168,30 @@ export const REQUETES_NUTRITION = [
   "nutrition course à pied", "nutrition running", "alimentation coureur", "hydratation course",
 ].map((q) => `${q} when:7d`);
 
-export async function collecterNutritionSemaine(maintenant = Date.now()): Promise<Item[]> {
+export const collecterNutritionSemaine = (maintenant = Date.now()) =>
+  collecterRubriqueSemaine(REQUETES_NUTRITION, "nutrition", maintenant);
+
+/**
+ * Le matériel testé EN FRANÇAIS cette semaine.
+ *
+ * ⚠️ « Matériel & chaussures » était entièrement anglophone le 9/11/2026 : trois tests
+ * vidéo de Believe in the Run. Les flux de la rubrique sont tous anglais ; la presse
+ * française (Run Actu, u-Trail, runninglab, Montre cardio GPS) n'y entrait que par une
+ * requête Google News sans borne de date. Ces requêtes ramènent aussi beaucoup de
+ * promotions : la route les filtre par `PROMO`.
+ */
+export const REQUETES_MATERIEL = [
+  "test chaussure running", "chaussure trail test", "montre GPS course à pied", "nouvelle chaussure running",
+].map((q) => `${q} when:7d`);
+
+export const collecterMaterielSemaine = (maintenant = Date.now()) =>
+  collecterRubriqueSemaine(REQUETES_MATERIEL, null, maintenant);
+
+/** Des requêtes Google News de la semaine (+ les flux d'une rubrique), bornées à 7 jours. */
+async function collecterRubriqueSemaine(requetes: string[], cat: Cat | null, maintenant: number): Promise<Item[]> {
   const depuis = maintenant - 7 * 24 * 3600 * 1000;
-  const tout = await fusionner(REQUETES_NUTRITION, FEEDS.filter((f) => f.cats.includes("nutrition")), DELAI_FLUX_MS + 2000);
+  const feeds = cat ? FEEDS.filter((f) => f.cats.includes(cat)) : [];
+  const tout = await fusionner(requetes, feeds, DELAI_FLUX_MS + 2000);
   return tout.filter((it) => {
     const t = new Date(it.date).getTime();
     return Number.isFinite(t) && t >= depuis;

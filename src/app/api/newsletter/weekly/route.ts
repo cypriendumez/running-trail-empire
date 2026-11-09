@@ -5,8 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { lienDesinscription } from "@/lib/newsletter/token";
 import { resumerArticles, traduireTextes, RESUMES_MAX, type ArticleResume } from "@/lib/newsletter/resume";
 import { construireEmail, estLang, type Lang, type Section, type Course } from "@/lib/newsletter/email";
-import { RUBRIQUES_LETTRE, FILTRES, PAS_ELITE, CONTEXTE_COURSE, PROMO } from "@/lib/news/rubriques";
-import { collecterSemaine, collecterNutritionSemaine } from "@/lib/news/actualites";
+import { RUBRIQUES_LETTRE, FILTRES, PAS_ELITE, CONTEXTE_COURSE, PROMO, TEST_MATERIEL, HORS_COURSE } from "@/lib/news/rubriques";
+import { collecterSemaine, collecterNutritionSemaine, collecterMaterielSemaine } from "@/lib/news/actualites";
 import { classerALaUne, motsDuTitre, texteDuSujet } from "@/lib/news/alaune";
 import { EDITEUR } from "@/lib/brand/editeur";
 import { envoyerEmail } from "@/lib/email/envoyer";
@@ -59,6 +59,13 @@ export async function GET(req: Request) {
   // sont pas lus. ⚠️ Il consomme le quota Gemini comme un vrai envoi : pas en boucle.
   const apercuDemande = new URL(req.url).searchParams.get("apercu");
   const apercu: Lang | null = apercuDemande === null ? null : estLang(apercuDemande) ? apercuDemande : "fr";
+  // ── L'ESSAI : la vraie lettre, vraiment envoyée, à UNE seule adresse ────────────
+  // `?essai=1` passe par toute la chaîne d'envoi (Resend, en-têtes, désinscription) mais
+  // n'écrit qu'à l'adresse de l'éditeur. Elle est fixée ICI, jamais lue dans la requête :
+  // ce mode ne doit pas pouvoir servir à écrire à quelqu'un d'autre. C'est la preuve de
+  // bout en bout qui manquait le 10/11/2026 (« la lettre n'a jamais été envoyée avec ce
+  // code »), sans attendre le lundi ni écrire aux abonnés.
+  const essai = new URL(req.url).searchParams.get("essai") === "1" && !apercu;
 
   const CLE = process.env.RESEND_API_KEY;
   const FROM = process.env.RESEND_FROM;
@@ -88,14 +95,18 @@ export async function GET(req: Request) {
   // à la main, elle parcourt la liste. Une rubrique inexistante y serait refusée par le
   // typage, plus seulement silencieusement remplacée par l'actualité générale.
   let echecSemaine: string | null = null;
-  const [parRubrique, semaine, nutritionSemaine] = await Promise.all([
+  const [parRubrique, semaineBrute, nutritionSemaine, materielSemaine] = await Promise.all([
     Promise.all(RUBRIQUES_LETTRE.map((r) => recentsDe(r.cat))),
     // Une panne ici ne doit pas annuler la lettre : la une retombe sur le fil, et la
     // réponse (lue dans le journal de l'action GitHub) dit pourquoi.
     collecterSemaine().catch((e: unknown) => { echecSemaine = e instanceof Error ? e.message : String(e); return [] as Item[]; }),
     // Même règle : une panne ne coûte que la rubrique, qui retombe sur le fil.
     collecterNutritionSemaine().catch(() => [] as Item[]),
+    collecterMaterielSemaine().catch(() => [] as Item[]),
   ]);
+  // Ni promotion ni hors-sujet, nulle part dans la lettre (voir `PROMO`, `HORS_COURSE`).
+  const publiable = (it: Item) => !PROMO.test(it.title) && !HORS_COURSE.test(it.title);
+  const semaine = semaineBrute.filter(publiable);
 
   // ── 1 bis. LA UNE : les sujets dont le plus de médias ont parlé ────────────
   // ⚠️ La une prenait les 5 articles les plus RÉCENTS du fil (coupé à 48). Le 9/11/2026,
@@ -120,12 +131,13 @@ export async function GET(req: Request) {
   // Une fois gardés les seuls articles de la semaine, il ne restait rien. Elle puise
   // désormais dans la semaine entière, comme la une, avec le filtre des résultats.
   const iElite = RUBRIQUES_LETTRE.findIndex((r) => r.cle === "elite");
+  let sujetsElites: typeof une = [];
   if (iElite > 0 && semaine.length) {
     const resultats = semaine.filter((it) =>
       FILTRES.elite!.test(it.title) && !PAS_ELITE.test(it.title) && !dejaALaUne.has(it.link)
       && !motsDuTitre(it.title).some((m) => sujetsUne.has(m)));
-    const elites = classerALaUne(resultats, RUBRIQUES_LETTRE[iElite].max + 3).map((s) => s.article);
-    if (elites.length) parRubrique[iElite] = elites;
+    sujetsElites = classerALaUne(resultats, RUBRIQUES_LETTRE[iElite].max + 3);
+    if (sujetsElites.length) parRubrique[iElite] = sujetsElites.map((s) => s.article);
   }
 
   // ── 1 quater. NUTRITION : la semaine, la course, pas la charcuterie ──────────
@@ -141,11 +153,31 @@ export async function GET(req: Request) {
     if (nutrition.length) parRubrique[iNutrition] = nutrition;
   }
 
+  // ── 1 quinquies. MATÉRIEL : des tests en français d'abord ──────────────────
+  // ⚠️ Entièrement anglophone le 9/11/2026 (voir `collecterMaterielSemaine`). Les tests
+  // français de la semaine passent devant ; les tests anglophones complètent, parce que
+  // leur flux fournit le texte et qu'ils seront résumés (un titre français de Google
+  // News, lui, part seul : son robots.txt interdit d'ouvrir ses pages d'articles).
+  const iMateriel = RUBRIQUES_LETTRE.findIndex((r) => r.cle === "materiel");
+  if (iMateriel > 0 && materielSemaine.length) {
+    const temps = (it: Item) => new Date(it.date).getTime() || 0;
+    const francais = materielSemaine
+      .filter((it) => FILTRES.gear!.test(it.title) && TEST_MATERIEL.test(it.title) && publiable(it) && !dejaALaUne.has(it.link))
+      .sort((a, b) => temps(b) - temps(a))
+      .slice(0, RUBRIQUES_LETTRE[iMateriel].max - 1);
+    if (francais.length) {
+      const liens = new Set(francais.map((it) => it.link));
+      parRubrique[iMateriel] = [...francais, ...parRubrique[iMateriel].filter((it) => !liens.has(it.link))];
+    }
+  }
+
   // Le texte à résumer pour chaque sujet de la une : ce qu'en titrent les médias (voir
   // `texteDuSujet`). Seulement quand l'article retenu n'apporte pas déjà son texte.
   const texteUne = new Map<string, string>();
   const mediasUne = new Map<string, number>();
-  for (const s of une) {
+  // Les résultats d'Élites couverts par plusieurs médias aussi : sans eux, la rubrique
+  // partait en titres seuls (Google News ne donne pas le texte des articles).
+  for (const s of [...une, ...sujetsElites]) {
     if (s.medias >= 2) mediasUne.set(s.article.link, s.medias);
     if ((s.article.texte ?? "").trim().length >= 320) continue;
     const t = texteDuSujet(s);
@@ -162,7 +194,7 @@ export async function GET(req: Request) {
   // ── 2. Les destinataires, avec leur langue ─────────────────────────────────
   const admin = createAdminClient();
   let abonnes: { email: string; lang: Lang }[] = [];
-  if (!apercu) {
+  if (!apercu && !essai) {
     const avecLangue = await admin
       .from("newsletter_subscribers")
       .select("email, lang")
@@ -185,6 +217,7 @@ export async function GET(req: Request) {
   }
   abonnes = abonnes.filter((a) => a.email);
   if (apercu) abonnes = [{ email: "apercu@pacevo.fr", lang: apercu }];
+  if (essai) abonnes = [{ email: EDITEUR.email, lang: "fr" }];
   if (!abonnes.length) return NextResponse.json({ ok: true, envoye: 0, raison: "aucun abonné" });
 
   // ── 3. Le plan des rubriques, ÉTABLI AVANT LE RÉSUMÉ ──────────────────────
@@ -202,6 +235,7 @@ export async function GET(req: Request) {
     const liens: string[] = [];
     for (const it of parRubrique[n]) {
       if (!it.link || pris.has(it.link) || vivier.length >= RESUMES_MAX) continue;
+      if (!publiable(it)) continue;
       if (n > 0 && (dejaALaUne.has(it.link) || motsDuTitre(it.title).some((m) => sujetsUne.has(m)))) continue;
       pris.add(it.link);
       liens.push(it.link);
@@ -343,6 +377,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ok: true,
+    ...(essai ? { essai: EDITEUR.email } : {}),
     envoye,
     destinataires: abonnes.length,
     articles: base.length,
