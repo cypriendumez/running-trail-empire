@@ -175,6 +175,8 @@ export type TextesPlan = {
   recupWhyRouge: (motifs: string) => string;
   allegeeDetailSuffixe: string;
   allegeeWhy: (motifs: string) => string;
+  /** Le jour de la course visée, le feu rouge n'annule pas la course : il s'ajoute au pourquoi. */
+  courseFeuRouge: (motifs: string) => string;
 
   // ── Doubles séances ─────────────────────────────────────────────────────────
   suffixeSoir: string;
@@ -312,6 +314,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     recupWhyRouge: (m) => `Aujourd'hui ton corps demande de la récupération : ${m}. Reporter une séance dure de 24 h ne coûte rien ; la forcer coûte des semaines.`,
     allegeeDetailSuffixe: "\n\n⚠️ Version ALLÉGÉE aujourd'hui : réduis le corps de séance d'environ un tiers.",
     allegeeWhy: (m) => `Séance maintenue mais raccourcie : ${m}.`,
+    courseFeuRouge: (m) => ` Feu rouge ce matin : ${m}. Écoute-le à l'échauffement : si la douleur augmente ou change ta foulée, ne prends pas le départ — aucun chrono ne vaut une blessure.`,
 
     suffixeSoir: " (soir)",
     whySoir: " Journée doublée : la sortie principale reste le soir.",
@@ -438,6 +441,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     recupWhyRouge: (m) => `Today your body is asking for recovery: ${m}. Postponing a hard session by 24 h costs nothing; forcing it costs weeks.`,
     allegeeDetailSuffixe: "\n\n⚠️ EASED version today: cut the main set by about a third.",
     allegeeWhy: (m) => `Session kept but shortened: ${m}.`,
+    courseFeuRouge: (m) => ` Red flag this morning: ${m}. Listen to it during your warm-up: if the pain grows or changes your stride, don't start — no time is worth an injury.`,
 
     suffixeSoir: " (evening)",
     whySoir: " Doubled day: the main run stays in the evening.",
@@ -564,6 +568,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     recupWhyRouge: (m) => `Heute verlangt dein Körper Erholung: ${m}. Eine harte Einheit um 24 h zu verschieben kostet nichts; sie zu erzwingen kostet Wochen.`,
     allegeeDetailSuffixe: "\n\n⚠️ Heute REDUZIERTE Fassung: Kürze den Hauptteil um etwa ein Drittel.",
     allegeeWhy: (m) => `Einheit bleibt, aber verkürzt: ${m}.`,
+    courseFeuRouge: (m) => ` Rotes Signal heute Morgen: ${m}. Hör beim Einlaufen darauf: Wenn der Schmerz zunimmt oder deinen Laufstil verändert, geh nicht an den Start — keine Zeit ist eine Verletzung wert.`,
 
     suffixeSoir: " (abends)",
     whySoir: " Doppeltag: Der Hauptlauf bleibt am Abend.",
@@ -690,6 +695,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     recupWhyRouge: (m) => `Hoy tu cuerpo pide recuperación: ${m}. Aplazar una sesión dura 24 h no cuesta nada; forzarla cuesta semanas.`,
     allegeeDetailSuffixe: "\n\n⚠️ Versión ALIGERADA hoy: reduce la parte principal en torno a un tercio.",
     allegeeWhy: (m) => `Sesión mantenida pero acortada: ${m}.`,
+    courseFeuRouge: (m) => ` Señal roja esta mañana: ${m}. Escúchala en el calentamiento: si el dolor aumenta o cambia tu zancada, no tomes la salida — ninguna marca vale una lesión.`,
 
     suffixeSoir: " (tarde)",
     whySoir: " Día doblado: la salida principal se queda por la tarde.",
@@ -816,6 +822,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     recupWhyRouge: (m) => `Hoje o teu corpo pede recuperação: ${m}. Adiar uma sessão dura 24 h não custa nada; forçá-la custa semanas.`,
     allegeeDetailSuffixe: "\n\n⚠️ Versão ALIVIADA hoje: reduz a parte principal em cerca de um terço.",
     allegeeWhy: (m) => `Sessão mantida mas encurtada: ${m}.`,
+    courseFeuRouge: (m) => ` Sinal vermelho esta manhã: ${m}. Ouve-o no aquecimento: se a dor aumentar ou mudar a tua passada, não alinhes à partida — nenhum tempo vale uma lesão.`,
 
     suffixeSoir: " (tarde)",
     whySoir: " Dia duplicado: a saída principal fica ao fim do dia.",
