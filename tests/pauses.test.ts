@@ -140,5 +140,13 @@ test("l'analyse, le coach et la page de séance appellent le calcul des arrêts"
   assert.match(page, /T\[langue\]\["act\.arrets"\]/, "la page n'affiche plus les arrêts");
 });
 
+test("une trace illisible part dans error_logs, sur les trois chemins", () => {
+  // Relecture du 09/11 : l'erreur était avalée (coach) ou laissée à la console (route, page).
+  assert.match(codeOf("src/app/api/ai/analyse-seance/route.ts"), /if \(eTrace\) \{[\s\S]{0,200}await journaliserEchec\(null, \{ source: "analyse-seance"/, "route : trace illisible non journalisée");
+  assert.match(codeOf("src/lib/ai/coachContext.ts"), /if \(error\) \{[\s\S]{0,200}await journaliserEchecUneFois\(null, \{ source: "coach-arrets"/, "coach : trace illisible non journalisée");
+  assert.match(codeOf("src/app/dashboard/activite/page.tsx"), /if \(eTrace\) await journaliserTraceIllisible\(user\.id, /, "page : trace illisible non journalisée");
+  assert.match(codeOf("src/lib/journal/traceIllisible.ts"), /await journaliserEchecUneFois\(null, \{\s*source: "seance-trace"/, "le module de la page n'écrit plus dans error_logs");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

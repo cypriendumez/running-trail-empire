@@ -187,7 +187,10 @@ export async function POST(req: Request) {
   //    ne garde que le temps en mouvement. Sans trace lisible, `null` : l'analyse dit qu'elle
   //    ne sait pas, elle ne conclut jamais « aucun arrêt ».
   const { data: trace, error: eTrace } = await supabase.from("activity_tracks").select("points").eq("workout_id", workoutId).maybeSingle();
-  if (eTrace) console.error("[analyse-seance] trace illisible, arrêts inconnus :", eTrace.message);
+  if (eTrace) {
+    console.error("[analyse-seance] trace illisible, arrêts inconnus :", eTrace.message);
+    await journaliserEchec(null, { source: "analyse-seance", userId: user.id, url: "/api/ai/analyse-seance", message: `Trace illisible, arrêts inconnus dans l'analyse : ${eTrace.code ?? "?"} ${eTrace.message}` });
+  }
   const arrets = eTrace || !trace ? null
     : pausesDeTrace(pointsStockes((trace as { points?: unknown }).points), vitesseEnMouvement(s.distance_km, s.duration_seconds));
   const course = courseDuJour((objRes.data as { data?: ObjectifAvecPrecedente } | null)?.data, String(s.date).slice(0, 10), Number(s.distance_km));

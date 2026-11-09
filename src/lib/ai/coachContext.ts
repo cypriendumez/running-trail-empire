@@ -51,6 +51,7 @@ import { decaleJour } from "@/lib/streak/compute";
 import { niveauDeVma } from "@/lib/running/niveau";
 import { libellesActifs, type Douleur } from "@/lib/health/douleurs";
 import { pausesDeTrace, pointsStockes, vitesseEnMouvement, dureeCourte } from "@/lib/activities/pauses";
+import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
 import { phaseDeSemaine, specifiqueEnTete, semainesAffutage, partAffutage, allegementDuBloc } from "@/lib/coach/phase";
 
@@ -2444,7 +2445,12 @@ ${catalog}`;
     if (objectifSeul || !w?.id || Math.floor((now - new Date(w.date).getTime()) / 86400000) > 3) return null;
     const { data, error } = await sb.from("activity_tracks").select("points").eq("workout_id", w.id).maybeSingle();
     // Une lecture ratée se DIT au journal ; une séance sans trace (tapis, import à venir) se tait.
-    if (error) { console.error("[coach] trace de la dernière séance illisible, arrêts inconnus :", error.code ?? "?", error.message); return null; }
+    // Une fois par jour : ce contexte se reconstruit à chaque synchro (2 min).
+    if (error) {
+      console.error("[coach] trace de la dernière séance illisible, arrêts inconnus :", error.code ?? "?", error.message);
+      await journaliserEchecUneFois(null, { source: "coach-arrets", userId, message: `Trace de la dernière séance illisible, arrêts inconnus : ${error.code ?? "?"} ${error.message}` });
+      return null;
+    }
     if (!data) return null;
     return pausesDeTrace(pointsStockes((data as { points?: unknown }).points), vitesseEnMouvement(w.distance_km, w.duration_seconds));
   })();
