@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { tracePartiel } from "@/lib/parcours/trace";
 import {
   SPORTS, DIFFICULTES, TYPES, SPORT_META, DIFF_META, SPORT_ACTIVITY, coordFor,
   type ParcoursHdf, type SortKey, type Facets,
@@ -131,6 +132,9 @@ export function ParcoursBrowser({ initialSearch = "", exportGpx = false }: { ini
         // ne sont pas « OpenStreetMap ne répond pas » (relecture du 09/11/2026).
         if (res?.status === 401) { toast.error(L["t.sessionExpiree"], { id: tid }); return; }
         if (res?.status === 404) { toast.error(L["t.gpxNa"], { id: tid }); return; }
+        // « Réessaie dans quelques minutes » seulement pour une PANNE (503) ou une absence de réponse ;
+        // un autre statut (400, 500) n'ira pas mieux dans cinq minutes.
+        if (res && !res.ok && res.status !== 503) { toast.error(L["t.traceErr"], { id: tid }); return; }
         const json = res?.ok ? await res.json().catch(() => ({})) : {};
         if (Array.isArray(json.coordinates) && json.coordinates.length > 1) coordinates = json.coordinates;
       }
@@ -395,26 +399,6 @@ export function ParcoursBrowser({ initialSearch = "", exportGpx = false }: { ini
 }
 
 // ─── GPX : tracé téléchargeable (montre / téléphone / appli GPS) ───────────────────
-/**
- * Un tracé trop court pour être le parcours : moins de 4 points, moins de 400 m, ou moins des trois
- * quarts de la distance AFFICHÉE sur sa carte (le catalogue est bâti sur la même chaîne principale :
- * un tracé conforme passe, un fragment non). Relecture « échecs muets » du 09/11/2026.
- */
-export function tracePartiel(coords: [number, number][], distanceAnnonceeKm: number): boolean {
-  const km = traceLengthKm(coords);
-  return coords.length < 4 || km < 0.4 || (distanceAnnonceeKm > 0 && km < distanceAnnonceeKm * 0.75);
-}
-
-function traceLengthKm(coords: [number, number][]): number {
-  const R = 6371; let d = 0;
-  for (let i = 1; i < coords.length; i++) {
-    const a = coords[i - 1], b = coords[i];
-    const dLat = ((b[1] - a[1]) * Math.PI) / 180, dLng = ((b[0] - a[0]) * Math.PI) / 180;
-    const s = Math.sin(dLat / 2) ** 2 + Math.cos((a[1] * Math.PI) / 180) * Math.cos((b[1] * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-    d += R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
-  }
-  return d;
-}
 function escapeXml(s: string): string {
   const map: Record<string, string> = { "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" };
   return s.replace(/[<>&'"]/g, (c) => map[c] ?? c);
@@ -458,6 +442,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad, exportGpx }: { p: Pa
       if (!coords || coords.length < 2) {
         const res = await fetch(`/api/parcours/geometry?id=${p.osm_id ?? p.id}&type=${p.osm_type || "relation"}`, { signal: AbortSignal.timeout(25_000) }).catch(() => null);
         if (res?.status === 401) { toast.error(L["t.sessionExpiree"], { id: tid }); return; }
+        if (res && !res.ok && res.status !== 503 && res.status !== 404) { toast.error(L["t.gpxFail"], { id: tid }); return; }
         const json = res?.ok ? await res.json().catch(() => ({})) : {};
         if (Array.isArray(json.coordinates)) coords = json.coordinates;
         // Pas de réponse, ou une panne passagère : on le dit comme telle, pas « indisponible pour ce parcours ».
