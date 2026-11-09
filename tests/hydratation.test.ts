@@ -57,7 +57,7 @@ function rendu(fuseauMachine: string, jourAthlete: string, avecSeanceDuCoach: bo
   const props = {
     profile: { id: "u", full_name: "Cyprien Dumez", preferred_language: "fr" },
     hrv: Array.from({ length: 20 }, (_, i) => ({ date: jourAvant(i), hrv_ms: 70 + (i % 5), physiological_state: null })),
-    metriqueVfc: null, workouts: seances, plan: null, league: null, prWorkouts: seances, recordsDeclares: [],
+    metriqueVfc: null, workouts: seances, plan: null, prWorkouts: seances, recordsDeclares: [],
     premiereSeance: "2025-04-26",
     chargeHistory: Array.from({ length: 300 }, (_, i) => ({ date: jourAvant(i), tss: 40 + (i % 7) * 12, type: "easy", duration_seconds: 3000 })),
     sleep: { total_sleep_min: 410, sleep_score: 65, body_battery_end: 55, deep_sleep_min: 70, rem_sleep_min: 90, date: nuit },
@@ -65,7 +65,7 @@ function rendu(fuseauMachine: string, jourAthlete: string, avecSeanceDuCoach: bo
     ressenti: null,
     objective: { race: "sub 16 min", distanceKm: 5, raceDate: "2026-12-19", targetSeconds: 959, targetTime: "15'59", targetPace: "3'12/km", officielle: false, depuis: "2026-10-30" },
     derniereCourse: null, currentVma: 20.1, sourceVma: { type: "seances", date: "2026-09-29", km: 23.7 },
-    newMembersWeek: 0, streak: null, acces: { etat: "premium", joursRestants: null, essaiExpire: false },
+    streak: null, acces: { etat: "premium", joursRestants: null, essaiExpire: false },
     donneesIncompletes: [], jourAujourdhui: jourAthlete,
     planCoach: { qBudget: 0, recuperation: { course: "Marathon International de Lille", reprise: "2026-11-21" } },
   };

@@ -6450,8 +6450,9 @@ test("la carte Ligue est retirée et sa rangée reste pavée", () => {
     const carte = src.slice(src.lastIndexOf("<motion.div", i), i);
     assert.match(carte, /col-span-12 md:col-span-6 bento-card/, `${titre} ne prend plus la moitié de la rangée : un trou blanc revient`);
   }
-  // Le classement reste joignable depuis la carte Badges.
-  assert.match(src, /href="\/dashboard\/leagues"/, "plus aucun lien vers le classement");
+  // Le classement reste joignable : par le menu de gauche depuis que la carte Badges, qui y
+  // menait aussi, a été retirée (09/11/2026, Cyprien).
+  assert.match(readFileSync("src/components/layout/navigation.ts", "utf8"), /href: "\/dashboard\/leagues"/, "plus aucun lien vers le classement");
   assert.match(src, /const disc = computeDiscipline\(workouts, hrv, freshSleep, state, \{ aujourdhui: jour, serie: streak\?\.days \?\? null \}\)/);
 });
 
