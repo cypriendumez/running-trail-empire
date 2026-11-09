@@ -6516,12 +6516,17 @@ test("le volume se compare à une médiane, et l'étiquette dit laquelle", () =>
     "l'étiquette du volume est redevenue fixe : elle ne décrit plus le calcul réellement fait");
 });
 
-test("« Cette semaine » n'est affiché qu'une fois", () => {
+test("le bilan de la semaine (séances, distance, D+, durée) n'est affiché qu'une fois", () => {
   const src = codeOf("src/components/dashboard/BentoDashboard.tsx");
   // Les quatre mêmes chiffres apparaissaient dans le rail ET dans un bouche-trou de la
-  // grille, mis en forme différemment — de quoi douter de laquelle est la bonne.
+  // grille, mis en forme différemment — de quoi douter de laquelle est la bonne. Puis
+  // (audit du 09/11/2026) la carte du rail elle-même doublait « Activité 7 jours », sur la
+  // MÊME fenêtre de sept jours : elle est retirée, ses chiffres vivent dans l'en-tête du graphe.
   const n = (src.match(/t\("dash\.summary\.title"\)/g) ?? []).length;
-  assert.equal(n, 1, `« Cette semaine » est rendu ${n} fois au lieu d'une`);
+  assert.equal(n, 0, `la carte « Cette semaine » est revenue (${n} fois) : elle double « Activité 7 jours »`);
+  for (const v of ["weekSummary.sessions", "weekSummary.km", "weekSummary.elev", "duree(weekSummary.sec / 60)"]) {
+    assert.equal(src.split(v).length - 1 >= 1, true, `« Activité 7 jours » ne montre plus ${v}`);
+  }
 });
 
 test("le rail de droite ne peut plus laisser de trou blanc", () => {

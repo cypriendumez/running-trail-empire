@@ -50,9 +50,9 @@ export function WeatherChip() {
   const airLabel = data.aqi == null ? null : data.aqi <= 40 ? aq.good : data.aqi <= 60 ? aq.fair : aq.poor;
   return (
     <>
-      <span className={chip}><Cloud className="h-3.5 w-3.5 text-[#0ea5e9]" /> {data.temp}°C</span>
-      {data.city && <span className={chip}><MapPin className="h-3.5 w-3.5 text-[#0ea5e9]" /> {data.city}</span>}
-      {airLabel && <span className={chip}><Wind className="h-3.5 w-3.5 text-[#059669]" /> {airLabel}</span>}
+      <span className={chip}><Cloud className="h-3.5 w-3.5 text-zinc-400" strokeWidth={1.5} /> {data.temp}°C</span>
+      {data.city && <span className={chip}><MapPin className="h-3.5 w-3.5 text-zinc-400" strokeWidth={1.5} /> {data.city}</span>}
+      {airLabel && <span className={chip}><Wind className="h-3.5 w-3.5 text-zinc-400" strokeWidth={1.5} /> {airLabel}</span>}
     </>
   );
 }

@@ -82,7 +82,7 @@ interface Props {
   currentVma?: number | null;
   /** D'où vient la VMA affichée, et de quand — pour qu'on voie qu'elle suit la forme. */
   sourceVma?: SourceVma | null;
-  loadRisk?: { acwr: number; monotony: number; deload: boolean; level: string; reason: string };
+  loadRisk?: { acwr: number; monotony: number; deload: boolean; level: string; reason: string; base?: boolean };
   /** Série calculée à la lecture (lib/streak) — jamais stockée, donc réparable. */
   streak?: StreakResult | null;
   /** État d'abonnement, déduit du profil (lib/billing/access). */
@@ -321,8 +321,16 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
     ? t("dash.coach.badgeLe", { date: formatDateCivile(dateCoach, lang, { day: "numeric", month: "short" }) })
     : t("dash.coach.badge");
 
+  // La dernière séance COURUE et son analyse mémorisée (lib/dashboard/derniereAnalyse).
+  const analyse = derniereAnalyse(runs, analyses);
   // Dernière séance : on n'affiche que les métriques réellement disponibles (pas de "--" vide).
-  const w0 = workouts[0];
+  // ⚠️ LA MÊME SÉANCE QUE L'ANALYSE QUAND ELLES TOMBENT LE MÊME JOUR (audit du 09/11/2026). Le
+  // 25/10, « Dernière séance » montrait le retour au calme de 2,1 km et « Analyse IA », juste à
+  // côté, « ta dernière séance · 42,5 km » : deux « dernières séances » différentes sur un écran.
+  // La séance principale du jour (analysée, sinon la plus longue) l'emporte sur l'ordre d'arrivée.
+  const w0 = analyse && workouts[0] && String(analyse.seance.date).slice(0, 10) === String(workouts[0].date).slice(0, 10)
+    ? (workouts.find((w) => w.id === analyse.seance.id) ?? workouts[0])
+    : workouts[0];
   const lastMetrics = w0 ? buildLastMetrics(w0, t, lang) : [];
 
   // ── Données dérivées (toutes calculées depuis le réel — rien d'inventé) ──────────
@@ -348,8 +356,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   const volumeDelta = volRef ? weeklyKm - volRef.km : prevAvg > 0 ? weeklyKm - prevAvg : null;
   const volumeRefLabel = volRef ? "dash.volume.vsMedian" : "dash.volume.vsAvg";
   const records = computeRecords(workouts);
-  // La dernière séance COURUE et son analyse mémorisée (lib/dashboard/derniereAnalyse).
-  const analyse = derniereAnalyse(runs, analyses);
   const al = ANALYSE_LABELS[lang] ?? ANALYSE_LABELS.fr;
   const weekSummary = computeWeekSummary(workouts, jour);
   const acwr = loadRisk?.acwr ?? 0;
@@ -634,13 +640,8 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               <span className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium tabular-nums text-zinc-600">
                 <Activity className="h-3.5 w-3.5 text-zinc-400" strokeWidth={1.5} /> {weeklyKm.toFixed(0)} km · {hl.sept}
               </span>
-              {/* Série du jour — visible dès le premier coup d'œil, sans quitter l'en-tête. */}
-              {streak && streak.current > 0 && (
-                <span className="hidden flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium tabular-nums text-zinc-600 sm:inline-flex">
-                  <Flame className="h-3.5 w-3.5 text-zinc-400" strokeWidth={1.5} />
-                  {streak.current} {streak.current === 1 ? t("streak.unit1") : t("streak.unit")}
-                </span>
-              )}
+              {/* Plus de pastille « série » ici (audit du 09/11/2026) : la carte Série, juste sous la
+                  séance, dit la même chose avec ses quatorze jours. */}
               <WeatherChip />
             </div>
           </div>
@@ -856,14 +857,16 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
         </motion.div>
       )}
 
-      {/* Bento Grid — sections éditoriales, chaque rangée pavée (aucune colonne vide) */}
+      {/* Bento Grid — sections éditoriales, chaque rangée pavée (aucune colonne vide).
+          ⚠️ PLUS D'ENTRÉE ANIMÉE CARTE PAR CARTE (passe « unslop », audit du 09/11/2026) : douze
+          cartes qui montaient l'une après l'autre au chargement, c'est la signature d'une page
+          générée. Une seule entrée reste, celle de la séance du jour — la chose qu'on vient voir. */}
       <div className="grid grid-cols-12 gap-4 auto-rows-auto">
 
         <SectionLabel>{t("dash.sec.today")}</SectionLabel>
 
         {/* Discipline Score — large card */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
           className="group relative col-span-12 md:col-span-4 bento-card"
         >
           <div className="flex items-center justify-between mb-4">
@@ -980,7 +983,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
             n'est pas lisible — c'est pourtant le seul contenu de cette carte. En
             `flex-col`, le graphique prend la place que la rangée lui donne. */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
           className="group relative col-span-12 md:col-span-4 bento-card flex flex-col"
         >
           <div className="flex items-start justify-between mb-3">
@@ -1055,7 +1057,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
         {/* VMA & prédictions de course — depuis la VMA estimée (modèle % VMA) */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
           className="group relative col-span-12 md:col-span-4 bento-card"
         >
           <div className="mb-3 flex items-center justify-between">
@@ -1114,30 +1115,41 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
         {/* Activité 7 jours — barres km/jour */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          className="col-span-12 md:col-span-8 bento-card flex flex-col"
+          className={`col-span-12 bento-card flex flex-col ${fillers[0] ? "md:col-span-8" : ""}`}
         >
           <div className="mb-4 flex items-center justify-between">
             <div className="metric-label">{t("dash.weekly.title")}</div>
-            <div className="flex items-center gap-4 text-xs">
+            <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs">
+              <span className="text-zinc-400">{t("dash.summary.sessions")} <strong className="tabular-nums text-zinc-900">{weekSummary.sessions}</strong></span>
               <span className="text-zinc-400">{t("dash.weekly.total")} <strong className="tabular-nums text-zinc-900">{nf(weekSummary.km)} km</strong></span>
               <span className="text-zinc-400">{t("dash.chart.elevation")} <strong className="tabular-nums text-zinc-900">+{Math.round(weekSummary.elev)} m</strong></span>
+              {/* Même format que la liste des séances (« 46 min », « 1h02 ») : « 0:00 » ne s'écrit nulle part ailleurs. */}
+              <span className="text-zinc-400">{t("dash.metric.duration")} <strong className="tabular-nums text-zinc-900">{duree(weekSummary.sec / 60)}</strong></span>
             </div>
           </div>
           {/* Même raison que la carte VFC : la rangée impose sa hauteur, le graphique
               était figé à 140 px et laissait 36 px de blanc mesuré sous lui. */}
           <div className="min-h-[140px] flex-1">
-            <MiniBarres barres={weeklyData.map((d) => ({ jour: d.day, valeur: d.km }))} libelle={t("dash.chart.distance")} unite="km" lang={lang} />
+            {/* Sept barres à zéro ne disent rien : on dit qu'il n'y a pas eu de course, et depuis quand. */}
+            {weekSummary.sessions === 0 ? (
+              <div className="flex h-full min-h-[140px] flex-col items-center justify-center text-center">
+                <p className="text-sm font-medium text-zinc-600">{t("dash.weekly.vide")}</p>
+                {runs[0] && <p className="mt-1 text-xs text-zinc-400">{t("dash.weekly.derniere", { d: formatDateCivile(String(runs[0].date).slice(0, 10), lang, { day: "numeric", month: "long" }) })}</p>}
+              </div>
+            ) : (
+              <MiniBarres barres={weeklyData.map((d) => ({ jour: d.day, valeur: d.km }))} libelle={t("dash.chart.distance")} unite="km" lang={lang} />
+            )}
           </div>
         </motion.div>
 
-        {/* Carte de droite n°1 — toujours remplie (pas de colonne vide) */}
-        <motion.div key={fillers[0].key}
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
+        {/* Carte de droite n°1. Garde-fou (audit du 09/11/2026) : si le vivier venait à être vide,
+            `fillers[0].node` ferait tomber tout le tableau de bord — vu au crash-test de rendu le
+            temps d'un essai sans « Forme du jour ». « Activité 7 jours » prend alors la pleine largeur. */}
+        {fillers[0] && <motion.div key={fillers[0].key}
           className="col-span-12 md:col-span-4"
         >
           {fillers[0].node}
-        </motion.div>
+        </motion.div>}
 
         {/* Dernière séance (col-8) + carte de droite n°2 (col-4) — rangée pavée */}
         {/* ⚠️ LA SECONDE CARTE PEUT MANQUER (06/11/2026, crash-test au hasard). Le vivier n'a
@@ -1147,7 +1159,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
         {w0 && lastMetrics.length > 0 && (
           <>
             <motion.div
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.30 }}
               className={`col-span-12 bento-card ${fillers[1] ? "md:col-span-8" : ""}`}
             >
               <div className="mb-4 flex items-center gap-2">
@@ -1170,7 +1181,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               </div>
             </motion.div>
             {fillers[1] && <motion.div key={fillers[1].key}
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
               className="col-span-12 md:col-span-4"
             >
               {fillers[1].node}
@@ -1180,7 +1190,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
         {/* Recent workouts */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.40 }}
           className="col-span-12 bento-card"
         >
           <div className="flex items-center justify-between mb-4">
@@ -1250,7 +1259,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
         {/* Charge & Affûtage — CTL/ATL/TSB réels (modèle Banister) */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
           className="group relative col-span-12 md:col-span-6"
         >
           <TaperingWidget workouts={chargeHistory} raceDate={raceDate} aujourdhui={jour} />
@@ -1259,7 +1267,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
         {/* Charge aiguë / chronique (ACWR) — prévention blessure (modèle Gabbett) */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.10 }}
           className="group relative col-span-12 md:col-span-6 bento-card flex flex-col"
         >
           <div className="mb-1 flex items-start justify-between">
@@ -1269,7 +1276,11 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               <div className="mt-0.5 text-[11px] text-zinc-400">{t("dash.acwr.sub")}</div>
             </div>
           </div>
-          {acwr > 0 ? (() => {
+          {/* ⚠️ RATIO NUL ≠ PAS DE DONNÉES (audit du 09/11/2026). Sans course depuis sept jours, la
+              charge aiguë vaut 0 et le ratio aussi : la carte disait « Plus de séances nécessaires »
+              à un coureur qui en avait 21 sur six semaines. Quand la base chronique existe, 0,00 est
+              une vraie mesure — une sous-charge — et on l'affiche comme telle. */}
+          {acwr > 0 || loadRisk?.base ? (() => {
             const zone = acwr < 0.8 ? { l: t("dash.acwr.under"), c: "#0284C7" }
               : acwr <= 1.3 ? { l: t("dash.acwr.optimal"), c: "#059669" }
               : acwr <= 1.5 ? { l: t("dash.acwr.caution"), c: "#EA580C" }
@@ -1311,7 +1322,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
         {/* Volume + tendance 6 semaines */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
           className="group relative col-span-12 md:col-span-6 bento-card"
         >
           <div className="mb-2 flex items-center justify-between">
@@ -1350,7 +1360,6 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
 
         {/* Zones d'entraînement (FC) — temps par zone + verdict de polarisation 80/20 */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.20 }}
           className="group relative col-span-12 md:col-span-6 bento-card"
         >
           <div className="mb-1 flex items-center justify-between">
@@ -1471,23 +1480,9 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           </div>
         )}
 
-        {/* Cette semaine */}
-        <div className="bento-card">
-          <div className="metric-label">{t("dash.summary.title")}</div>
-          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
-            {[
-              { v: String(weekSummary.sessions), u: "", l: t("dash.summary.sessions") },
-              { v: nf(weekSummary.km), u: "km", l: t("dash.metric.distance") },
-              { v: String(Math.round(weekSummary.elev)), u: "m", l: t("dash.metric.elevation") },
-              { v: fmtTime(weekSummary.sec), u: "", l: t("dash.metric.duration") },
-            ].map((s) => (
-              <div key={s.l}>
-                <div className="text-lg font-semibold leading-none tabular-nums text-zinc-900">{s.v}<span className="ml-0.5 text-xs font-normal text-zinc-400">{s.u}</span></div>
-                <div className="mt-1 text-[11px] text-zinc-500">{s.l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* ⚠️ PLUS DE CARTE « Cette semaine » (audit du 09/11/2026). Même fenêtre de sept jours que
+            « Activité 7 jours » (`computeWeekSummary`) : le même total s'affichait QUATRE fois (en-tête,
+            Activité 7 jours, Cette semaine, Volume). Séances et durée sont passées dans « Activité 7 jours ». */}
 
         {/* ⚠️ CETTE CARTE S'APPELAIT « Statut de préparation » ET AFFICHAIT « 90 % ».
             Or `computeReadiness` ne produit AUCUN pourcentage — seulement une couleur et

@@ -396,7 +396,9 @@ function acwr(d: DonneesFiche): Fiche {
   const base: Fiche = { cle: "acwr", titre: t.titre, mesure: t.mesure, valeur: "—", verdict: "", calcul: [], conseils: [], pourquoi: t.pourquoi,
     sources: ["Gabbett T. J. — The training–injury prevention paradox, Br J Sports Med, 2016.", "Foster C. — Monitoring training in athletes with reference to overtraining syndrome, Med Sci Sports Exerc, 1998."] };
   const r = loadRisk(d.seances, d.aujourdhui);
-  if (!(r.acwr > 0)) return { ...base, vide: T.commun.vide };
+  // Sans base chronique, pas de ratio ; AVEC base mais sans course depuis 7 jours, 0,00 est une
+  // vraie sous-charge — la même lecture que la carte du tableau de bord (audit du 09/11/2026).
+  if (!(r.acwr > 0) && !r.base) return { ...base, vide: T.commun.vide };
   const q = chargesQuotidiennes(d.seances, 28, d.aujourdhui);
   const sept = q.slice(0, 7).reduce((a, b) => a + b, 0), moyenne = q.reduce((a, b) => a + b, 0) / 4;
   const z = r.acwr < 0.8 ? 0 : r.acwr <= 1.3 ? 1 : r.acwr <= 1.5 ? 2 : 3;
