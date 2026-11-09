@@ -1,6 +1,6 @@
 # État de l'équipe d'agents Pacevo
 
-*Tenu par `@Nexus`. Mis à jour le 09/11/2026 à 10 h 24. Chaque ligne dit ce qui TOURNE VRAIMENT,
+*Tenu par `@Nexus`. Mis à jour le 09/11/2026 à 11 h 30. Chaque ligne dit ce qui TOURNE VRAIMENT,
 pas ce qui est prévu : un agent écrit dans la constitution mais sans routine planifiée n'existe pas.*
 
 > ⚠️ **Dépôt PUBLIC** (`cypriendumez/running-trail-empire`). Rien de personnel, de comptable ni
@@ -54,7 +54,7 @@ https://pacevo.fr (HTTP 200) et https://pacevo.fr/version.json (alerte si « com
 | 8 | `@Sweeper` | **EXÉCUTÉ** | 08/11 : pacevo.fr joignable depuis le cloud (version lue), aucun défaut sur 24 h. Filtre `localhost` en place à la source depuis le 06/11. |
 | 9 | `@Bunker` | **EXÉCUTÉ** | 08/11 : 23 → 9 failles de dépendances, Next.js 16.4.5, déployé. Restent `zod` (importé nulle part) et la chaîne ESLint (non utilisée). |
 | 10 | `@Vault` | PLANIFIÉ | Sécurité, le 5/12. Lecture seule ; une faille non corrigée ne va jamais dans le dépôt. |
-| 21 | `@Plume` | **EXÉCUTÉ** | PR #3 « Reprendre après une blessure » fusionnée et en ligne le 08/11. Prochain article le 15/11. |
+| 21 | `@Plume` | **EXÉCUTÉ** | 09/11 : PR #6 « Courir dans le froid et la nuit » (p16) fusionnée et en ligne (e738e78). Elle vient de la relance MANUELLE du 07/11, arrêtée par la limite d'usage puis finie le 09/11 : trois tours de double relecture rendus ÉCHOUE, deux imprécisions corrigées à la relecture finale. Lancée avant le texte du 09/11, elle ne prouve pas le visa `@Mercator`. Prochain article le 15/11 à 3 h (cron `0 3 1,15 * *`, heure de Paris). |
 | 26 | `@Radar` | PLANIFIÉ | Sécurité et veille, le 5/12. Sites des concurrents autorisés dans le réseau cloud. |
 | 34 | `@Greffier` | PLANIFIÉ | Direction, vendredi. Check-list : `ops/greffier/API-MONTRES.md`. |
 | 48 | `@TimeMachine` | **EXÉCUTÉ** | 08/11 : 1re sauvegarde chiffrée complète de la base, relue et recomptée. Tâche locale chaque dimanche. |
@@ -124,6 +124,14 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
   d'administration, jamais le formulaire de connexion.
 - Mails d'Outlook « perdus » vers Gmail : ils étaient tous dans le Spam de Gmail, invisible au connecteur. Sortis du spam, filtre posé ; `@Concierge` prévenu de cet angle mort.
 - PR #4 du Coach relue, vérifiée sur le Mac, fusionnée et déployée.
+- **Trois articles de blog en ligne le même jour**, sans que `@Plume` ait tourné plus souvent que prévu :
+  p16 « froid et nuit » (PR #6) vient de la relance manuelle du 07/11 ; p14 « GPS en forêt et de nuit » et
+  p15 « plaque carbone en trail » (PR #8) viennent d'une session de Cyprien, sujets choisis dans la veille.
+  Depuis son passage prévu du 01/11 (arrêté en 15 s par la limite d'usage), la routine n'a été déclenchée
+  qu'une fois, à la main le 07/11 (`RemoteTrigger get` : `last_fired_at` ; `list_runs`). À la
+  relecture finale de p16, deux imprécisions ont été corrigées : les seuils de température de l'app portent
+  sur la maximale prévue du jour, pas sur l'heure de la sortie ; et un optimum (El Helou 2012) suppose aussi
+  une baisse de vitesse du côté froid.
 
 ## Résolues le 08/11/2026
 
