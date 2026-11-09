@@ -50,6 +50,7 @@ import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { decaleJour } from "@/lib/streak/compute";
 import { niveauDeVma } from "@/lib/running/niveau";
 import { libellesActifs, type Douleur } from "@/lib/health/douleurs";
+import { douleursDeSeance } from "@/lib/health/douleursSeance";
 import { pausesDeTrace, pointsStockes, vitesseEnMouvement, dureeCourte } from "@/lib/activities/pauses";
 import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
@@ -528,8 +529,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // par le plan gratuit »). Un « 9/10, épuisé » qui laissait le lendemain inchangé était un
   // plan qui n'écoutait pas : le ressenti n'est pas une mesure, c'est ce que l'athlète dit.
   // Les NOTES libres restent dehors : seul un modèle les lit, et aucun ne parle au gratuit.
-  const feedback = ((fbRes.data ?? []) as { data: { rpe?: number; pain?: string[]; note?: string } }[])
-    .map((f) => objectifSeul ? { data: { pain: f.data?.pain, rpe: f.data?.rpe } } : f);
+  const feedback = ((fbRes.data ?? []) as { data: { rpe?: number; pain?: string[]; note?: string; date?: string; ts?: string; painPasse?: string[] } }[])
+    .map((f) => objectifSeul ? { data: { pain: f.data?.pain, rpe: f.data?.rpe, date: f.data?.date, ts: f.data?.ts, painPasse: f.data?.painPasse } } : f);
   // ⚠️ UN OBJECTIF PASSÉ RESTAIT L'OBJECTIF. `race_objective` est une ligne unique que rien
   // n'efface après la course. Cas réel (Cyprien, marathon de Lille couru le 25/10/2026) :
   // cinq jours plus tard, le coach se croyait encore en AFFÛTAGE (`weeksToRace` = −1, donc
@@ -749,8 +750,12 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     aujourdhui(FUSEAU_DEFAUT),
     { mieux: "en amélioration selon l'athlète", pire: "en aggravation selon l'athlète" },
   );
+  // ⚠️ UNE DOULEUR COCHÉE APRÈS UNE SÉANCE NE S'ÉTEIGNAIT JAMAIS (09/11/2026) : elle pesait
+  // tant que son ressenti restait parmi les cinq derniers, sans bouton « c'est passé ».
+  // Désormais : 14 jours, « c'est passé » (Santé), ou un « Aucune douleur » plus récent
+  // (lib/health/douleursSeance).
   const pains = [...new Set([
-    ...feedback.flatMap(f => f.data?.pain ?? []).filter((p) => p && p !== "Aucune douleur"),
+    ...douleursDeSeance(feedback.map((f) => f.data ?? {}), aujourdhui(FUSEAU_DEFAUT)).map((d) => d.zone),
     ...declaredPains,
   ])];
   const lastRpe = feedback[0]?.data?.rpe ?? null;
