@@ -13,10 +13,11 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { classerALaUne, motsDuTitre, texteDuSujet, type ArticleSemaine } from "../src/lib/news/alaune";
-import { FILTRES, PAS_ELITE, CONTEXTE_COURSE, PROMO, TEST_MATERIEL, HORS_COURSE } from "../src/lib/news/rubriques";
+import { classerALaUne, motsDuTitre, texteDuSujet, POLITIQUE, type ArticleSemaine } from "../src/lib/news/alaune";
+import { FILTRES, PAS_ELITE, PAS_CONSEIL, CONTEXTE_COURSE, COURSE_A_PIED, PROMO, TEST_MATERIEL, HORS_COURSE, RUBRIQUES_LETTRE } from "../src/lib/news/rubriques";
+import { fusionnerListes, lienGoogleNews } from "../src/lib/news/actualites";
 import { chiffresVerifies, chiffresIntrus } from "../src/lib/newsletter/resume";
-import { construireEmail, LANGS } from "../src/lib/newsletter/email";
+import { construireEmail, LANGS, libellesSections } from "../src/lib/newsletter/email";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -150,7 +151,8 @@ test("une semaine sans sujet commun : les plus récents complètent, comme avant
 
 test("la lettre lit TOUTE la semaine pour sa une, sans le plafond de 48 du fil", () => {
   const act = sansCommentaires("src/lib/news/actualites.ts");
-  const semaine = act.slice(act.indexOf("export async function collecterSemaine"), act.indexOf("async function fusionner"));
+  const debut = act.indexOf("export async function collecterSemaine");
+  const semaine = act.slice(debut, act.indexOf("\n}\n", debut));
   assert.ok(semaine.length > 50, "collecterSemaine a disparu");
   assert.doesNotMatch(semaine, /slice\(/, "la semaine est de nouveau coupée");
   assert.match(act, /export const REQUETES_SEMAINE = \[[\s\S]*?\]\.map\(\(q\) => `\$\{q\} when:7d`\)/, "les requêtes ne sont plus bornées à la semaine");
@@ -265,7 +267,9 @@ test("la lettre cherche la nutrition de la SEMAINE et la classe par date", () =>
   const bloc = route.slice(route.indexOf("const iNutrition"), route.indexOf("const texteUne"));
   assert.ok(bloc.length > 50, "le bloc Nutrition a disparu");
   assert.match(bloc, /nutritionSemaine\s*\.filter\(\(it\) => FILTRES\.nutrition!\.test\(it\.title\) && CONTEXTE_COURSE\.test\(it\.title\) && !PROMO\.test\(it\.title\) && !dejaALaUne\.has\(it\.link\)\)/);
-  assert.match(bloc, /\.sort\(\(a, b\) => temps\(b\) - temps\(a\)\)/, "classée autrement que par date : un seul article survivrait au regroupement");
+  // Résumable d'abord, puis par date (10/11/2026) ; jamais par regroupement de mots.
+  assert.match(bloc, /\.sort\(parInteret\)/, "Nutrition n'est plus classée par intérêt puis par date");
+  assert.match(route, /const parInteret = \(a: Item, b: Item\) => resumable\(b\) - resumable\(a\) \|\| tempsDe\(b\) - tempsDe\(a\);/);
   assert.doesNotMatch(bloc, /classerALaUne/, "le regroupement par mot réduirait la rubrique à un article (« nutrition » est son thème)");
   assert.match(bloc, /parRubrique\[iNutrition\] = nutrition/);
   assert.match(route, /collecterNutritionSemaine\(\)\.catch\(/, "une panne de la collecte nutrition ferait tomber la lettre");
@@ -352,6 +356,86 @@ test("l'essai envoie la vraie lettre à la SEULE adresse de l'éditeur", () => {
   assert.ok(!lus.some((p) => /mail|to|dest/i.test(p)), `un paramètre d'adresse est lu : ${lus.join(", ")}`);
   // Et l'abonné d'essai est remplacé APRÈS le filtre, juste avant l'envoi.
   assert.ok(route.indexOf("if (essai) abonnes =") > route.indexOf("abonnes = abonnes.filter((a) => a.email);"));
+});
+
+// ── 10/11 (pertinence) : « ça concerne vraiment mon type de client ? » ───────────────────
+
+test("une rubrique Conseils d'entraînement, juste après la une, annoncée dans les cinq langues", () => {
+  assert.equal(RUBRIQUES_LETTRE[1].cle, "conseils", "Conseils n'est plus juste après la une");
+  const attendu: Record<string, string> = { fr: "Conseils d'entraînement", en: "Training tips", de: "Trainingstipps", es: "Consejos de entrenamiento", pt: "Dicas de treino" };
+  for (const lg of LANGS) assert.equal(libellesSections(lg)[1], attendu[lg], `${lg} : libellé`);
+  const m = construireEmail("fr", [{ cle: "conseils", articles: [{ title: "Trouver son allure facile", source: "Canadian Running", link: "https://x.fr/a", resume: "R." }] }], [], "https://x.fr/d", "https://x.fr");
+  assert.match(m.texte, /CONSEILS D'ENTRAÎNEMENT/);
+});
+
+test("Conseils garde les conseils, pas le sport voisin ni les classements de produits", () => {
+  const garde = (t: string, gn: boolean) => FILTRES.conseils!.test(t) && !PAS_CONSEIL.test(t) && (!gn || COURSE_A_PIED.test(t)) && !PROMO.test(t) && !HORS_COURSE.test(t);
+  // Titres réels de la semaine du 9/11/2026.
+  for (const [t, gn] of [["The easy way to find your easy pace", false], ["How to Master the Run/Walk Method: Training Principles for Consistent Success", false],
+    ["Marathon de La Baule. Régularité, nutrition, confiance… les trois conseils d'un coach spécialisé dans la course à pied", true]] as const) {
+    assert.ok(garde(t, gn), `écarté à tort : ${t}`);
+  }
+  for (const [t, gn] of [["The Best Heart Rate Monitors Give You the Most Accurate Training Data", false], ["Where Runners' Pace Broke at the 2026 New York City Marathon", false],
+    ["Football : absent des terrains depuis la Coupe du monde, William Saliba de retour à l'entraînement", true],
+    ["XV de France : le Rochelais Paul Boudehent ménagé à l'entraînement", true], ["Codes Speed Training (Septembre 2026)", true],
+    // « pace » seul n'est pas un conseil (une allure FACILE, de COURSE, de MARATHON, oui).
+    ["Strava Pace Charts Get a Redesign", false]] as const) {
+    assert.ok(!garde(t, gn), `gardé à tort : ${t}`);
+  }
+  // Le contexte de course de la presse générale : l'entraînement d'un autre sport n'en est pas.
+  // Même sans la liste HORS_COURSE, le football doit rester dehors (deux protections).
+  assert.ok(!COURSE_A_PIED.test("William Saliba de retour à l'entraînement après la Coupe du monde"));
+  // HORS_COURSE garde AUSSI la une et Élites, qui n'ont pas COURSE_A_PIED.
+  for (const t of ["Football : William Saliba de retour", "XV de France : Paul Boudehent ménagé", "Rugby : le Stade toulousain s'impose"]) assert.ok(HORS_COURSE.test(t), t);
+  assert.ok(CONTEXTE_COURSE.test("William Saliba de retour à l'entraînement"), "CONTEXTE_COURSE contient bien « entraînement » : d'où COURSE_A_PIED");
+  for (const t of ["La course de Saint-Pol", "Les coureuses du dimanche", "Courir en hiver", "Réussir son premier 10 km"]) assert.ok(COURSE_A_PIED.test(t), t);
+});
+
+test("la route remplit Conseils : français résumable d'abord, un article par média", () => {
+  const route = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  const bloc = route.slice(route.indexOf("const iConseils"), route.indexOf("const texteUne"));
+  assert.ok(bloc.length > 50, "le bloc Conseils a disparu");
+  assert.match(bloc, /FILTRES\.conseils!\.test\(it\.title\) && !PAS_CONSEIL\.test\(it\.title\)/);
+  assert.match(bloc, /\(!lienGoogleNews\(it\.link\) \|\| COURSE_A_PIED\.test\(it\.title\)\) && publiable\(it\) && !dejaALaUne\.has\(it\.link\)/);
+  assert.match(bloc, /\.sort\(parInteretFr\)/);
+  assert.match(bloc, /parRubrique\[iConseils\] = unParMedia\(conseils\)/, "Runner's World peut occuper toute la rubrique");
+  assert.match(route, /const interetFr = \(it: Item\) => resumable\(it\) \* 2 \+ \(it\.langue === "en" \? 0 : 1\);/, "l'ordre français résumable > anglais résumable > titre seul a changé");
+  assert.match(route, /const resumable = \(it: Item\) => \(\(it\.texte \?\? ""\)\.trim\(\)\.length >= 320 \|\| !lienGoogleNews\(it\.link\) \? 1 : 0\);/);
+  assert.match(route, /collecterConseilsSemaine\(\)\.catch\(/);
+  // Nutrition et Matériel trient aussi par intérêt, et Matériel ne prend que du français.
+  assert.match(route.slice(route.indexOf("const nutrition = nutritionSemaine")), /^[\s\S]{0,300}\.sort\(parInteret\)/);
+  assert.match(route, /\.filter\(\(it\) => it\.langue !== "en" && FILTRES\.gear!\.test\(it\.title\)/);
+  assert.match(route, /const francais = unParMedia\(materielSemaine/, "Run Actu peut occuper toutes les places françaises de Matériel");
+});
+
+test("entre deux copies d'un article, on garde celle qu'on pourra résumer (lien direct)", () => {
+  const gn = { title: "Test On Cloudsurfer 3 : la révolution de la mousse", source: "Run Actu", link: "https://news.google.com/rss/articles/CBMi123", date: "2026-11-08T10:00:00Z", domain: "", favicon: "", langue: "fr" as const };
+  const direct = { ...gn, link: "https://runactu.com/test-on-cloudsurfer-3/" };
+  for (const ordre of [[[gn], [direct]], [[direct], [gn]]]) {
+    const r = fusionnerListes(ordre);
+    assert.equal(r.length, 1, "un même article compté deux fois");
+    assert.equal(r[0].link, direct.link, "la copie Google News (non résumable) est gardée");
+  }
+  assert.ok(lienGoogleNews(gn.link) && !lienGoogleNews(direct.link));
+  const act = sansCommentaires("src/lib/news/actualites.ts");
+  for (const f of ["runactu.com/feed", "montre-cardio-gps.fr/feed"]) assert.ok(act.includes(f), `flux à lien direct retiré : ${f}`);
+});
+
+test("un sujet n'est pas représenté par un titre politique quand il en a un autre", () => {
+  const nice = [
+    art("ladepeche.fr", "David Lisnard et Christian Estrosi courent sur le marathon Nice-Cannes, le candidat à l'élection présidentielle boucle 21,1 km", "2026-11-09T12:00:00Z"),
+    art("Jogging International", "Marathon des Alpes-Maritimes Nice-Cannes : 25 000 participants pour une 18e édition", "2026-11-09T08:00:00Z"),
+    art("u-Trail", "Manon Gras remporte le Marathon Nice-Cannes", "2026-11-08T10:00:00Z"),
+  ];
+  // Et à place égale au cœur du sujet, le lien direct (résumable) passe devant Google News,
+  // même plus récent.
+  const gn = art("Média X", "Backyard de Clem Qui Court : le bilan", "2026-11-09T12:00:00Z");
+  gn.link = "https://news.google.com/rss/articles/CBMiXYZ";
+  const direct = art("Média Y", "Backyard de Clem Qui Court : le classement", "2026-11-08T12:00:00Z");
+  assert.equal(classerALaUne([gn, direct, ...BRUIT], 1)[0].article, direct, "un lien Google News (titre seul) représente le sujet");
+  const [s] = classerALaUne([...nice, ...BRUIT], 1);
+  assert.equal(s.medias, 3, `le sujet Nice-Cannes n'est pas formé (${s.mot})`);
+  assert.ok(!POLITIQUE.test(s.article.title), `représenté par : « ${s.article.title} »`);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

@@ -70,6 +70,9 @@ const SOURCE_MAX = 2600;
 /**
  * Combien d'articles on résume au plus.
  *
+ * 19 depuis le 10/11/2026 : la rubrique « Conseils d'entraînement » (3 articles) s'est
+ * ajoutée aux 16 précédents. Un lot de résumés de plus par semaine.
+ *
  * ⚠️ Ce plafond a failli vider des rubriques. La lettre choisit désormais jusqu'à 16
  * articles (5 à la une + 3 trail + 3 élites + 3 matériel + 2 nutrition) ; tant qu'il
  * valait 10, les six derniers n'étaient pas seulement privés de résumé — ils étaient
@@ -78,7 +81,7 @@ const SOURCE_MAX = 2600;
  * articles reçus (voir plus bas) : un décalage de plafond ne peut plus faire disparaître
  * une rubrique, au pire elle s'affiche en titres seuls.
  */
-export const RESUMES_MAX = 16;
+export const RESUMES_MAX = 19;
 
 function decoder(t: string): string {
   return t

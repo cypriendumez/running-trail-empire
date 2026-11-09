@@ -5,8 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { lienDesinscription } from "@/lib/newsletter/token";
 import { resumerArticles, traduireTextes, RESUMES_MAX, type ArticleResume } from "@/lib/newsletter/resume";
 import { construireEmail, estLang, type Lang, type Section, type Course } from "@/lib/newsletter/email";
-import { RUBRIQUES_LETTRE, FILTRES, PAS_ELITE, CONTEXTE_COURSE, PROMO, TEST_MATERIEL, HORS_COURSE } from "@/lib/news/rubriques";
-import { collecterSemaine, collecterNutritionSemaine, collecterMaterielSemaine } from "@/lib/news/actualites";
+import { RUBRIQUES_LETTRE, FILTRES, PAS_ELITE, PAS_CONSEIL, CONTEXTE_COURSE, COURSE_A_PIED, PROMO, TEST_MATERIEL, HORS_COURSE } from "@/lib/news/rubriques";
+import { collecterSemaine, collecterNutritionSemaine, collecterMaterielSemaine, collecterConseilsSemaine, lienGoogleNews } from "@/lib/news/actualites";
 import { classerALaUne, motsDuTitre, texteDuSujet } from "@/lib/news/alaune";
 import { EDITEUR } from "@/lib/brand/editeur";
 import { envoyerEmail } from "@/lib/email/envoyer";
@@ -95,7 +95,7 @@ export async function GET(req: Request) {
   // à la main, elle parcourt la liste. Une rubrique inexistante y serait refusée par le
   // typage, plus seulement silencieusement remplacée par l'actualité générale.
   let echecSemaine: string | null = null;
-  const [parRubrique, semaineBrute, nutritionSemaine, materielSemaine] = await Promise.all([
+  const [parRubrique, semaineBrute, nutritionSemaine, materielSemaine, conseilsSemaine] = await Promise.all([
     Promise.all(RUBRIQUES_LETTRE.map((r) => recentsDe(r.cat))),
     // Une panne ici ne doit pas annuler la lettre : la une retombe sur le fil, et la
     // réponse (lue dans le journal de l'action GitHub) dit pourquoi.
@@ -103,7 +103,25 @@ export async function GET(req: Request) {
     // Même règle : une panne ne coûte que la rubrique, qui retombe sur le fil.
     collecterNutritionSemaine().catch(() => [] as Item[]),
     collecterMaterielSemaine().catch(() => [] as Item[]),
+    collecterConseilsSemaine().catch(() => [] as Item[]),
   ]);
+  const tempsDe = (it: Item) => new Date(it.date).getTime() || 0;
+  // ⚠️ Un article dont on peut lire le texte (fourni par le flux, ou lien direct vers une
+  // page que l'éditeur autorise) passe devant un lien Google News, qui partira en titre
+  // seul : son robots.txt interdit d'ouvrir ses pages d'articles (vérifié le 10/11/2026),
+  // et Ouest-France refuse PacevoBot. À égalité, le plus récent.
+  const resumable = (it: Item) => ((it.texte ?? "").trim().length >= 320 || !lienGoogleNews(it.link) ? 1 : 0);
+  const parInteret = (a: Item, b: Item) => resumable(b) - resumable(a) || tempsDe(b) - tempsDe(a);
+  // Pour un abonné français : un article français résumable d'abord, puis un article
+  // anglais résumable (titre et résumé seront traduits), puis un titre français seul.
+  const interetFr = (it: Item) => resumable(it) * 2 + (it.langue === "en" ? 0 : 1);
+  const parInteretFr = (a: Item, b: Item) => interetFr(b) - interetFr(a) || tempsDe(b) - tempsDe(a);
+  // Un média, un article : Runner's World publie une dizaine de conseils par semaine et
+  // aurait occupé toute la rubrique.
+  const unParMedia = (liste: Item[]) => {
+    const vus = new Set<string>();
+    return liste.filter((it) => !vus.has(it.source) && (vus.add(it.source), true));
+  };
   // Ni promotion ni hors-sujet, nulle part dans la lettre (voir `PROMO`, `HORS_COURSE`).
   const publiable = (it: Item) => !PROMO.test(it.title) && !HORS_COURSE.test(it.title);
   const semaine = semaineBrute.filter(publiable);
@@ -146,10 +164,9 @@ export async function GET(req: Request) {
   // rubrique, il réunirait tous ses articles en un seul « sujet » et n'en garderait qu'un.
   const iNutrition = RUBRIQUES_LETTRE.findIndex((r) => r.cle === "nutrition");
   if (iNutrition > 0 && nutritionSemaine.length) {
-    const temps = (it: Item) => new Date(it.date).getTime() || 0;
     const nutrition = nutritionSemaine
       .filter((it) => FILTRES.nutrition!.test(it.title) && CONTEXTE_COURSE.test(it.title) && !PROMO.test(it.title) && !dejaALaUne.has(it.link))
-      .sort((a, b) => temps(b) - temps(a));
+      .sort(parInteret);
     if (nutrition.length) parRubrique[iNutrition] = nutrition;
   }
 
@@ -160,15 +177,29 @@ export async function GET(req: Request) {
   // News, lui, part seul : son robots.txt interdit d'ouvrir ses pages d'articles).
   const iMateriel = RUBRIQUES_LETTRE.findIndex((r) => r.cle === "materiel");
   if (iMateriel > 0 && materielSemaine.length) {
-    const temps = (it: Item) => new Date(it.date).getTime() || 0;
-    const francais = materielSemaine
-      .filter((it) => FILTRES.gear!.test(it.title) && TEST_MATERIEL.test(it.title) && publiable(it) && !dejaALaUne.has(it.link))
-      .sort((a, b) => temps(b) - temps(a))
+    // Un média, un test : Run Actu en publie plusieurs par semaine.
+    const francais = unParMedia(materielSemaine
+      .filter((it) => it.langue !== "en" && FILTRES.gear!.test(it.title) && TEST_MATERIEL.test(it.title) && publiable(it) && !dejaALaUne.has(it.link))
+      .sort(parInteret))
       .slice(0, RUBRIQUES_LETTRE[iMateriel].max - 1);
     if (francais.length) {
       const liens = new Set(francais.map((it) => it.link));
       parRubrique[iMateriel] = [...francais, ...parRubrique[iMateriel].filter((it) => !liens.has(it.link))];
     }
+  }
+
+  // ── 1 sexies. CONSEILS D'ENTRAÎNEMENT : ce que cherche un coureur coaché ────────
+  // ⚠️ Rubrique ajoutée le 10/11/2026 (voir `FILTRES.conseils`). Elle passe juste après
+  // la une : c'est la plus proche de ce que Pacevo fait pour ses coureurs.
+  const iConseils = RUBRIQUES_LETTRE.findIndex((r) => r.cle === "conseils");
+  if (iConseils > 0 && conseilsSemaine.length) {
+    const conseils = conseilsSemaine
+      // Le contexte de course n'est exigé que de la presse générale (Google News) : un flux
+      // spécialisé n'écrit que pour des coureurs (« The easy way to find your easy pace »).
+      .filter((it) => FILTRES.conseils!.test(it.title) && !PAS_CONSEIL.test(it.title)
+        && (!lienGoogleNews(it.link) || COURSE_A_PIED.test(it.title)) && publiable(it) && !dejaALaUne.has(it.link))
+      .sort(parInteretFr);
+    if (conseils.length) parRubrique[iConseils] = unParMedia(conseils);
   }
 
   // Le texte à résumer pour chaque sujet de la une : ce qu'en titrent les médias (voir
