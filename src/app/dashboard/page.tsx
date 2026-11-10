@@ -5,8 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { lecturesEnEchec } from "@/lib/dashboard/lectures";
 import type { AnalyseMemorisee } from "@/lib/dashboard/derniereAnalyse";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
-import { BilanMatin } from "@/components/health/BilanMatin";
-import { TYPE_BILAN } from "@/lib/health/bilanMatin";
 import { TestVmaBanner } from "@/components/dashboard/TestVmaBanner";
 import { InviteAvis } from "@/components/dashboard/InviteAvis";
 import { momentFavorable } from "@/lib/avis/invite";
@@ -267,13 +265,8 @@ export default async function DashboardPage() {
   const inviterAvis = (avisRes.data?.length ?? 0) === 0 && (nbSeancesRes.count ?? 0) >= SEANCES_AVANT_INVITE
     && momentFavorable(streak.days, decaleJour(streakToday, -1));
 
-  // ── LE BILAN DU MATIN (Santé, lot 2, 10/11/2026) : la carte reste tant que celui du JOUR de
-  //    l'athlète n'est pas rempli. Lecture en panne : la carte s'affiche (la route réécrit la ligne du
-  //    jour, refaire le bilan ne crée pas de doublon).
-  const { data: bilanJour, error: eBilan } = await supabase.from("notifications").select("id")
-    .eq("user_id", user!.id).eq("type", TYPE_BILAN).eq("data->>date", today).limit(1);
-  if (eBilan) console.error("[tableau de bord] bilan du matin illisible :", eBilan.message);
-  const bilanAFaire = !(bilanJour ?? []).length;
+  // Le bilan du matin n'a PAS de carte sur le tableau de bord : Cyprien l'a retirée le 10/11/2026
+  // (« vraiment nul » en tête de page). Il se remplit dans Santé › Récupération.
 
   return (
     <>
@@ -283,7 +276,6 @@ export default async function DashboardPage() {
         « quand j'ouvre l'application on voit toute la page verte »). On demande un avis
         APRÈS avoir rendu service, pas avant. */}
     <TestVmaBanner measured={vmaMesuree || estFondateur || enMarcheCourse} />
-    {bilanAFaire && <BilanMatin variante="carte" />}
     <BentoDashboard
       donneesIncompletes={donneesIncompletes}
       profile={stripProfileSecrets(profileRes.data)}
