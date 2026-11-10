@@ -119,6 +119,20 @@ async function main() {
     }
   });
 
+  await test("questionnaire coché ET douleur déclarée : chaque renfo garde « saute ce qui sollicite la zone »", async () => {
+    const ressenti = { user_id: "u", type: "session_feedback", created_at: `${ilYa(1)}T19:00:00Z`, data: { date: ilYa(1), ts: `${ilYa(1)}T19:00:00Z`, rpe: 3, pain: ["Tibia (périoste)"] } };
+    const ctx = await contexte([APT(["essoufflement"]), ressenti]);
+    let renfos = 0;
+    for (const d of departs()) {
+      for (const j of buildWeekPlan(ctx, d).filter((x) => x.type === "Renfo")) {
+        renfos++;
+        assert.ok(j.detail.includes(PLAN_T.fr.renfoDouleur), `la mise en garde douleur a disparu du renfo du ${j.date}`);
+        assert.ok(j.i18n?.en?.detail.includes(PLAN_T.en.renfoDouleur), "la mise en garde douleur manque en anglais");
+      }
+    }
+    assert.ok(renfos > 0, "précondition : aucun renfo, le test ne prouve rien");
+  });
+
   await test("la course du jour est retirée du plan, avec « l'avis d'un médecin avant » (5 langues) ; idempotent", async () => {
     const ctx = await contexte([APT(["malaise"])]);
     const plan = buildWeekPlan({ ...ctx, daysToRace: 0 }, new Date(`${AUJ}T08:00:00`));

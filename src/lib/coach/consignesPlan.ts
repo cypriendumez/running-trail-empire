@@ -261,7 +261,12 @@ export function appliquerAptitude(plan: readonly PlanDay[]): PlanDay[] {
     // bondissements, de la corde à sauter ou « 4×1 min sur un footing » ne protégeait personne
     // (relecture du directeur scientifique, 10/11/2026).
     if (jour.type === "Renfo") {
-      return reecrire(jour, "Renfo", (l) => ({ ...texteDe(jour, l), detail: SANS_COURSE[l].renfo }));
+      // …en GARDANT la mise en garde « douleur » qu'un autre chemin y a mise (règle du 09/11/2026 :
+      // chaque renfo dit de sauter ce qui sollicite la zone) — relecture du 10/11/2026.
+      return reecrire(jour, "Renfo", (l) => {
+        const avant = texteDe(jour, l).detail;
+        return { ...texteDe(jour, l), detail: SANS_COURSE[l].renfo + (avant.includes(PLAN_T[l].renfoDouleur) ? PLAN_T[l].renfoDouleur : "") };
+      });
     }
     if (GARDES_SANS_COURSE.has(jour.type)) return jour;
     const course = jour.type === "Course";
