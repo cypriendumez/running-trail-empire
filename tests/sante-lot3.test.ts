@@ -163,6 +163,15 @@ async function main() {
     }
   });
 
+  await test("sans plan du jour et avis attendu : ni séance de l'IA, ni repli calculé (qui proposent de l'intensité)", () => {
+    const bento = codeOf("src/components/dashboard/BentoDashboard.tsx");
+    assert.match(bento, /const displaySession = coachKey \?\? \(sansCourse \? sessionAttente : aiSession \?\? keySession\);/, "le repli peut de nouveau proposer une séance");
+    assert.match(bento, /if \(sansCourse\) return;/, "l'IA est de nouveau appelée pendant l'attente");
+    assert.match(codeOf("src/app/dashboard/page.tsx"), /sansCourse=\{sansTestVma\}/, "le tableau de bord ne transmet plus l'attente");
+    // La route elle-même refuse (l'écran n'est pas la seule porte) ; une panne vaut refus.
+    assert.match(codeOf("src/app/api/ai/session/route.ts"), /if \(eApt \|\| avisAttendu\(lireAptitude\(/, "la route propose une séance malgré l'avis attendu");
+  });
+
   await test("une lecture du questionnaire en panne refuse le contexte (pas « rien à signaler »)", () => {
     assert.match(codeOf("src/lib/ai/coachContext.ts"), /if \(estUnePanne\(\{ error: eApt \}\)\) throw new Error\(`Questionnaire d'aptitude illisible/);
   });

@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { exigeAcces } from "@/lib/billing/guard";
@@ -34,6 +35,15 @@ export async function POST() {
   // route resterait appelable à la main, et c'est l'appel qui coûte.
   const refus = await exigeAcces(supabase, user.id, "ia");
   if (refus) return refus.reponse;
+
+  // ⚠️ AVIS MÉDICAL ATTENDU (questionnaire d'aptitude, Santé lot 3) : aucune séance proposée par le
+  // modèle — il pourrait prescrire de l'intensité à un coureur qui a signalé un symptôme cardiaque.
+  // Lecture en panne : même refus (dans le doute, rien).
+  const { data: lignesApt, error: eApt } = await supabase.from("notifications").select("data")
+    .eq("user_id", user.id).eq("type", TYPE_APTITUDE).order("created_at", { ascending: false }).limit(1);
+  if (eApt || avisAttendu(lireAptitude(((lignesApt ?? []) as { data?: unknown }[])[0]?.data))) {
+    return NextResponse.json({ session: null, motif: "aptitude" });
+  }
 
   const day = serverDay();
 
