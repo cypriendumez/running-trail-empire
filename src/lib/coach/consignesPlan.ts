@@ -88,49 +88,8 @@ export type ContexteConsignes = {
   sortiesRecentes: string[];
   /** Date d'une course C de la semaine (AAAA-MM-JJ), à transformer en footing ; `null` sinon. */
   courseC: string | null;
-  /** D'où vient le cadre : le kinésithérapeute (défaut), ou le questionnaire d'aptitude en attente
-   *  de l'avis d'un médecin (lot 3) — mêmes règles, autres mots. */
-  source?: "kine" | "aptitude";
 };
 
-/** Les textes quand le cadre vient du questionnaire d'aptitude (pas de durée, pas de nombre de sorties). */
-const TA: typeof T = {
-  fr: {
-    titre: "Footing facile, en attendant l'avis d'un médecin",
-    why: () => "Ton questionnaire d'aptitude signale une situation à faire voir à un médecin : en attendant son avis, ton plan ne contient aucune intensité.",
-    repos: () => "", mc: () => "",
-    course: () => " ⚠️ Ton questionnaire d'aptitude demande l'avis d'un médecin : vois-le avant de courir cette course.",
-    renfo: " En attendant l'avis d'un médecin : aucun saut ni bondissement.",
-  },
-  en: {
-    titre: "Easy run, while waiting for a doctor's opinion",
-    why: () => "Your fitness questionnaire flags something a doctor should look at: until then, your plan has no intensity.",
-    repos: () => "", mc: () => "",
-    course: () => " ⚠️ Your fitness questionnaire calls for a doctor's opinion: see one before running this race.",
-    renfo: " Until a doctor has seen you: no jumps or bounds.",
-  },
-  de: {
-    titre: "Lockerer Lauf, bis eine Ärztin oder ein Arzt draufgeschaut hat",
-    why: () => "Dein Fitness-Fragebogen nennt etwas, das ärztlich abgeklärt werden sollte: Bis dahin enthält dein Plan keine Intensität.",
-    repos: () => "", mc: () => "",
-    course: () => " ⚠️ Dein Fitness-Fragebogen verlangt eine ärztliche Einschätzung: Hol sie vor diesem Wettkampf ein.",
-    renfo: " Bis zur ärztlichen Einschätzung: keine Sprünge.",
-  },
-  es: {
-    titre: "Rodaje suave, a la espera de la opinión de un médico",
-    why: () => "Tu cuestionario de aptitud señala algo que debe ver un médico: hasta entonces, tu plan no tiene intensidad.",
-    repos: () => "", mc: () => "",
-    course: () => " ⚠️ Tu cuestionario de aptitud pide la opinión de un médico: consúltalo antes de correr esta carrera.",
-    renfo: " Hasta que te vea un médico: ningún salto ni bote.",
-  },
-  pt: {
-    titre: "Corrida fácil, à espera da opinião de um médico",
-    why: () => "O teu questionário de aptidão assinala algo que um médico deve ver: até lá, o teu plano não tem intensidade.",
-    repos: () => "", mc: () => "",
-    course: () => " ⚠️ O teu questionário de aptidão pede a opinião de um médico: consulta-o antes de correres esta prova.",
-    renfo: " Até um médico te ver: nenhum salto.",
-  },
-};
 
 const jjmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const decale = (jour: string, n: number) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -193,7 +152,7 @@ const texteDe = (jour: PlanDay, l: Lang): PlanDayText =>
  */
 export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsignes): PlanDay[] {
   const { consignes } = c;
-  const TX = c.source === "aptitude" ? TA : T;
+  const TX = T;
   const fin = jjmm(consignes.jusquAu);
   const footing = (jour: PlanDay) => {
     const corps = corpsFooting(consignes.dureeMaxMin, jour, c.allureFacile);
@@ -256,6 +215,58 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
     if (c.sortiesRecentes.includes(jour.date)) return jour;
     if (tient(jour.date)) { gardees.push(jour.date); return jour; }
     return repos(jour, (l) => TX[l].repos(max, fin));
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LE QUESTIONNAIRE D'APTITUDE EN ATTENTE D'AVIS (lot 3, décision de Cyprien du 10/11/2026) :
+//  AUCUNE séance d'endurance (course, vélo, natation, sport croisé) jusqu'à l'avis d'un médecin —
+//  « sans intensité » ne suffisait pas (relecture du directeur scientifique : une sortie longue
+//  facile garde une forte charge cardiovasculaire). Jours de repos, une marche tranquille reste
+//  possible ; le renforcement reste, sans saut. La course du jour elle-même est retirée du plan.
+// ─────────────────────────────────────────────────────────────────────────────
+const SANS_COURSE: Record<Lang, { why: string; course: string; renfo: string }> = {
+  fr: {
+    why: "Ton questionnaire d'aptitude signale une situation à faire voir à un médecin : en attendant son avis, pas de course. Une marche tranquille reste possible.",
+    course: "Course retirée de ton plan : ton questionnaire d'aptitude demande l'avis d'un médecin avant de la courir.",
+    renfo: " En attendant l'avis d'un médecin : renforcement doux, aucun saut ni bondissement.",
+  },
+  en: {
+    why: "Your fitness questionnaire flags something a doctor should look at: until then, no running. A gentle walk is still fine.",
+    course: "Race removed from your plan: your fitness questionnaire calls for a doctor's opinion before running it.",
+    renfo: " Until a doctor has seen you: gentle strength work, no jumps or bounds.",
+  },
+  de: {
+    why: "Dein Fitness-Fragebogen nennt etwas, das ärztlich abgeklärt werden sollte: Bis dahin kein Laufen. Ein ruhiger Spaziergang ist möglich.",
+    course: "Wettkampf aus deinem Plan entfernt: Dein Fitness-Fragebogen verlangt vorher eine ärztliche Einschätzung.",
+    renfo: " Bis zur ärztlichen Einschätzung: sanftes Krafttraining, keine Sprünge.",
+  },
+  es: {
+    why: "Tu cuestionario de aptitud señala algo que debe ver un médico: hasta entonces, nada de correr. Un paseo tranquilo sigue siendo posible.",
+    course: "Carrera retirada de tu plan: tu cuestionario de aptitud pide la opinión de un médico antes de correrla.",
+    renfo: " Hasta que te vea un médico: fuerza suave, ningún salto ni bote.",
+  },
+  pt: {
+    why: "O teu questionário de aptidão assinala algo que um médico deve ver: até lá, nada de corrida. Uma caminhada tranquila continua possível.",
+    course: "Prova retirada do teu plano: o teu questionário de aptidão pede a opinião de um médico antes de a correres.",
+    renfo: " Até um médico te ver: reforço suave, nenhum salto.",
+  },
+};
+/** Ce qui reste sous « aucune course » : le repos, le renforcement, la mobilité. */
+const GARDES_SANS_COURSE = new Set(["Repos", "Renfo", "Mobilité"]);
+
+/** Le plan FINI quand l'avis d'un médecin est attendu : aucune séance d'endurance. Idempotent. */
+export function appliquerAptitude(plan: readonly PlanDay[]): PlanDay[] {
+  return plan.map((jour) => {
+    if (jour.type === "Renfo") {
+      return reecrire(jour, "Renfo", (l) => { const t = texteDe(jour, l); return { ...t, detail: t.detail.includes(SANS_COURSE[l].renfo) ? t.detail : t.detail + SANS_COURSE[l].renfo }; });
+    }
+    if (GARDES_SANS_COURSE.has(jour.type)) return jour;
+    const course = jour.type === "Course";
+    return reecrire(jour, "Repos", (l) => ({
+      title: PLAN_T[l].reposTitre, detail: PLAN_T[l].reposFinalDetail,
+      why: course ? SANS_COURSE[l].course : SANS_COURSE[l].why, tags: [PLAN_T[l].tags["Repos"]],
+    }));
   });
 }
 

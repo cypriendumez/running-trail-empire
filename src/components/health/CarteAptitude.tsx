@@ -17,7 +17,7 @@ import { APTITUDE_UI } from "@/lib/health/aptitudeI18n";
  * et un bouton permet de déclarer l'avis d'un médecin. `"ok"` : rien n'est affiché.
  * L'écran ne dit « plan à jour » que si la route l'a recalculé.
  */
-export function CarteAptitude({ etat }: { etat: "absent" | "attente" | "ok" | "panne" }) {
+export function CarteAptitude({ etat }: { etat: "absent" | "attente" | "ok" | "panne" | "renouveler" }) {
   const { lang } = useT();
   const t = APTITUDE_UI[(lang as Lang) in APTITUDE_UI ? (lang as Lang) : "fr"];
   const router = useRouter();
@@ -82,6 +82,7 @@ export function CarteAptitude({ etat }: { etat: "absent" | "attente" | "ok" | "p
         <HeartPulse className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-700" aria-hidden />
         <div>
           <h2 className="text-[15px] font-semibold text-zinc-900">{t.titre}</h2>
+          {etat === "renouveler" && <p className="mt-0.5 text-[12.5px] font-medium text-amber-800">{t.renouveler}</p>}
           <p className="mt-0.5 text-[12.5px] text-zinc-600">{t.aide}</p>
         </div>
       </div>

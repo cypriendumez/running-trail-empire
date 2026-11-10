@@ -19,7 +19,7 @@ import { normLang } from "@/lib/i18n/base";
 import { chargerDonnees } from "@/lib/indicateurs/donnees";
 import { TYPE_BILAN } from "@/lib/health/bilanMatin";
 import { donneesRecup, bilansRecents, type DonneesRecup } from "@/lib/health/recuperation";
-import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
+import { TYPE_APTITUDE, lireAptitude, avisAttendu, aRenouveler } from "@/lib/health/aptitude";
 
 export const metadata = { title: "Santé" };
 
@@ -50,7 +50,7 @@ export default async function HealthPage() {
   let recup: DonneesRecup | null = null;
   // Santé, lot 3 : le questionnaire d'aptitude (absent pour un inscrit d'avant, ou en attente d'avis).
   // Lecture en panne : rien n'est affiché (le coach, lui, refuse son contexte et le dit).
-  let aptitude: "absent" | "attente" | "ok" | "panne" = "ok";
+  let aptitude: "absent" | "attente" | "ok" | "panne" | "renouveler" = "ok";
   if (user) {
     // Pour la nutrition, les courses à venir et de quoi PRÉDIRE leur durée — la même VMA effective que le coach
     // (`effectiveVma`, seule définition de l'app) : lus ensemble, en une vague.
@@ -192,7 +192,7 @@ export default async function HealthPage() {
       aptitude = "panne";
     } else {
       const apt = lireAptitude(((lignesApt ?? []) as { data?: unknown }[])[0]?.data);
-      aptitude = !apt ? "absent" : avisAttendu(apt) ? "attente" : "ok";
+      aptitude = !apt ? "absent" : avisAttendu(apt) ? "attente" : aRenouveler(apt, jourJ) ? "renouveler" : "ok";
     }
     recup = donnees
       ? donneesRecup(donnees, (bilanRes.data ?? []) as { data?: unknown }[], jourAthlete, bilanPanne)

@@ -13,7 +13,11 @@
 import type { Lang } from "@/lib/i18n/translations";
 
 export const TYPE_APTITUDE = "aptitude";
-export const QUESTIONS_APTITUDE = ["poitrine", "malaise", "essoufflement", "palpitations", "avisContraire"] as const;
+/** Le questionnaire se repose chaque année (décision de Cyprien, comme QS-SPORT : « ces 12 derniers mois »). */
+export const JOURS_RENOUVELLEMENT = 365;
+// Ajoutées le 10/11/2026 (directeur scientifique, d'après QS-SPORT et PAR-Q+) : mort subite d'un proche,
+// maladie cardiaque ou traitement au long cours. Une ligne ancienne sans elles reste valide.
+export const QUESTIONS_APTITUDE = ["poitrine", "malaise", "essoufflement", "palpitations", "avisContraire", "familleMortSubite", "maladieConnue"] as const;
 export type QuestionAptitude = (typeof QUESTIONS_APTITUDE)[number];
 
 export type Aptitude = {
@@ -52,9 +56,16 @@ export function avisAttendu(a: Aptitude | null): boolean {
 
 /** Les textes du plan (bandeau, séances), 5 langues. */
 export const APTITUDE_T: Record<Lang, { motif: string }> = {
-  fr: { motif: "questionnaire d'aptitude : avis d'un médecin attendu, pas d'intensité" },
-  en: { motif: "fitness questionnaire: waiting for a doctor's opinion, no intensity" },
-  de: { motif: "Fitness-Fragebogen: ärztliche Einschätzung ausstehend, keine Intensität" },
-  es: { motif: "cuestionario de aptitud: a la espera de la opinión de un médico, sin intensidad" },
-  pt: { motif: "questionário de aptidão: à espera da opinião de um médico, sem intensidade" },
+  fr: { motif: "questionnaire d'aptitude : avis d'un médecin attendu, pas de course" },
+  en: { motif: "fitness questionnaire: waiting for a doctor's opinion, no running" },
+  de: { motif: "Fitness-Fragebogen: ärztliche Einschätzung ausstehend, kein Laufen" },
+  es: { motif: "cuestionario de aptitud: a la espera de la opinión de un médico, sin correr" },
+  pt: { motif: "questionário de aptidão: à espera da opinião de um médico, sem corrida" },
 };
+
+/** À reposer : la dernière réponse date d'un an ou plus (l'attente d'avis, elle, ne se périme pas). */
+export function aRenouveler(a: Aptitude | null, jour: string): boolean {
+  if (!a) return false;
+  const ecart = (new Date(`${jour}T12:00:00Z`).getTime() - new Date(`${a.date}T12:00:00Z`).getTime()) / 864e5;
+  return ecart >= JOURS_RENOUVELLEMENT;
+}

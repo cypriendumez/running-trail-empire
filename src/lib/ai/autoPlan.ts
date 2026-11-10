@@ -23,7 +23,7 @@ import { joursSansIntensite } from "@/lib/coach/apresCourse";
 import { axesRenforcement } from "@/lib/coach/renforcement";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
-import { appliquerConsignes } from "@/lib/coach/consignesPlan";
+import { appliquerConsignes, appliquerAptitude } from "@/lib/coach/consignesPlan";
 import { BILAN_T } from "@/lib/health/bilanMatin";
 import { nRaw, type I18nText } from "@/lib/i18n/multi";
 import type { Lang } from "@/lib/i18n/translations";
@@ -142,13 +142,8 @@ export function consignesSurPlan(ctx: AthleteContext, plan: PlanDay[], today = n
   };
   let semaine = ctx.consignes ? appliquerConsignes(plan, { consignes: ctx.consignes, ...commun }) : plan;
   // LE QUESTIONNAIRE D'APTITUDE (lot 3, décision de Cyprien) : une situation cochée et pas encore
-  // d'avis médical → aucune intensité, sans limite de durée ni de nombre de sorties.
-  if (aptitude) {
-    semaine = appliquerConsignes(semaine, {
-      consignes: { dureeMaxMin: null, sansIntensite: true, seancesMaxSemaine: null, jusquAu: "9999-12-31", majA: "" },
-      ...commun, source: "aptitude",
-    });
-  }
+  // d'avis médical → AUCUNE séance d'endurance (lib/coach/consignesPlan, `appliquerAptitude`).
+  if (aptitude) semaine = appliquerAptitude(semaine);
   return semaine;
 }
 

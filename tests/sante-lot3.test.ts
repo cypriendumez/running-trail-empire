@@ -10,7 +10,8 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { validerAptitude, lireAptitude, avisAttendu, APTITUDE_T } from "../src/lib/health/aptitude";
+import { validerAptitude, lireAptitude, avisAttendu, aRenouveler, APTITUDE_T } from "../src/lib/health/aptitude";
+import { appliquerAptitude } from "../src/lib/coach/consignesPlan";
 import { APTITUDE_UI } from "../src/lib/health/aptitudeI18n";
 import { buildAthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
@@ -55,6 +56,7 @@ const SEANCES = Array.from({ length: 24 }, (_, i) => ({ id: `w${i}`, user_id: "u
 const APT = (oui: string[], avisMedecin: string | null = null) => ({ user_id: "u", type: "aptitude", created_at: `${ilYa(3)}T08:00:00Z`, data: { oui, date: ilYa(3), avisMedecin } });
 const contexte = (notifs: unknown[]) => buildAthleteContext(fauxClient({ profiles: [PROFIL], performance_baselines: BASE, workouts: SEANCES, notifications: notifs }), "u");
 const QUALITE = /^(VMA|Seuil|Spécifique|Côtes|Fartlek|Tempo)/;
+const SANS_COURSE = new Set(["Repos", "Renfo", "Mobilité"]);
 const departs = () => Array.from({ length: 7 }, (_, k) => { const d = new Date(`${AUJ}T08:00:00`); d.setDate(d.getDate() + k); return d; });
 const intense = (d: { type: string; title: string; tags: string[] }) => QUALITE.test(d.type) || d.tags.some((t) => /^(Qualité|Progressif|Spécifique)$/.test(t))
   || [PLAN_T.fr.enduranceTitreLignes, PLAN_T.fr.enduranceTitreProg, PLAN_T.fr.veilleTitre, PLAN_T.fr.avantVeilleTitre].includes(d.title);
@@ -71,6 +73,13 @@ async function main() {
     assert.equal(lireAptitude({ oui: ["poitrine"], date: "pas une date" }), null, "une ligne illisible est lue comme un questionnaire");
   });
 
+  await test("à reposer après un an, pas avant ; les deux nouvelles situations sont acceptées", () => {
+    assert.equal(aRenouveler({ oui: [], date: ilYa(364), avisMedecin: null }, AUJ), false);
+    assert.equal(aRenouveler({ oui: [], date: ilYa(365), avisMedecin: null }, AUJ), true);
+    assert.equal(aRenouveler(null, AUJ), false);
+    assert.equal(validerAptitude({ oui: ["familleMortSubite", "maladieConnue"] }, AUJ).ok, true);
+  });
+
   await test("avis attendu : une situation cochée et pas d'avis ; jamais sinon", () => {
     assert.equal(avisAttendu({ oui: ["palpitations"], date: AUJ, avisMedecin: null }), true);
     assert.equal(avisAttendu({ oui: ["palpitations"], date: AUJ, avisMedecin: AUJ }), false, "l'avis du médecin ne lève pas l'attente");
@@ -80,16 +89,21 @@ async function main() {
 
   console.log("\nLE PLAN RÉEL");
 
-  await test("une situation cochée : aucune intensité sur les 7 jours de départ, motif affiché, l'appli n'est pas vide", async () => {
+  await test("une situation cochée : AUCUNE course (ni vélo, ni natation) sur les 7 jours de départ, renfo sans saut, motif affiché", async () => {
     const ctx = await contexte([APT(["poitrine"])]);
     assert.equal(ctx.aptitude?.attente, true, "le questionnaire n'est pas lu");
     assert.equal(ctx.weekPlan.qBudget, 0, `qualité gardée : ${ctx.weekPlan.qBudget}`);
     assert.ok(ctx.readiness.reasonsAll?.some((r) => r.fr === APTITUDE_T.fr.motif), "le motif n'est pas dans le bandeau");
+    let renfos = 0;
     for (const d of departs()) {
       const plan = buildWeekPlan(ctx, d);
-      for (const j of plan) assert.ok(!intense(j), `séance intense le ${j.date} : ${j.type} « ${j.title} »`);
-      assert.ok(plan.some((j) => !/^(Repos)/.test(j.type)), "plus aucune séance : l'appli serait bloquée");
+      for (const j of plan) {
+        assert.ok(SANS_COURSE.has(j.type), `séance d'endurance le ${j.date} : ${j.type} « ${j.title} »`);
+        if (j.type === "Renfo") { renfos++; assert.match(j.detail, /aucun saut/, "le renfo garde ses sauts"); }
+      }
+      assert.ok(plan.some((j) => /médecin/.test(j.why)), "aucun jour ne dit pourquoi : voir un médecin");
     }
+    assert.ok(renfos > 0, "précondition : aucun renforcement dans les plans, le test du renfo ne prouve rien");
   });
 
   await test("sans le questionnaire (contre-épreuve), avec « aucune » ou avec l'avis d'un médecin : la qualité est là", async () => {
@@ -101,16 +115,16 @@ async function main() {
     }
   });
 
-  await test("la course objectif reste, avec « vois un médecin avant » ; les footings remplacés ont leur texte (5 langues)", async () => {
+  await test("la course du jour est retirée du plan, avec « l'avis d'un médecin avant » (5 langues) ; idempotent", async () => {
     const ctx = await contexte([APT(["malaise"])]);
-    const j0 = buildWeekPlan({ ...ctx, daysToRace: 0 }, new Date(`${AUJ}T08:00:00`))[0];
-    assert.equal(j0.type, "Course", "la course a été retirée");
-    assert.match(j0.why, /avis d'un médecin/, "la course ne dit pas de voir un médecin");
-    assert.ok(j0.i18n?.en?.why.includes("doctor"), "l'avertissement manque en anglais");
-    assert.match(codeOf("src/lib/coach/consignesPlan.ts"), /const TX = c\.source === "aptitude" \? TA : T;/, "les textes du kiné servent à l'aptitude");
+    const plan = buildWeekPlan({ ...ctx, daysToRace: 0 }, new Date(`${AUJ}T08:00:00`));
+    assert.equal(plan[0].type, "Repos", `la course est restée : ${plan[0].type}`);
+    assert.match(plan[0].why, /Course retirée[\s\S]*avis d'un médecin/, "le jour ne dit pas pourquoi la course est retirée");
+    assert.ok(plan[0].i18n?.en?.why.includes("doctor"), "l'avertissement manque en anglais");
+    assert.deepEqual(appliquerAptitude(plan), plan, "réappliqué (après les ajustements de l'athlète), le contrôle change le plan");
   });
 
-  await test("un nouvel inscrit SANS VMA et en attente d'avis : aucun test VMA (6 min à fond), un plan sans intensité", async () => {
+  await test("un nouvel inscrit SANS VMA et en attente d'avis : aucun test VMA (6 min à fond), aucune course", async () => {
     // Le verrou « test VMA d'abord » d'autoCoach ne s'applique pas tant que l'avis est attendu.
     const ac = codeOf("src/lib/ai/autoCoach.ts");
     const iAvis = ac.indexOf("const avisMedicalAttendu = avisAttendu(");
@@ -122,8 +136,7 @@ async function main() {
     assert.equal(ctx.aptitude?.attente, true);
     for (const d of departs()) {
       const plan = buildWeekPlan(ctx, d);
-      assert.ok(plan.some((j) => j.type !== "Repos"), "aucune séance sans VMA");
-      for (const j of plan) assert.ok(!intense(j) && !/VMA|test/i.test(j.title), `séance intense ou test le ${j.date} : ${j.type} « ${j.title} »`);
+      for (const j of plan) assert.ok(SANS_COURSE.has(j.type) && !/VMA|test/i.test(j.title), `course ou test le ${j.date} : ${j.type} « ${j.title} »`);
     }
   });
 
@@ -152,7 +165,7 @@ async function main() {
 
   await test("Santé : la carte au-dessus des onglets ; à remplir pour un inscrit d'avant, l'attente sinon ; 5 langues", () => {
     const page = codeOf("src/app/dashboard/health/page.tsx");
-    assert.match(page, /aptitude = !apt \? "absent" : avisAttendu\(apt\) \? "attente" : "ok";/);
+    assert.match(page, /aptitude = !apt \? "absent" : avisAttendu\(apt\) \? "attente" : aRenouveler\(apt, jourJ\) \? "renouveler" : "ok";/, "le questionnaire n'est plus reposé chaque année");
     assert.match(codeOf("src/components/health/HealthCenter.tsx"), /<CarteAptitude etat=\{aptitude\} \/>/);
     // Lecture en panne : l'écran le dit (le coach, lui, refuse son contexte) — relecture du 10/11/2026.
     assert.match(page, /if \(eApt\) \{\s*console\.error\([^)]*\);\s*aptitude = "panne";/, "une panne de lecture se tait de nouveau");
@@ -161,7 +174,8 @@ async function main() {
     assert.match(carte, /if \(etat === "ok" && !modifier\) return <div>\{lienModifier\}<\/div>;/, "plus moyen de corriger ses réponses");
     assert.match(codeOf("src/app/onboarding/page.tsx"), /\{aptOui\.length > 0 && <p[^>]*>\{APTITUDE_UI\[[^\]]*\]\.urgence\}<\/p>\}/, "l'inscription n'affiche plus l'urgence");
     for (const l of ["fr", "en", "de", "es", "pt"] as const) {
-      assert.equal(Object.keys(APTITUDE_UI[l].questions).length, 5, `questions incomplètes en ${l}`);
+      assert.equal(Object.keys(APTITUDE_UI[l].questions).length, 7, `questions incomplètes en ${l}`);
+      assert.match(APTITUDE_UI[l].questions.palpitations, /effort|exercise|Belastung|esfuerzo|esforço/, `palpitations non restreintes à l'effort en ${l}`);
       assert.match(APTITUDE_UI[l].attente, /112/, `pas de numéro d'urgence en ${l}`);
       assert.match(APTITUDE_UI[l].urgence, /112/, `pas de numéro d'urgence à l'inscription en ${l}`);
     }
