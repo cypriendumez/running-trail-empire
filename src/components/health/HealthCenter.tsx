@@ -12,6 +12,9 @@ import { WeightMode } from "@/components/health/WeightMode";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import type { SuiviZone, Tendance } from "@/lib/health/douleurs";
 import { fichesPour, ANNUAIRE_KINE } from "@/lib/health/fichesKine";
+import { JOURS_AVANT_CONSULTER, type ChargeAvant, type DouleurUnifiee } from "@/lib/health/santeDouleurs";
+import type { ConsignesKine } from "@/lib/health/consignesKine";
+import Link from "next/link";
 
 // ── i18n local (5 langues) — la page Santé naît traduite. ───────────────────────
 type Tr = (k: string, p?: Record<string, string | number>) => string;
@@ -21,7 +24,7 @@ function fill(s: string, p?: Record<string, string | number>) {
 const H: Record<string, Record<string, string>> = {
   fr: {
     "h.enPanne": "Tes douleurs déclarées n'ont pas pu être chargées. Cet historique paraît vide, mais rien n'est perdu — réessaie dans un instant.", "h.title": "Santé et performance", "h.subtitle": "Tes douleurs suivies, ta nutrition de course et ton poids — au même endroit.",
-    "tab.kine": "Douleurs", "k.declarer": "Enregistrer cette douleur", "k.seuil": "En dessous de 4/10, une gêne légère ne modifie pas ton plan : rien n'est enregistré.", "k.declOk": "Douleur enregistrée : ton plan réduit l'intensité.", "k.declErr": "Douleur non enregistrée, réessaie dans un instant.", "k.avisTitre": "Pacevo n'est pas un professionnel de santé", "k.kineAnnuaire": "Trouver un masseur-kinésithérapeute en France (annuaire de l'Ordre)", "k.fiches": "Fiches de prévention", "k.ficheSignee": "Relue et signée en français par {nom}, masseur-kinésithérapeute (RPPS {rpps}), le {d}.", "k.ficheRemuneree": "Relecture rémunérée par Pacevo.", "k.ficheRegion": "Région que tu as signalée", "k.ficheAvert": "Information générale, la même pour tous les coureurs : elle ne remplace pas une consultation et n'est pas adaptée à ta douleur.", "k.avis": "Une douleur déclarée allège ton plan (moins d'intensité) le temps qu'elle passe. Pacevo ne pose aucun diagnostic et ne propose aucun soin : pour savoir ce que tu as et comment le soigner, consulte un médecin ou un masseur-kinésithérapeute.", "k.alerte": "Consulte sans attendre si la douleur t'empêche de marcher, te réveille la nuit, s'accompagne d'un gonflement, d'une rougeur ou de fièvre, ou s'aggrave malgré le repos. En cas d'urgence : 15 ou 112.", "tab.nutrition": "Nutrition", "tab.poids": "Poids",
+    "tab.kine": "Douleurs", "k.declarer": "Enregistrer cette douleur", "k.seuil": "En dessous de 4/10, une gêne légère ne modifie pas ton plan : rien n'est enregistré.", "k.declOk": "Douleur enregistrée : ton plan réduit l'intensité.", "k.declErr": "Douleur non enregistrée, réessaie dans un instant.", "k.avisTitre": "Pacevo n'est pas un professionnel de santé", "k.pese": "Ce qui pèse sur ton plan aujourd'hui", "k.peseAucune": "Aucune douleur ne pèse sur ton plan. Si tu as mal, déclare-la sur le schéma ou dans ton ressenti d'après séance.", "k.srcSeance": "signalée après une séance", "k.effets": "Ce que ton coach a changé", "k.effetQualite": "{n} séance(s) de qualité retirée(s) cette semaine", "k.effetLongue": "Sortie longue réduite de {a} à {b} km", "k.effetLignes": "Footings sans accélérations ni lignes droites", "k.effetsAttente": "Ton plan sera recalculé avec cette douleur à la prochaine synchronisation.", "k.consulterDuree": "Cette douleur dure depuis {n} jours ou plus : fais-la voir à un médecin ou à un masseur-kinésithérapeute.", "k.consulterPire": "Tu indiques qu'elle s'aggrave : fais-la voir à un médecin ou à un masseur-kinésithérapeute.", "k.charge": "Les 2 semaines avant le début de cette douleur : {a} km courus, contre {b} km les 2 semaines d'avant ({p}).", "k.chargeSeule": "Les 2 semaines avant le début de cette douleur : {a} km courus.", "k.chargeAide": "Un chiffre d'entraînement à montrer à ton kiné. Il n'explique pas à lui seul une douleur.", "k.consignes": "Les consignes de ton kiné", "k.consignesAide": "Ton kinésithérapeute t'a donné un cadre ? Recopie-le : ton plan s'y tient jusqu'à la date indiquée. Pacevo ne fixe pas ces consignes, il les applique.", "k.consDuree": "Durée maximale d'une sortie (min)", "k.consSeances": "Sorties de course par semaine, au maximum", "k.consSansIntensite": "Pas d'intensité (ni seuil, ni VMA, ni côtes)", "k.consJusqu": "Jusqu'au", "k.consEnregistrer": "Appliquer à mon plan", "k.consRetirer": "Retirer ces consignes", "k.consOk": "Consignes appliquées : ton plan a été recalculé.", "k.consRetirees": "Consignes retirées : ton plan a été recalculé.", "k.consActives": "En vigueur jusqu'au {d}.", "k.consErr.duree": "La durée doit être un nombre de minutes entre 15 et 240.", "k.consErr.seances": "Le nombre de sorties doit être entre 1 et 7.", "k.consErr.date": "Choisis une date de fin dans les 6 prochains mois.", "k.consErr.vide": "Indique au moins une consigne.", "k.carnet": "Préparer mon carnet pour le rendez-vous", "k.carnetAide": "Tes douleurs, ta charge et tes dernières séances sur une page, à imprimer ou à enregistrer en PDF.", "k.kineAnnuaire": "Trouver un masseur-kinésithérapeute en France (annuaire de l'Ordre)", "k.fiches": "Fiches de prévention", "k.ficheSignee": "Relue et signée en français par {nom}, masseur-kinésithérapeute (RPPS {rpps}), le {d}.", "k.ficheRemuneree": "Relecture rémunérée par Pacevo.", "k.ficheRegion": "Région que tu as signalée", "k.ficheAvert": "Information générale, la même pour tous les coureurs : elle ne remplace pas une consultation et n'est pas adaptée à ta douleur.", "k.avis": "Une douleur déclarée allège ton plan (moins d'intensité) le temps qu'elle passe. Pacevo ne pose aucun diagnostic et ne propose aucun soin : pour savoir ce que tu as et comment le soigner, consulte un médecin ou un masseur-kinésithérapeute.", "k.alerte": "Consulte sans attendre si la douleur t'empêche de marcher, te réveille la nuit, s'accompagne d'un gonflement, d'une rougeur ou de fièvre, ou s'aggrave malgré le repos. En cas d'urgence : 15 ou 112.", "tab.nutrition": "Nutrition", "tab.poids": "Poids",
     "k.where": "Où as-tu mal ?", "view.face": "Face", "view.dos": "Dos",
     "k.hint": "Touche une zone sur le corps ou dans la liste, ajuste l'intensité, puis enregistre-la : ton plan s'adapte.",
     "k.pain": "Douleur", "k.painLight": "Gêne légère", "k.painHard": "Très douloureux",
@@ -36,7 +39,7 @@ const H: Record<string, Record<string, string>> = {
     },
   en: {
     "h.enPanne": "Your reported pains could not be loaded. This history looks empty, but nothing is lost — try again in a moment.", "h.title": "Health and performance", "h.subtitle": "Your pain log, your race nutrition and your weight — all in one place.",
-    "tab.kine": "Pain", "k.declarer": "Save this pain", "k.seuil": "Below 4/10, a slight discomfort doesn't change your plan: nothing is saved.", "k.declOk": "Pain saved: your plan lowers the intensity.", "k.declErr": "Pain not saved, try again in a moment.", "k.avisTitre": "Pacevo is not a health professional", "k.kineAnnuaire": "Find a physiotherapist in France (official register)", "k.fiches": "Prevention guides", "k.ficheSignee": "Reviewed and signed in English by {nom}, physiotherapist (RPPS {rpps}), on {d}.", "k.ficheRemuneree": "Review paid for by Pacevo.", "k.ficheRegion": "Area you reported", "k.ficheAvert": "General information, the same for every runner: it does not replace a consultation and is not tailored to your pain.", "k.avis": "A declared pain lightens your plan (less intensity) while it lasts. Pacevo makes no diagnosis and offers no treatment: to know what you have and how to treat it, see a doctor or a physiotherapist.", "k.alerte": "See someone without delay if the pain stops you walking, wakes you at night, comes with swelling, redness or fever, or gets worse despite rest. Emergency: 112.", "tab.nutrition": "Nutrition", "tab.poids": "Weight",
+    "tab.kine": "Pain", "k.declarer": "Save this pain", "k.seuil": "Below 4/10, a slight discomfort doesn't change your plan: nothing is saved.", "k.declOk": "Pain saved: your plan lowers the intensity.", "k.declErr": "Pain not saved, try again in a moment.", "k.avisTitre": "Pacevo is not a health professional", "k.pese": "What is weighing on your plan today", "k.peseAucune": "No pain is weighing on your plan. If something hurts, report it on the body map or in your post-session feedback.", "k.srcSeance": "reported after a session", "k.effets": "What your coach changed", "k.effetQualite": "{n} quality session(s) removed this week", "k.effetLongue": "Long run cut from {a} to {b} km", "k.effetLignes": "Easy runs without strides or pick-ups", "k.effetsAttente": "Your plan will be recalculated with this pain at the next sync.", "k.consulterDuree": "This pain has lasted {n} days or more: have it checked by a doctor or a physiotherapist.", "k.consulterPire": "You say it is getting worse: have it checked by a doctor or a physiotherapist.", "k.charge": "The 2 weeks before this pain started: {a} km run, against {b} km the 2 weeks before ({p}).", "k.chargeSeule": "The 2 weeks before this pain started: {a} km run.", "k.chargeAide": "A training figure to show your physio. On its own, it does not explain a pain.", "k.consignes": "Your physio's instructions", "k.consignesAide": "Did your physiotherapist give you limits? Copy them here: your plan sticks to them until the date you set. Pacevo does not set these instructions, it applies them.", "k.consDuree": "Maximum duration of a run (min)", "k.consSeances": "Runs per week, at most", "k.consSansIntensite": "No intensity (no threshold, intervals or hills)", "k.consJusqu": "Until", "k.consEnregistrer": "Apply to my plan", "k.consRetirer": "Remove these instructions", "k.consOk": "Instructions applied: your plan has been recalculated.", "k.consRetirees": "Instructions removed: your plan has been recalculated.", "k.consActives": "In force until {d}.", "k.consErr.duree": "The duration must be a number of minutes between 15 and 240.", "k.consErr.seances": "The number of runs must be between 1 and 7.", "k.consErr.date": "Choose an end date within the next 6 months.", "k.consErr.vide": "Enter at least one instruction.", "k.carnet": "Prepare my log for the appointment", "k.carnetAide": "Your pains, your load and your latest sessions on one page, to print or save as PDF.", "k.kineAnnuaire": "Find a physiotherapist in France (official register)", "k.fiches": "Prevention guides", "k.ficheSignee": "Reviewed and signed in English by {nom}, physiotherapist (RPPS {rpps}), on {d}.", "k.ficheRemuneree": "Review paid for by Pacevo.", "k.ficheRegion": "Area you reported", "k.ficheAvert": "General information, the same for every runner: it does not replace a consultation and is not tailored to your pain.", "k.avis": "A declared pain lightens your plan (less intensity) while it lasts. Pacevo makes no diagnosis and offers no treatment: to know what you have and how to treat it, see a doctor or a physiotherapist.", "k.alerte": "See someone without delay if the pain stops you walking, wakes you at night, comes with swelling, redness or fever, or gets worse despite rest. Emergency: 112.", "tab.nutrition": "Nutrition", "tab.poids": "Weight",
     "k.where": "Where does it hurt?", "view.face": "Front", "view.dos": "Back",
     "k.hint": "Tap a zone on the body or in the list, set the intensity, then save it: your plan adapts.",
     "k.pain": "Pain", "k.painLight": "Mild discomfort", "k.painHard": "Very painful",
@@ -51,7 +54,7 @@ const H: Record<string, Record<string, string>> = {
     },
   de: {
     "h.enPanne": "Deine gemeldeten Schmerzen konnten nicht geladen werden. Der Verlauf wirkt leer, es ist aber nichts verloren — versuch es gleich nochmal.", "h.title": "Gesundheit und Leistung", "h.subtitle": "Deine erfassten Schmerzen, deine Wettkampfernährung und dein Gewicht — alles an einem Ort.",
-    "tab.kine": "Schmerzen", "k.declarer": "Diesen Schmerz speichern", "k.seuil": "Unter 4/10 ändert ein leichtes Ziehen deinen Plan nicht: Es wird nichts gespeichert.", "k.declOk": "Schmerz gespeichert: dein Plan senkt die Intensität.", "k.declErr": "Schmerz nicht gespeichert, versuche es gleich noch einmal.", "k.avisTitre": "Pacevo ist keine medizinische Fachkraft", "k.kineAnnuaire": "Physiotherapie in Frankreich finden (offizielles Verzeichnis)", "k.fiches": "Präventionsblätter", "k.ficheSignee": "Auf Deutsch geprüft und unterzeichnet von {nom}, Physiotherapeut(in) (RPPS {rpps}), am {d}.", "k.ficheRemuneree": "Prüfung von Pacevo vergütet.", "k.ficheRegion": "Von dir gemeldeter Bereich", "k.ficheAvert": "Allgemeine Information, für alle Läufer gleich: Sie ersetzt keinen Arztbesuch und ist nicht auf deinen Schmerz zugeschnitten.", "k.avis": "Ein gemeldeter Schmerz macht deinen Plan leichter (weniger Intensität), solange er anhält. Pacevo stellt keine Diagnose und bietet keine Behandlung an: Um zu wissen, was du hast und wie es behandelt wird, geh zu einer Ärztin, einem Arzt oder in die Physiotherapie.", "k.alerte": "Geh sofort zum Arzt, wenn der Schmerz dich am Gehen hindert, dich nachts weckt, mit Schwellung, Rötung oder Fieber einhergeht oder trotz Ruhe schlimmer wird. Notfall: 112.", "tab.nutrition": "Ernährung", "tab.poids": "Gewicht",
+    "tab.kine": "Schmerzen", "k.declarer": "Diesen Schmerz speichern", "k.seuil": "Unter 4/10 ändert ein leichtes Ziehen deinen Plan nicht: Es wird nichts gespeichert.", "k.declOk": "Schmerz gespeichert: dein Plan senkt die Intensität.", "k.declErr": "Schmerz nicht gespeichert, versuche es gleich noch einmal.", "k.avisTitre": "Pacevo ist keine medizinische Fachkraft", "k.pese": "Was deinen Plan heute belastet", "k.peseAucune": "Kein Schmerz belastet deinen Plan. Wenn dir etwas wehtut, melde es auf der Körperkarte oder im Feedback nach der Einheit.", "k.srcSeance": "nach einer Einheit gemeldet", "k.effets": "Was dein Coach geändert hat", "k.effetQualite": "{n} Qualitätseinheit(en) diese Woche gestrichen", "k.effetLongue": "Langer Lauf von {a} auf {b} km verkürzt", "k.effetLignes": "Lockere Läufe ohne Steigerungen", "k.effetsAttente": "Dein Plan wird bei der nächsten Synchronisierung mit diesem Schmerz neu berechnet.", "k.consulterDuree": "Dieser Schmerz dauert seit {n} Tagen oder länger: Lass ihn von einer Ärztin, einem Arzt oder in der Physiotherapie anschauen.", "k.consulterPire": "Du gibst an, dass er schlimmer wird: Lass ihn von einer Ärztin, einem Arzt oder in der Physiotherapie anschauen.", "k.charge": "Die 2 Wochen vor Beginn dieses Schmerzes: {a} km gelaufen, gegenüber {b} km in den 2 Wochen davor ({p}).", "k.chargeSeule": "Die 2 Wochen vor Beginn dieses Schmerzes: {a} km gelaufen.", "k.chargeAide": "Eine Trainingszahl für deine Physiotherapie. Allein erklärt sie keinen Schmerz.", "k.consignes": "Die Vorgaben deiner Physiotherapie", "k.consignesAide": "Hat dir deine Physiotherapie einen Rahmen gegeben? Trag ihn hier ein: Dein Plan hält sich bis zum gewählten Datum daran. Pacevo legt diese Vorgaben nicht fest, es wendet sie an.", "k.consDuree": "Maximale Dauer eines Laufs (Min.)", "k.consSeances": "Läufe pro Woche, höchstens", "k.consSansIntensite": "Keine Intensität (keine Schwelle, kein Intervall, keine Hügel)", "k.consJusqu": "Bis", "k.consEnregistrer": "Auf meinen Plan anwenden", "k.consRetirer": "Diese Vorgaben entfernen", "k.consOk": "Vorgaben angewendet: Dein Plan wurde neu berechnet.", "k.consRetirees": "Vorgaben entfernt: Dein Plan wurde neu berechnet.", "k.consActives": "Gültig bis {d}.", "k.consErr.duree": "Die Dauer muss eine Minutenzahl zwischen 15 und 240 sein.", "k.consErr.seances": "Die Anzahl der Läufe muss zwischen 1 und 7 liegen.", "k.consErr.date": "Wähle ein Enddatum in den nächsten 6 Monaten.", "k.consErr.vide": "Gib mindestens eine Vorgabe an.", "k.carnet": "Mein Protokoll für den Termin vorbereiten", "k.carnetAide": "Deine Schmerzen, deine Belastung und deine letzten Einheiten auf einer Seite, zum Drucken oder als PDF.", "k.kineAnnuaire": "Physiotherapie in Frankreich finden (offizielles Verzeichnis)", "k.fiches": "Präventionsblätter", "k.ficheSignee": "Auf Deutsch geprüft und unterzeichnet von {nom}, Physiotherapeut(in) (RPPS {rpps}), am {d}.", "k.ficheRemuneree": "Prüfung von Pacevo vergütet.", "k.ficheRegion": "Von dir gemeldeter Bereich", "k.ficheAvert": "Allgemeine Information, für alle Läufer gleich: Sie ersetzt keinen Arztbesuch und ist nicht auf deinen Schmerz zugeschnitten.", "k.avis": "Ein gemeldeter Schmerz macht deinen Plan leichter (weniger Intensität), solange er anhält. Pacevo stellt keine Diagnose und bietet keine Behandlung an: Um zu wissen, was du hast und wie es behandelt wird, geh zu einer Ärztin, einem Arzt oder in die Physiotherapie.", "k.alerte": "Geh sofort zum Arzt, wenn der Schmerz dich am Gehen hindert, dich nachts weckt, mit Schwellung, Rötung oder Fieber einhergeht oder trotz Ruhe schlimmer wird. Notfall: 112.", "tab.nutrition": "Ernährung", "tab.poids": "Gewicht",
     "k.where": "Wo tut es weh?", "view.face": "Vorne", "view.dos": "Hinten",
     "k.hint": "Tippe eine Zone am Körper oder in der Liste an, stelle die Stärke ein und speichere sie: dein Plan passt sich an.",
     "k.pain": "Schmerz", "k.painLight": "Leichtes Unbehagen", "k.painHard": "Sehr schmerzhaft",
@@ -66,7 +69,7 @@ const H: Record<string, Record<string, string>> = {
     },
   es: {
     "h.enPanne": "Tus dolores declarados no se han podido cargar. Este historial parece vacío, pero no se ha perdido nada — inténtalo de nuevo en un momento.", "h.title": "Salud y rendimiento", "h.subtitle": "Tus dolores registrados, tu nutrición de carrera y tu peso, en un mismo lugar.",
-    "tab.kine": "Dolor", "k.declarer": "Guardar este dolor", "k.seuil": "Por debajo de 4/10, una molestia leve no cambia tu plan: no se guarda nada.", "k.declOk": "Dolor guardado: tu plan reduce la intensidad.", "k.declErr": "Dolor no guardado, inténtalo de nuevo en un momento.", "k.avisTitre": "Pacevo no es un profesional sanitario", "k.kineAnnuaire": "Encontrar un fisioterapeuta en Francia (registro oficial)", "k.fiches": "Fichas de prevención", "k.ficheSignee": "Revisada y firmada en español por {nom}, fisioterapeuta (RPPS {rpps}), el {d}.", "k.ficheRemuneree": "Revisión remunerada por Pacevo.", "k.ficheRegion": "Zona que has señalado", "k.ficheAvert": "Información general, la misma para todos los corredores: no sustituye una consulta ni está adaptada a tu dolor.", "k.avis": "Un dolor declarado aligera tu plan (menos intensidad) mientras dure. Pacevo no hace ningún diagnóstico ni propone ningún tratamiento: para saber qué tienes y cómo tratarlo, consulta a un médico o a un fisioterapeuta.", "k.alerte": "Consulta sin esperar si el dolor te impide caminar, te despierta por la noche, va acompañado de hinchazón, enrojecimiento o fiebre, o empeora pese al reposo. Urgencias: 112.", "tab.nutrition": "Nutrición", "tab.poids": "Peso",
+    "tab.kine": "Dolor", "k.declarer": "Guardar este dolor", "k.seuil": "Por debajo de 4/10, una molestia leve no cambia tu plan: no se guarda nada.", "k.declOk": "Dolor guardado: tu plan reduce la intensidad.", "k.declErr": "Dolor no guardado, inténtalo de nuevo en un momento.", "k.avisTitre": "Pacevo no es un profesional sanitario", "k.pese": "Lo que pesa hoy en tu plan", "k.peseAucune": "Ningún dolor pesa en tu plan. Si algo te duele, señálalo en el esquema corporal o en tu sensación tras la sesión.", "k.srcSeance": "señalado tras una sesión", "k.effets": "Lo que ha cambiado tu entrenador", "k.effetQualite": "{n} sesión(es) de calidad retirada(s) esta semana", "k.effetLongue": "Tirada larga reducida de {a} a {b} km", "k.effetLignes": "Rodajes sin progresivos ni rectas", "k.effetsAttente": "Tu plan se recalculará con este dolor en la próxima sincronización.", "k.consulterDuree": "Este dolor dura desde hace {n} días o más: consulta a un médico o a un fisioterapeuta.", "k.consulterPire": "Indicas que empeora: consulta a un médico o a un fisioterapeuta.", "k.charge": "Las 2 semanas antes de que empezara este dolor: {a} km corridos, frente a {b} km las 2 semanas anteriores ({p}).", "k.chargeSeule": "Las 2 semanas antes de que empezara este dolor: {a} km corridos.", "k.chargeAide": "Una cifra de entrenamiento para enseñar a tu fisioterapeuta. Por sí sola no explica un dolor.", "k.consignes": "Las indicaciones de tu fisioterapeuta", "k.consignesAide": "¿Tu fisioterapeuta te ha dado un marco? Cópialo aquí: tu plan lo respeta hasta la fecha indicada. Pacevo no fija estas indicaciones, las aplica.", "k.consDuree": "Duración máxima de una salida (min)", "k.consSeances": "Salidas de carrera por semana, como máximo", "k.consSansIntensite": "Sin intensidad (ni umbral, ni VAM, ni cuestas)", "k.consJusqu": "Hasta el", "k.consEnregistrer": "Aplicar a mi plan", "k.consRetirer": "Quitar estas indicaciones", "k.consOk": "Indicaciones aplicadas: tu plan se ha recalculado.", "k.consRetirees": "Indicaciones quitadas: tu plan se ha recalculado.", "k.consActives": "Vigentes hasta el {d}.", "k.consErr.duree": "La duración debe ser un número de minutos entre 15 y 240.", "k.consErr.seances": "El número de salidas debe estar entre 1 y 7.", "k.consErr.date": "Elige una fecha de fin dentro de los próximos 6 meses.", "k.consErr.vide": "Indica al menos una indicación.", "k.carnet": "Preparar mi registro para la cita", "k.carnetAide": "Tus dolores, tu carga y tus últimas sesiones en una página, para imprimir o guardar en PDF.", "k.kineAnnuaire": "Encontrar un fisioterapeuta en Francia (registro oficial)", "k.fiches": "Fichas de prevención", "k.ficheSignee": "Revisada y firmada en español por {nom}, fisioterapeuta (RPPS {rpps}), el {d}.", "k.ficheRemuneree": "Revisión remunerada por Pacevo.", "k.ficheRegion": "Zona que has señalado", "k.ficheAvert": "Información general, la misma para todos los corredores: no sustituye una consulta ni está adaptada a tu dolor.", "k.avis": "Un dolor declarado aligera tu plan (menos intensidad) mientras dure. Pacevo no hace ningún diagnóstico ni propone ningún tratamiento: para saber qué tienes y cómo tratarlo, consulta a un médico o a un fisioterapeuta.", "k.alerte": "Consulta sin esperar si el dolor te impide caminar, te despierta por la noche, va acompañado de hinchazón, enrojecimiento o fiebre, o empeora pese al reposo. Urgencias: 112.", "tab.nutrition": "Nutrición", "tab.poids": "Peso",
     "k.where": "¿Dónde te duele?", "view.face": "Frente", "view.dos": "Espalda",
     "k.hint": "Toca una zona en el cuerpo o en la lista, ajusta la intensidad y guárdala: tu plan se adapta.",
     "k.pain": "Dolor", "k.painLight": "Molestia leve", "k.painHard": "Muy doloroso",
@@ -81,7 +84,7 @@ const H: Record<string, Record<string, string>> = {
     },
   pt: {
     "h.enPanne": "As tuas dores declaradas não puderam ser carregadas. Este histórico parece vazio, mas nada se perdeu — tenta novamente daqui a pouco.", "h.title": "Saúde e desempenho", "h.subtitle": "As tuas dores registadas, a tua nutrição de prova e o teu peso, no mesmo sítio.",
-    "tab.kine": "Dor", "k.declarer": "Guardar esta dor", "k.seuil": "Abaixo de 4/10, um incómodo ligeiro não altera o teu plano: nada é guardado.", "k.declOk": "Dor guardada: o teu plano reduz a intensidade.", "k.declErr": "Dor não guardada, tenta novamente daqui a pouco.", "k.avisTitre": "O Pacevo não é um profissional de saúde", "k.kineAnnuaire": "Encontrar um fisioterapeuta em França (registo oficial)", "k.fiches": "Fichas de prevenção", "k.ficheSignee": "Revista e assinada em português por {nom}, fisioterapeuta (RPPS {rpps}), a {d}.", "k.ficheRemuneree": "Revisão remunerada pelo Pacevo.", "k.ficheRegion": "Zona que assinalaste", "k.ficheAvert": "Informação geral, igual para todos os corredores: não substitui uma consulta nem está adaptada à tua dor.", "k.avis": "Uma dor declarada alivia o teu plano (menos intensidade) enquanto durar. O Pacevo não faz nenhum diagnóstico nem propõe nenhum tratamento: para saberes o que tens e como tratar, consulta um médico ou um fisioterapeuta.", "k.alerte": "Consulta sem esperar se a dor te impedir de andar, te acordar à noite, vier com inchaço, vermelhidão ou febre, ou piorar apesar do repouso. Emergência: 112.", "tab.nutrition": "Nutrição", "tab.poids": "Peso",
+    "tab.kine": "Dor", "k.declarer": "Guardar esta dor", "k.seuil": "Abaixo de 4/10, um incómodo ligeiro não altera o teu plano: nada é guardado.", "k.declOk": "Dor guardada: o teu plano reduz a intensidade.", "k.declErr": "Dor não guardada, tenta novamente daqui a pouco.", "k.avisTitre": "O Pacevo não é um profissional de saúde", "k.pese": "O que pesa hoje no teu plano", "k.peseAucune": "Nenhuma dor pesa no teu plano. Se te dói alguma coisa, assinala-a no esquema corporal ou na tua sensação depois do treino.", "k.srcSeance": "assinalada depois de um treino", "k.effets": "O que o teu treinador mudou", "k.effetQualite": "{n} sessão(ões) de qualidade retirada(s) esta semana", "k.effetLongue": "Treino longo reduzido de {a} para {b} km", "k.effetLignes": "Corridas fáceis sem acelerações nem retas", "k.effetsAttente": "O teu plano vai ser recalculado com esta dor na próxima sincronização.", "k.consulterDuree": "Esta dor dura há {n} dias ou mais: mostra-a a um médico ou a um fisioterapeuta.", "k.consulterPire": "Indicas que está a piorar: mostra-a a um médico ou a um fisioterapeuta.", "k.charge": "As 2 semanas antes do início desta dor: {a} km corridos, contra {b} km nas 2 semanas anteriores ({p}).", "k.chargeSeule": "As 2 semanas antes do início desta dor: {a} km corridos.", "k.chargeAide": "Um número de treino para mostrar ao teu fisioterapeuta. Sozinho, não explica uma dor.", "k.consignes": "As indicações do teu fisioterapeuta", "k.consignesAide": "O teu fisioterapeuta deu-te um enquadramento? Copia-o aqui: o teu plano respeita-o até à data indicada. O Pacevo não define estas indicações, aplica-as.", "k.consDuree": "Duração máxima de uma corrida (min)", "k.consSeances": "Corridas por semana, no máximo", "k.consSansIntensite": "Sem intensidade (nem limiar, nem VAM, nem subidas)", "k.consJusqu": "Até", "k.consEnregistrer": "Aplicar ao meu plano", "k.consRetirer": "Retirar estas indicações", "k.consOk": "Indicações aplicadas: o teu plano foi recalculado.", "k.consRetirees": "Indicações retiradas: o teu plano foi recalculado.", "k.consActives": "Em vigor até {d}.", "k.consErr.duree": "A duração deve ser um número de minutos entre 15 e 240.", "k.consErr.seances": "O número de corridas deve estar entre 1 e 7.", "k.consErr.date": "Escolhe uma data de fim nos próximos 6 meses.", "k.consErr.vide": "Indica pelo menos uma indicação.", "k.carnet": "Preparar o meu registo para a consulta", "k.carnetAide": "As tuas dores, a tua carga e os teus últimos treinos numa página, para imprimir ou guardar em PDF.", "k.kineAnnuaire": "Encontrar um fisioterapeuta em França (registo oficial)", "k.fiches": "Fichas de prevenção", "k.ficheSignee": "Revista e assinada em português por {nom}, fisioterapeuta (RPPS {rpps}), a {d}.", "k.ficheRemuneree": "Revisão remunerada pelo Pacevo.", "k.ficheRegion": "Zona que assinalaste", "k.ficheAvert": "Informação geral, igual para todos os corredores: não substitui uma consulta nem está adaptada à tua dor.", "k.avis": "Uma dor declarada alivia o teu plano (menos intensidade) enquanto durar. O Pacevo não faz nenhum diagnóstico nem propõe nenhum tratamento: para saberes o que tens e como tratar, consulta um médico ou um fisioterapeuta.", "k.alerte": "Consulta sem esperar se a dor te impedir de andar, te acordar à noite, vier com inchaço, vermelhidão ou febre, ou piorar apesar do repouso. Emergência: 112.", "tab.nutrition": "Nutrição", "tab.poids": "Peso",
     "k.where": "Onde te dói?", "view.face": "Frente", "view.dos": "Costas",
     "k.hint": "Toca numa zona do corpo ou da lista, ajusta a intensidade e guarda-a: o teu plano adapta-se.",
     "k.pain": "Dor", "k.painLight": "Desconforto ligeiro", "k.painHard": "Muito doloroso",
@@ -169,14 +172,19 @@ const TON_TENDANCE: Record<Tendance, string> = {
 // le partage de position en direct reste sur la Carte.
 type Tab = "kine" | "nutrition" | "poids";
 
-export function HealthCenter({ suivi = [], etats = [], douleursSeance = [], enPanne = false, coursesNutrition = [], poidsKg = null }: {
+export function HealthCenter({ suivi = [], douleurs = [], effets = null, consignes = null, charge = null, rappel = null, enPanne = false, coursesNutrition = [], poidsKg = null }: {
+  /** Santé, lot 1 : une seule liste des douleurs actives (déclarées + cochées après une séance). */
+  douleurs?: (DouleurUnifiee & { libelle?: Partial<Record<string, string>>; zone?: string })[];
+  /** Ce que la douleur a retiré au plan (état du coach) ; `null` s'il n'est pas encore recalculé. */
+  effets?: { qualiteRetiree: number; sortieLongue: { prevueKm: number; reduiteKm: number } | null; lignesDroites: boolean } | null;
+  /** Les consignes du kinésithérapeute en vigueur. */
+  consignes?: ConsignesKine | null;
+  /** La charge des deux semaines avant la douleur la plus ancienne. */
+  charge?: ChargeAvant | null;
+  /** La durée maximale du kiné n'a pas pu s'appliquer (allure facile inconnue). */
+  /** Faut-il dire « consulte » (durée ou aggravation) ? */
+  rappel?: { motif: "duree" | "pire"; cle: string } | null;
   suivi?: SuiviZone[];
-  /** Les douleurs cochées après une séance que le coach compte encore (lib/health/douleursSeance). */
-  /** `libelle` est traduit côté serveur : la table des zones tire tout le dictionnaire `T`,
-   *  qui n'a rien à faire dans le bundle de cet écran (chargé à la demande ailleurs). */
-  douleursSeance?: { zone: string; date: string; ilYaJours: number; libelle: Partial<Record<string, string>> }[];
-  /** Pour chaque zone, la déclaration la plus récente et son état déclaré. */
-  etats?: { cle: string; id: string; etat: string }[];
   /** La lecture des douleurs a ÉCHOUÉ : l'historique est vide par accident. */
   enPanne?: boolean;
   /** La consultation précédente, relue côté serveur (type `kine_chat`). */
@@ -248,7 +256,52 @@ export function HealthCenter({ suivi = [], etats = [], douleursSeance = [], enPa
       setEnCours(null);
     }
   }
-  const fichesAffichees = fichesPour([...douleursSeance.map((d) => d.zone), ...suivi.map((z) => z.cle)], lang);
+  const fichesAffichees = fichesPour(douleurs.map((d) => d.cle), lang);
+
+  // ── LES CONSIGNES DU KINÉSITHÉRAPEUTE (/api/health/consignes) ─────────────────────────
+  // Comme partout ici : l'écran ne change qu'une fois l'écriture faite.
+  const [cons, setCons] = useState({
+    dureeMaxMin: consignes?.dureeMaxMin != null ? String(consignes.dureeMaxMin) : "",
+    seancesMaxSemaine: consignes?.seancesMaxSemaine != null ? String(consignes.seancesMaxSemaine) : "",
+    sansIntensite: consignes?.sansIntensite ?? false,
+    jusquAu: consignes?.jusquAu ?? "",
+  });
+  const [consActives, setConsActives] = useState<string | null>(consignes?.jusquAu ?? null);
+  async function envoyerConsignes(retirer: boolean) {
+    setEnCours("consignes");
+    try {
+      const r = await fetch("/api/health/consignes", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(retirer ? { retirer: true } : {
+          dureeMaxMin: cons.dureeMaxMin === "" ? null : Number(cons.dureeMaxMin),
+          seancesMaxSemaine: cons.seancesMaxSemaine === "" ? null : Number(cons.seancesMaxSemaine),
+          sansIntensite: cons.sansIntensite, jusquAu: cons.jusquAu,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) {
+        const motif = typeof j?.error === "string" && ["duree", "seances", "date", "vide"].includes(j.error) ? `k.consErr.${j.error}` : "k.etatErr";
+        toast.error(tr(motif));
+        return;
+      }
+      setConsActives(retirer ? null : cons.jusquAu);
+      if (retirer) setCons({ dureeMaxMin: "", seancesMaxSemaine: "", sansIntensite: false, jusquAu: "" });
+      toast.success(tr(retirer ? "k.consRetirees" : "k.consOk"));
+      router.refresh();
+    } catch {
+      toast.error(tr("k.etatErr"));
+    } finally {
+      setEnCours(null);
+    }
+  }
+  /** Une date AAAA-MM-JJ lisible, identique côté serveur et navigateur (fuseau UTC fixe). */
+  const dateLisible = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString(lang, { timeZone: "UTC", day: "numeric", month: "long" });
+  /** Le libellé d'une douleur : traduit côté serveur (ressenti), ou la zone du schéma. */
+  const libelleDouleur = (d: (typeof douleurs)[number]) => {
+    if (d.source === "seance") return d.libelle?.[lang] ?? d.cle;
+    const [vue, emplacement] = d.cle.split(":");
+    return emplacement ? tr(`${vue === "dos" ? "zd" : "zf"}.${emplacement}`) : (d.zone ?? d.cle);
+  };
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [painLevel, setPainLevel] = useState(5);
 
@@ -428,132 +481,170 @@ export function HealthCenter({ suivi = [], etats = [], douleursSeance = [], enPa
                 )}
               </div>
 
-              {/* ── SUIVI DES DOULEURS ────────────────────────────────────────────
-                  Ce que le kiné IA relit désormais avant de répondre. L'afficher n'est
-                  pas décoratif : si l'athlète voit « 7/10 → 4/10 » et que le modèle
-                  repart de zéro, l'un des deux se trompe et rien ne dit lequel. Les deux
-                  lisent le MÊME calcul (`suiviParZone`). */}
-              <div className="bento-card">
-                <div className="mb-2.5 flex items-center gap-2">
+              {/* ══ CE QUI PÈSE SUR TON PLAN AUJOURD'HUI (Santé, lot 1, 10/11/2026) ═══════════════
+                  UNE seule liste : les douleurs déclarées sur le schéma ET celles cochées après une
+                  séance (lib/health/santeDouleurs). Deux listes se contredisaient (« aucune douleur
+                  déclarée » au-dessus d'un tibia signalé). Puis ce que le coach a changé, quand
+                  consulter, et la charge des semaines d'avant — des faits, aucun diagnostic. */}
+              <div className="bento-card space-y-3">
+                <div className="flex items-center gap-2">
                   <Activity className="h-4 w-4 text-emerald-600" />
-                  <h3 className="text-sm font-semibold text-zinc-900">{tr("k.suivi")}</h3>
+                  <h3 className="text-sm font-semibold text-zinc-900">{tr("k.pese")}</h3>
                 </div>
-                {suivi.length === 0 ? (
-                  <p className="text-xs text-zinc-400">{tr("k.suiviNone")}</p>
+                {douleurs.length === 0 ? (
+                  <p className="text-xs text-zinc-400">{tr("k.peseAucune")}</p>
                 ) : (
                   <div className="space-y-1.5">
-                    {suivi.slice(0, 5).map((z) => {
-                      const ton = TON_TENDANCE;
+                    {douleurs.map((d) => {
+                      const cleBouton = d.source === "seance" ? `seance:${d.cle}` : d.id ?? d.cle;
+                      const passeeSeance = d.source === "seance" && seancePassees[d.cle] === true;
+                      const courant = d.id ? (majEtats[d.id] ?? d.etat) : undefined;
                       return (
-                        <div key={z.zone} className="flex items-center gap-2 rounded-xl bg-zinc-50 px-2.5 py-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-[13px] font-medium text-zinc-900">{z.zone}</div>
-                            <div className="text-[11px] text-zinc-400">
-                              {z.derniereIlYaJours <= 0 ? tr("k.suiviToday") : tr("k.suiviAgo", { n: z.derniereIlYaJours })}
-                              {z.depuisJours > 0 && ` · ${tr("k.suiviSince", { n: z.depuisJours })}`}
+                        <div key={`${d.source}:${d.cle}`} className="rounded-xl bg-zinc-50 px-2.5 py-2">
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-[13px] font-medium text-zinc-900">{libelleDouleur(d)}</div>
+                              <div className="text-[11px] text-zinc-400">
+                                {d.depuisJours <= 0 ? tr("k.suiviToday") : tr("k.suiviSince", { n: d.depuisJours })}
+                                {d.source === "seance" && ` · ${tr("k.srcSeance")}`}
+                              </div>
                             </div>
+                            {d.source === "declaree" && d.dernier != null && (
+                              <div className="flex items-center gap-1 text-[13px] font-semibold tabular-nums text-zinc-700">
+                                {(d.signalements ?? 0) > 1 && <><span className="text-zinc-400">{d.premier}</span><span className="text-zinc-300">→</span></>}
+                                <span>{d.dernier}</span><span className="text-[11px] font-medium text-zinc-400">/10</span>
+                              </div>
+                            )}
                           </div>
-                          {/* ⚠️ On montre « 7 → 4 » seulement s'il y a DEUX déclarations.
-                              Avec une seule, une flèche laisserait croire à une évolution
-                              qui n'a jamais été mesurée. */}
-                          <div className="flex items-center gap-1 text-[13px] font-semibold tabular-nums text-zinc-700">
-                            {z.signalements > 1 && <><span className="text-zinc-400">{z.premier}</span><span className="text-zinc-300">→</span></>}
-                            <span>{z.dernier}</span><span className="text-[11px] font-medium text-zinc-400">/10</span>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            {d.source === "seance" ? (
+                              passeeSeance ? (
+                                <>
+                                  <span className="text-[11px] font-medium text-emerald-700">{tr("k.etatPasse")}</span>
+                                  <button type="button" disabled={enCours === cleBouton} onClick={() => majDouleurSeance(d.cle, false)}
+                                    className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 disabled:opacity-50">
+                                    {tr("k.annuler")}
+                                  </button>
+                                </>
+                              ) : (
+                                <button type="button" disabled={enCours === cleBouton} onClick={() => majDouleurSeance(d.cle, true)}
+                                  className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100 disabled:opacity-50">
+                                  {tr("k.passe")}
+                                </button>
+                              )
+                            ) : d.id && courant === "resolu" ? (
+                              <>
+                                <span className="text-[11px] font-medium text-emerald-700">{tr("k.etatPasse")}</span>
+                                <button type="button" disabled={enCours === d.id} onClick={() => majEtatDouleur(d.id!, "actif")}
+                                  className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 disabled:opacity-50">
+                                  {tr("k.annuler")}
+                                </button>
+                              </>
+                            ) : d.id ? (
+                              ([["mieux", "k.mieux"], ["pire", "k.pire"], ["resolu", "k.passe"]] as const).map(([val, cle]) => (
+                                <button key={val} type="button" disabled={enCours === d.id} onClick={() => majEtatDouleur(d.id!, val)}
+                                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 transition-colors disabled:opacity-50 ${
+                                    courant === val ? "bg-zinc-900 text-white ring-zinc-900"
+                                    : val === "resolu" ? "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
+                                    : val === "pire" ? "bg-red-50 text-red-700 ring-red-200 hover:bg-red-100"
+                                    : "bg-white text-zinc-600 ring-zinc-200 hover:bg-zinc-50"}`}>
+                                  {tr(cle)}
+                                </button>
+                              ))
+                            ) : null}
                           </div>
-                          <span className={`rounded-lg px-1.5 py-0.5 text-[11px] font-semibold ring-1 ${ton[z.tendance]}`}>
-                            {tr("trend." + z.tendance)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {/* ══ CE QUE L'ATHLÈTE PEUT EN DIRE ═══════════════════════════════
-                        ⚠️ Une douleur déclarée ne pouvait pas être retirée : elle ne
-                        s'éteignait QUE par péremption, au bout de 14 jours, en retirant de
-                        l'intensité à chaque replanification. Cyprien en avait déclaré une
-                        POUR TESTER (23/09/2026) et son plan a été allégé pour rien.
-                        « Ça va mieux » NE L'EFFACE PAS : une gêne qui s'améliore reste une
-                        gêne, et la faire disparaître du budget de qualité rendrait la
-                        séance dure le jour même. Seul « c'est passé » l'éteint. */}
-                    {suivi.slice(0, 5).map((z) => {
-                      const e = etats.find((x) => x.cle === z.cle);
-                      if (!e) return null;
-                      const courant = majEtats[e.id] ?? e.etat;
-                      // ⚠️ UN CLIC DE TROP DOIT POUVOIR SE REPRENDRE. La ligne disparaît au
-                      // prochain chargement (elle n'est plus active), mais tant qu'on est sur
-                      // l'écran on garde « c'est passé » affiché avec son annulation : sans
-                      // cela, un appui par erreur efface la douleur sans retour possible, et
-                      // il faut repasser par le kiné pour la redéclarer.
-                      if (courant === "resolu") {
-                        return (
-                          <div key={`etat-${e.id}`} className="-mt-0.5 flex flex-wrap items-center gap-1.5 px-2.5 pb-1">
-                            <span className="text-[11px] font-medium text-emerald-700">{tr("k.etatPasse")}</span>
-                            <button type="button" disabled={enCours === e.id} onClick={() => majEtatDouleur(e.id, "actif")}
-                              className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 disabled:opacity-50">
-                              {tr("k.annuler")}
-                            </button>
-                          </div>
-                        );
-                      }
-                      return (
-                        <div key={`etat-${e.id}`} className="-mt-0.5 flex flex-wrap items-center gap-1.5 px-2.5 pb-1">
-                          <span className="text-[11px] text-zinc-400">{tr("k.etatQ", { z: z.zone })}</span>
-                          {([["mieux", "k.mieux"], ["pire", "k.pire"], ["resolu", "k.passe"]] as const).map(([val, cle]) => (
-                            <button key={val} type="button" disabled={enCours === e.id}
-                              onClick={() => majEtatDouleur(e.id, val)}
-                              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 transition-colors disabled:opacity-50 ${
-                                courant === val ? "bg-zinc-900 text-white ring-zinc-900"
-                                : val === "resolu" ? "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
-                                : val === "pire" ? "bg-red-50 text-red-700 ring-red-200 hover:bg-red-100"
-                                : "bg-white text-zinc-600 ring-zinc-200 hover:bg-zinc-50"}`}>
-                              {tr(cle)}
-                            </button>
-                          ))}
                         </div>
                       );
                     })}
                   </div>
                 )}
+
+                {/* Ce que le coach a changé : relu dans l'état du coach, jamais déduit du texte. */}
+                {douleurs.length > 0 && (
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+                    <div className="text-[12px] font-semibold text-emerald-900">{tr("k.effets")}</div>
+                    {effets ? (
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[12px] text-emerald-900">
+                        {effets.qualiteRetiree > 0 && <li>{tr("k.effetQualite", { n: effets.qualiteRetiree })}</li>}
+                        {effets.sortieLongue && <li>{tr("k.effetLongue", { a: effets.sortieLongue.prevueKm, b: effets.sortieLongue.reduiteKm })}</li>}
+                        {effets.lignesDroites && <li>{tr("k.effetLignes")}</li>}
+                      </ul>
+                    ) : (
+                      <p className="mt-1 text-[12px] text-emerald-900">{tr("k.effetsAttente")}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Quand consulter : un délai, ou ce qu'il déclare (« ça empire »). */}
+                {rappel && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+                    <p>{rappel.motif === "pire" ? tr("k.consulterPire") : tr("k.consulterDuree", { n: JOURS_AVANT_CONSULTER })}</p>
+                    <a href={ANNUAIRE_KINE} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block font-semibold underline-offset-2 hover:underline">
+                      {tr("k.kineAnnuaire")} →
+                    </a>
+                  </div>
+                )}
+
+                {/* La charge d'avant : un chiffre d'entraînement, sans conclusion. */}
+                {charge && douleurs.length > 0 && (
+                  <div className="text-[12px] text-zinc-600">
+                    <p>{charge.variationPct != null
+                      ? tr("k.charge", { a: charge.kmAvant, b: charge.kmPrecedent, p: `${charge.variationPct > 0 ? "+" : ""}${charge.variationPct} %` })
+                      : tr("k.chargeSeule", { a: charge.kmAvant })}</p>
+                    <p className="mt-0.5 text-[11px] text-zinc-400">{tr("k.chargeAide")}</p>
+                  </div>
+                )}
               </div>
 
-            {/* ══ LES DOULEURS COCHÉES APRÈS UNE SÉANCE ════════════════════════════════
-                ⚠️ Elles pesaient sur le plan sans fin et sans bouton pour les éteindre
-                (Cyprien, 09/11/2026). Le coach les compte 14 jours, sauf « c'est passé ». */}
-            {douleursSeance.length > 0 && (
-              <div className="bento-card space-y-2">
+              {/* ══ LES CONSIGNES DE TON KINÉ — il fixe le cadre, le plan s'y tient ══════════════ */}
+              <div className="bento-card space-y-2.5">
                 <div className="flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-amber-600" />
-                  <h3 className="text-sm font-semibold text-zinc-900">{tr("k.seance")}</h3>
+                  <Activity className="h-4 w-4 text-emerald-600" />
+                  <h3 className="text-sm font-semibold text-zinc-900">{tr("k.consignes")}</h3>
                 </div>
-                <p className="text-[11px] text-zinc-500">{tr("k.seanceAide")}</p>
-                <div className="space-y-1.5">
-                  {douleursSeance.map((d) => {
-                    const passee = seancePassees[d.zone] === true;
-                    return (
-                      <div key={d.zone} className="flex flex-wrap items-center gap-2 rounded-xl bg-zinc-50 px-2.5 py-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-[13px] font-medium text-zinc-900">{d.libelle[lang] ?? d.zone}</div>
-                          <div className="text-[11px] text-zinc-400">{d.ilYaJours <= 0 ? tr("k.suiviToday") : tr("k.suiviAgo", { n: d.ilYaJours })}</div>
-                        </div>
-                        {passee ? (
-                          <>
-                            <span className="text-[11px] font-medium text-emerald-700">{tr("k.etatPasse")}</span>
-                            <button type="button" disabled={enCours === `seance:${d.zone}`} onClick={() => majDouleurSeance(d.zone, false)}
-                              className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 disabled:opacity-50">
-                              {tr("k.annuler")}
-                            </button>
-                          </>
-                        ) : (
-                          <button type="button" disabled={enCours === `seance:${d.zone}`} onClick={() => majDouleurSeance(d.zone, true)}
-                            className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100 disabled:opacity-50">
-                            {tr("k.passe")}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
+                <p className="text-[11px] text-zinc-500">{tr("k.consignesAide")}</p>
+                {consActives && <p className="text-[12px] font-medium text-emerald-700">{tr("k.consActives", { d: dateLisible(consActives) })}</p>}
+                <div className="grid grid-cols-2 gap-2">
+                  <label htmlFor={`${cid}-duree`} className="text-[11px] text-zinc-600">{tr("k.consDuree")}
+                    <input id={`${cid}-duree`} type="number" inputMode="numeric" min={15} max={240} value={cons.dureeMaxMin}
+                      onChange={(e) => setCons((c) => ({ ...c, dureeMaxMin: e.target.value }))}
+                      className="mt-1 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-[13px] text-zinc-900" />
+                  </label>
+                  <label htmlFor={`${cid}-seances`} className="text-[11px] text-zinc-600">{tr("k.consSeances")}
+                    <input id={`${cid}-seances`} type="number" inputMode="numeric" min={1} max={7} value={cons.seancesMaxSemaine}
+                      onChange={(e) => setCons((c) => ({ ...c, seancesMaxSemaine: e.target.value }))}
+                      className="mt-1 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-[13px] text-zinc-900" />
+                  </label>
+                </div>
+                <label htmlFor={`${cid}-intensite`} className="flex items-center gap-2 text-[12px] text-zinc-700">
+                  <input id={`${cid}-intensite`} type="checkbox" checked={cons.sansIntensite}
+                    onChange={(e) => setCons((c) => ({ ...c, sansIntensite: e.target.checked }))} className="h-4 w-4 rounded border-zinc-300" />
+                  {tr("k.consSansIntensite")}
+                </label>
+                <label htmlFor={`${cid}-jusqu`} className="block text-[11px] text-zinc-600">{tr("k.consJusqu")}
+                  <input id={`${cid}-jusqu`} type="date" value={cons.jusquAu}
+                    onChange={(e) => setCons((c) => ({ ...c, jusquAu: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-[13px] text-zinc-900" />
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" disabled={enCours === "consignes"} onClick={() => envoyerConsignes(false)}
+                    className="rounded-full bg-emerald-600 px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50">
+                    {tr("k.consEnregistrer")}
+                  </button>
+                  {consActives && (
+                    <button type="button" disabled={enCours === "consignes"} onClick={() => envoyerConsignes(true)}
+                      className="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 disabled:opacity-50">
+                      {tr("k.consRetirer")}
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
+
+              {/* ══ LE CARNET POUR LE RENDEZ-VOUS (page imprimable) ══════════════════════════════ */}
+              <Link href="/dashboard/health/carnet" className="bento-card block transition-colors hover:bg-zinc-50">
+                <div className="text-sm font-semibold text-zinc-900">{tr("k.carnet")} →</div>
+                <p className="mt-1 text-[11px] text-zinc-500">{tr("k.carnetAide")}</p>
+              </Link>
 
             {/* ══ LA BIBLIOTHÈQUE DE FICHES SIGNÉES (lib/health/fichesKine) ═══════════════════
                 Ouverte à tous, identiques pour tous, chacune signée par un kinésithérapeute ;

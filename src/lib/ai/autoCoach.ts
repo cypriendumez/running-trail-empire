@@ -7,6 +7,7 @@
 //
 //  Déterministe (pas d'appel LLM) → fiable pour un cron qui tourne sans surveillance.
 // ─────────────────────────────────────────────────────────────────────────────
+import { lignesRetireesParDouleur } from "@/lib/coach/footings";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
@@ -499,6 +500,16 @@ export async function autoCoachForUser(
       : null,
     // Le jour 0 a-t-il été gelé parce qu'une séance y était déjà enregistrée ?
     dayZeroFrozen,
+    // CE QUE LA DOULEUR A CHANGÉ et LES CONSIGNES DU KINÉ appliquées (Santé, 10/11/2026) :
+    // l'écran Santé les montre au coureur, sans relire le texte du plan.
+    douleurEffets: ctx.effetsDouleur ? {
+      ...ctx.effetsDouleur,
+      lignesDroites: lignesRetireesParDouleur(
+        week.filter((d: PlanDay) => d.date >= from && d.type === "Endurance").length,
+        { taper: ctx.cycle.taper, semaineCourse: week.some((d: PlanDay) => d.type === "Course"), sansHistorique: ctx.noHistory },
+      ),
+    } : null,
+    consignes: ctx.consignes ?? null,
     // L'objectif tel qu'il a RÉELLEMENT été pris en compte : c'est ce qui permet à
     // l'athlète de vérifier que son changement a bien été enregistré.
     objective: ctx.objective ? { race: ctx.objective.race, raceDate: ctx.objective.raceDate, distanceKm: ctx.objective.distanceKm } : null,

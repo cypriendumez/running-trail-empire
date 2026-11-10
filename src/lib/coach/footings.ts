@@ -86,6 +86,15 @@ export type Variante = "base" | "lignes" | "progressif";
  * le seuil retiré pour une périostite tibiale, ses accélérations revenaient en fin de
  * footing — or le coach dit lui-même de ne jamais forcer sur une douleur.
  */
+/**
+ * La douleur a-t-elle VRAIMENT retiré des lignes droites cette semaine ? Seulement si, sans elle,
+ * un footing en aurait porté : au moins deux footings, hors affûtage, hors semaine de course et
+ * hors athlète sans historique (relecture du 10/11/2026 : l'écran l'affirmait toujours).
+ */
+export function lignesRetireesParDouleur(nbFootings: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean }): boolean {
+  return varianteFooting(1, nbFootings, { ...o, douleur: false }) === "lignes";
+}
+
 export function varianteFooting(rang: number, total: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean; douleur?: boolean }): Variante {
   if (o.taper || o.semaineCourse || o.sansHistorique || o.douleur) return "base";
   if (!Number.isFinite(rang) || !Number.isFinite(total) || total < 2 || rang < 0) return "base";

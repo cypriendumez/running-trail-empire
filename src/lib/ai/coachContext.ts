@@ -53,6 +53,7 @@ import { libellesActifs, PEREMPTION_JOURS, type Douleur } from "@/lib/health/dou
 import { douleursDeSeance } from "@/lib/health/douleursSeance";
 import { pausesDeTrace, pointsStockes, vitesseEnMouvement, dureeCourte } from "@/lib/activities/pauses";
 import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
+import { TYPE_CONSIGNES, consignesEnVigueur, kmPourDuree, type ConsignesKine } from "@/lib/health/consignesKine";
 import { recupAllongee, verdictExecution } from "@/lib/coach/arretsQualite";
 import { arretsMemorises, memoriserArrets } from "@/lib/activities/cacheArrets";
 import { estUnePanne } from "@/lib/dashboard/lectures";
@@ -299,6 +300,13 @@ export type AthleteContext = {
    *  passent le jour au rouge. Le renforcement les lit (rien d'ajouté, zone épargnée).
    *  Optionnel : un contexte sérialisé avant le 09/11/2026 ne l'a pas. */
   douleursActives?: string[];
+  /** Ce que la douleur a retiré au plan, comparé au même athlète sans douleur ; `null` sans douleur. */
+  effetsDouleur?: { qualiteRetiree: number; sortieLongue: { prevueKm: number; reduiteKm: number } | null; lignesDroites: boolean } | null;
+  /** Les consignes du kinésithérapeute en vigueur, et la distance que tient leur durée maximale. */
+  consignes?: (ConsignesKine & { kmMax: number | null }) | null;
+  /** Dates (AAAA-MM-JJ) des sorties de course des 7 derniers jours, une par sortie : le nombre
+   *  de sorties fixé par le kinésithérapeute se compte sur 7 jours GLISSANTS. */
+  sortiesRecentes?: string[];
   /** Disponibilités déclarées : nb de séances de course/semaine et jours praticables (0 = dim). */
   availability: { daysPerWeek: number; days: number[] };
   /** Prévisions RÉELLES à 7 jours (Open-Meteo) — vide si la position est inconnue. */
@@ -762,6 +770,14 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // retirait de l'intensité pendant deux semaines. L'athlète peut désormais dire « c'est
   // passé », « ça va mieux » ou « ça empire » ; seul « c'est passé » l'efface, et la
   // tendance part au coach avec la douleur.
+  // ── LES CONSIGNES DU KINÉSITHÉRAPEUTE, saisies par le coureur (lib/health/consignesKine) ──
+  //    Une lecture en panne n'est pas « aucune consigne » : on refuse de bâtir le contexte,
+  //    comme pour les douleurs (le plan en place reste, le passage suivant réessaie).
+  // La plus récente : deux lignes (double clic) ne doivent pas faire échouer `maybeSingle`.
+  const { data: lignesConsignes, error: eConsignes } = await sb.from("notifications").select("data")
+    .eq("user_id", userId).eq("type", TYPE_CONSIGNES).order("created_at", { ascending: false }).limit(1);
+  if (estUnePanne({ error: eConsignes })) throw new Error(`Consignes du kiné illisibles : ${eConsignes?.code ?? "?"} ${eConsignes?.message ?? ""}`);
+  const consignes = consignesEnVigueur(((lignesConsignes ?? []) as { data?: unknown }[])[0]?.data, aujourdhui(FUSEAU_DEFAUT));
   const declaredPains = libellesActifs(
     ((painRes.data ?? []) as { id?: string; data: Douleur | null }[]).map((n) => ({ ...(n.data ?? {}), id: n.id })),
     aujourdhui(FUSEAU_DEFAUT),
@@ -1453,7 +1469,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // et elle était intestable au milieu des requêtes. Deux défauts y ont été corrigés —
   // la charge comptée deux fois (ratio ET TSB) et le plancher de préparation qui ne
   // s'appliquait jamais en cas de fatigue. Voir l'en-tête du module.
-  const qb = computeQualityBudget({
+  const entreeQualite: Parameters<typeof computeQualityBudget>[0] = {
     level: libLevel, goal: libGoal, phase, noHistory, pains,
     // Ce qu'on a VU, pas ce qui a été déclaré : le budget de qualité ne peut pas
     // dépasser ce que l'historique observé justifie.
@@ -1469,7 +1485,12 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     hasObjective: !!objective, daysToRace, isShortGoal,
     apresCourse: recupMotif ? { motif: recupMotif.fr, reprise: repriseCetteSemaine } : null,
     marcheCourse: !!marcheCourse,
-  });
+    consignesKine: consignes ? {
+      motif: `consignes de ton kinésithérapeute jusqu'au ${consignes.jusquAu.slice(8, 10)}/${consignes.jusquAu.slice(5, 7)}`,
+      sansQualite: consignes.sansIntensite || consignes.dureeMaxMin != null,
+    } : null,
+  };
+  const qb = computeQualityBudget(entreeQualite);
   // Une course B ou C dans la semaine EST une séance dure : elle prend la place d'une qualité.
   const qBudget = Math.max(0, qb.qBudget - (secondaire ? 1 : 0));
   const { structuralQBudget, easeReasons, expCapped, expCap } = qb;
@@ -1913,7 +1934,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const allureSeuilConnue = /\d+['’]\d{2}/.test(sPace);
   // La récupération d'après-course n'a pas besoin d'être exclue ici : `etatDouble` refuse
   // tout double tant qu'elle dure (phase de reprise comprise) — vérifié par mutation.
-  const doubleSeuilActif = etatDoubles.seuilActif && allureSeuilConnue && qBudget >= 1
+  const doubleSeuilActif = !consignes && etatDoubles.seuilActif && allureSeuilConnue && qBudget >= 1
     && !repriseArret && !marcheCourse;
   const doseDS = doseDoubleSeuil(habitudeKm);
   const qDoubleSeuil: QualitySession = {
@@ -2289,8 +2310,32 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // compter son motif ici la raccourcissait une seconde fois.
   const motifsAllegement = easeReasons.filter((r) => r !== recupMotif?.fr).length;
   const longRunEase = readyLevel === "rouge" ? 0.6 : readyLevel === "orange" ? 0.8 : motifsAllegement ? 0.85 : 1;
-  const longRunKm = Math.max(4, Math.round(longRunPlanned * longRunEase));
+  // Une durée maximale donnée par le kinésithérapeute plafonne la sortie longue (et donc les
+  // footings, bornés à 85 % d'elle) : la distance que tient cette durée à l'allure facile.
+  const kmConsigne = consignes?.dureeMaxMin != null ? kmPourDuree(consignes.dureeMaxMin, easyPaceCorrige) : null;
+  const longRunKmBrut = Math.max(4, Math.round(longRunPlanned * longRunEase));
+  const longRunKm = kmConsigne != null ? Math.min(longRunKmBrut, kmConsigne) : longRunKmBrut;
   const longRunEased = longRunKm < longRunPlanned;
+  // CE QUE LA DOULEUR A CHANGÉ, pour l'écran Santé (« ton coach a retiré… ») : comparé au même
+  // athlète SANS douleur, jamais déduit du texte du plan. Relecture du 10/11 : la sortie longue
+  // était attribuée à la douleur même quand la fatigue ou la VFC la réduisaient. La douleur
+  // n'ajoute qu'UN signal rouge (`MOTIF_T.douleur`) et UN motif d'allègement (« douleur
+  // signalée ») : on les retire et on recalcule la même coupe.
+  const effetsDouleur = pains.length ? (() => {
+    const rougesSansDouleur = redFlags.length - 1;
+    const niveauSansDouleur = rougesSansDouleur > 0 ? "rouge" : orangeFlags.length >= 2 ? "orange" : orangeFlags.length === 1 ? "jaune" : "vert";
+    const motifsSansDouleur = easeReasons.filter((r) => r !== recupMotif?.fr && r !== "douleur signalée").length;
+    const coupeSansDouleur = niveauSansDouleur === "rouge" ? 0.6 : niveauSansDouleur === "orange" ? 0.8 : motifsSansDouleur ? 0.85 : 1;
+    const longueSansDouleurBrut = Math.max(4, Math.round(longRunPlanned * coupeSansDouleur));
+    const longueSansDouleur = kmConsigne != null ? Math.min(longueSansDouleurBrut, kmConsigne) : longueSansDouleurBrut;
+    return {
+      qualiteRetiree: Math.max(0, computeQualityBudget({ ...entreeQualite, pains: [] }).qBudget - qb.qBudget),
+      sortieLongue: longRunKm < longueSansDouleur ? { prevueKm: longueSansDouleur, reduiteKm: longRunKm } : null,
+      // Fixé par le coach automatique sur le plan RÉEL (lib/coach/footings, `lignesRetireesParDouleur`) :
+      // ici on ne sait pas encore combien de footings la semaine portera.
+      lignesDroites: false,
+    };
+  })() : null;
 
   // ── NUTRITION ET HYDRATATION CHIFFRÉES ───────────────────────────────────────
   // « 30 à 60 g de glucides par heure » est un intervalle de manuel : il ne dit pas
@@ -2616,7 +2661,12 @@ ${catalog}`;
     })(),
     zonesFragiles: Array.isArray(p?.injury_zones) ? (p.injury_zones as string[]).filter((z) => typeof z === "string") : [],
     douleursActives: pains,
-    availability: { daysPerWeek: availDaysPerWeek, days: availDays },
+    effetsDouleur,
+    consignes: consignes ? { ...consignes, kmMax: kmConsigne } : null,
+    sortiesRecentes: workouts.filter((w) => isRun(w.sport) && now - new Date(w.date).getTime() <= 7 * 86400000)
+      .map((w) => String(w.date).slice(0, 10)),
+    // Un nombre maximal de sorties fixé par le kinésithérapeute borne celles de la semaine.
+    availability: { daysPerWeek: consignes?.seancesMaxSemaine != null ? Math.min(availDaysPerWeek, consignes.seancesMaxSemaine) : availDaysPerWeek, days: availDays },
     forecast,
     altitude: { elevationM, lossPct: altLoss },
     warmCool: warmCoolMin(num(p?.warmup_min), num(p?.cooldown_min)),

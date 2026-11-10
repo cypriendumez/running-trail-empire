@@ -96,7 +96,7 @@ console.log("\nL'ÉCRAN ET SES GARDE-FOUS");
 
 test("Santé affiche la bibliothèque, la signature complète et l'annuaire officiel de l'Ordre", () => {
   const ecran = codeOf("src/components/health/HealthCenter.tsx");
-  assert.match(ecran, /const fichesAffichees = fichesPour\(\[\.\.\.douleursSeance\.map\(\(d\) => d\.zone\), \.\.\.suivi\.map\(\(z\) => z\.cle\)\], lang\);/, "les fiches ne suivent plus les douleurs signalées");
+  assert.match(ecran, /const fichesAffichees = fichesPour\(douleurs\.map\(\(d\) => d\.cle\), lang\);/, "les fiches ne suivent plus les douleurs signalées");
   assert.match(ecran, /<a href=\{ANNUAIRE_KINE\} target="_blank" rel="noopener noreferrer"/, "le lien vers l'annuaire a disparu");
   assert.match(ecran, /tr\("k\.ficheSignee", \{ nom: f\.signataire, rpps: f\.rpps/, "la fiche n'affiche plus qui l'a signée ni son RPPS");
   assert.match(ecran, /\{f\.remuneree && ` \$\{tr\("k\.ficheRemuneree"\)\}`\}/, "une relecture payée n'est plus dite");
