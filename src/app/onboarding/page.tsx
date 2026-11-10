@@ -15,6 +15,10 @@ import type { MarqueId } from "./marquesMontre";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthLabel } from "@/data/healthCatalog";
 import { TERRAINS, terrainLabel } from "@/data/terrainCatalog";
 import { AGE_MINIMUM, ageEntier, estMajeur } from "@/lib/legal/age";
+import { QUESTIONS_APTITUDE, TYPE_APTITUDE, validerAptitude, type QuestionAptitude } from "@/lib/health/aptitude";
+import { APTITUDE_UI } from "@/lib/health/aptitudeI18n";
+import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import type { Lang } from "@/lib/i18n/translations";
 
 /**
  * LE QUESTIONNAIRE D'INSCRIPTION — refondu le 11/10/2026.
@@ -200,6 +204,12 @@ export default function OnboardingPage() {
   };
   // Une réponse santé est donnée soit en cochant au moins une entrée, soit « rien à signaler ».
   const healthAnswered = healthNone || profile.health_conditions.length > 0 || profile.injury_zones.length > 0;
+  // LE QUESTIONNAIRE D'APTITUDE (Santé, lot 3) : réponse OBLIGATOIRE — au moins une situation
+  // cochée, ou « aucune » explicitement. Une situation cochée → plan sans intensité jusqu'à l'avis
+  // d'un médecin (lib/health/aptitude).
+  const [aptOui, setAptOui] = useState<QuestionAptitude[]>([]);
+  const [aptAucune, setAptAucune] = useState(false);
+  const aptRepondu = aptAucune || aptOui.length > 0;
 
   // FC déclarées — FACULTATIVES. Vides, le coach s'en passe très bien (migration 029).
   const [fc, setFc] = useState({ max_hr: "", resting_hr: "" });
@@ -236,6 +246,7 @@ export default function OnboardingPage() {
         [!profile.elevation_pref, `${cid}-denivele`, tr("elevTitle")],
       ] : s === "health" ? [
         [!healthAnswered, `${cid}-sante`, tr("healthTitle")],
+        [!aptRepondu, `${cid}-aptitude`, APTITUDE_UI[(lang as Lang) in APTITUDE_UI ? (lang as Lang) : "fr"].titre],
       ] : [];
     return m.filter(([manque]) => manque).map(([, id, label]) => ({ id, label: sansEmoji(label) }));
   };
@@ -320,6 +331,16 @@ export default function OnboardingPage() {
     const echecs: string[] = [];
     const noter = (e: { message: string } | null, quoi: string) => { if (e) echecs.push(`${quoi}: ${e.message}`); };
     noter(eContexte, "contexte et santé");
+
+    // Le questionnaire d'aptitude, écrit AVANT que le plan ne soit bâti (plus bas) : sinon le
+    // premier plan d'un coureur qui a coché une situation contiendrait des séances dures.
+    const apt = validerAptitude({ oui: aptOui }, aujourdhui(FUSEAU_DEFAUT));
+    if (apt.ok) {
+      const { error: eApt } = await supabase.from("notifications").insert({
+        user_id: user.id, type: TYPE_APTITUDE, title: "Questionnaire d'aptitude", body: "", data: apt.aptitude,
+      });
+      noter(eApt, "questionnaire d'aptitude");
+    }
 
     const { error: eDispo } = await supabase.from("profiles").update({
       days_per_week: profile.days_per_week,
@@ -601,6 +622,25 @@ export default function OnboardingPage() {
                   <span className={`${TUILE} w-full`}>
                     {healthNone && <Check aria-hidden="true" className="h-4 w-4 shrink-0" />}
                     {tr("healthNoneLong")}
+                  </span>
+                </label>
+              </div>
+            </div>
+            {/* ── LE QUESTIONNAIRE D'APTITUDE (lot 3) ── */}
+            <div id={`${cid}-aptitude`} className="scroll-mt-32">
+              <Question id={`${cid}-apt`} titre={APTITUDE_UI[(lang as Lang) in APTITUDE_UI ? (lang as Lang) : "fr"].titre}
+                aide={APTITUDE_UI[(lang as Lang) in APTITUDE_UI ? (lang as Lang) : "fr"].aide} marque={marqueManque(`${cid}-aptitude`)}>
+                <Cases id={`${cid}-apt`} disposition="flex flex-col gap-2" valeurs={aptOui}
+                  onToggle={(v) => { setAptAucune(false); setAptOui((o) => (o.includes(v as QuestionAptitude) ? o.filter((x) => x !== v) : [...o, v as QuestionAptitude])); }}
+                  options={QUESTIONS_APTITUDE.map((q) => ({ v: q, l: APTITUDE_UI[(lang as Lang) in APTITUDE_UI ? (lang as Lang) : "fr"].questions[q] }))} />
+              </Question>
+              <div className="px-5 pb-6 sm:px-7">
+                <label htmlFor={`${cid}-apt-aucune`} className="relative block cursor-pointer">
+                  <input id={`${cid}-apt-aucune`} type="checkbox" checked={aptAucune}
+                    onChange={() => { setAptOui([]); setAptAucune((v) => !v); }} className="peer sr-only" />
+                  <span className={`${TUILE} w-full`}>
+                    {aptAucune && <Check aria-hidden="true" className="h-4 w-4 shrink-0" />}
+                    {APTITUDE_UI[(lang as Lang) in APTITUDE_UI ? (lang as Lang) : "fr"].aucune}
                   </span>
                 </label>
               </div>

@@ -16,6 +16,7 @@ import { JOURS_AVANT_CONSULTER, type ChargeAvant, type DouleurUnifiee } from "@/
 import type { ConsignesKine } from "@/lib/health/consignesKine";
 import Link from "next/link";
 import { Recuperation } from "@/components/health/Recuperation";
+import { CarteAptitude } from "@/components/health/CarteAptitude";
 import type { DonneesRecup } from "@/lib/health/recuperation";
 
 // ── i18n local (5 langues) — la page Santé naît traduite. ───────────────────────
@@ -174,7 +175,7 @@ const TON_TENDANCE: Record<Tendance, string> = {
 // le partage de position en direct reste sur la Carte.
 type Tab = "kine" | "recup" | "nutrition" | "poids";
 
-export function HealthCenter({ suivi = [], douleurs = [], effets = null, consignes = null, charge = null, rappel = null, enPanne = false, coursesNutrition = [], poidsKg = null, recup = null }: {
+export function HealthCenter({ suivi = [], douleurs = [], effets = null, consignes = null, charge = null, rappel = null, enPanne = false, coursesNutrition = [], poidsKg = null, recup = null, aptitude = "ok" }: {
   /** Santé, lot 1 : une seule liste des douleurs actives (déclarées + cochées après une séance). */
   douleurs?: (DouleurUnifiee & { libelle?: Partial<Record<string, string>>; zone?: string })[];
   /** Ce que la douleur a retiré au plan (état du coach) ; `null` s'il n'est pas encore recalculé. */
@@ -194,6 +195,8 @@ export function HealthCenter({ suivi = [], douleurs = [], effets = null, consign
   poidsKg?: number | null;
   /** Santé › Récupération (lot 2) : bilan du matin et indicateurs, calculés côté serveur. */
   recup?: DonneesRecup | null;
+  /** Le questionnaire d'aptitude (lot 3) : à remplir, en attente d'avis médical, ou rien à afficher. */
+  aptitude?: "absent" | "attente" | "ok";
 }) {
   // Chaque libellé est relié à son champ : sans cela, un lecteur d'écran annonce
   // le placeholder — ou rien — à la place du texte affiché.
@@ -367,6 +370,9 @@ export function HealthCenter({ suivi = [], douleurs = [], effets = null, consign
           <p className="mt-0.5 line-clamp-2 text-[13px] text-zinc-500 sm:text-sm">{tr("h.subtitle")}</p>
         </div>
       </div>
+
+      {/* Le questionnaire d'aptitude, au-dessus des onglets : il conditionne l'intensité du plan. */}
+      <CarteAptitude etat={aptitude} />
 
       {/* Onglets — pastille active qui glisse en douceur */}
       {/* Défilement horizontal sur téléphone : cinq onglets à icône ne tiennent pas dans

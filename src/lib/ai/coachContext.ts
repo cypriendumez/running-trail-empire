@@ -55,6 +55,7 @@ import { pausesDeTrace, pointsStockes, vitesseEnMouvement, dureeCourte } from "@
 import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { TYPE_CONSIGNES, consignesEnVigueur, kmPourDuree, type ConsignesKine } from "@/lib/health/consignesKine";
 import { TYPE_BILAN, BILAN_T, bilanDuJour, effetBilan, type BilanMatin } from "@/lib/health/bilanMatin";
+import { TYPE_APTITUDE, APTITUDE_T, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
 import { recupAllongee, verdictExecution } from "@/lib/coach/arretsQualite";
 import { arretsMemorises, memoriserArrets } from "@/lib/activities/cacheArrets";
 import { estUnePanne } from "@/lib/dashboard/lectures";
@@ -310,6 +311,8 @@ export type AthleteContext = {
   sortiesRecentes?: string[];
   /** Le bilan du matin de CE jour (lib/health/bilanMatin) et ce qu'il fait au plan ; `null` sans bilan. */
   bilanMatin?: (BilanMatin & { allege: boolean; stressHaut: boolean }) | null;
+  /** Le questionnaire d'aptitude (lib/health/aptitude) : `attente` = situation cochée, avis médical pas encore donné. */
+  aptitude?: { attente: boolean } | null;
   /** Disponibilités déclarées : nb de séances de course/semaine et jours praticables (0 = dim). */
   availability: { daysPerWeek: number; days: number[] };
   /** Prévisions RÉELLES à 7 jours (Open-Meteo) — vide si la position est inconnue. */
@@ -797,6 +800,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const lignesB = (lignesBilan ?? []) as { data?: unknown }[];
   const bilan = bilanDuJour(lignesB, lendemainParis) ?? bilanDuJour(lignesB, jourParis);
   const effetDuBilan = effetBilan(bilan);
+  // ── LE QUESTIONNAIRE D'APTITUDE (lot 3) : une panne n'est pas « rien à signaler ».
+  const { data: lignesApt, error: eApt } = await sb.from("notifications").select("data")
+    .eq("user_id", userId).eq("type", TYPE_APTITUDE).order("created_at", { ascending: false }).limit(1);
+  if (estUnePanne({ error: eApt })) throw new Error(`Questionnaire d'aptitude illisible : ${eApt?.code ?? "?"} ${eApt?.message ?? ""}`);
+  const aptitudeAttente = avisAttendu(lireAptitude(((lignesApt ?? []) as { data?: unknown }[])[0]?.data));
   const declaredPains = libellesActifs(
     ((painRes.data ?? []) as { id?: string; data: Douleur | null }[]).map((n) => ({ ...(n.data ?? {}), id: n.id })),
     aujourdhui(FUSEAU_DEFAUT),
@@ -1504,9 +1512,12 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     hasObjective: !!objective, daysToRace, isShortGoal,
     apresCourse: recupMotif ? { motif: recupMotif.fr, reprise: repriseCetteSemaine } : null,
     marcheCourse: !!marcheCourse,
-    consignesKine: consignes ? {
-      motif: `consignes de ton kinésithérapeute jusqu'au ${consignes.jusquAu.slice(8, 10)}/${consignes.jusquAu.slice(5, 7)}`,
-      sansQualite: consignes.sansIntensite || consignes.dureeMaxMin != null,
+    consignesKine: consignes || aptitudeAttente ? {
+      motif: [
+        consignes ? `consignes de ton kinésithérapeute jusqu'au ${consignes.jusquAu.slice(8, 10)}/${consignes.jusquAu.slice(5, 7)}` : null,
+        aptitudeAttente ? APTITUDE_T.fr.motif : null,
+      ].filter(Boolean).join(" ; "),
+      sansQualite: aptitudeAttente || !!consignes?.sansIntensite || consignes?.dureeMaxMin != null,
     } : null,
   };
   const qb = computeQualityBudget(entreeQualite);
@@ -1553,6 +1564,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   //    coureur déjà « jaune » à « orange », ce qui coupe la sortie longue de TOUTE la semaine.
   //    Le bilan ne parle que d'aujourd'hui : seule la séance dure du jour change (autoPlan).
   if (bilan && effetDuBilan.allege) infoFlags.push(tr((l) => BILAN_T[l].motif(bilan.fatigue, bilan.jambes)));
+  if (aptitudeAttente) infoFlags.push(tr((l) => APTITUDE_T[l].motif));
   if (bilan && effetDuBilan.stressHaut) infoFlags.push(tr((l) => BILAN_T[l].stress(bilan.stress)));
   if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.map((x) => traduireDouleur(x, l)).join(", "))));
   // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
@@ -1960,7 +1972,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const allureSeuilConnue = /\d+['’]\d{2}/.test(sPace);
   // La récupération d'après-course n'a pas besoin d'être exclue ici : `etatDouble` refuse
   // tout double tant qu'elle dure (phase de reprise comprise) — vérifié par mutation.
-  const doubleSeuilActif = !consignes && etatDoubles.seuilActif && allureSeuilConnue && qBudget >= 1
+  const doubleSeuilActif = !consignes && !aptitudeAttente && etatDoubles.seuilActif && allureSeuilConnue && qBudget >= 1
     && !repriseArret && !marcheCourse;
   const doseDS = doseDoubleSeuil(habitudeKm);
   const qDoubleSeuil: QualitySession = {
@@ -2690,6 +2702,7 @@ ${catalog}`;
     effetsDouleur,
     consignes: consignes ? { ...consignes, kmMax: kmConsigne } : null,
     bilanMatin: bilan ? { ...bilan, ...effetDuBilan } : null,
+    aptitude: { attente: aptitudeAttente },
     sortiesRecentes: (() => {
       const jour = aujourdhui(FUSEAU_DEFAUT);
       const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 7);

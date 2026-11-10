@@ -88,6 +88,48 @@ export type ContexteConsignes = {
   sortiesRecentes: string[];
   /** Date d'une course C de la semaine (AAAA-MM-JJ), à transformer en footing ; `null` sinon. */
   courseC: string | null;
+  /** D'où vient le cadre : le kinésithérapeute (défaut), ou le questionnaire d'aptitude en attente
+   *  de l'avis d'un médecin (lot 3) — mêmes règles, autres mots. */
+  source?: "kine" | "aptitude";
+};
+
+/** Les textes quand le cadre vient du questionnaire d'aptitude (pas de durée, pas de nombre de sorties). */
+const TA: typeof T = {
+  fr: {
+    titre: "Footing facile, en attendant l'avis d'un médecin",
+    why: () => "Ton questionnaire d'aptitude signale une situation à faire voir à un médecin : en attendant son avis, ton plan ne contient aucune intensité.",
+    repos: () => "", mc: () => "",
+    course: () => " ⚠️ Ton questionnaire d'aptitude demande l'avis d'un médecin : vois-le avant de courir cette course.",
+    renfo: " En attendant l'avis d'un médecin : aucun saut ni bondissement.",
+  },
+  en: {
+    titre: "Easy run, while waiting for a doctor's opinion",
+    why: () => "Your fitness questionnaire flags something a doctor should look at: until then, your plan has no intensity.",
+    repos: () => "", mc: () => "",
+    course: () => " ⚠️ Your fitness questionnaire calls for a doctor's opinion: see one before running this race.",
+    renfo: " Until a doctor has seen you: no jumps or bounds.",
+  },
+  de: {
+    titre: "Lockerer Lauf, bis eine Ärztin oder ein Arzt draufgeschaut hat",
+    why: () => "Dein Fitness-Fragebogen nennt etwas, das ärztlich abgeklärt werden sollte: Bis dahin enthält dein Plan keine Intensität.",
+    repos: () => "", mc: () => "",
+    course: () => " ⚠️ Dein Fitness-Fragebogen verlangt eine ärztliche Einschätzung: Hol sie vor diesem Wettkampf ein.",
+    renfo: " Bis zur ärztlichen Einschätzung: keine Sprünge.",
+  },
+  es: {
+    titre: "Rodaje suave, a la espera de la opinión de un médico",
+    why: () => "Tu cuestionario de aptitud señala algo que debe ver un médico: hasta entonces, tu plan no tiene intensidad.",
+    repos: () => "", mc: () => "",
+    course: () => " ⚠️ Tu cuestionario de aptitud pide la opinión de un médico: consúltalo antes de correr esta carrera.",
+    renfo: " Hasta que te vea un médico: ningún salto ni bote.",
+  },
+  pt: {
+    titre: "Corrida fácil, à espera da opinião de um médico",
+    why: () => "O teu questionário de aptidão assinala algo que um médico deve ver: até lá, o teu plano não tem intensidade.",
+    repos: () => "", mc: () => "",
+    course: () => " ⚠️ O teu questionário de aptidão pede a opinião de um médico: consulta-o antes de correres esta prova.",
+    renfo: " Até um médico te ver: nenhum salto.",
+  },
 };
 
 const jjmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
@@ -151,11 +193,12 @@ const texteDe = (jour: PlanDay, l: Lang): PlanDayText =>
  */
 export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsignes): PlanDay[] {
   const { consignes } = c;
+  const TX = c.source === "aptitude" ? TA : T;
   const fin = jjmm(consignes.jusquAu);
   const footing = (jour: PlanDay) => {
     const corps = corpsFooting(consignes.dureeMaxMin, jour, c.allureFacile);
     return reecrire(jour, "Récup", (l) => ({
-      title: T[l].titre, detail: PLAN_T[l].recupDetail(5, 5, corps), why: T[l].why(fin),
+      title: TX[l].titre, detail: PLAN_T[l].recupDetail(5, 5, corps), why: TX[l].why(fin),
       tags: [PLAN_T[l].tags["Récup"], PLAN_T[l].tags["Z1"], `${corps + 10} min`],
     }));
   };
@@ -177,19 +220,19 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
     if (!course) {
       // Le renfo perd ses sauts quand l'intensité est interdite.
       apres.push(jour.type === "Renfo" && consignes.sansIntensite
-        ? reecrire(jour, "Renfo", (l) => { const t = texteDe(jour, l); return { ...t, detail: t.detail.includes(T[l].renfo) ? t.detail : t.detail + T[l].renfo }; })
+        ? reecrire(jour, "Renfo", (l) => { const t = texteDe(jour, l); return { ...t, detail: t.detail.includes(TX[l].renfo) ? t.detail : t.detail + TX[l].renfo }; })
         : jour);
       continue;
     }
     if (jour.type === "Course" && jour.date !== c.courseC) {
       // Course A ou B : l'objectif de l'athlète, jamais retiré ; on dit de demander l'accord.
-      apres.push(reecrire(jour, "Course", (l) => { const t = texteDe(jour, l); return { ...t, why: t.why.includes(T[l].course(fin)) ? t.why : t.why + T[l].course(fin) }; }));
+      apres.push(reecrire(jour, "Course", (l) => { const t = texteDe(jour, l); return { ...t, why: t.why.includes(TX[l].course(fin)) ? t.why : t.why + TX[l].course(fin) }; }));
       continue;
     }
     if (jour.type === "Marche/course") {
       const total = minDeTags(jour.tags ?? []);
       apres.push(consignes.dureeMaxMin != null && (total == null || total > consignes.dureeMaxMin)
-        ? repos(jour, (l) => T[l].mc(fin)) : jour);
+        ? repos(jour, (l) => TX[l].mc(fin)) : jour);
       continue;
     }
     apres.push(consignes.dureeMaxMin != null || jour.type === "Course" || (consignes.sansIntensite && intense(jour)) ? footing(jour) : jour);
@@ -212,7 +255,7 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
     // est dans `sortiesRecentes`, on ne la compte pas deux fois.
     if (c.sortiesRecentes.includes(jour.date)) return jour;
     if (tient(jour.date)) { gardees.push(jour.date); return jour; }
-    return repos(jour, (l) => T[l].repos(max, fin));
+    return repos(jour, (l) => TX[l].repos(max, fin));
   });
 }
 
