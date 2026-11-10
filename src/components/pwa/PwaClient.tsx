@@ -12,20 +12,25 @@
  *    manuel (Partager → « Sur l'écran d'accueil »). On ne peut donc que l'EXPLIQUER — un bouton
  *    « installer » y serait un mensonge, il ne ferait rien.
  *
- * On n'affiche jamais rien si l'app est DÉJÀ installée (mode `standalone`), et un rejet est
- * mémorisé (localStorage) pour ne pas harceler. Tout accès au stockage est protégé : en
- * navigation privée, `localStorage` peut lever une exception.
+ * QUAND la proposition se montre (règles et raisons dans `invitation.ts`) : seulement dans
+ * l'application (`/dashboard`), seulement sur un appareil tactile, jamais si l'app est DÉJÀ
+ * installée (mode `standalone`), et un rejet est mémorisé (localStorage) pour ne pas
+ * harceler. Tout accès au stockage est protégé : en navigation privée, `localStorage` peut
+ * lever une exception, d'où la fermeture gardée AUSSI en mémoire (`ferme`).
  */
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Download, X } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { PWA_I18N } from "@/components/pwa/pwaI18n";
+import { appareilAInviter, pageOuInviter } from "@/components/pwa/invitation";
 
 type PromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 
 const CLE_REJET = "pacevo_pwa_rejet";
 const REPIT_MS = 14 * 24 * 60 * 60 * 1000; // 14 jours après un rejet
+const DELAI_MS = 4000; // le temps de voir l'écran avant qu'on propose quoi que ce soit
 
 function rejeteRecemment(): boolean {
   try {
@@ -37,9 +42,11 @@ function rejeteRecemment(): boolean {
 export function PwaClient() {
   const { lang } = useT();
   const L = PWA_I18N[lang] ?? PWA_I18N.fr;
+  const dansAppli = pageOuInviter(usePathname());
   const [invite, setInvite] = useState<PromptEvent | null>(null); // Android : événement natif
   const [ios, setIos] = useState(false); // iPhone : instructions manuelles
-  const [visible, setVisible] = useState(false);
+  const [ferme, setFerme] = useState(false); // fermée pendant cette visite, même sans stockage
+  const [pose, setPose] = useState(false); // la personne a eu le temps de voir l'écran
 
   // Enregistrement du service worker (hors-ligne + base des notifications). Best effort :
   // un échec ne doit rien casser du site.
@@ -61,77 +68,96 @@ export function PwaClient() {
   }, []);
 
   useEffect(() => {
-    // Déjà installée → on ne propose rien.
-    const standalone = window.matchMedia?.("(display-mode: standalone)").matches
+    // Déjà installée, refusée récemment, ou ordinateur → on ne propose rien et on ne capte
+    // rien : le navigateur garde son propre chemin d'installation.
+    const installee = window.matchMedia?.("(display-mode: standalone)").matches
       || (navigator as unknown as { standalone?: boolean }).standalone === true;
-    if (standalone || rejeteRecemment()) return;
+    const tactile = window.matchMedia?.("(pointer: coarse)").matches === true;
+    if (!appareilAInviter({ installee, tactile, rejetRecent: rejeteRecemment() })) return;
 
     const ua = navigator.userAgent || "";
     const estIOS = /iphone|ipad|ipod/i.test(ua)
       || (/Macintosh/.test(ua) && "ontouchend" in document); // iPad récent se déclare « Macintosh »
 
     // Android / Chrome : on attend l'événement, sinon rien ne s'affiche (l'app n'est pas
-    // installable sur ce navigateur, mieux vaut se taire que promettre).
+    // installable sur ce navigateur, mieux vaut se taire que promettre). L'événement arrive au
+    // chargement, souvent sur une page publique : on le GARDE, et on ne le montre que dans
+    // l'application. ⚠️ Chrome le réémet après un refus de sa fenêtre d'installation : c'est
+    // `ferme` qui empêche alors la proposition de revenir.
     const onPrompt = (e: Event) => {
       e.preventDefault();
       setInvite(e as PromptEvent);
-      setVisible(true);
     };
     window.addEventListener("beforeinstallprompt", onPrompt);
 
-    // iPhone : pas d'événement possible → on montre les instructions après un court délai,
-    // le temps que la personne voie d'abord l'app.
-    let minuteur: ReturnType<typeof setTimeout> | undefined;
-    if (estIOS) {
-      minuteur = setTimeout(() => { setIos(true); setVisible(true); }, 4000);
-    }
+    // iPhone : pas d'événement possible → on ne peut qu'expliquer le geste.
+    if (estIOS) setIos(true);
 
     // Si l'app est installée pendant la visite, on retire la proposition.
-    const onInstalled = () => { setVisible(false); memoriseRejet(); };
+    const onInstalled = () => { setFerme(true); memoriseRejet(); };
     window.addEventListener("appinstalled", onInstalled);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onPrompt);
       window.removeEventListener("appinstalled", onInstalled);
-      if (minuteur) clearTimeout(minuteur);
     };
   }, []);
+
+  // Dans l'application seulement, et après un court délai : on laisse d'abord voir l'écran.
+  useEffect(() => {
+    if (!dansAppli) return;
+    const minuteur = setTimeout(() => setPose(true), DELAI_MS);
+    return () => { clearTimeout(minuteur); setPose(false); };
+  }, [dansAppli]);
 
   function memoriseRejet() {
     try { localStorage.setItem(CLE_REJET, String(Date.now())); } catch { /* navigation privée */ }
   }
 
-  function fermer() { setVisible(false); memoriseRejet(); }
+  function fermer() { setFerme(true); memoriseRejet(); }
 
   async function installer() {
     if (!invite) return;
-    await invite.prompt();
-    await invite.userChoice.catch(() => null);
+    // `prompt()` ne sert qu'une fois par événement et lève s'il est rappelé : quoi qu'il
+    // arrive, la proposition se retire.
+    try {
+      await invite.prompt();
+      await invite.userChoice;
+    } catch { /* fenêtre déjà servie ou refusée par le navigateur */ }
     setInvite(null);
-    setVisible(false);
-    memoriseRejet();
+    fermer();
   }
 
+  const visible = dansAppli && pose && !ferme && (invite !== null || ios);
   if (!visible) return null;
 
+  // Au-dessus de la barre d'onglets du téléphone (même réserve que `MiseAJour`), sinon la
+  // proposition recouvre la navigation.
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[60] p-4 sm:p-6 flex justify-center pointer-events-none">
-      <div role="dialog" aria-label={L.installTitle}
+    <div className="fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[60] flex justify-center px-3 pointer-events-none md:bottom-6">
+      <div role="dialog" aria-label={ios ? L.iosTitle : L.installTitle}
         className="pointer-events-auto w-full max-w-md rounded-2xl border border-zinc-200 bg-white shadow-xl p-4 flex items-start gap-3">
         <div className="shrink-0 mt-0.5"><Logo size={36} /></div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-zinc-900">{ios ? L.iosTitle : L.installTitle}</p>
           <p className="text-xs text-zinc-500 mt-0.5">{ios ? L.iosBody : L.installBody}</p>
-          {!ios && (
-            <button type="button" onClick={installer}
-              className="btn-brand justify-center inline-flex mt-3 px-4 py-2 text-sm">
-              <Download className="w-4 h-4" /> {L.installBtn}
+          {/* La sortie est écrite en toutes lettres : une croix seule ne se voit pas. */}
+          <div className="mt-3 flex flex-wrap items-center gap-1">
+            {!ios && (
+              <button type="button" onClick={installer}
+                className="btn-brand justify-center inline-flex px-4 py-2 text-sm">
+                <Download className="w-4 h-4" /> {L.installBtn}
+              </button>
+            )}
+            <button type="button" onClick={fermer}
+              className={`rounded-lg py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 ${ios ? "pr-3" : "px-3"}`}>
+              {L.later}
             </button>
-          )}
+          </div>
         </div>
-        <button type="button" onClick={fermer} aria-label={L.later}
-          className="shrink-0 text-zinc-400 hover:text-zinc-700 p-1 -m-1">
-          <X className="w-4 h-4" />
+        <button type="button" onClick={fermer} aria-label={L.close}
+          className="shrink-0 rounded-lg p-2 -m-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900">
+          <X className="w-5 h-5" />
         </button>
       </div>
     </div>

@@ -12,6 +12,7 @@ export type PwaBloc = {
   installBody: string;
   installBtn: string;
   later: string;
+  close: string;
   iosTitle: string;
   iosBody: string;
   // Page hors-ligne
@@ -33,6 +34,7 @@ export const PWA_I18N: Record<string, PwaBloc> = {
     installBody: "Ton coach en un tap sur l'écran d'accueil, même hors-ligne.",
     installBtn: "Installer l'application",
     later: "Plus tard",
+    close: "Fermer",
     iosTitle: "Ajoute Pacevo à ton écran d'accueil",
     iosBody: "Appuie sur Partager, puis « Sur l'écran d'accueil ».",
     offlineTitle: "Tu es hors-ligne",
@@ -50,6 +52,7 @@ export const PWA_I18N: Record<string, PwaBloc> = {
     installBody: "Your coach one tap away on your home screen, even offline.",
     installBtn: "Install the app",
     later: "Later",
+    close: "Close",
     iosTitle: "Add Pacevo to your home screen",
     iosBody: "Tap Share, then “Add to Home Screen”.",
     offlineTitle: "You're offline",
@@ -67,6 +70,7 @@ export const PWA_I18N: Record<string, PwaBloc> = {
     installBody: "Dein Coach mit einem Tipp auf dem Startbildschirm, auch offline.",
     installBtn: "App installieren",
     later: "Später",
+    close: "Schließen",
     iosTitle: "Füge Pacevo zum Startbildschirm hinzu",
     iosBody: "Tippe auf Teilen und dann „Zum Home-Bildschirm“.",
     offlineTitle: "Du bist offline",
@@ -84,6 +88,7 @@ export const PWA_I18N: Record<string, PwaBloc> = {
     installBody: "Tu entrenador a un toque en la pantalla de inicio, incluso sin conexión.",
     installBtn: "Instalar la app",
     later: "Más tarde",
+    close: "Cerrar",
     iosTitle: "Añade Pacevo a tu pantalla de inicio",
     iosBody: "Toca Compartir y luego “Añadir a pantalla de inicio”.",
     offlineTitle: "Estás sin conexión",
@@ -101,6 +106,7 @@ export const PWA_I18N: Record<string, PwaBloc> = {
     installBody: "O teu treinador a um toque no ecrã inicial, mesmo offline.",
     installBtn: "Instalar a aplicação",
     later: "Mais tarde",
+    close: "Fechar",
     iosTitle: "Adiciona o Pacevo ao teu ecrã inicial",
     iosBody: "Toca em Partilhar e depois “Adicionar ao ecrã principal”.",
     offlineTitle: "Estás offline",

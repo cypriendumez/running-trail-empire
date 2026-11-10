@@ -12,6 +12,7 @@
  */
 import { readFileSync } from "node:fs";
 import { PWA_I18N } from "../src/components/pwa/pwaI18n";
+import { appareilAInviter, pageOuInviter } from "../src/components/pwa/invitation";
 
 let ko = 0;
 const fail = (quoi: string, detail = "") => { ko++; console.log(`  ✗ ${quoi}${detail ? "\n      " + detail : ""}`); };
@@ -79,12 +80,42 @@ const layout = sansCommentaires(readFileSync("src/app/layout.tsx", "utf8"));
 if (!/<PwaClient/.test(layout)) fail("le layout racine ne monte pas PwaClient");
 if (!/manifest: "\/manifest\.json"/.test(layout)) fail("le layout ne lie plus le manifest");
 c += 2;
-console.log(`  ✓ installation : ${c} contrôles (Android, iOS, déjà installée, SW, montage)`);
+
+// ── 3 bis. QUAND la proposition se montre ────────────────────────────────────
+// Défaut du 09/11/2026 : un visiteur venu pour la première fois, sur ordinateur, a vu
+// « Installe Pacevo » sur la page d'accueil publique, avec une croix grise pour seule sortie.
+for (const chemin of ["/", "/courses", "/blog/un-article", "/login", "/signup", "/onboarding", "/consentement", "/dashboardx", "", null, undefined]) {
+  if (pageOuInviter(chemin)) fail(`la proposition d'installation se montre hors de l'application (${JSON.stringify(chemin)})`, "un visiteur qui découvre le site n'a rien à installer");
+  c++;
+}
+for (const chemin of ["/dashboard", "/dashboard/calendar", "/dashboard/settings"]) {
+  if (!pageOuInviter(chemin)) fail(`la proposition d'installation ne se montre plus dans l'application (${chemin})`);
+  c++;
+}
+const telephone = { installee: false, tactile: true, rejetRecent: false };
+if (!appareilAInviter(telephone)) fail("un téléphone qui n'a pas l'app ne reçoit plus la proposition");
+if (appareilAInviter({ ...telephone, tactile: false })) fail("un ordinateur reçoit la proposition d'installation", "le texte parle d'écran d'accueil ; le navigateur a déjà son icône d'installation");
+if (appareilAInviter({ ...telephone, installee: true })) fail("la proposition se montre alors que l'app est déjà installée");
+if (appareilAInviter({ ...telephone, rejetRecent: true })) fail("la proposition revient malgré un refus récent");
+c += 4;
+// Le composant applique bien ces deux règles (au site d'appel, pas à l'import)…
+if (!/pageOuInviter\(usePathname\(\)\)/.test(pwa)) fail("PwaClient ne limite plus la proposition aux pages de l'application");
+if (!/if \(!appareilAInviter\(\{/.test(pwa)) fail("PwaClient ne filtre plus l'appareil avant de capter l'installation");
+if (!/pointer: coarse/.test(pwa)) fail("PwaClient ne distingue plus le tactile de l'ordinateur");
+const visibleDe = pwa.match(/const visible = ([^;]+);/)?.[1] ?? "";
+for (const terme of ["dansAppli", "pose", "!ferme"]) {
+  if (!visibleDe.includes(terme)) fail(`l'affichage de la proposition ne dépend plus de « ${terme} »`, "Chrome réémet l'événement après un refus : sans `ferme`, elle revient");
+  c++;
+}
+// … et la sortie est écrite en toutes lettres, pas seulement une croix.
+if (!/onClick=\{fermer\}[^>]*>\s*\{L\.later\}/.test(pwa)) fail("la proposition n'a plus de bouton « Plus tard » lisible", "une croix grise de 16 px ne se voit pas");
+c += 4;
+console.log(`  ✓ installation : ${c} contrôles (Android, iOS, déjà installée, SW, montage, moment et sortie)`);
 
 // ── 4. Textes : cinq langues, aucune clé vide, page hors-ligne branchée ───────
 let t = 0;
 const CLES: (keyof typeof PWA_I18N["fr"])[] = [
-  "installTitle", "installBody", "installBtn", "later", "iosTitle", "iosBody",
+  "installTitle", "installBody", "installBtn", "later", "close", "iosTitle", "iosBody",
   "offlineTitle", "offlineBody", "offlineRetry", "pushTitle", "pushBody", "pushEnable", "pushEnabled", "pushBlocked", "pushInstallFirst",
 ];
 for (const lg of ["fr", "en", "de", "es", "pt"] as const) {
