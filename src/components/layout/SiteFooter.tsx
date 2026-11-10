@@ -53,6 +53,7 @@ export function SiteFooter({ newsletter = true }: { newsletter?: boolean }) {
         { href: "/blog", label: c.nav.blog },
         { href: "/courses", label: f.races },
         { href: "/chaussures", label: f.shoes },
+        { href: "/methode", label: f.method },
       ],
     },
     {

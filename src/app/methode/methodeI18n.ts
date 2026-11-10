@@ -79,6 +79,7 @@ export const METHODE: Record<Lang, PageMethode> = {
       { id: "ia", titre: "Ce que fait l'IA, et ce qu'elle ne fait pas", paras: [
         "Un modèle de langage (Gemini, de Google) n'intervient que pour écrire : l'analyse de tes séances, le bilan de la semaine et les conseils des séances clés pour les abonnés Premium, des propositions d'ajustement que tu acceptes ou non, et l'assistant d'aide.",
         "Il ne décide jamais de ton plan, de tes allures ni de tes zones, et une proposition d'ajustement est vérifiée par les mêmes règles que le plan avant de t'être montrée.",
+        "Seule exception, quand ton plan n'a encore aucune séance pour aujourd'hui : le tableau de bord te propose une séance indicative, rédigée par l'IA ou calculée, qui n'entre pas dans ton plan. Rien n'est proposé si ton questionnaire d'aptitude attend l'avis d'un médecin.",
       ] },
       { id: "limites", titre: "Ce que Pacevo ne sait pas", paras: [
         "Quand une donnée manque, Pacevo le dit au lieu de la remplacer par un chiffre plausible : pas de VMA, de fréquence cardiaque maximale ni de sommeil inventés. Un trou dans tes séances (blessure, coupure, montre oubliée) est signalé, pas lu comme « zéro entraînement ».",
@@ -142,6 +143,7 @@ export const METHODE: Record<Lang, PageMethode> = {
       { id: "ia", titre: "What AI does, and what it doesn't", paras: [
         "A language model (Google's Gemini) is only used to write: the analysis of your sessions, the weekly review and the key-session advice for Premium members, adjustment suggestions that you accept or not, and the help assistant.",
         "It never decides your plan, your paces or your zones, and an adjustment suggestion is checked against the same rules as the plan before it is shown to you.",
+        "One exception, when your plan has no session for today yet: the dashboard suggests an indicative session, written by the AI or calculated, which does not enter your plan. Nothing is suggested if your fitness questionnaire is waiting for a doctor's opinion.",
       ] },
       { id: "limites", titre: "What Pacevo doesn't know", paras: [
         "When data is missing, Pacevo says so instead of replacing it with a plausible figure: no invented MAS, maximum heart rate or sleep. A gap in your sessions (injury, break, forgotten watch) is flagged, not read as \"zero training\".",
@@ -205,6 +207,7 @@ export const METHODE: Record<Lang, PageMethode> = {
       { id: "ia", titre: "Was die KI tut und was nicht", paras: [
         "Ein Sprachmodell (Gemini von Google) wird nur zum Schreiben eingesetzt: die Analyse deiner Einheiten, der Wochenrückblick und die Tipps zu Schlüsseleinheiten für Premium-Mitglieder, Anpassungsvorschläge, die du annimmst oder nicht, und der Hilfe-Assistent.",
         "Es entscheidet nie über deinen Plan, deine Tempi oder Zonen, und ein Anpassungsvorschlag wird mit denselben Regeln wie der Plan geprüft, bevor du ihn siehst.",
+        "Einzige Ausnahme, wenn dein Plan für heute noch keine Einheit hat: Das Dashboard schlägt eine unverbindliche Einheit vor, von der KI geschrieben oder berechnet, die nicht in deinen Plan eingeht. Nichts wird vorgeschlagen, wenn dein Fitness-Fragebogen auf eine ärztliche Einschätzung wartet.",
       ] },
       { id: "limites", titre: "Was Pacevo nicht weiß", paras: [
         "Fehlen Daten, sagt Pacevo es, statt sie durch eine plausible Zahl zu ersetzen: keine erfundene VMA, maximale Herzfrequenz oder Schlafdauer. Eine Lücke in deinen Einheiten (Verletzung, Pause, vergessene Uhr) wird gemeldet, nicht als „null Training“ gelesen.",
@@ -268,6 +271,7 @@ export const METHODE: Record<Lang, PageMethode> = {
       { id: "ia", titre: "Lo que hace la IA, y lo que no hace", paras: [
         "Un modelo de lenguaje (Gemini, de Google) solo interviene para escribir: el análisis de tus sesiones, el balance de la semana y los consejos de las sesiones clave para los suscriptores Premium, propuestas de ajuste que aceptas o no, y el asistente de ayuda.",
         "Nunca decide tu plan, tus ritmos ni tus zonas, y una propuesta de ajuste se comprueba con las mismas reglas que el plan antes de mostrártela.",
+        "Única excepción, cuando tu plan aún no tiene sesión para hoy: el panel te propone una sesión orientativa, redactada por la IA o calculada, que no entra en tu plan. No se propone nada si tu cuestionario de aptitud espera la opinión de un médico.",
       ] },
       { id: "limites", titre: "Lo que Pacevo no sabe", paras: [
         "Cuando falta un dato, Pacevo lo dice en lugar de sustituirlo por una cifra verosímil: ni VAM, ni frecuencia cardíaca máxima, ni sueño inventados. Un hueco en tus sesiones (lesión, parón, reloj olvidado) se señala, no se lee como «cero entrenamiento».",
@@ -331,6 +335,7 @@ export const METHODE: Record<Lang, PageMethode> = {
       { id: "ia", titre: "O que a IA faz, e o que não faz", paras: [
         "Um modelo de linguagem (Gemini, da Google) só serve para escrever: a análise dos teus treinos, o balanço da semana e os conselhos dos treinos-chave para os assinantes Premium, propostas de ajuste que aceitas ou não, e o assistente de ajuda.",
         "Nunca decide o teu plano, os teus ritmos nem as tuas zonas, e uma proposta de ajuste é verificada pelas mesmas regras do plano antes de ta mostrarmos.",
+        "Única exceção, quando o teu plano ainda não tem treino para hoje: o painel propõe-te um treino indicativo, escrito pela IA ou calculado, que não entra no teu plano. Nada é proposto se o teu questionário de aptidão estiver à espera da opinião de um médico.",
       ] },
       { id: "limites", titre: "O que o Pacevo não sabe", paras: [
         "Quando falta um dado, o Pacevo di-lo em vez de o substituir por um número plausível: nem VAM, nem frequência cardíaca máxima, nem sono inventados. Um buraco nos teus treinos (lesão, paragem, relógio esquecido) é assinalado, não lido como «zero treino».",

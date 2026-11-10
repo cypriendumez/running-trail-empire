@@ -112,6 +112,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Google prenait encore « pacevo » pour une faute de frappe (« pancevo »). Ce sont elles
     // qu'un moteur lit pour comprendre qu'une marque existe, avant les 15 000 fiches.
     { path: "/notre-histoire", freq: "monthly", priority: 0.7 },
+    // « Comment Pacevo calcule » (10/11/2026) : la méthode, exigée par l'App Store (règle 1.4.1).
+    { path: "/methode", freq: "monthly", priority: 0.6 },
     { path: "/pricing", freq: "monthly", priority: 0.6 },
     { path: "/contact", freq: "yearly", priority: 0.4 },
     { path: "/mentions-legales", freq: "yearly", priority: 0.3 },
