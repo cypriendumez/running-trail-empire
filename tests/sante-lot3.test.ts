@@ -15,6 +15,7 @@ import { APTITUDE_UI } from "../src/lib/health/aptitudeI18n";
 import { buildAthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
+import { PLAN_T } from "../src/lib/ai/planI18n";
 
 let passed = 0; const fails: string[] = [];
 async function test(nom: string, fn: () => void | Promise<void>) {
@@ -55,7 +56,8 @@ const APT = (oui: string[], avisMedecin: string | null = null) => ({ user_id: "u
 const contexte = (notifs: unknown[]) => buildAthleteContext(fauxClient({ profiles: [PROFIL], performance_baselines: BASE, workouts: SEANCES, notifications: notifs }), "u");
 const QUALITE = /^(VMA|Seuil|Spécifique|Côtes|Fartlek|Tempo)/;
 const departs = () => Array.from({ length: 7 }, (_, k) => { const d = new Date(`${AUJ}T08:00:00`); d.setDate(d.getDate() + k); return d; });
-const intense = (d: { type: string; title: string; tags: string[] }) => QUALITE.test(d.type) || d.tags.some((t) => /^(Qualité|Progressif|Spécifique)$/.test(t));
+const intense = (d: { type: string; title: string; tags: string[] }) => QUALITE.test(d.type) || d.tags.some((t) => /^(Qualité|Progressif|Spécifique)$/.test(t))
+  || [PLAN_T.fr.enduranceTitreLignes, PLAN_T.fr.enduranceTitreProg, PLAN_T.fr.veilleTitre, PLAN_T.fr.avantVeilleTitre].includes(d.title);
 
 async function main() {
   console.log("\nLE QUESTIONNAIRE : VALIDATION");
@@ -106,6 +108,23 @@ async function main() {
     assert.match(j0.why, /avis d'un médecin/, "la course ne dit pas de voir un médecin");
     assert.ok(j0.i18n?.en?.why.includes("doctor"), "l'avertissement manque en anglais");
     assert.match(codeOf("src/lib/coach/consignesPlan.ts"), /const TX = c\.source === "aptitude" \? TA : T;/, "les textes du kiné servent à l'aptitude");
+  });
+
+  await test("un nouvel inscrit SANS VMA et en attente d'avis : aucun test VMA (6 min à fond), un plan sans intensité", async () => {
+    // Le verrou « test VMA d'abord » d'autoCoach ne s'applique pas tant que l'avis est attendu.
+    const ac = codeOf("src/lib/ai/autoCoach.ts");
+    const iAvis = ac.indexOf("const avisMedicalAttendu = avisAttendu(");
+    const iVerrou = ac.indexOf("if (!vmaMesuree && !estFondateur && !avisMedicalAttendu) {");
+    assert.ok(iAvis > 0 && iVerrou > iAvis, "le test VMA est de nouveau prescrit sans regarder le questionnaire");
+    assert.match(ac, /if \(eApt\) \{\s*await journaliserEchecUneFois[\s\S]{0,200}return \{ processed: false, reason: "aptitude illisible" \};/, "une panne de lecture passerait pour « rien à signaler »");
+    // Et le plan qu'il reçoit à la place : bâti sans VMA ni historique, sans aucune intensité.
+    const ctx = await buildAthleteContext(fauxClient({ profiles: [PROFIL], performance_baselines: [], workouts: [], notifications: [APT(["poitrine"])] }), "u");
+    assert.equal(ctx.aptitude?.attente, true);
+    for (const d of departs()) {
+      const plan = buildWeekPlan(ctx, d);
+      assert.ok(plan.some((j) => j.type !== "Repos"), "aucune séance sans VMA");
+      for (const j of plan) assert.ok(!intense(j) && !/VMA|test/i.test(j.title), `séance intense ou test le ${j.date} : ${j.type} « ${j.title} »`);
+    }
   });
 
   await test("une lecture du questionnaire en panne refuse le contexte (pas « rien à signaler »)", () => {

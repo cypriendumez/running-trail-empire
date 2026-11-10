@@ -11,6 +11,7 @@ import { lignesRetireesParDouleur } from "@/lib/coach/footings";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, consignesSurPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
+import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
 import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
 import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, fcMaxMontre, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { avecFcMaxMontre } from "@/lib/coach/fcCible";
@@ -209,7 +210,18 @@ export async function autoCoachForUser(
   // depuis sa courbe d'allure/VO2max, il pilote l'app et n'a pas à passer par le test 6 min.
   // `estAdmin` lit ADMIN_EMAILS côté serveur (repli : le propriétaire historique).
   const estFondateur = estAdmin((profilAcces as { email?: string } | null)?.email);
-  if (!vmaMesuree && !estFondateur) {
+  // ⚠️ LE QUESTIONNAIRE D'APTITUDE PASSE AVANT LE TEST VMA (relecture du 10/11/2026). Le test
+  // (« 6 min À FOND ») était posé ICI, avant le plan : un inscrit qui venait de cocher « douleur
+  // dans la poitrine » recevait l'effort le plus dur de l'appli, montre comprise. Tant que l'avis
+  // d'un médecin est attendu, pas de test : le plan sans intensité ; le test viendra après l'avis.
+  const { data: lignesApt, error: eApt } = await admin.from("notifications").select("data")
+    .eq("user_id", userId).eq("type", TYPE_APTITUDE).order("created_at", { ascending: false }).limit(1);
+  if (eApt) {
+    await journaliserEchecUneFois(admin, { source: "coach-auto", userId, message: `Questionnaire d'aptitude illisible, plan laissé en place : ${eApt.code ?? "?"} ${eApt.message}` });
+    return { processed: false, reason: "aptitude illisible" };
+  }
+  const avisMedicalAttendu = avisAttendu(lireAptitude(((lignesApt ?? []) as { data?: unknown }[])[0]?.data));
+  if (!vmaMesuree && !estFondateur && !avisMedicalAttendu) {
     // ⚠️ SAUF EN MARCHE-COURSE. « Cours 6 minutes À FOND » était le premier effort de
     // coureur d'une personne qui ne court pas encore 30 minutes d'affilée (Cyprien,
     // 05/11/2026). Son programme ne dépend d'aucune allure : il démarre sans test, et le
