@@ -54,6 +54,7 @@ import { douleursDeSeance } from "@/lib/health/douleursSeance";
 import { pausesDeTrace, pointsStockes, vitesseEnMouvement, dureeCourte } from "@/lib/activities/pauses";
 import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { recupAllongee, verdictExecution } from "@/lib/coach/arretsQualite";
+import { arretsMemorises, memoriserArrets } from "@/lib/activities/cacheArrets";
 import { estUnePanne } from "@/lib/dashboard/lectures";
 import type { PausesSeance } from "@/lib/activities/pauses";
 import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
@@ -1291,6 +1292,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     if (objectifSeul || !w?.id) return Promise.resolve(null);
     const id = w.id;
     if (!arretsLus.has(id)) arretsLus.set(id, (async () => {
+      // Une trace ne change plus une fois importée : ses arrêts sont mémorisés d'une
+      // reconstruction à l'autre (lib/activities/cacheArrets), au lieu de relire des
+      // milliers de points à chaque synchro.
+      const deja = arretsMemorises(id, w.distance_km, w.duration_seconds);
+      if (deja !== undefined) return deja;
       const { data, error } = await sb.from("activity_tracks").select("points, has_gps").eq("workout_id", id).maybeSingle();
       if (error) {
         console.error("[coach] trace illisible, arrêts inconnus :", error.code ?? "?", error.message);
@@ -1299,11 +1305,14 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
       }
       // Pas de ligne, ou une séance SANS GPS (tapis) : on ne sait rien des arrêts, et c'est assumé.
       const ligne = data as { points?: unknown; has_gps?: boolean | null } | null;
-      if (!ligne || ligne.has_gps === false) return null;
+      if (!ligne) return null;
+      if (ligne.has_gps === false) { memoriserArrets(id, w.distance_km, w.duration_seconds, null); return null; }
       // ⚠️ UNE TRACE PRÉSENTE MAIS INEXPLOITABLE n'est pas « aucun arrêt » (relecture du
       // 10/11/2026) : trop peu de points, ou séance sans distance ni durée en mouvement.
       const arrets = pausesDeTrace(pointsStockes(ligne.points), vitesseEnMouvement(w.distance_km, w.duration_seconds));
-      return arrets ?? ("illisible" as const);
+      if (!arrets) return "illisible" as const;
+      memoriserArrets(id, w.distance_km, w.duration_seconds, arrets);
+      return arrets;
     })());
     return arretsLus.get(id)!;
   };

@@ -107,7 +107,7 @@ test("le coach lit les douleurs par la règle, et le verdict des arrêts", () =>
   assert.match(coach, /const verdictQualite = verdictExecution\(qe\?\.fadeSec, recupQualite, arretsQualite === "illisible"\);/, "une trace illisible n'est plus distinguée d'une séance sans arrêt");
   assert.match(coach, /return "illisible" as const;/, "la lecture en erreur de la trace rend « aucun arrêt »");
   // 3e relecture : trace présente mais inexploitable, ou séance introuvable → pas « aucun arrêt ».
-  assert.match(coach, /if \(!ligne \|\| ligne\.has_gps === false\) return null;[\s\S]{0,400}return arrets \?\? \("illisible" as const\);/, "une trace inexploitable passe pour « aucun arrêt »");
+  assert.match(coach, /if \(ligne\.has_gps === false\) \{ memoriserArrets\([^;]*null\); return null; \}[\s\S]{0,400}if \(!arrets\) return "illisible" as const;/, "une trace inexploitable passe pour « aucun arrêt »");
   assert.match(coach, /!seanceQualite && !objectifSeul \? \("illisible" as const\)/, "une séance de qualité introuvable passe pour « aucun arrêt »");
   // Relecture du 10/11 : une panne de lecture des douleurs rendait « aucune douleur ».
   assert.match(coach, /for \(const \[nom, r\] of \[\["ressentis", fbRes\], \["douleurs déclarées", painRes\]\] as const\) \{\s*if \(estUnePanne\(r\)\) throw new Error/, "une panne des douleurs passe pour « aucune douleur »");
