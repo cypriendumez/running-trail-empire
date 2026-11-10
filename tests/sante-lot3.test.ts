@@ -170,6 +170,8 @@ async function main() {
     assert.match(codeOf("src/app/dashboard/page.tsx"), /sansCourse=\{sansTestVma\}/, "le tableau de bord ne transmet plus l'attente");
     // La route elle-même refuse (l'écran n'est pas la seule porte) ; une panne vaut refus.
     assert.match(codeOf("src/app/api/ai/session/route.ts"), /if \(eApt \|\| avisAttendu\(lireAptitude\(/, "la route propose une séance malgré l'avis attendu");
+    // La troisième voie : le chat des cours reçoit le dossier et propose des séances (relecture).
+    assert.match(codeOf("src/app/api/ai/cours/route.ts"), /if \(aptRes\.error \|\| avisAttendu\(lireAptitude\([\s\S]{0,120}\)\) \{\s*return NextResponse\.json\(\{ reply: APTITUDE_CHAT\[/, "le chat des cours répond malgré l'avis attendu");
   });
 
   await test("une lecture du questionnaire en panne refuse le contexte (pas « rien à signaler »)", () => {

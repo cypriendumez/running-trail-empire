@@ -8,6 +8,9 @@ import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { prochaineCourse } from "@/lib/coach/prochaineCourse";
 import { courseDatee, echeance, enteteTemps } from "@/lib/ai/reperesTemps";
 import { COLONNES_VFC, precisionMetrique, serieVfc } from "@/lib/health/vfc";
+import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
+import { APTITUDE_CHAT } from "@/lib/health/aptitudeI18n";
+import { normLang } from "@/lib/i18n/base";
 
 type Msg = { role: "user" | "model"; text: string };
 
@@ -26,6 +29,18 @@ export async function POST(req: Request) {
 
   const { message, history } = await req.json() as { message: string; history?: Msg[] };
   if (!message?.trim()) return NextResponse.json({ error: "Question vide" }, { status: 400 });
+
+  // ⚠️ AVIS MÉDICAL ATTENDU (questionnaire d'aptitude, Santé lot 3) : le modèle reçoit le dossier de
+  // l'athlète et l'invite propose des séances — il pourrait conseiller du fractionné à un coureur
+  // qui a signalé un symptôme cardiaque (relecture du 10/11/2026). Réponse fixe, aucun appel au
+  // modèle ; une lecture en panne vaut le même refus.
+  const [aptRes, langRes] = await Promise.all([
+    supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", TYPE_APTITUDE).order("created_at", { ascending: false }).limit(1),
+    supabase.from("profiles").select("preferred_language").eq("id", user.id).maybeSingle(),
+  ]);
+  if (aptRes.error || avisAttendu(lireAptitude(((aptRes.data ?? []) as { data?: unknown }[])[0]?.data))) {
+    return NextResponse.json({ reply: APTITUDE_CHAT[normLang(String((langRes.data as { preferred_language?: string } | null)?.preferred_language ?? "fr"))] });
+  }
 
   // Dossier athlète complet — c'est ce qui rend la réponse SUPÉRIEURE à un conseil générique.
   const [profileRes, baselineRes, workoutsRes, hrvRes, sleepRes, raceRes, objRes, coachSessRes, coachMsgRes, adviceRes, planRes] = await Promise.all([
