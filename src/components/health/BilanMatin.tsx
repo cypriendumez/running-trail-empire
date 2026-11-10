@@ -24,7 +24,7 @@ const T: Record<Lang, {
     titre: "Ton bilan du matin", aide: "Trois clics : ton plan du jour en tient compte. 1 = très bien, 5 = très mal.",
     enregistrer: "Envoyer mon bilan", modifier: "Mettre à jour mon bilan",
     q: { fatigue: ["Fatigue", "En forme", "Épuisé"], jambes: ["Jambes", "Légères", "Très lourdes, courbatures"], stress: ["Stress", "Serein", "Très stressé"] },
-    ok: "Bilan enregistré : ton plan du jour est à jour.", okAllege: "Bilan enregistré : la séance dure du jour devient facile.",
+    ok: "Bilan enregistré : ton plan du jour est à jour.", okAllege: "Bilan enregistré : si une séance dure était prévue aujourd'hui, elle devient facile.",
     attente: "Bilan enregistré : ton plan en tiendra compte à son prochain recalcul.", erreur: "Bilan non enregistré, réessaie dans un instant.",
     douleur: "Une douleur précise (tendon, articulation, os) se déclare dans Santé › Douleurs, pas ici.",
   },
@@ -32,7 +32,7 @@ const T: Record<Lang, {
     titre: "Your morning check-in", aide: "Three taps: today's plan takes it into account. 1 = very good, 5 = very bad.",
     enregistrer: "Send my check-in", modifier: "Update my check-in",
     q: { fatigue: ["Fatigue", "Fresh", "Exhausted"], jambes: ["Legs", "Light", "Very heavy, sore"], stress: ["Stress", "Calm", "Very stressed"] },
-    ok: "Check-in saved: today's plan is up to date.", okAllege: "Check-in saved: today's hard session becomes easy.",
+    ok: "Check-in saved: today's plan is up to date.", okAllege: "Check-in saved: if a hard session was planned today, it becomes easy.",
     attente: "Check-in saved: your plan will take it into account at its next recalculation.", erreur: "Check-in not saved, try again in a moment.",
     douleur: "A specific pain (tendon, joint, bone) is reported in Health › Pain, not here.",
   },
@@ -40,7 +40,7 @@ const T: Record<Lang, {
     titre: "Dein Morgen-Check", aide: "Drei Klicks: Dein heutiger Plan berücksichtigt ihn. 1 = sehr gut, 5 = sehr schlecht.",
     enregistrer: "Check senden", modifier: "Check aktualisieren",
     q: { fatigue: ["Müdigkeit", "Fit", "Erschöpft"], jambes: ["Beine", "Leicht", "Sehr schwer, Muskelkater"], stress: ["Stress", "Entspannt", "Sehr gestresst"] },
-    ok: "Check gespeichert: Dein heutiger Plan ist aktuell.", okAllege: "Check gespeichert: Die harte Einheit von heute wird locker.",
+    ok: "Check gespeichert: Dein heutiger Plan ist aktuell.", okAllege: "Check gespeichert: War heute eine harte Einheit geplant, wird sie locker.",
     attente: "Check gespeichert: Dein Plan berücksichtigt ihn bei der nächsten Neuberechnung.", erreur: "Check nicht gespeichert, versuche es gleich noch einmal.",
     douleur: "Ein konkreter Schmerz (Sehne, Gelenk, Knochen) wird unter Gesundheit › Schmerzen gemeldet, nicht hier.",
   },
@@ -48,7 +48,7 @@ const T: Record<Lang, {
     titre: "Tu chequeo matinal", aide: "Tres clics: tu plan de hoy lo tiene en cuenta. 1 = muy bien, 5 = muy mal.",
     enregistrer: "Enviar mi chequeo", modifier: "Actualizar mi chequeo",
     q: { fatigue: ["Cansancio", "En forma", "Agotado"], jambes: ["Piernas", "Ligeras", "Muy pesadas, agujetas"], stress: ["Estrés", "Tranquilo", "Muy estresado"] },
-    ok: "Chequeo guardado: tu plan de hoy está al día.", okAllege: "Chequeo guardado: la sesión dura de hoy pasa a ser suave.",
+    ok: "Chequeo guardado: tu plan de hoy está al día.", okAllege: "Chequeo guardado: si hoy había una sesión dura, pasa a ser suave.",
     attente: "Chequeo guardado: tu plan lo tendrá en cuenta en su próximo recálculo.", erreur: "Chequeo no guardado, inténtalo de nuevo en un momento.",
     douleur: "Un dolor concreto (tendón, articulación, hueso) se declara en Salud › Dolor, no aquí.",
   },
@@ -56,7 +56,7 @@ const T: Record<Lang, {
     titre: "O teu check-in da manhã", aide: "Três cliques: o teu plano de hoje tem-no em conta. 1 = muito bem, 5 = muito mal.",
     enregistrer: "Enviar o meu check-in", modifier: "Atualizar o meu check-in",
     q: { fatigue: ["Cansaço", "Em forma", "Exausto"], jambes: ["Pernas", "Leves", "Muito pesadas, dores musculares"], stress: ["Stress", "Tranquilo", "Muito stressado"] },
-    ok: "Check-in guardado: o teu plano de hoje está atualizado.", okAllege: "Check-in guardado: a sessão dura de hoje passa a ser fácil.",
+    ok: "Check-in guardado: o teu plano de hoje está atualizado.", okAllege: "Check-in guardado: se hoje estava prevista uma sessão dura, passa a ser fácil.",
     attente: "Check-in guardado: o teu plano vai tê-lo em conta no próximo recálculo.", erreur: "Check-in não guardado, tenta novamente daqui a pouco.",
     douleur: "Uma dor concreta (tendão, articulação, osso) declara-se em Saúde › Dor, não aqui.",
   },
@@ -112,7 +112,7 @@ export function BilanMatin({ initial = null, variante = "onglet" }: { initial?: 
                   const choisi = rep[c] === n;
                   return (
                     <button key={n} type="button" role="radio" aria-checked={choisi} onClick={() => setRep((p) => ({ ...p, [c]: n }))}
-                      className={`h-9 w-9 rounded-lg text-sm font-semibold ring-1 transition-colors ${choisi
+                      className={`h-11 w-11 rounded-lg text-sm font-semibold ring-1 transition-colors ${choisi
                         ? n >= 4 ? "bg-amber-600 text-white ring-amber-600" : "bg-zinc-900 text-white ring-zinc-900"
                         : "bg-white text-zinc-700 ring-zinc-200 hover:bg-zinc-50"}`}>
                       {n}
@@ -120,7 +120,7 @@ export function BilanMatin({ initial = null, variante = "onglet" }: { initial?: 
                   );
                 })}
               </div>
-              <div className="mt-0.5 flex w-[13.5rem] justify-between text-[11px] text-zinc-500">
+              <div className="mt-0.5 flex w-[15.75rem] justify-between text-[11px] text-zinc-500">
                 <span>{t.q[c][1]}</span><span>{t.q[c][2]}</span>
               </div>
             </div>

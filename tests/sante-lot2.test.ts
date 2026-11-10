@@ -104,6 +104,12 @@ async function main() {
     const avec = await contexte([BILAN({ fatigue: 5, jambes: 2, stress: 2 })]);
     assert.ok(avec.bilanMatin?.allege, `bilan non lu : ${JSON.stringify(avec.bilanMatin)}`);
     assert.notEqual(avec.readiness.level, "rouge", "le seul ressenti a mis le feu au rouge");
+    // Affiché, jamais compté dans le feu : sinon un coureur déjà « jaune » passerait « orange » et
+    // perdrait 20 % de sortie longue sur TOUTE la semaine (relecture du 10/11/2026).
+    const sansBilan = await contexte([]);
+    assert.equal(avec.readiness.level, sansBilan.readiness.level, "le bilan a changé la couleur du feu");
+    assert.equal(avec.volume.longRunKm, sansBilan.volume.longRunKm, "le bilan a coupé la sortie longue de la semaine");
+    assert.doesNotMatch(codeOf("src/lib/ai/coachContext.ts"), /orangeFlags\.push\(tr\(\(l\) => BILAN_T/, "le bilan compte de nouveau dans le feu");
     assert.ok(avec.readiness.reasonsAll?.some((r) => r.fr === BILAN_T.fr.motif(5, 2)), "le motif du bilan n'est pas dans le bandeau");
     for (const d of departs) {
       const j0 = buildWeekPlan(avec, d)[0];
@@ -136,6 +142,14 @@ async function main() {
     const stresse = await contexte([BILAN({ fatigue: 2, jambes: 2, stress: 5 })]);
     assert.equal(stresse.readiness.level, sans.readiness.level, "le stress seul a changé la couleur du feu");
     assert.ok(stresse.readiness.reasonsAll?.some((r) => r.fr === BILAN_T.fr.stress(5)), "le stress n'est pas affiché");
+  });
+
+  await test("un bilan daté du lendemain à Paris (coureur d'Asie, le matin) compte ; celui de la veille jamais", async () => {
+    const demain = ilYa(-1);
+    const asie = await contexte([BILAN({ fatigue: 5, jambes: 5, stress: 1 }, demain)]);
+    assert.ok(asie.bilanMatin?.allege, "le bilan du lendemain (fuseau à l'est) est ignoré");
+    const veille = await contexte([BILAN({ fatigue: 5, jambes: 5, stress: 1 }, ilYa(1))]);
+    assert.equal(veille.bilanMatin, null, "le bilan de la veille compte");
   });
 
   await test("une lecture du bilan en panne refuse le contexte (pas « aucun bilan »)", () => {

@@ -788,7 +788,12 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const { data: lignesBilan, error: eBilan } = await sb.from("notifications").select("data")
     .eq("user_id", userId).eq("type", TYPE_BILAN).order("created_at", { ascending: false }).limit(3);
   if (estUnePanne({ error: eBilan })) throw new Error(`Bilan du matin illisible : ${eBilan?.code ?? "?"} ${eBilan?.message ?? ""}`);
-  const bilan = bilanDuJour((lignesBilan ?? []) as { data?: unknown }[], aujourdhui(FUSEAU_DEFAUT));
+  // Le jour de Paris, ou le LENDEMAIN : le matin d'un coureur d'Asie ou d'Océanie tombe encore la
+  //    veille à Paris (relecture du 10/11/2026). Un bilan de la veille, lui, ne compte jamais.
+  const jourParis = aujourdhui(FUSEAU_DEFAUT);
+  const lendemainParis = (() => { const d = new Date(`${jourParis}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); })();
+  const lignesB = (lignesBilan ?? []) as { data?: unknown }[];
+  const bilan = bilanDuJour(lignesB, lendemainParis) ?? bilanDuJour(lignesB, jourParis);
   const effetDuBilan = effetBilan(bilan);
   const declaredPains = libellesActifs(
     ((painRes.data ?? []) as { id?: string; data: Douleur | null }[]).map((n) => ({ ...(n.data ?? {}), id: n.id })),
@@ -1542,7 +1547,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   if (secondaireMotif) infoFlags.push(secondaireMotif);
   // Le bilan du matin : fatigue ou jambes à 4-5/5 colorent le feu (et allègent la séance dure du
   // jour, autoPlan) ; le stress seul s'affiche sans rien retirer. Jamais de rouge sur le ressenti.
-  if (bilan && effetDuBilan.allege) orangeFlags.push(tr((l) => BILAN_T[l].motif(bilan.fatigue, bilan.jambes)));
+  // ⚠️ AFFICHÉ, PAS COMPTÉ DANS LE FEU (relecture du 10/11/2026) : en orange, il faisait passer un
+  //    coureur déjà « jaune » à « orange », ce qui coupe la sortie longue de TOUTE la semaine.
+  //    Le bilan ne parle que d'aujourd'hui : seule la séance dure du jour change (autoPlan).
+  if (bilan && effetDuBilan.allege) infoFlags.push(tr((l) => BILAN_T[l].motif(bilan.fatigue, bilan.jambes)));
   if (bilan && effetDuBilan.stressHaut) infoFlags.push(tr((l) => BILAN_T[l].stress(bilan.stress)));
   if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.map((x) => traduireDouleur(x, l)).join(", "))));
   // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
