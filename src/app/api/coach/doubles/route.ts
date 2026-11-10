@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { COLONNES_ACCES, lectureDuCoach } from "@/lib/billing/access";
+import { journaliserEchecUneFois, causeStable } from "@/lib/journal/echecServeur";
 
 /**
  * GET /api/coach/doubles → l'athlète peut-il doubler, et sinon que lui manque-t-il ?
@@ -41,9 +42,12 @@ export async function GET() {
       volumeKm: ctx.volume.avg4wkKm,
       cetteSemaineKm: ctx.volume.weekKm,
     });
-  } catch {
+  } catch (e) {
     // On ne prétend PAS que tout va bien quand on n'a pas pu calculer : l'écran doit
     // pouvoir dire « je n'ai pas réussi à vérifier » plutôt que d'inventer un verdict.
+    // Et la cause part dans `error_logs` (le contexte refuse désormais de se bâtir sur des
+    // douleurs illisibles, relecture du 10/11/2026), une fois par jour.
+    await journaliserEchecUneFois(null, { source: "coach-doubles", userId: user.id, url: "/api/coach/doubles", message: `Contexte du coach impossible : ${causeStable(e)}` });
     return NextResponse.json({ error: "Vérification impossible pour le moment" }, { status: 503 });
   }
 }

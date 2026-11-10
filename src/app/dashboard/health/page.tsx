@@ -6,6 +6,10 @@ import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { estUnePanne } from "@/lib/dashboard/lectures";
 import { effectiveVma, bestVmaFromWorkouts } from "@/lib/running/fitness";
 import { coursesPourNutrition, type CourseNutri } from "@/lib/health/coursesNutrition";
+import { douleursDeSeance, type DouleurSeance } from "@/lib/health/douleursSeance";
+import { PEREMPTION_JOURS } from "@/lib/health/douleurs";
+import { traduireDouleur } from "@/lib/coach/painZonesI18n";
+import { LANGS } from "@/lib/i18n/base";
 
 export const metadata = { title: "Santé" };
 
@@ -24,6 +28,7 @@ export default async function HealthPage() {
   let enPanne = false;
   let coursesNutrition: CourseNutri[] = [];
   let poidsKg: number | null = null;
+  let douleursSeance: (DouleurSeance & { ilYaJours: number; libelle: Record<string, string> })[] = [];
   if (user) {
     // Pour la nutrition, les courses à venir et de quoi PRÉDIRE leur durée — la même VMA effective que le coach
     // (`effectiveVma`, seule définition de l'app) : lus ensemble, en une vague.
@@ -86,6 +91,28 @@ export default async function HealthPage() {
     }
     enPanne = estUnePanne({ error });
     if (enPanne) console.error("[santé] douleurs illisibles :", error?.message);
+
+    // ── LES DOULEURS COCHÉES APRÈS UNE SÉANCE, celles que le coach compte encore ─────────
+    //    (lib/health/douleursSeance : 14 jours, « c'est passé », ou un « Aucune douleur » plus
+    //    récent). Elles n'avaient aucun bouton pour s'éteindre (Cyprien, 09/11/2026).
+    //    Une lecture ratée met l'écran en panne : une liste vide dirait « rien ne pèse ».
+    const { data: ress, error: eRess } = await supabase.from("notifications").select("data")
+      .eq("user_id", user.id).eq("type", "session_feedback")
+      .gte("created_at", new Date(Date.now() - (PEREMPTION_JOURS + 1) * 86400000).toISOString())
+      .order("created_at", { ascending: false }).limit(60);
+    if (eRess && estUnePanne({ error: eRess })) {
+      enPanne = true;
+      console.error("[santé] ressentis illisibles :", eRess.message);
+    }
+    // L'ancienneté se calcule ICI, côté serveur, avec le fuseau commun : la calculer dans le
+    // navigateur ferait différer le rendu serveur la nuit (erreur React #418, lib/time).
+    const jourJ = aujourdhui(FUSEAU_DEFAUT);
+    douleursSeance = douleursDeSeance(((ress ?? []) as { data: Record<string, unknown> | null }[]).map((r) => r.data ?? {}), jourJ)
+      .map((d) => ({
+        ...d,
+        ilYaJours: Math.max(0, Math.round((Date.parse(`${jourJ}T12:00:00Z`) - Date.parse(`${d.date}T12:00:00Z`)) / 86400000)),
+        libelle: Object.fromEntries(LANGS.map(({ code }) => [code, traduireDouleur(d.zone, code)])),
+      }));
   }
-  return <HealthCenter suivi={suivi} etats={etats} enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} />;
+  return <HealthCenter suivi={suivi} etats={etats} douleursSeance={douleursSeance} enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} />;
 }

@@ -49,9 +49,13 @@ import { coursesDeSaison, prochaineCourseA, courseSecondaireDeLaSemaine, courses
 import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { decaleJour } from "@/lib/streak/compute";
 import { niveauDeVma } from "@/lib/running/niveau";
-import { libellesActifs, type Douleur } from "@/lib/health/douleurs";
+import { libellesActifs, PEREMPTION_JOURS, type Douleur } from "@/lib/health/douleurs";
+import { douleursDeSeance } from "@/lib/health/douleursSeance";
 import { pausesDeTrace, pointsStockes, vitesseEnMouvement, dureeCourte } from "@/lib/activities/pauses";
 import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
+import { recupAllongee, verdictExecution } from "@/lib/coach/arretsQualite";
+import { estUnePanne } from "@/lib/dashboard/lectures";
+import type { PausesSeance } from "@/lib/activities/pauses";
 import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
 import { phaseDeSemaine, specifiqueEnTete, semainesAffutage, partAffutage, allegementDuBloc } from "@/lib/coach/phase";
 
@@ -452,7 +456,13 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     objectifSeul || essentielle ? nonLu() : sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(30),
     objectifSeul ? nonLu() : sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(30),
     fetchWorkouts(sb, userId, objectifSeul, essentielle),
-    sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(5),
+    // Les ressentis des 15 DERNIERS JOURS, pas les cinq derniers : une douleur compte 14 jours
+    // (lib/health/douleursSeance), et un « Aucune douleur » ou un « c'est passé » plus ancien que
+    // le 5e ressenti restait invisible au coach alors que l'écran Santé le voyait (relecture du
+    // 10/11/2026). Les lectures du ressenti (RPE, notes) prennent toujours les plus récents.
+    sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback")
+      .gte("created_at", new Date(Date.now() - (PEREMPTION_JOURS + 1) * 86400000).toISOString())
+      .order("created_at", { ascending: false }).limit(60),
     // Douleurs déclarées depuis l'espace Santé (schéma corporel) — elles n'atteignaient
     // pas le coach, qui ne regardait que le formulaire post-séance.
     sb.from("notifications").select("id, data").eq("user_id", userId).eq("type", "pain_report").order("created_at", { ascending: false }).limit(10),
@@ -528,8 +538,15 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // par le plan gratuit »). Un « 9/10, épuisé » qui laissait le lendemain inchangé était un
   // plan qui n'écoutait pas : le ressenti n'est pas une mesure, c'est ce que l'athlète dit.
   // Les NOTES libres restent dehors : seul un modèle les lit, et aucun ne parle au gratuit.
-  const feedback = ((fbRes.data ?? []) as { data: { rpe?: number; pain?: string[]; note?: string } }[])
-    .map((f) => objectifSeul ? { data: { pain: f.data?.pain, rpe: f.data?.rpe } } : f);
+  // ⚠️ UNE PANNE N'EST PAS « AUCUNE DOULEUR » (relecture du 10/11/2026). Ressentis et douleurs
+  // déclarées décident à eux seuls si une douleur bride le plan : une lecture ratée rendait
+  // `[]`, donc un plan durci sur un tibia signalé. On refuse de bâtir le contexte ; le coach
+  // automatique laisse alors le plan en place et journalise la cause (autoCoach, « ctx »).
+  for (const [nom, r] of [["ressentis", fbRes], ["douleurs déclarées", painRes]] as const) {
+    if (estUnePanne(r)) throw new Error(`Douleurs illisibles (${nom}) : ${r.error?.code ?? "?"} ${r.error?.message ?? ""}`);
+  }
+  const feedback = ((fbRes.data ?? []) as { data: { rpe?: number; pain?: string[]; note?: string; date?: string; ts?: string; painPasse?: string[] } }[])
+    .map((f) => objectifSeul ? { data: { pain: f.data?.pain, rpe: f.data?.rpe, date: f.data?.date, ts: f.data?.ts, painPasse: f.data?.painPasse } } : f);
   // ⚠️ UN OBJECTIF PASSÉ RESTAIT L'OBJECTIF. `race_objective` est une ligne unique que rien
   // n'efface après la course. Cas réel (Cyprien, marathon de Lille couru le 25/10/2026) :
   // cinq jours plus tard, le coach se croyait encore en AFFÛTAGE (`weeksToRace` = −1, donc
@@ -749,8 +766,12 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     aujourdhui(FUSEAU_DEFAUT),
     { mieux: "en amélioration selon l'athlète", pire: "en aggravation selon l'athlète" },
   );
+  // ⚠️ UNE DOULEUR COCHÉE APRÈS UNE SÉANCE NE S'ÉTEIGNAIT JAMAIS (09/11/2026) : elle pesait
+  // tant que son ressenti restait parmi les cinq derniers, sans bouton « c'est passé ».
+  // Désormais : 14 jours, « c'est passé » (Santé), ou un « Aucune douleur » plus récent
+  // (lib/health/douleursSeance).
   const pains = [...new Set([
-    ...feedback.flatMap(f => f.data?.pain ?? []).filter((p) => p && p !== "Aucune douleur"),
+    ...douleursDeSeance(feedback.map((f) => f.data ?? {}), aujourdhui(FUSEAU_DEFAUT)).map((d) => d.zone),
     ...declaredPains,
   ])];
   const lastRpe = feedback[0]?.data?.rpe ?? null;
@@ -1259,14 +1280,57 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Périmée au-delà de 12 jours : une série ratée il y a trois semaines ne doit pas
   // continuer à brider l'entraînement d'aujourd'hui. L'analyse n'est rafraîchie que
   // lorsqu'une nouvelle séance dure est détectée, elle peut donc traîner.
+  // ── LES ARRÊTS D'UNE SÉANCE, relus sur sa trace (lib/activities/pauses) ─────────────────
+  //    Une lecture ratée se DIT au journal (une fois par jour : ce contexte se reconstruit à
+  //    chaque synchro) ; une séance sans trace se tait. Mémorisé par séance : la dernière
+  //    séance et la dernière qualité sont souvent la même.
+  //    « illisible » (lecture en erreur) n'est pas « aucun arrêt » : le verdict d'une qualité
+  //    ne dit alors plus « tu peux durcir » (lib/coach/arretsQualite).
+  const arretsLus = new Map<string, Promise<PausesSeance | null | "illisible">>();
+  const lireArrets = (w: Wk | undefined): Promise<PausesSeance | null | "illisible"> => {
+    if (objectifSeul || !w?.id) return Promise.resolve(null);
+    const id = w.id;
+    if (!arretsLus.has(id)) arretsLus.set(id, (async () => {
+      const { data, error } = await sb.from("activity_tracks").select("points, has_gps").eq("workout_id", id).maybeSingle();
+      if (error) {
+        console.error("[coach] trace illisible, arrêts inconnus :", error.code ?? "?", error.message);
+        await journaliserEchecUneFois(null, { source: "coach-arrets", userId, message: `Trace d'une séance illisible, arrêts inconnus : ${error.code ?? "?"} ${error.message}` });
+        return "illisible" as const;
+      }
+      // Pas de ligne, ou une séance SANS GPS (tapis) : on ne sait rien des arrêts, et c'est assumé.
+      const ligne = data as { points?: unknown; has_gps?: boolean | null } | null;
+      if (!ligne || ligne.has_gps === false) return null;
+      // ⚠️ UNE TRACE PRÉSENTE MAIS INEXPLOITABLE n'est pas « aucun arrêt » (relecture du
+      // 10/11/2026) : trop peu de points, ou séance sans distance ni durée en mouvement.
+      const arrets = pausesDeTrace(pointsStockes(ligne.points), vitesseEnMouvement(w.distance_km, w.duration_seconds));
+      return arrets ?? ("illisible" as const);
+    })());
+    return arretsLus.get(id)!;
+  };
   const qeRaw = (p?.last_quality_exec ?? null) as { date?: string; repsSec?: number[]; avgHr?: number | null; fadeSec?: number | null } | null;
   const qeAgeDays = qeRaw?.date ? Math.floor((Date.now() - new Date(`${qeRaw.date}T12:00:00`).getTime()) / 86400_000) : null;
   const qe = qeAgeDays != null && qeAgeDays <= 12 ? qeRaw : null;
+  // ⚠️ DES RÉPÉTITIONS TENUES APRÈS DES RÉCUPÉRATIONS RALLONGÉES NE PROUVENT RIEN (choix de
+  // Cyprien, 10/11/2026) : un arrêt d'au moins une minute pendant la séance de qualité, et
+  // « tu peux durcir » / « charge bien calibrée » ne sont plus dits (lib/coach/arretsQualite).
+  // La séance est celle du jour de la série, la plus chargée si deux séances partagent la date.
+  const seanceQualite = qe?.date
+    ? runs.filter((w) => String(w.date).slice(0, 10) === qe.date).sort((a, b) => (Number(b.tss) || 0) - (Number(a.tss) || 0))[0]
+    : undefined;
+  // Une série relevée dont la séance est introuvable parmi les séances lues : on ne sait pas.
+  const arretsQualite = !qe ? null : !seanceQualite && !objectifSeul ? ("illisible" as const) : await lireArrets(seanceQualite);
+  const recupQualite = arretsQualite === "illisible" ? null : recupAllongee(arretsQualite);
+  const verdictQualite = verdictExecution(qe?.fadeSec, recupQualite, arretsQualite === "illisible");
+  const arretsQualiteTxt = recupQualite
+    ? `${recupQualite.n} arrêt${recupQualite.n > 1 ? "s" : ""} d'au moins une minute (${dureeCourte(recupQualite.totalSec)} au total)`
+    : "";
   const qeLine = qe?.repsSec?.length
     ? `${qe.repsSec.length} répétitions le ${qe.date} : ${qe.repsSec.map(fmtPace).join(" · ")}/km${qe.avgHr ? ` (FC moy ${qe.avgHr})` : ""}. ${
-        qe.fadeSec == null ? ""
-        : qe.fadeSec >= 12 ? `⚠️ DÉCROCHAGE de ${qe.fadeSec} s/km entre le début et la fin : la séance était trop ambitieuse, réduis l'allure cible ou le nombre de répétitions la prochaine fois.`
-        : qe.fadeSec <= -6 ? `✅ Il a ACCÉLÉRÉ de ${-qe.fadeSec} s/km sur la fin : il en avait sous le pied, tu peux durcir la prochaine.`
+        verdictQualite == null ? ""
+        : verdictQualite === "decrochage" ? `⚠️ DÉCROCHAGE de ${qe.fadeSec} s/km entre le début et la fin : la séance était trop ambitieuse, réduis l'allure cible ou le nombre de répétitions la prochaine fois.${recupQualite ? ` (Malgré ${arretsQualiteTxt} : le signal n'en est que plus net.)` : ""}`
+        : verdictQualite === "non_probant" ? `⏸️ Allure tenue, mais avec ${arretsQualiteTxt} : ses récupérations ont été plus longues que prévu. Cette séance NE PROUVE PAS qu'il peut durcir : ne durcis pas la prochaine sur cette base, garde la même charge.`
+        : verdictQualite === "arrets_inconnus" ? "⏸️ Allure tenue, mais ses arrêts n'ont pas pu être relus : on ne sait pas si ses récupérations ont été plus longues que prévu. Ne durcis pas la prochaine sur cette seule base."
+        : verdictQualite === "accelere" ? `✅ Il a ACCÉLÉRÉ de ${-(qe.fadeSec ?? 0)} s/km sur la fin : il en avait sous le pied, tu peux durcir la prochaine.`
         : "✅ Allure tenue du début à la fin : la charge était bien calibrée."}`
     : null;
 
@@ -2440,20 +2504,9 @@ ${catalog}`;
   //    les pauses »). La base ne garde que le temps en mouvement ; la trace garde l'heure de
   //    chaque point (lib/activities/pauses). Une lecture ratée ou sans trace : rien n'est dit,
   //    jamais « aucun arrêt ».
-  const arretsDerniere = await (async () => {
-    const w = runs[0];
-    if (objectifSeul || !w?.id || Math.floor((now - new Date(w.date).getTime()) / 86400000) > 3) return null;
-    const { data, error } = await sb.from("activity_tracks").select("points").eq("workout_id", w.id).maybeSingle();
-    // Une lecture ratée se DIT au journal ; une séance sans trace (tapis, import à venir) se tait.
-    // Une fois par jour : ce contexte se reconstruit à chaque synchro (2 min).
-    if (error) {
-      console.error("[coach] trace de la dernière séance illisible, arrêts inconnus :", error.code ?? "?", error.message);
-      await journaliserEchecUneFois(null, { source: "coach-arrets", userId, message: `Trace de la dernière séance illisible, arrêts inconnus : ${error.code ?? "?"} ${error.message}` });
-      return null;
-    }
-    if (!data) return null;
-    return pausesDeTrace(pointsStockes((data as { points?: unknown }).points), vitesseEnMouvement(w.distance_km, w.duration_seconds));
-  })();
+  const arretsLusDerniere = runs[0] && Math.floor((now - new Date(runs[0].date).getTime()) / 86400000) <= 3
+    ? await lireArrets(runs[0]) : null;
+  const arretsDerniere = arretsLusDerniere === "illisible" ? null : arretsLusDerniere;
   const lastSession = (() => {
     const w = runs[0];
     if (!w?.date) return null;
@@ -2473,9 +2526,13 @@ ${catalog}`;
     const shows: string[] = [];
     // Exécution de la série : le signal le plus direct qu'on ait sur le dosage.
     if (qe?.repsSec?.length && qe.fadeSec != null) {
-      shows.push(qe.fadeSec >= 12
+      shows.push(verdictQualite === "decrochage"
         ? `décrochage de ${qe.fadeSec} s/km entre le début et la fin de la série : elle était trop ambitieuse`
-        : qe.fadeSec <= -6
+        : verdictQualite === "arrets_inconnus"
+        ? "allure tenue sur ta série, mais tes arrêts n'ont pas pu être relus : elle ne compte pas comme preuve que tu peux durcir"
+        : verdictQualite === "non_probant"
+        ? `allure tenue sur ta série, mais avec ${arretsQualiteTxt} : tes récupérations ont été plus longues que prévu, cette séance ne compte pas comme preuve que tu peux durcir`
+        : verdictQualite === "accelere"
         ? `tu as accéléré de ${-qe.fadeSec} s/km sur la fin : il en restait sous le pied`
         : "allure tenue du début à la fin de la série : la charge était bien calibrée");
     }

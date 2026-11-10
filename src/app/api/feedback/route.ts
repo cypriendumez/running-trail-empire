@@ -8,6 +8,7 @@ import { envoyerEmail } from "@/lib/email/envoyer";
 import { kmApres } from "@/lib/dashboard/ressenti";
 import { douleursDeclarees } from "@/lib/coach/painZonesI18n";
 import { journaliserEchec } from "@/lib/journal/echecServeur";
+import { autoCoachForUser } from "@/lib/ai/autoCoach";
 
 // POST /api/feedback {workout_id?, date, title, rpe (0-10), pain: string[], note, chaussure_id?}
 // → enregistre le ressenti post-séance (lu par le coach, informe la perso IA), rattaché à
@@ -148,6 +149,28 @@ export async function POST(req: Request) {
           html: coquilleEmail({ base: BASE, corps, pied }),
         }, { userId: user.id, url: "/api/feedback" });
     } catch { /* e-mail best-effort, le ressenti est déjà enregistré ; l'échec d'envoi est journalisé */ }
+  }
+
+  // ── LE PLAN TIENT COMPTE DE LA DOULEUR TOUT DE SUITE ─────────────────────────────
+  // ⚠️ Cyprien, 09/11/2026 : séance synchronisée à 22 h 28 (plan recalculé), douleur au tibia
+  // cochée à 22 h 31 — le plan affiché et envoyé à la montre l'ignorait jusqu'au cron de nuit.
+  // Une douleur cochée, ou un « Aucune douleur » (qui en éteint d'anciennes), replanifie
+  // maintenant. Même chemin que /api/health/douleur ; le cron rattrape un échec.
+  const cochees = Array.isArray(pain) ? pain.map(String) : [];
+  if (cochees.some((p) => p.trim())) {
+    // Un échec part dans `error_logs` (le ressenti, lui, est déjà enregistré).
+    const { data: creds, error: eCreds } = await admin.from("profiles")
+      .select("intervals_athlete_id, intervals_api_key").eq("id", user.id).maybeSingle();
+    if (eCreds) {
+      await journaliserEchec(admin, { source: "feedback", userId: user.id, url: "/api/feedback", message: `Replanification non lancée, identifiants illisibles : ${eCreds.code ?? "?"} ${eCreds.message}` });
+    } else {
+      await autoCoachForUser(admin, {
+        userId: user.id,
+        athleteId: (creds?.intervals_athlete_id as string | null) ?? null,
+        apiKey: (creds?.intervals_api_key as string | null) ?? null,
+        notify: false,
+      }).catch((e) => journaliserEchec(admin, { source: "feedback", userId: user.id, url: "/api/feedback", message: `Replanification en échec après un ressenti : ${e instanceof Error ? e.message : String(e)}` }));
+    }
   }
 
   return NextResponse.json({ ok: true, chaussure, chaussureErreur });
