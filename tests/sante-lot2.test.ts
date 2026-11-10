@@ -195,6 +195,12 @@ async function main() {
     assert.match(codeOf("src/app/dashboard/health/page.tsx"), /recup = donneesRecup\(donnees, \(bilanRes\.data \?\? \[\]\) as \{ data\?: unknown \}\[\], jourAthlete, bilanPanne\);/);
   });
 
+  await test("douleur à la reprise : « pas couru avant » plutôt que « 0 km, -100 % »", () => {
+    const hc = codeOf("src/components/health/HealthCenter.tsx");
+    assert.match(hc, /\{charge\.kmAvant === 0 && charge\.kmPrecedent > 0\s*\? tr\("k\.chargeArret", \{ b: charge\.kmPrecedent \}\)/, "l'écran affiche de nouveau « 0 km, -100 % » à la reprise");
+    assert.equal((hc.match(/"k\.chargeArret": "/g) ?? []).length, 5, "le texte n'est pas dans les 5 langues");
+  });
+
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
   for (const f of fails) console.log("  ✗ " + f);
   if (fails.length) process.exit(1);
