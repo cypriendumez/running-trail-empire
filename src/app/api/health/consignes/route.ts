@@ -61,18 +61,29 @@ export async function POST(req: Request) {
   }
 
   // Le plan tient compte des consignes tout de suite (même chemin que /api/health/douleur).
+  // ⚠️ `autoCoachForUser` ne lève pas sur un refus : il RETOURNE `{ processed: false, reason }`
+  // (essai expiré, contexte refusé…). L'écran ne doit dire « plan recalculé » que s'il l'a été.
+  let replanifie = false;
   const admin = createAdminClient();
   const { data: creds, error: eCreds } = await admin.from("profiles")
     .select("intervals_athlete_id, intervals_api_key").eq("id", user.id).maybeSingle();
   if (eCreds) {
     await journal(`Replanification non lancée, identifiants illisibles : ${eCreds.code ?? "?"} ${eCreds.message}`);
   } else {
-    await autoCoachForUser(admin, {
+    const res = await autoCoachForUser(admin, {
       userId: user.id,
       athleteId: (creds?.intervals_athlete_id as string | null) ?? null,
       apiKey: (creds?.intervals_api_key as string | null) ?? null,
       notify: false,
-    }).catch((e) => journal(`Replanification en échec après des consignes : ${e instanceof Error ? e.message : String(e)}`));
+    }).catch(async (e) => {
+      await journal(`Replanification en échec après des consignes : ${e instanceof Error ? e.message : String(e)}`);
+      return null;
+    });
+    replanifie = res?.processed === true;
+    // Un essai expiré n'est pas une panne : le plan n'est simplement plus recalculé.
+    if (res && !res.processed && res.reason !== "essai_expire") {
+      await journal(`Replanification refusée après des consignes : ${res.reason ?? "raison inconnue"}`);
+    }
   }
-  return NextResponse.json({ ok: true, consignes: valide?.ok ? valide.consignes : null });
+  return NextResponse.json({ ok: true, replanifie, consignes: valide?.ok ? valide.consignes : null });
 }

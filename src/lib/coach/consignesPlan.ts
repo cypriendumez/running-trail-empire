@@ -105,12 +105,33 @@ const secParKm = (allure: string | null) => {
   return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 };
 
+/**
+ * La durée (min) de la séance remplacée, dans cet ordre : la prose française (échauffement +
+ * corps + retour au calme, ce que la montre reçoit), l'étiquette « N min », la distance × l'allure
+ * facile. `null` si rien ne la dit.
+ * Relecture du 10/11/2026 : sans distance, une récupération de 25 min devenait un footing de
+ * 50 min sous une consigne de 120 min — le contrôle RALLONGEAIT la séance d'un coureur blessé.
+ */
+export function dureeSeance(jour: PlanDay, allureFacile: string | null): number | null {
+  const lu = (re: RegExp) => { const m = re.exec(jour.detail ?? ""); return m ? Number(m[1]) : null; };
+  const corps = lu(/Corps : (\d+) min/);
+  if (corps != null) return (lu(/Échauffement (\d+) min/) ?? 0) + corps + (lu(/Retour au calme (\d+) min/) ?? 0);
+  const min = minDeTags(jour.tags ?? []);
+  if (min != null) return min;
+  const km = kmDeTags(jour.tags ?? []), sec = secParKm(allureFacile);
+  if (km != null && sec != null) return Math.round((km * sec) / 60);
+  // « 20 min de footing… » (veille), « 20 à 30 min » (récupération d'après-course) → la plus courte.
+  return lu(/(\d+)(?:\s*(?:à|-)\s*\d+)?\s*min/);
+}
+
+/** Durée totale retenue quand rien ne dit celle de la séance remplacée : courte, jamais 40 min de corps. */
+export const REPLI_TOTAL_MIN = 25;
+
 /** Le corps (min) d'un footing qui tient dans la durée maximale et ne dépasse pas la séance remplacée. */
 export function corpsFooting(dureeMaxMin: number | null, jour: PlanDay, allureFacile: string | null): number {
   const plafond = dureeMaxMin != null ? dureeMaxMin - 10 : 40;
-  const km = kmDeTags(jour.tags ?? []), sec = secParKm(allureFacile);
-  const avant = km != null && sec != null ? Math.round((km * sec) / 60) - 10 : null;
-  return Math.max(5, Math.min(plafond, avant ?? 40));
+  const avant = dureeSeance(jour, allureFacile);
+  return Math.max(5, Math.min(plafond, (avant ?? REPLI_TOTAL_MIN) - 10));
 }
 
 /** Le jour réécrit dans les 5 langues. */
@@ -123,7 +144,11 @@ function reecrire(jour: PlanDay, type: string, texte: (l: Lang) => PlanDayText):
 const texteDe = (jour: PlanDay, l: Lang): PlanDayText =>
   l === "fr" ? { title: jour.title, detail: jour.detail, why: jour.why, tags: jour.tags } : (jour.i18n?.[l] ?? { title: jour.title, detail: jour.detail, why: jour.why, tags: jour.tags });
 
-/** Applique les consignes du kinésithérapeute à la liste FINALE des séances. */
+/**
+ * Applique les consignes du kinésithérapeute à la liste FINALE des séances. IDEMPOTENT : le coach
+ * le réapplique après les ajustements de l'athlète (« décaler », « échanger »), qui réécrivent la
+ * semaine après `buildWeekPlan` (relecture du 10/11/2026).
+ */
 export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsignes): PlanDay[] {
   const { consignes } = c;
   const fin = jjmm(consignes.jusquAu);
@@ -143,19 +168,22 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
     || jour.title === PLAN_T.fr.enduranceTitreLignes || jour.title === PLAN_T.fr.enduranceTitreProg
     || jour.title === PLAN_T.fr.veilleTitre || jour.title === PLAN_T.fr.avantVeilleTitre;
 
+  // Les consignes s'arrêtent à leur date de fin : un jour d'après n'est ni bridé ni annoncé.
+  const enVigueur = (jour: PlanDay) => jour.date <= consignes.jusquAu;
   const apres: PlanDay[] = [];
   for (const jour of plan) {
+    if (!enVigueur(jour)) { apres.push(jour); continue; }
     const course = !PAS_COURSE.has(jour.type);
     if (!course) {
       // Le renfo perd ses sauts quand l'intensité est interdite.
       apres.push(jour.type === "Renfo" && consignes.sansIntensite
-        ? reecrire(jour, "Renfo", (l) => { const t = texteDe(jour, l); return { ...t, detail: t.detail + T[l].renfo }; })
+        ? reecrire(jour, "Renfo", (l) => { const t = texteDe(jour, l); return { ...t, detail: t.detail.includes(T[l].renfo) ? t.detail : t.detail + T[l].renfo }; })
         : jour);
       continue;
     }
     if (jour.type === "Course" && jour.date !== c.courseC) {
       // Course A ou B : l'objectif de l'athlète, jamais retiré ; on dit de demander l'accord.
-      apres.push(reecrire(jour, "Course", (l) => { const t = texteDe(jour, l); return { ...t, why: t.why + T[l].course(fin) }; }));
+      apres.push(reecrire(jour, "Course", (l) => { const t = texteDe(jour, l); return { ...t, why: t.why.includes(T[l].course(fin)) ? t.why : t.why + T[l].course(fin) }; }));
       continue;
     }
     if (jour.type === "Marche/course") {
@@ -171,12 +199,19 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
   // compte mais n'est jamais retirée.
   if (consignes.seancesMaxSemaine == null) return apres;
   const max = consignes.seancesMaxSemaine;
-  const gardees: string[] = [...c.sortiesRecentes];
+  // Les courses A et B, jamais retirées, prennent leur place AVANT les autres sorties : sinon un
+  // footing posé plus tôt dans la semaine ferait dépasser la fenêtre qui contient la course.
+  const gardees: string[] = [...c.sortiesRecentes,
+    ...apres.filter((j) => j.type === "Course" && enVigueur(j) && !c.sortiesRecentes.includes(j.date)).map((j) => j.date)];
+  // Une sortie le jour d jouxte 7 fenêtres : celles qui finissent de d à d + 6 (jusqu'à la fin des consignes).
+  const tient = (d: string) => [0, 1, 2, 3, 4, 5, 6].map((k) => decale(d, k)).filter((w) => w <= consignes.jusquAu)
+    .every((w) => gardees.filter((x) => x >= decale(w, -6) && x <= w).length < max);
   return apres.map((jour) => {
-    if (PAS_COURSE.has(jour.type)) return jour;
-    const depuis = decale(jour.date, -6);
-    const dansFenetre = gardees.filter((d) => d >= depuis && d <= jour.date).length;
-    if (jour.type === "Course" || dansFenetre < max) { gardees.push(jour.date); return jour; }
+    if (PAS_COURSE.has(jour.type) || !enVigueur(jour) || jour.type === "Course") return jour;
+    // Déjà courue ce jour-là (le jour 0 est gelé dès qu'une séance est enregistrée) : la sortie
+    // est dans `sortiesRecentes`, on ne la compte pas deux fois.
+    if (c.sortiesRecentes.includes(jour.date)) return jour;
+    if (tient(jour.date)) { gardees.push(jour.date); return jour; }
     return repos(jour, (l) => T[l].repos(max, fin));
   });
 }

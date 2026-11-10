@@ -118,9 +118,16 @@ function kmAndTime(km: number, pace: string | null, lang: Lang): string {
  * d'intensité, quoi qu'il ait été planifié.
  */
 export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[] {
-  const plan = construireSemaine(ctx, today);
   // LES CONSIGNES DU KINÉSITHÉRAPEUTE : un contrôle unique sur le plan FINI, quel que soit le
   // chemin qui a produit chaque séance (lib/coach/consignesPlan).
+  return consignesSurPlan(ctx, construireSemaine(ctx, today), today);
+}
+
+/**
+ * Les consignes du kinésithérapeute appliquées à une semaine FINIE. Le coach l'appelle aussi
+ * APRÈS les ajustements de l'athlète (autoCoach), qui réécrivent la semaine ensuite.
+ */
+export function consignesSurPlan(ctx: AthleteContext, plan: PlanDay[], today = new Date()): PlanDay[] {
   if (!ctx.consignes) return plan;
   const debut = new Date(today); debut.setHours(0, 0, 0, 0);
   const cs = ctx.courseSecondaire ?? null;
@@ -128,7 +135,8 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   return appliquerConsignes(plan, {
     consignes: ctx.consignes,
     allureFacile: ctx.easyPace ?? null,
-    sortiesRecentes: (ctx.sortiesRecentes ?? []).filter((d) => d < iso(debut)),
+    // Celles d'aujourd'hui comprises : une sortie non prévue courue ce matin compte.
+    sortiesRecentes: (ctx.sortiesRecentes ?? []).filter((d) => d <= iso(debut)),
     courseC: cs?.priorite === "C" && cs.idx !== objectifIdx ? iso(addDays(debut, cs.idx)) : null,
   });
 }

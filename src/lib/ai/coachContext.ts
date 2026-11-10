@@ -2663,8 +2663,12 @@ ${catalog}`;
     douleursActives: pains,
     effetsDouleur,
     consignes: consignes ? { ...consignes, kmMax: kmConsigne } : null,
-    sortiesRecentes: workouts.filter((w) => isRun(w.sport) && now - new Date(w.date).getTime() <= 7 * 86400000)
-      .map((w) => String(w.date).slice(0, 10)),
+    sortiesRecentes: (() => {
+      const jour = aujourdhui(FUSEAU_DEFAUT);
+      const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 7);
+      const depuis = d.toISOString().slice(0, 10);
+      return workouts.filter((w) => isRun(w.sport)).map((w) => String(w.date).slice(0, 10)).filter((x) => x >= depuis && x <= jour);
+    })(),
     // Un nombre maximal de sorties fixé par le kinésithérapeute borne celles de la semaine.
     availability: { daysPerWeek: consignes?.seancesMaxSemaine != null ? Math.min(availDaysPerWeek, consignes.seancesMaxSemaine) : availDaysPerWeek, days: availDays },
     forecast,

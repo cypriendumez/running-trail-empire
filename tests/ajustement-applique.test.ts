@@ -154,7 +154,8 @@ test("le coach réapplique les ajustements AVANT de publier le plan et de l'envo
   const iApplique = src.indexOf("appliquerAjustements(semaineMoteur");
   const iPurge = src.indexOf(`.eq("type", "coach_session").gte("data->>date", from)`);
   assert.ok(iApplique > 0 && iPurge > iApplique, "les ajustements ne sont plus appliqués avant la publication");
-  assert.match(src, /const week = ajuste\.week;/, "le plan publié n'est plus le plan ajusté");
+  // Le plan ajusté, puis les consignes du kinésithérapeute réappliquées dessus (Santé, lot 1).
+  assert.match(src, /const week = consignesSurPlan\(ctx, ajuste\.week, maintenant\);/, "le plan publié n'est plus le plan ajusté");
   assert.match(src, /joursCourables: ctx\.availability\.days\.filter\(\(d\) => !ctx\.skippedWeekdays\.includes\(d\)\)/);
 });
 

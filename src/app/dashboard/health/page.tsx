@@ -154,11 +154,9 @@ export default async function HealthPage() {
     for (const [nom, r] of [["état du coach", etatRes], ["consignes", consRes]] as const) {
       if (r.error && estUnePanne(r)) console.error("[santé] lecture illisible :", nom, r.error.message);
     }
-    const etat = etatRes.data?.data as { douleurEffets?: typeof effets; consignes?: { dureeMaxMin?: number | null; kmMax?: number | null } | null } | null;
+    const etat = etatRes.data?.data as { douleurEffets?: typeof effets } | null;
     effets = douleurs.length ? (etat?.douleurEffets ?? null) : null;
     consignes = consignesEnVigueur(((consRes.data ?? []) as { data?: unknown }[])[0]?.data, jourJ);
-    // La durée maximale n'a pas pu s'appliquer : sans allure facile connue, aucune distance n'en
-    // découle. On le DIT plutôt que de laisser croire qu'elle borne le plan.
   }
   return <HealthCenter suivi={suivi} douleurs={douleurs} effets={effets} consignes={consignes} charge={charge} rappel={rappel}
     enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} />;

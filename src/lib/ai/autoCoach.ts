@@ -10,7 +10,7 @@
 import { lignesRetireesParDouleur } from "@/lib/coach/footings";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
-import { buildWeekPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
+import { buildWeekPlan, consignesSurPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
 import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, fcMaxMontre, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { avecFcMaxMontre } from "@/lib/coach/fcCible";
@@ -271,7 +271,9 @@ export async function autoCoachForUser(
     const { error: eElague } = await admin.from("notifications").update({ data: { ajustements: ajuste.gardes } }).eq("id", ligneAjustements.id);
     if (eElague) console.error("[coach-auto] ajustements non élagués :", eElague.message);
   }
-  const week = ajuste.week;
+  // Les ajustements (« décaler », « échanger ») réécrivent la semaine APRÈS le moteur : les
+  // consignes du kinésithérapeute sont réappliquées sur le résultat (relecture du 10/11/2026).
+  const week = consignesSurPlan(ctx, ajuste.week, maintenant);
 
   // ── LE COACH AVANCÉ (Premium, et l'essai qui le montre) ─────────────────────
   // Le modèle relit les séances CLÉS et ajoute à leur « pourquoi » un conseil d'exécution
