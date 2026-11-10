@@ -56,15 +56,21 @@ export async function POST(req: Request) {
   // Le motif des séances est un texte figé dans le plan : sans replanification, l'écran dirait
   // encore « douleur en cours ». Même chemin que /api/health/douleur ; le cron de nuit rattrape
   // un échec. Plan déterministe : aucun appel d'IA pour la séance elle-même.
+  // Un échec (identifiants illisibles, replanification qui plante) part dans `error_logs` : sans
+  // lui, l'écran dit « c'est noté » et le plan garde son ancien motif jusqu'à la nuit, sans trace.
   const admin = createAdminClient();
-  const { data: creds } = await admin.from("profiles")
+  const { data: creds, error: eCreds } = await admin.from("profiles")
     .select("intervals_athlete_id, intervals_api_key").eq("id", user.id).maybeSingle();
-  await autoCoachForUser(admin, {
-    userId: user.id,
-    athleteId: (creds?.intervals_athlete_id as string | null) ?? null,
-    apiKey: (creds?.intervals_api_key as string | null) ?? null,
-    notify: false,
-  }).catch((e) => console.error("[santé] replanification après une douleur d'après séance :", e));
+  if (eCreds) {
+    await journaliserEchec(null, { source: "douleur-seance", userId: user.id, url: "/api/health/douleur-seance", message: `Replanification non lancée, identifiants illisibles : ${eCreds.code ?? "?"} ${eCreds.message}` });
+  } else {
+    await autoCoachForUser(admin, {
+      userId: user.id,
+      athleteId: (creds?.intervals_athlete_id as string | null) ?? null,
+      apiKey: (creds?.intervals_api_key as string | null) ?? null,
+      notify: false,
+    }).catch((e) => journaliserEchec(null, { source: "douleur-seance", userId: user.id, url: "/api/health/douleur-seance", message: `Replanification en échec après une douleur passée : ${e instanceof Error ? e.message : String(e)}` }));
+  }
 
   return NextResponse.json({ ok: true, passee: annuler !== true });
 }

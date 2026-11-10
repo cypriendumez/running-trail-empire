@@ -158,14 +158,19 @@ export async function POST(req: Request) {
   // maintenant. Même chemin que /api/health/douleur ; le cron rattrape un échec.
   const cochees = Array.isArray(pain) ? pain.map(String) : [];
   if (cochees.some((p) => p.trim())) {
-    const { data: creds } = await admin.from("profiles")
+    // Un échec part dans `error_logs` (le ressenti, lui, est déjà enregistré).
+    const { data: creds, error: eCreds } = await admin.from("profiles")
       .select("intervals_athlete_id, intervals_api_key").eq("id", user.id).maybeSingle();
-    await autoCoachForUser(admin, {
-      userId: user.id,
-      athleteId: (creds?.intervals_athlete_id as string | null) ?? null,
-      apiKey: (creds?.intervals_api_key as string | null) ?? null,
-      notify: false,
-    }).catch((e) => console.error("[feedback] replanification après une douleur :", e));
+    if (eCreds) {
+      await journaliserEchec(admin, { source: "feedback", userId: user.id, url: "/api/feedback", message: `Replanification non lancée, identifiants illisibles : ${eCreds.code ?? "?"} ${eCreds.message}` });
+    } else {
+      await autoCoachForUser(admin, {
+        userId: user.id,
+        athleteId: (creds?.intervals_athlete_id as string | null) ?? null,
+        apiKey: (creds?.intervals_api_key as string | null) ?? null,
+        notify: false,
+      }).catch((e) => journaliserEchec(admin, { source: "feedback", userId: user.id, url: "/api/feedback", message: `Replanification en échec après un ressenti : ${e instanceof Error ? e.message : String(e)}` }));
+    }
   }
 
   return NextResponse.json({ ok: true, chaussure, chaussureErreur });

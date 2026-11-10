@@ -35,16 +35,20 @@ export function recupAllongee(p: PausesSeance | null | undefined): RecupAllongee
   };
 }
 
-export type VerdictExecution = "decrochage" | "accelere" | "tenue" | "non_probant";
+export type VerdictExecution = "decrochage" | "accelere" | "tenue" | "non_probant" | "arrets_inconnus";
 
 /**
  * Le verdict sur l'exécution de la dernière série. `null` sans décrochage mesuré.
  * `non_probant` : allure tenue ou accélérée, mais avec des arrêts d'au moins une minute —
  * la séance ne prouve pas qu'on peut durcir.
+ * `arrets_inconnus` : la trace existe mais n'a pas pu être LUE (panne) — une panne n'est pas
+ * « aucun arrêt », on ne conclut pas non plus qu'on peut durcir (relecture du 10/11/2026).
+ * Une séance SANS trace (tapis) garde le verdict des allures : choix assumé, voir l'en-tête.
  */
-export function verdictExecution(fadeSec: number | null | undefined, recup: RecupAllongee | null): VerdictExecution | null {
+export function verdictExecution(fadeSec: number | null | undefined, recup: RecupAllongee | null, arretsIllisibles = false): VerdictExecution | null {
   if (fadeSec == null || !Number.isFinite(fadeSec)) return null;
   if (fadeSec >= DECROCHAGE_SEC) return "decrochage";
   if (recup) return "non_probant";
+  if (arretsIllisibles) return "arrets_inconnus";
   return fadeSec <= ACCELERATION_SEC ? "accelere" : "tenue";
 }

@@ -83,6 +83,13 @@ test("allure tenue ou accélérée AVEC arrêts : la séance ne prouve plus qu'o
   assert.equal(verdictExecution(2, null), "tenue");
 });
 
+test("une trace ILLISIBLE n'est pas « aucun arrêt » : pas de « tu peux durcir »", () => {
+  assert.equal(verdictExecution(2, null, true), "arrets_inconnus", "panne de lecture prise pour une séance sans arrêt");
+  assert.equal(verdictExecution(-8, null, true), "arrets_inconnus");
+  assert.equal(verdictExecution(15, null, true), "decrochage", "la panne efface un décrochage");
+  assert.equal(verdictExecution(2, null), "tenue", "sans trace (tapis), le verdict des allures doit rester");
+});
+
 test("un décrochage malgré des arrêts reste un décrochage", () => {
   assert.equal(verdictExecution(15, recupAllongee(arrets(120))), "decrochage");
   assert.equal(verdictExecution(null, recupAllongee(arrets(120))), null, "verdict sans décrochage mesuré");
@@ -96,8 +103,11 @@ test("le coach lit les douleurs par la règle, et le verdict des arrêts", () =>
   assert.doesNotMatch(coach, /feedback\.flatMap\(f => f\.data\?\.pain/, "l'ancienne lecture sans fin est revenue");
   // Relecture du 10/11 : la règle vaut 14 jours, la lecture s'arrêtait aux 5 derniers ressentis.
   assert.match(coach, /eq\("type", "session_feedback"\)\s*\.gte\("created_at", new Date\(Date\.now\(\) - \(PEREMPTION_JOURS \+ 1\) \* 86400000\)\.toISOString\(\)\)\s*\.order\("created_at", \{ ascending: false \}\)\.limit\(60\)/, "le coach ne lit plus les 15 derniers jours de ressentis");
-  assert.match(coach, /const recupQualite = qe \? recupAllongee\(await lireArrets\(seanceQualite\)\) : null;/, "les arrêts de la séance de qualité ne sont plus lus");
-  assert.match(coach, /const verdictQualite = verdictExecution\(qe\?\.fadeSec, recupQualite\);/);
+  assert.match(coach, /const arretsQualite = qe \? await lireArrets\(seanceQualite\) : null;\s*const recupQualite = arretsQualite === "illisible" \? null : recupAllongee\(arretsQualite\);/, "les arrêts de la séance de qualité ne sont plus lus");
+  assert.match(coach, /const verdictQualite = verdictExecution\(qe\?\.fadeSec, recupQualite, arretsQualite === "illisible"\);/, "une trace illisible n'est plus distinguée d'une séance sans arrêt");
+  assert.match(coach, /return "illisible" as const;/, "la lecture en erreur de la trace rend « aucun arrêt »");
+  // Relecture du 10/11 : une panne de lecture des douleurs rendait « aucune douleur ».
+  assert.match(coach, /for \(const \[nom, r\] of \[\["ressentis", fbRes\], \["douleurs déclarées", painRes\]\] as const\) \{\s*if \(estUnePanne\(r\)\) throw new Error/, "une panne des douleurs passe pour « aucune douleur »");
   assert.match(coach, /verdictQualite === "non_probant" \? `⏸️/, "le coach ne dit plus que la séance ne prouve rien");
   assert.match(coach, /shows\.push\(verdictQualite === "decrochage"/, "le constat affiché ignore les arrêts");
 });
@@ -108,10 +118,14 @@ test("« c'est passé » écrit sur ses propres ressentis, lit ses erreurs et re
   assert.match(route, /if \(error\) \{\s*await journaliserEchec/, "erreur d'écriture non journalisée");
   assert.match(route, /if \(eLecture\) \{\s*await journaliserEchec/, "erreur de lecture non journalisée");
   assert.match(route, /await autoCoachForUser\(admin,/, "le plan n'est pas relancé");
+  assert.match(route, /\.catch\(\(e\) => journaliserEchec\(null, \{ source: "douleur-seance"/, "replanification en échec hors de error_logs");
+  assert.match(route, /if \(eCreds\) \{\s*await journaliserEchec/, "identifiants illisibles non journalisés");
 });
 
 test("une douleur cochée après une séance relance le plan tout de suite", () => {
-  assert.match(codeOf("src/app/api/feedback/route.ts"), /if \(cochees\.some\(\(p\) => p\.trim\(\)\)\) \{[\s\S]{0,300}await autoCoachForUser\(admin,/, "le ressenti attend encore le cron de nuit");
+  const fb = codeOf("src/app/api/feedback/route.ts");
+  assert.match(fb, /if \(cochees\.some\(\(p\) => p\.trim\(\)\)\) \{[\s\S]{0,900}await autoCoachForUser\(admin,/, "le ressenti attend encore le cron de nuit");
+  assert.match(fb, /\.catch\(\(e\) => journaliserEchec\(admin, \{ source: "feedback"/, "replanification en échec hors de error_logs");
 });
 
 test("Santé montre les douleurs d'après séance avec leur bouton, sans le dictionnaire dans le bundle", () => {
