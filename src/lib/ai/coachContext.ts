@@ -1291,14 +1291,19 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     if (objectifSeul || !w?.id) return Promise.resolve(null);
     const id = w.id;
     if (!arretsLus.has(id)) arretsLus.set(id, (async () => {
-      const { data, error } = await sb.from("activity_tracks").select("points").eq("workout_id", id).maybeSingle();
+      const { data, error } = await sb.from("activity_tracks").select("points, has_gps").eq("workout_id", id).maybeSingle();
       if (error) {
         console.error("[coach] trace illisible, arrêts inconnus :", error.code ?? "?", error.message);
         await journaliserEchecUneFois(null, { source: "coach-arrets", userId, message: `Trace d'une séance illisible, arrêts inconnus : ${error.code ?? "?"} ${error.message}` });
         return "illisible" as const;
       }
-      if (!data) return null;
-      return pausesDeTrace(pointsStockes((data as { points?: unknown }).points), vitesseEnMouvement(w.distance_km, w.duration_seconds));
+      // Pas de ligne, ou une séance SANS GPS (tapis) : on ne sait rien des arrêts, et c'est assumé.
+      const ligne = data as { points?: unknown; has_gps?: boolean | null } | null;
+      if (!ligne || ligne.has_gps === false) return null;
+      // ⚠️ UNE TRACE PRÉSENTE MAIS INEXPLOITABLE n'est pas « aucun arrêt » (relecture du
+      // 10/11/2026) : trop peu de points, ou séance sans distance ni durée en mouvement.
+      const arrets = pausesDeTrace(pointsStockes(ligne.points), vitesseEnMouvement(w.distance_km, w.duration_seconds));
+      return arrets ?? ("illisible" as const);
     })());
     return arretsLus.get(id)!;
   };
@@ -1312,7 +1317,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const seanceQualite = qe?.date
     ? runs.filter((w) => String(w.date).slice(0, 10) === qe.date).sort((a, b) => (Number(b.tss) || 0) - (Number(a.tss) || 0))[0]
     : undefined;
-  const arretsQualite = qe ? await lireArrets(seanceQualite) : null;
+  // Une série relevée dont la séance est introuvable parmi les séances lues : on ne sait pas.
+  const arretsQualite = !qe ? null : !seanceQualite && !objectifSeul ? ("illisible" as const) : await lireArrets(seanceQualite);
   const recupQualite = arretsQualite === "illisible" ? null : recupAllongee(arretsQualite);
   const verdictQualite = verdictExecution(qe?.fadeSec, recupQualite, arretsQualite === "illisible");
   const arretsQualiteTxt = recupQualite

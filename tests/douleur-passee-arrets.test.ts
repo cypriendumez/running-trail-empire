@@ -103,13 +103,21 @@ test("le coach lit les douleurs par la règle, et le verdict des arrêts", () =>
   assert.doesNotMatch(coach, /feedback\.flatMap\(f => f\.data\?\.pain/, "l'ancienne lecture sans fin est revenue");
   // Relecture du 10/11 : la règle vaut 14 jours, la lecture s'arrêtait aux 5 derniers ressentis.
   assert.match(coach, /eq\("type", "session_feedback"\)\s*\.gte\("created_at", new Date\(Date\.now\(\) - \(PEREMPTION_JOURS \+ 1\) \* 86400000\)\.toISOString\(\)\)\s*\.order\("created_at", \{ ascending: false \}\)\.limit\(60\)/, "le coach ne lit plus les 15 derniers jours de ressentis");
-  assert.match(coach, /const arretsQualite = qe \? await lireArrets\(seanceQualite\) : null;\s*const recupQualite = arretsQualite === "illisible" \? null : recupAllongee\(arretsQualite\);/, "les arrêts de la séance de qualité ne sont plus lus");
+  assert.match(coach, /const arretsQualite = !qe \? null : !seanceQualite && !objectifSeul \? \("illisible" as const\) : await lireArrets\(seanceQualite\);\s*const recupQualite = arretsQualite === "illisible" \? null : recupAllongee\(arretsQualite\);/, "les arrêts de la séance de qualité ne sont plus lus");
   assert.match(coach, /const verdictQualite = verdictExecution\(qe\?\.fadeSec, recupQualite, arretsQualite === "illisible"\);/, "une trace illisible n'est plus distinguée d'une séance sans arrêt");
   assert.match(coach, /return "illisible" as const;/, "la lecture en erreur de la trace rend « aucun arrêt »");
+  // 3e relecture : trace présente mais inexploitable, ou séance introuvable → pas « aucun arrêt ».
+  assert.match(coach, /if \(!ligne \|\| ligne\.has_gps === false\) return null;[\s\S]{0,400}return arrets \?\? \("illisible" as const\);/, "une trace inexploitable passe pour « aucun arrêt »");
+  assert.match(coach, /!seanceQualite && !objectifSeul \? \("illisible" as const\)/, "une séance de qualité introuvable passe pour « aucun arrêt »");
   // Relecture du 10/11 : une panne de lecture des douleurs rendait « aucune douleur ».
   assert.match(coach, /for \(const \[nom, r\] of \[\["ressentis", fbRes\], \["douleurs déclarées", painRes\]\] as const\) \{\s*if \(estUnePanne\(r\)\) throw new Error/, "une panne des douleurs passe pour « aucune douleur »");
   assert.match(coach, /verdictQualite === "non_probant" \? `⏸️/, "le coach ne dit plus que la séance ne prouve rien");
   assert.match(coach, /shows\.push\(verdictQualite === "decrochage"/, "le constat affiché ignore les arrêts");
+});
+
+test("un contexte du coach impossible part dans error_logs, sur les écrans qui le bâtissent", () => {
+  assert.match(codeOf("src/app/api/ai/session/route.ts"), /ctx = await buildAthleteContext\([^)]*\)\);\s*\} catch \(e\) \{\s*await journaliserEchecUneFois\(null, \{ source: "seance-ia"/, "séance du jour : contexte impossible non journalisé");
+  assert.match(codeOf("src/app/api/coach/doubles/route.ts"), /\} catch \(e\) \{\s*await journaliserEchecUneFois\(null, \{ source: "coach-doubles"/, "doubles : contexte impossible non journalisé");
 });
 
 test("« c'est passé » écrit sur ses propres ressentis, lit ses erreurs et replanifie", () => {

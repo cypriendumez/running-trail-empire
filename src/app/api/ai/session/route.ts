@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { buildAthleteContext, COACH_SYSTEM } from "@/lib/ai/coachContext";
 import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 import { generateContent } from "@/lib/ai/gemini";
-import { journaliserEchec } from "@/lib/journal/echecServeur";
+import { journaliserEchec, journaliserEchecUneFois, causeStable } from "@/lib/journal/echecServeur";
 import {
   SESSION_CACHE_TYPE, PROFILE_FINGERPRINT_COLUMNS, fingerprint, isCacheUsable, serverDay,
   type SessionSignals, type AiSession,
@@ -87,7 +87,15 @@ export async function POST() {
   // La MÊME lecture que le plan (`lectureDuCoach`) : Starter ne lit ni la VFC, ni la dérive
   // cardiaque, ni la foulée — une séance du jour tirée de signaux que son plan ignore le
   // contredirait.
-  const ctx = await buildAthleteContext(supabase, user.id, lectureDuCoach(acces));
+  // Le contexte refuse de se bâtir sur des douleurs illisibles (relecture du 10/11/2026) : la
+  // cause part dans `error_logs` et l'écran reçoit une erreur, jamais une séance dure inventée.
+  let ctx: Awaited<ReturnType<typeof buildAthleteContext>>;
+  try {
+    ctx = await buildAthleteContext(supabase, user.id, lectureDuCoach(acces));
+  } catch (e) {
+    await journaliserEchecUneFois(null, { source: "seance-ia", userId: user.id, url: "/api/ai/session", message: `Contexte du coach impossible : ${causeStable(e)}` });
+    return NextResponse.json({ error: "Séance du jour indisponible pour le moment, réessaie dans un instant." }, { status: 503 });
+  }
   const jour = new Date().toLocaleDateString("fr-FR", { weekday: "long" });
 
   const prompt = `${COACH_SYSTEM}
