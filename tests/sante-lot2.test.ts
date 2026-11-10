@@ -220,10 +220,9 @@ async function main() {
     assert.match(codeOf("src/components/health/BilanMatin.tsx"), /j\.replanifie === true \? \(j\.allege === true \? t\.okAllege : t\.ok\) : t\.attente/, "l'écran affirme un recalcul sans le savoir");
   });
 
-  await test("la carte du tableau de bord tant que le bilan du jour manque ; l'onglet Récupération dans Santé", () => {
-    const dash = codeOf("src/app/dashboard/page.tsx");
-    assert.match(dash, /\.eq\("type", TYPE_BILAN\)\.eq\("data->>date", today\)/, "le tableau de bord ne cherche plus le bilan du jour de l'athlète");
-    assert.match(dash, /\{bilanAFaire && <BilanMatin variante="carte" \/>\}/);
+  await test("pas de carte sur le tableau de bord (retirée par Cyprien) ; l'onglet Récupération dans Santé", () => {
+    // Décision de Cyprien (10/11/2026) : AUCUNE carte du bilan sur le tableau de bord.
+    assert.doesNotMatch(codeOf("src/app/dashboard/page.tsx"), /BilanMatin/, "la carte du bilan est revenue sur le tableau de bord");
     const hc = codeOf("src/components/health/HealthCenter.tsx");
     assert.match(hc, /\{tab === "recup" && recup && \(/);
     assert.equal((hc.match(/"tab\.recup": "/g) ?? []).length, 5, "l'onglet n'est pas traduit dans les 5 langues");
@@ -238,6 +237,14 @@ async function main() {
     const hc = codeOf("src/components/health/HealthCenter.tsx");
     assert.match(hc, /\{charge\.kmAvant === 0 && charge\.kmPrecedent > 0\s*\? tr\("k\.chargeArret", \{ b: charge\.kmPrecedent \}\)/, "l'écran affiche de nouveau « 0 km, -100 % » à la reprise");
     assert.equal((hc.match(/"k\.chargeArret": "/g) ?? []).length, 5, "le texte n'est pas dans les 5 langues");
+  });
+
+  await test("consignes du kiné : formulaire fermé tant qu'aucune n'est en vigueur ; l'ouvrir propose une fin à +14 jours", () => {
+    const hc = codeOf("src/components/health/HealthCenter.tsx");
+    assert.match(hc, /const \[consOuvert, setConsOuvert\] = useState<boolean>\(!!consignes\);/, "le formulaire s'affiche de nouveau à tous");
+    assert.match(hc, /\{!consOuvert \? \(\s*<button type="button" onClick=\{ouvrirConsignes\}/);
+    assert.match(hc, /function ouvrirConsignes\(\) \{\s*const d = new Date\(\); d\.setDate\(d\.getDate\(\) \+ 14\);/, "la date de fin n'est plus proposée à +14 jours, au clic");
+    assert.equal((hc.match(/"k\.consOuvrir": "/g) ?? []).length, 5, "le bouton n'est pas traduit dans les 5 langues");
   });
 
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
