@@ -152,12 +152,11 @@ const texteDe = (jour: PlanDay, l: Lang): PlanDayText =>
  */
 export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsignes): PlanDay[] {
   const { consignes } = c;
-  const TX = T;
   const fin = jjmm(consignes.jusquAu);
   const footing = (jour: PlanDay) => {
     const corps = corpsFooting(consignes.dureeMaxMin, jour, c.allureFacile);
     return reecrire(jour, "Récup", (l) => ({
-      title: TX[l].titre, detail: PLAN_T[l].recupDetail(5, 5, corps), why: TX[l].why(fin),
+      title: T[l].titre, detail: PLAN_T[l].recupDetail(5, 5, corps), why: T[l].why(fin),
       tags: [PLAN_T[l].tags["Récup"], PLAN_T[l].tags["Z1"], `${corps + 10} min`],
     }));
   };
@@ -179,19 +178,19 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
     if (!course) {
       // Le renfo perd ses sauts quand l'intensité est interdite.
       apres.push(jour.type === "Renfo" && consignes.sansIntensite
-        ? reecrire(jour, "Renfo", (l) => { const t = texteDe(jour, l); return { ...t, detail: t.detail.includes(TX[l].renfo) ? t.detail : t.detail + TX[l].renfo }; })
+        ? reecrire(jour, "Renfo", (l) => { const t = texteDe(jour, l); return { ...t, detail: t.detail.includes(T[l].renfo) ? t.detail : t.detail + T[l].renfo }; })
         : jour);
       continue;
     }
     if (jour.type === "Course" && jour.date !== c.courseC) {
       // Course A ou B : l'objectif de l'athlète, jamais retiré ; on dit de demander l'accord.
-      apres.push(reecrire(jour, "Course", (l) => { const t = texteDe(jour, l); return { ...t, why: t.why.includes(TX[l].course(fin)) ? t.why : t.why + TX[l].course(fin) }; }));
+      apres.push(reecrire(jour, "Course", (l) => { const t = texteDe(jour, l); return { ...t, why: t.why.includes(T[l].course(fin)) ? t.why : t.why + T[l].course(fin) }; }));
       continue;
     }
     if (jour.type === "Marche/course") {
       const total = minDeTags(jour.tags ?? []);
       apres.push(consignes.dureeMaxMin != null && (total == null || total > consignes.dureeMaxMin)
-        ? repos(jour, (l) => TX[l].mc(fin)) : jour);
+        ? repos(jour, (l) => T[l].mc(fin)) : jour);
       continue;
     }
     apres.push(consignes.dureeMaxMin != null || jour.type === "Course" || (consignes.sansIntensite && intense(jour)) ? footing(jour) : jour);
@@ -214,7 +213,7 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
     // est dans `sortiesRecentes`, on ne la compte pas deux fois.
     if (c.sortiesRecentes.includes(jour.date)) return jour;
     if (tient(jour.date)) { gardees.push(jour.date); return jour; }
-    return repos(jour, (l) => TX[l].repos(max, fin));
+    return repos(jour, (l) => T[l].repos(max, fin));
   });
 }
 
@@ -229,27 +228,27 @@ const SANS_COURSE: Record<Lang, { why: string; course: string; renfo: string }> 
   fr: {
     why: "Ton questionnaire d'aptitude signale une situation à faire voir à un médecin : en attendant son avis, pas de course. Une marche tranquille reste possible.",
     course: "Course retirée de ton plan : ton questionnaire d'aptitude demande l'avis d'un médecin avant de la courir.",
-    renfo: " En attendant l'avis d'un médecin : renforcement doux, aucun saut ni bondissement.",
+    renfo: "20 min, renforcement DOUX en attendant l'avis d'un médecin : mobilité des hanches et des chevilles, gainage 3×30 s (planche, latéral), pont fessier 2×12, montées de mollets lentes 2×12, équilibre sur une jambe 2×30 s. Rien d'explosif : reste à un effort où tu peux parler.",
   },
   en: {
     why: "Your fitness questionnaire flags something a doctor should look at: until then, no running. A gentle walk is still fine.",
     course: "Race removed from your plan: your fitness questionnaire calls for a doctor's opinion before running it.",
-    renfo: " Until a doctor has seen you: gentle strength work, no jumps or bounds.",
+    renfo: "20 min, GENTLE strength work until a doctor has seen you: hip and ankle mobility, core 3×30 s (plank, side plank), glute bridges 2×12, slow calf raises 2×12, single-leg balance 2×30 s. Nothing explosive: stay at an effort where you can talk.",
   },
   de: {
     why: "Dein Fitness-Fragebogen nennt etwas, das ärztlich abgeklärt werden sollte: Bis dahin kein Laufen. Ein ruhiger Spaziergang ist möglich.",
     course: "Wettkampf aus deinem Plan entfernt: Dein Fitness-Fragebogen verlangt vorher eine ärztliche Einschätzung.",
-    renfo: " Bis zur ärztlichen Einschätzung: sanftes Krafttraining, keine Sprünge.",
+    renfo: "20 min SANFTES Krafttraining bis zur ärztlichen Einschätzung: Mobilität für Hüfte und Sprunggelenke, Rumpfstabilität 3×30 s (Unterarmstütz, Seitstütz), Glute Bridge 2×12, langsames Wadenheben 2×12, Einbeinstand 2×30 s. Nichts Explosives: bleib bei einer Belastung, bei der du sprechen kannst.",
   },
   es: {
     why: "Tu cuestionario de aptitud señala algo que debe ver un médico: hasta entonces, nada de correr. Un paseo tranquilo sigue siendo posible.",
     course: "Carrera retirada de tu plan: tu cuestionario de aptitud pide la opinión de un médico antes de correrla.",
-    renfo: " Hasta que te vea un médico: fuerza suave, ningún salto ni bote.",
+    renfo: "20 min de fuerza SUAVE hasta que te vea un médico: movilidad de caderas y tobillos, core 3×30 s (plancha, lateral), puente de glúteos 2×12, elevaciones lentas de gemelos 2×12, equilibrio sobre una pierna 2×30 s. Nada explosivo: mantén un esfuerzo en el que puedas hablar.",
   },
   pt: {
     why: "O teu questionário de aptidão assinala algo que um médico deve ver: até lá, nada de corrida. Uma caminhada tranquila continua possível.",
     course: "Prova retirada do teu plano: o teu questionário de aptidão pede a opinião de um médico antes de a correres.",
-    renfo: " Até um médico te ver: reforço suave, nenhum salto.",
+    renfo: "20 min de reforço SUAVE até um médico te ver: mobilidade das ancas e dos tornozelos, core 3×30 s (prancha, lateral), ponte de glúteos 2×12, elevações lentas dos gémeos 2×12, equilíbrio numa perna 2×30 s. Nada explosivo: mantém um esforço em que consigas falar.",
   },
 };
 /** Ce qui reste sous « aucune course » : le repos, le renforcement, la mobilité. */
@@ -258,8 +257,11 @@ const GARDES_SANS_COURSE = new Set(["Repos", "Renfo", "Mobilité"]);
 /** Le plan FINI quand l'avis d'un médecin est attendu : aucune séance d'endurance. Idempotent. */
 export function appliquerAptitude(plan: readonly PlanDay[]): PlanDay[] {
   return plan.map((jour) => {
+    // Le renfo est REMPLACÉ, pas annoté : « aucun saut » à la fin d'un texte qui prescrit des
+    // bondissements, de la corde à sauter ou « 4×1 min sur un footing » ne protégeait personne
+    // (relecture du directeur scientifique, 10/11/2026).
     if (jour.type === "Renfo") {
-      return reecrire(jour, "Renfo", (l) => { const t = texteDe(jour, l); return { ...t, detail: t.detail.includes(SANS_COURSE[l].renfo) ? t.detail : t.detail + SANS_COURSE[l].renfo }; });
+      return reecrire(jour, "Renfo", (l) => ({ ...texteDe(jour, l), detail: SANS_COURSE[l].renfo }));
     }
     if (GARDES_SANS_COURSE.has(jour.type)) return jour;
     const course = jour.type === "Course";

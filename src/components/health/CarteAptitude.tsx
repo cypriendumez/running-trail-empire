@@ -12,8 +12,9 @@ import { APTITUDE_UI } from "@/lib/health/aptitudeI18n";
 /**
  * LE QUESTIONNAIRE D'APTITUDE dans Santé (lot 3, 10/11/2026).
  *
- * `etat = "absent"` : le coureur ne l'a jamais rempli (inscrit avant le lot 3) → les 5 situations.
- * `etat = "attente"` : une situation cochée, pas encore d'avis médical → le plan est sans intensité
+ * `etat = "absent"` : le coureur ne l'a jamais rempli (inscrit avant le lot 3) → les 7 situations ;
+ * `"renouveler"` : un an a passé ; `"panne"` : lecture en échec, on le dit.
+ * `etat = "attente"` : une situation cochée, pas encore d'avis médical → plus aucune course
  * et un bouton permet de déclarer l'avis d'un médecin. `"ok"` : rien n'est affiché.
  * L'écran ne dit « plan à jour » que si la route l'a recalculé.
  */
@@ -100,7 +101,7 @@ export function CarteAptitude({ etat }: { etat: "absent" | "attente" | "ok" | "p
           {t.aucune}
         </label>
       </div>
-      {oui.length > 0 && <p className="mt-2 text-[12.5px] font-medium text-red-800">{t.urgence}</p>}
+      <p className={`mt-2 text-[12.5px] ${oui.length > 0 ? "font-medium text-red-800" : "text-zinc-500"}`}>{t.urgence}</p>
       <button type="button" disabled={!repondu || enCours} onClick={() => envoyer({ oui }, oui.length ? t.okAttente : t.ok)}
         className="mt-3 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">
         {enCours && <Loader2 className="h-4 w-4 animate-spin" />}{t.envoyer}

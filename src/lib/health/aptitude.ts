@@ -1,22 +1,26 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  LE QUESTIONNAIRE D'APTITUDE À L'EFFORT (Santé, lot 3, 10/11/2026).
 //
-//  Cinq situations qui doivent faire voir un médecin AVANT de s'entraîner fort (inspiré des
+//  Sept situations qui doivent faire voir un médecin AVANT de s'entraîner (inspiré des
 //  questionnaires de pré-participation type PAR-Q et des « 10 règles d'or » du Club des
 //  cardiologues du sport ; formulation propre à Pacevo). Pacevo ne conclut rien : il oriente.
 //
-//  Décision de Cyprien (10/11/2026) : si le coureur coche au moins une situation, le plan ne
-//  contient AUCUNE séance dure tant qu'il n'a pas indiqué avoir vu un médecin qui l'autorise
-//  à reprendre l'intensité. L'application n'est pas bloquée : footings, renfo sans saut,
-//  sorties longues faciles restent. Une ligne `aptitude` par coureur (`notifications`).
+//  Décisions de Cyprien (10/11/2026) : si le coureur coche au moins une situation, le plan ne
+//  contient AUCUNE séance d'endurance (course, vélo, natation) tant qu'il n'a pas indiqué avoir
+//  vu un médecin qui l'autorise à courir — repos, renfo doux sans saut, pas de test VMA
+//  (lib/coach/consignesPlan `appliquerAptitude`, autoCoach). L'application n'est pas bloquée.
+//  Le questionnaire se repose chaque année. Une ligne `aptitude` par coureur (`notifications`).
+//  Une ligne illisible vaut « absent » : Santé redemande le questionnaire (pas de valeur inventée).
 // ─────────────────────────────────────────────────────────────────────────────
 import type { Lang } from "@/lib/i18n/translations";
 
 export const TYPE_APTITUDE = "aptitude";
 /** Le questionnaire se repose chaque année (décision de Cyprien, comme QS-SPORT : « ces 12 derniers mois »). */
 export const JOURS_RENOUVELLEMENT = 365;
-// Ajoutées le 10/11/2026 (directeur scientifique, d'après QS-SPORT et PAR-Q+) : mort subite d'un proche,
-// maladie cardiaque ou traitement au long cours. Une ligne ancienne sans elles reste valide.
+// Ajoutées le 10/11/2026 (directeur scientifique) : mort subite d'un proche avant 50 ans (seuil du
+// dépistage en 14 points de l'American Heart Association), maladie cardiaque, hypertension ou
+// traitement pour le cœur ou la tension (PAR-Q+ ; Cyprien a écarté « tout traitement au long
+// cours », qui aurait coupé la course pour une pilule ou une thyroïde). Une ligne ancienne reste valide.
 export const QUESTIONS_APTITUDE = ["poitrine", "malaise", "essoufflement", "palpitations", "avisContraire", "familleMortSubite", "maladieConnue"] as const;
 export type QuestionAptitude = (typeof QUESTIONS_APTITUDE)[number];
 
@@ -49,7 +53,7 @@ export function lireAptitude(data: unknown): Aptitude | null {
   return { ...v.aptitude, avisMedecin: avis };
 }
 
-/** Le plan doit-il rester sans intensité ? Oui si une situation est cochée et qu'aucun avis n'est venu. */
+/** L'avis d'un médecin est-il attendu (donc : aucune course) ? Oui si une situation est cochée et qu'aucun avis n'est venu. */
 export function avisAttendu(a: Aptitude | null): boolean {
   return !!a && a.oui.length > 0 && !a.avisMedecin;
 }

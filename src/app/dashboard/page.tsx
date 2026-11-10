@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { lecturesEnEchec } from "@/lib/dashboard/lectures";
 import type { AnalyseMemorisee } from "@/lib/dashboard/derniereAnalyse";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
+import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
 import { TestVmaBanner } from "@/components/dashboard/TestVmaBanner";
 import { InviteAvis } from "@/components/dashboard/InviteAvis";
 import { momentFavorable } from "@/lib/avis/invite";
@@ -245,6 +246,13 @@ export default async function DashboardPage() {
   // Le FONDATEUR (admin) en est exempté — même règle que le verrou du coach (autoCoach.ts).
   const estFondateur = estAdmin((profileRes.data as { email?: string } | null)?.email);
   const vmaMesuree = (Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || 0) > 0;
+  // ⚠️ PAS DE BANDEAU « FAIS TON TEST VMA » (6 min à fond) TANT QUE L'AVIS D'UN MÉDECIN EST ATTENDU
+  // (questionnaire d'aptitude, relecture du 10/11/2026) — ni sur une lecture en panne : dans le
+  // doute, on ne pousse pas un effort maximal. Le coach, lui, ne prescrit pas le test non plus.
+  const { data: lignesApt, error: eApt } = await supabase.from("notifications").select("data")
+    .eq("user_id", user!.id).eq("type", TYPE_APTITUDE).order("created_at", { ascending: false }).limit(1);
+  if (eApt) console.error("[tableau de bord] questionnaire d'aptitude illisible :", eApt.message);
+  const sansTestVma = !!eApt || avisAttendu(lireAptitude(((lignesApt ?? []) as { data?: unknown }[])[0]?.data));
 
   /**
    * INVITER À DONNER SON AVIS — et seulement quand c'est mérité.
@@ -275,7 +283,7 @@ export default async function DashboardPage() {
         la seule chose sur laquelle on agit en ouvrant l'application (Cyprien, 23/09/2026 :
         « quand j'ouvre l'application on voit toute la page verte »). On demande un avis
         APRÈS avoir rendu service, pas avant. */}
-    <TestVmaBanner measured={vmaMesuree || estFondateur || enMarcheCourse} />
+    <TestVmaBanner measured={vmaMesuree || estFondateur || enMarcheCourse || sansTestVma} />
     <BentoDashboard
       donneesIncompletes={donneesIncompletes}
       profile={stripProfileSecrets(profileRes.data)}

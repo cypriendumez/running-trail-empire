@@ -205,7 +205,7 @@ export default function OnboardingPage() {
   // Une réponse santé est donnée soit en cochant au moins une entrée, soit « rien à signaler ».
   const healthAnswered = healthNone || profile.health_conditions.length > 0 || profile.injury_zones.length > 0;
   // LE QUESTIONNAIRE D'APTITUDE (Santé, lot 3) : réponse OBLIGATOIRE — au moins une situation
-  // cochée, ou « aucune » explicitement. Une situation cochée → plan sans intensité jusqu'à l'avis
+  // cochée, ou « aucune » explicitement. Une situation cochée → plus aucune course jusqu'à l'avis
   // d'un médecin (lib/health/aptitude).
   const [aptOui, setAptOui] = useState<QuestionAptitude[]>([]);
   const [aptAucune, setAptAucune] = useState(false);
@@ -633,7 +633,7 @@ export default function OnboardingPage() {
                 <Cases id={`${cid}-apt`} disposition="flex flex-col gap-2" valeurs={aptOui}
                   onToggle={(v) => { setAptAucune(false); setAptOui((o) => (o.includes(v as QuestionAptitude) ? o.filter((x) => x !== v) : [...o, v as QuestionAptitude])); }}
                   options={QUESTIONS_APTITUDE.map((q) => ({ v: q, l: APTITUDE_UI[(lang as Lang) in APTITUDE_UI ? (lang as Lang) : "fr"].questions[q] }))} />
-                {aptOui.length > 0 && <p className="mt-3 text-[13px] font-medium text-red-800">{APTITUDE_UI[(lang as Lang) in APTITUDE_UI ? (lang as Lang) : "fr"].urgence}</p>}
+                <p className={`mt-3 text-[13px] ${aptOui.length > 0 ? "font-medium text-red-800" : "text-zinc-500"}`}>{APTITUDE_UI[(lang as Lang) in APTITUDE_UI ? (lang as Lang) : "fr"].urgence}</p>
               </Question>
               <div className="px-5 pb-6 sm:px-7">
                 <label htmlFor={`${cid}-apt-aucune`} className="relative block cursor-pointer">

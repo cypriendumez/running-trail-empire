@@ -64,7 +64,7 @@ const intense = (d: { type: string; title: string; tags: string[] }) => QUALITE.
 async function main() {
   console.log("\nLE QUESTIONNAIRE : VALIDATION");
 
-  await test("seules les 5 situations connues sont acceptées ; une liste vide est une réponse (« aucune »)", () => {
+  await test("seules les situations connues sont acceptées ; une liste vide est une réponse (« aucune »)", () => {
     assert.deepEqual(validerAptitude({ oui: [] }, AUJ), { ok: true, aptitude: { oui: [], date: AUJ, avisMedecin: null } });
     assert.equal(validerAptitude({ oui: ["poitrine", "malaise"] }, AUJ).ok, true);
     for (const mauvais of [{ oui: ["inventee"] }, { oui: "poitrine" }, {}, null, { oui: ["poitrine", "poitrine"] }]) {
@@ -84,7 +84,7 @@ async function main() {
     assert.equal(avisAttendu({ oui: ["palpitations"], date: AUJ, avisMedecin: null }), true);
     assert.equal(avisAttendu({ oui: ["palpitations"], date: AUJ, avisMedecin: AUJ }), false, "l'avis du médecin ne lève pas l'attente");
     assert.equal(avisAttendu({ oui: [], date: AUJ, avisMedecin: null }), false);
-    assert.equal(avisAttendu(null), false, "un questionnaire absent bride le plan");
+    assert.equal(avisAttendu(null), false, "un questionnaire absent ne doit pas brider le plan");
   });
 
   console.log("\nLE PLAN RÉEL");
@@ -99,7 +99,11 @@ async function main() {
       const plan = buildWeekPlan(ctx, d);
       for (const j of plan) {
         assert.ok(SANS_COURSE.has(j.type), `séance d'endurance le ${j.date} : ${j.type} « ${j.title} »`);
-        if (j.type === "Renfo") { renfos++; assert.match(j.detail, /aucun saut/, "le renfo garde ses sauts"); }
+        if (j.type === "Renfo") {
+          renfos++;
+          // L'ABSENCE du contenu interdit, pas seulement la présence d'une mise en garde.
+          for (const txt of [j.detail, j.i18n?.en?.detail ?? ""]) assert.doesNotMatch(txt, /saut|bondiss|pogo|corde|nordic|footing|jump|bound|rope/i, `renfo explosif ou couru : ${txt}`);
+        }
       }
       assert.ok(plan.some((j) => /médecin/.test(j.why)), "aucun jour ne dit pourquoi : voir un médecin");
     }
@@ -118,9 +122,10 @@ async function main() {
   await test("la course du jour est retirée du plan, avec « l'avis d'un médecin avant » (5 langues) ; idempotent", async () => {
     const ctx = await contexte([APT(["malaise"])]);
     const plan = buildWeekPlan({ ...ctx, daysToRace: 0 }, new Date(`${AUJ}T08:00:00`));
-    assert.equal(plan[0].type, "Repos", `la course est restée : ${plan[0].type}`);
-    assert.match(plan[0].why, /Course retirée[\s\S]*avis d'un médecin/, "le jour ne dit pas pourquoi la course est retirée");
-    assert.ok(plan[0].i18n?.en?.why.includes("doctor"), "l'avertissement manque en anglais");
+    const jourJ = plan.filter((j) => j.date === AUJ);  // lu par date : un jour peut porter deux séances
+    assert.ok(jourJ.length > 0 && jourJ.every((j) => j.type === "Repos"), `la course est restée : ${jourJ.map((j) => j.type)}`);
+    assert.match(jourJ[0].why, /Course retirée[\s\S]*avis d'un médecin/, "le jour ne dit pas pourquoi la course est retirée");
+    assert.ok(jourJ[0].i18n?.en?.why.includes("doctor"), "l'avertissement manque en anglais");
     assert.deepEqual(appliquerAptitude(plan), plan, "réappliqué (après les ajustements de l'athlète), le contrôle change le plan");
   });
 
@@ -131,6 +136,10 @@ async function main() {
     const iVerrou = ac.indexOf("if (!vmaMesuree && !estFondateur && !avisMedicalAttendu) {");
     assert.ok(iAvis > 0 && iVerrou > iAvis, "le test VMA est de nouveau prescrit sans regarder le questionnaire");
     assert.match(ac, /if \(eApt\) \{\s*await journaliserEchecUneFois[\s\S]{0,200}return \{ processed: false, reason: "aptitude illisible" \};/, "une panne de lecture passerait pour « rien à signaler »");
+    // L'autre voie vers le test : le bandeau « Fais ton test VMA » du tableau de bord (relecture, tour 2).
+    const dash = codeOf("src/app/dashboard/page.tsx");
+    assert.match(dash, /const sansTestVma = !!eApt \|\| avisAttendu\(lireAptitude\(/, "le bandeau ne lit plus le questionnaire (ou une panne l'affiche)");
+    assert.match(dash, /<TestVmaBanner measured=\{vmaMesuree \|\| estFondateur \|\| enMarcheCourse \|\| sansTestVma\} \/>/, "le bandeau du test VMA s'affiche malgré l'avis attendu");
     // Et le plan qu'il reçoit à la place : bâti sans VMA ni historique, sans aucune intensité.
     const ctx = await buildAthleteContext(fauxClient({ profiles: [PROFIL], performance_baselines: [], workouts: [], notifications: [APT(["poitrine"])] }), "u");
     assert.equal(ctx.aptitude?.attente, true);
@@ -172,12 +181,17 @@ async function main() {
     const carte = codeOf("src/components/health/CarteAptitude.tsx");
     assert.match(carte, /if \(etat === "panne"\) \{\s*return <p role="alert"[^>]*>\{t\.panne\}<\/p>;/);
     assert.match(carte, /if \(etat === "ok" && !modifier\) return <div>\{lienModifier\}<\/div>;/, "plus moyen de corriger ses réponses");
-    assert.match(codeOf("src/app/onboarding/page.tsx"), /\{aptOui\.length > 0 && <p[^>]*>\{APTITUDE_UI\[[^\]]*\]\.urgence\}<\/p>\}/, "l'inscription n'affiche plus l'urgence");
+    assert.match(codeOf("src/app/onboarding/page.tsx"), /<p className=\{`mt-3 text-\[13px\] \$\{aptOui\.length > 0[^`]*`\}>\{APTITUDE_UI\[[^\]]*\]\.urgence\}<\/p>/, "l'inscription n'affiche plus l'urgence");
+    // La carte dit quoi faire même si le recalcul a échoué (relecture, tour 2) : « ne cours pas ».
+    assert.match(APTITUDE_UI.fr.attente, /ne cours pas/, "la carte promet un plan sans course au lieu de dire de ne pas courir");
+    assert.doesNotMatch(APTITUDE_UI.fr.attente, /ton plan ne contient aucune/, "la carte affirme un recalcul qui a pu échouer");
     for (const l of ["fr", "en", "de", "es", "pt"] as const) {
       assert.equal(Object.keys(APTITUDE_UI[l].questions).length, 7, `questions incomplètes en ${l}`);
       assert.match(APTITUDE_UI[l].questions.palpitations, /effort|exercise|Belastung|esfuerzo|esforço/, `palpitations non restreintes à l'effort en ${l}`);
       assert.match(APTITUDE_UI[l].attente, /112/, `pas de numéro d'urgence en ${l}`);
       assert.match(APTITUDE_UI[l].urgence, /112/, `pas de numéro d'urgence à l'inscription en ${l}`);
+      // Décision de Cyprien : le cœur ou la tension, pas « tout traitement au long cours ».
+      assert.doesNotMatch(APTITUDE_UI[l].questions.maladieConnue, /long cours|long-term|dauerhaft|larga duración|prolongado/, `traitement trop large en ${l}`);
     }
   });
 
