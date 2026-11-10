@@ -121,6 +121,12 @@ test("« pas un dispositif médical » et le numéro d'urgence, dans chaque lang
   assert.ok(SOURCES.length >= 4 && SOURCES.some((s) => /Daniels/.test(s)) && SOURCES.some((s) => /Banister/.test(s)) && SOURCES.some((s) => /Karvonen/.test(s)));
 });
 
+test("l'aide du support ne reprend pas les formulations corrigées de la page", () => {
+  const kb = codeOf("src/data/helpKb.ts");
+  assert.ok(kb.includes('path: "/methode"'), "la page a disparu de l'aide du support");
+  assert.doesNotMatch(kb, /deux estimations|allures et prédictions \(modèle de Daniels|fraîcheur \(modèle de Banister\)/, "l'aide du support reprend une formulation inexacte de la page");
+});
+
 test("dans le plan du site et le pied de page", () => {
   assert.match(codeOf("src/app/sitemap.ts"), /\{ path: "\/methode", freq: "monthly", priority: 0\.6 \}/);
   assert.match(codeOf("src/components/layout/SiteFooter.tsx"), /\{ href: "\/methode", label: f\.method \}/);

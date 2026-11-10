@@ -85,7 +85,7 @@ export const METHODE: Record<Lang, PageMethode> = {
       { id: "ia", titre: "Ce que fait l'IA, et ce qu'elle ne fait pas", paras: [
         "Un modèle de langage (Gemini, de Google) n'intervient que pour écrire ou répondre : l'analyse de tes séances ; pour les abonnés Premium, le bilan de la semaine et les conseils des séances clés ; des propositions d'ajustement que tu acceptes ou non ; les réponses à tes questions dans les cours ; l'assistant d'aide.",
         "Il ne décide jamais de ton plan, de tes allures ni de tes zones. Une proposition d'ajustement passe des garde-fous avant de t'être montrée (le jour existe dans ton plan, pas deux séances dures d'affilée, aucune intensité ajoutée quand ta fatigue l'interdit).",
-        "Seule exception, quand ton plan n'a encore aucune séance pour aujourd'hui : le tableau de bord te propose une séance indicative, rédigée par l'IA ou calculée, qui n'entre pas dans ton plan. Pendant l'attente de l'avis d'un médecin (questionnaire d'aptitude), l'IA ne propose aucun entraînement.",
+        "Seule exception, quand ton plan n'a encore aucune séance pour aujourd'hui : le tableau de bord te propose une séance indicative, rédigée par l'IA ou calculée, qui n'entre pas dans ton plan. Pendant l'attente de l'avis d'un médecin (questionnaire d'aptitude), ni cette séance indicative ni les réponses dans les cours ne proposent d'entraînement.",
       ] },
       { id: "limites", titre: "Ce que Pacevo ne sait pas", paras: [
         "Quand une référence manque, Pacevo ne la remplace pas par un chiffre affiché comme une mesure : sans fréquence cardiaque de référence, pas de cible cardiaque. Une semaine où tu n'as presque pas couru (moins de 2 km) n'abaisse pas ton volume de référence.",
@@ -149,7 +149,7 @@ export const METHODE: Record<Lang, PageMethode> = {
       { id: "ia", titre: "What AI does, and what it doesn't", paras: [
         "A language model (Google's Gemini) is only used to write or answer: the analysis of your sessions; for Premium members, the weekly review and the key-session advice; adjustment suggestions that you accept or not; answers to your questions in the lessons; the help assistant.",
         "It never decides your plan, your paces or your zones. An adjustment suggestion goes through safeguards before it is shown to you (the day exists in your plan, no two hard sessions in a row, no intensity added when your fatigue rules it out).",
-        "One exception, when your plan has no session for today yet: the dashboard suggests an indicative session, written by the AI or calculated, which does not enter your plan. While a doctor's opinion is pending (fitness questionnaire), the AI suggests no training.",
+        "One exception, when your plan has no session for today yet: the dashboard suggests an indicative session, written by the AI or calculated, which does not enter your plan. While a doctor's opinion is pending (fitness questionnaire), neither this indicative session nor the answers in the lessons suggest any training.",
       ] },
       { id: "limites", titre: "What Pacevo doesn't know", paras: [
         "When a reference is missing, Pacevo does not replace it with a figure shown as a measurement: without a heart-rate reference, no heart-rate target. A week in which you barely ran (under 2 km) does not lower your reference volume.",
@@ -213,7 +213,7 @@ export const METHODE: Record<Lang, PageMethode> = {
       { id: "ia", titre: "Was die KI tut und was nicht", paras: [
         "Ein Sprachmodell (Gemini von Google) wird nur zum Schreiben oder Antworten eingesetzt: die Analyse deiner Einheiten; für Premium-Mitglieder der Wochenrückblick und die Tipps zu Schlüsseleinheiten; Anpassungsvorschläge, die du annimmst oder nicht; Antworten auf deine Fragen in den Kursen; der Hilfe-Assistent.",
         "Es entscheidet nie über deinen Plan, deine Tempi oder Zonen. Ein Anpassungsvorschlag durchläuft Schutzregeln, bevor du ihn siehst (der Tag existiert in deinem Plan, keine zwei harten Einheiten hintereinander, keine zusätzliche Intensität, wenn deine Ermüdung sie ausschließt).",
-        "Einzige Ausnahme, wenn dein Plan für heute noch keine Einheit hat: Das Dashboard schlägt eine unverbindliche Einheit vor, von der KI geschrieben oder berechnet, die nicht in deinen Plan eingeht. Solange eine ärztliche Einschätzung aussteht (Fitness-Fragebogen), schlägt die KI kein Training vor.",
+        "Einzige Ausnahme, wenn dein Plan für heute noch keine Einheit hat: Das Dashboard schlägt eine unverbindliche Einheit vor, von der KI geschrieben oder berechnet, die nicht in deinen Plan eingeht. Solange eine ärztliche Einschätzung aussteht (Fitness-Fragebogen), schlagen weder diese unverbindliche Einheit noch die Antworten in den Kursen ein Training vor.",
       ] },
       { id: "limites", titre: "Was Pacevo nicht weiß", paras: [
         "Fehlt eine Referenz, ersetzt Pacevo sie nicht durch eine Zahl, die wie eine Messung aussieht: ohne Herzfrequenzreferenz kein Herzfrequenzziel. Eine Woche, in der du kaum gelaufen bist (unter 2 km), senkt deinen Referenzumfang nicht.",
@@ -277,7 +277,7 @@ export const METHODE: Record<Lang, PageMethode> = {
       { id: "ia", titre: "Lo que hace la IA, y lo que no hace", paras: [
         "Un modelo de lenguaje (Gemini, de Google) solo interviene para escribir o responder: el análisis de tus sesiones; para los suscriptores Premium, el balance de la semana y los consejos de las sesiones clave; propuestas de ajuste que aceptas o no; las respuestas a tus preguntas en los cursos; el asistente de ayuda.",
         "Nunca decide tu plan, tus ritmos ni tus zonas. Una propuesta de ajuste pasa unos controles antes de mostrártela (el día existe en tu plan, no dos sesiones duras seguidas, ninguna intensidad añadida cuando tu fatiga la impide).",
-        "Única excepción, cuando tu plan aún no tiene sesión para hoy: el panel te propone una sesión orientativa, redactada por la IA o calculada, que no entra en tu plan. Mientras se espera la opinión de un médico (cuestionario de aptitud), la IA no propone ningún entrenamiento.",
+        "Única excepción, cuando tu plan aún no tiene sesión para hoy: el panel te propone una sesión orientativa, redactada por la IA o calculada, que no entra en tu plan. Mientras se espera la opinión de un médico (cuestionario de aptitud), ni esa sesión orientativa ni las respuestas en los cursos proponen entrenamiento.",
       ] },
       { id: "limites", titre: "Lo que Pacevo no sabe", paras: [
         "Cuando falta una referencia, Pacevo no la sustituye por una cifra presentada como una medida: sin referencia cardíaca, no hay objetivo cardíaco. Una semana en la que casi no corriste (menos de 2 km) no baja tu volumen de referencia.",
@@ -341,7 +341,7 @@ export const METHODE: Record<Lang, PageMethode> = {
       { id: "ia", titre: "O que a IA faz, e o que não faz", paras: [
         "Um modelo de linguagem (Gemini, da Google) só serve para escrever ou responder: a análise dos teus treinos; para os assinantes Premium, o balanço da semana e os conselhos dos treinos-chave; propostas de ajuste que aceitas ou não; as respostas às tuas perguntas nos cursos; o assistente de ajuda.",
         "Nunca decide o teu plano, os teus ritmos nem as tuas zonas. Uma proposta de ajuste passa por salvaguardas antes de ta mostrarmos (o dia existe no teu plano, não há dois treinos duros seguidos, nenhuma intensidade acrescentada quando o teu cansaço a impede).",
-        "Única exceção, quando o teu plano ainda não tem treino para hoje: o painel propõe-te um treino indicativo, escrito pela IA ou calculado, que não entra no teu plano. Enquanto se espera a opinião de um médico (questionário de aptidão), a IA não propõe nenhum treino.",
+        "Única exceção, quando o teu plano ainda não tem treino para hoje: o painel propõe-te um treino indicativo, escrito pela IA ou calculado, que não entra no teu plano. Enquanto se espera a opinião de um médico (questionário de aptidão), nem esse treino indicativo nem as respostas nos cursos propõem treino.",
       ] },
       { id: "limites", titre: "O que o Pacevo não sabe", paras: [
         "Quando falta uma referência, o Pacevo não a substitui por um número apresentado como uma medida: sem referência cardíaca, não há alvo cardíaco. Uma semana em que quase não correste (menos de 2 km) não baixa o teu volume de referência.",
