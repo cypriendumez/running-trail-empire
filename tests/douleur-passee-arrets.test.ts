@@ -51,7 +51,7 @@ test("recochée APRÈS « c'est passé », elle compte de nouveau", () => {
   const passe = { ...CYPRIEN, painPasse: ["Tibia (périoste)", "Articulaire"] };
   const revient = { date: "2026-11-12", ts: "2026-11-12T19:00:00Z", pain: ["Tibia (périoste)"] };
   const r = douleursDeSeance([passe, revient], "2026-11-12");
-  assert.deepEqual(r, [{ zone: "Tibia (périoste)", date: "2026-11-12" }]);
+  assert.deepEqual(r, [{ zone: "Tibia (périoste)", date: "2026-11-12", premiere: "2026-11-12" }]);
 });
 
 test("un « Aucune douleur » plus récent éteint ce qui précède ; un ressenti muet, non", () => {
@@ -139,10 +139,12 @@ test("une douleur cochée après une séance relance le plan tout de suite", () 
 test("Santé montre les douleurs d'après séance avec leur bouton, sans le dictionnaire dans le bundle", () => {
   const page = codeOf("src/app/dashboard/health/page.tsx");
   assert.match(page, /douleursSeance = douleursDeSeance\(/, "la page ne lit plus les douleurs d'après séance");
-  assert.match(page, /douleursSeance=\{douleursSeance\}/, "la page ne les transmet plus");
+  // Depuis le lot 1 (10/11) : elles rejoignent la liste UNIQUE transmise à l'écran.
+  assert.match(page, /\.\.\.douleursSeance\.map\(\(d\) => \(\{\s*cle: d\.zone, source: "seance" as const/, "la page ne les ajoute plus à la liste unique");
+  assert.match(page, /<HealthCenter suivi=\{suivi\} douleurs=\{douleurs\}/, "la page ne les transmet plus");
   const ecran = codeOf("src/components/health/HealthCenter.tsx");
   assert.match(ecran, /fetch\("\/api\/health\/douleur-seance"/, "aucun bouton n'appelle la route");
-  assert.match(ecran, /onClick=\{\(\) => majDouleurSeance\(d\.zone, true\)\}/, "le bouton « c'est passé » a disparu");
+  assert.match(ecran, /onClick=\{\(\) => majDouleurSeance\(d\.cle, true\)\}/, "le bouton « c'est passé » a disparu");
   assert.doesNotMatch(ecran, /painZonesI18n/, "l'écran client importe la table des zones, donc tout le dictionnaire T");
 });
 

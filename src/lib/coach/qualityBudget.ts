@@ -90,6 +90,9 @@ export type QualityBudgetInput = {
   /** Programme marche-course en cours (`lib/coach/marcheCourse`) : aucune qualité, quel que
    *  soit le plancher. Son motif s'affiche à part — c'est un cadre, pas un allègement. */
   marcheCourse?: boolean;
+  /** Consignes saisies d'après le kinésithérapeute (lib/health/consignesKine) : leur motif,
+   *  et si elles excluent la qualité (pas d'intensité, ou une durée maximale par sortie). */
+  consignesKine?: { motif: string; sansQualite: boolean } | null;
 };
 
 export type QualityBudget = {
@@ -255,6 +258,14 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   // MARCHE-COURSE : qui ne court pas encore 30 minutes d'affilée n'a rien à faire d'une
   // séance de VMA ou de seuil. En dernier, comme la récupération : aucun plancher ne la relève.
   if (i.marcheCourse) qBudget = 0;
+
+  // CONSIGNES DU KINÉSITHÉRAPEUTE (10/11/2026) : c'est le professionnel qui fixe le cadre ;
+  // aucun plancher ne le relève. Une durée maximale par sortie exclut aussi la qualité : un
+  // seuil ou une VMA, échauffement et retour au calme compris, n'y tiendrait pas.
+  if (i.consignesKine) {
+    easeReasons.push(i.consignesKine.motif);
+    if (i.consignesKine.sansQualite) qBudget = 0;
+  }
 
   // ── UNE DOULEUR NE SE FOND DANS AUCUN PLAFOND ───────────────────────────────
   // La douleur retire sa séance plus haut, AVANT les plafonds : quand l'un d'eux tombe

@@ -23,6 +23,7 @@ import { joursSansIntensite } from "@/lib/coach/apresCourse";
 import { axesRenforcement } from "@/lib/coach/renforcement";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
+import { appliquerConsignes } from "@/lib/coach/consignesPlan";
 import { nRaw, type I18nText } from "@/lib/i18n/multi";
 import type { Lang } from "@/lib/i18n/translations";
 
@@ -117,6 +118,30 @@ function kmAndTime(km: number, pace: string | null, lang: Lang): string {
  * d'intensité, quoi qu'il ait été planifié.
  */
 export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[] {
+  // LES CONSIGNES DU KINÉSITHÉRAPEUTE : un contrôle unique sur le plan FINI, quel que soit le
+  // chemin qui a produit chaque séance (lib/coach/consignesPlan).
+  return consignesSurPlan(ctx, construireSemaine(ctx, today), today);
+}
+
+/**
+ * Les consignes du kinésithérapeute appliquées à une semaine FINIE. Le coach l'appelle aussi
+ * APRÈS les ajustements de l'athlète (autoCoach), qui réécrivent la semaine ensuite.
+ */
+export function consignesSurPlan(ctx: AthleteContext, plan: PlanDay[], today = new Date()): PlanDay[] {
+  if (!ctx.consignes) return plan;
+  const debut = new Date(today); debut.setHours(0, 0, 0, 0);
+  const cs = ctx.courseSecondaire ?? null;
+  const objectifIdx = ctx.daysToRace != null && ctx.daysToRace >= 0 && ctx.daysToRace <= 6 ? ctx.daysToRace : -1;
+  return appliquerConsignes(plan, {
+    consignes: ctx.consignes,
+    allureFacile: ctx.easyPace ?? null,
+    // Celles d'aujourd'hui comprises : une sortie non prévue courue ce matin compte.
+    sortiesRecentes: (ctx.sortiesRecentes ?? []).filter((d) => d <= iso(debut)),
+    courseC: cs?.priorite === "C" && cs.idx !== objectifIdx ? iso(addDays(debut, cs.idx)) : null,
+  });
+}
+
+function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   const start = new Date(today); start.setHours(0, 0, 0, 0);
   const dates = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const gapDays = Math.max(2, Math.ceil(ctx.hardGapHours / 24));
@@ -716,13 +741,15 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   // Un footing plus long que la sortie longue n'a aucun sens : c'est la sortie longue qui
   // porte le volume, et deux séances de même durée n'en font qu'une répétée. Constaté sur
   // 3 sorties par semaine — 16 km de « footing » contre 13 km de sortie longue.
-  const easyCap = Math.min(raceIdx >= 0 ? 10 : 18, longIdx >= 0 ? Math.max(4, longRunKm * 0.85) : 18);
+  const easyCap = Math.min(raceIdx >= 0 ? 10 : 18, longIdx >= 0 ? Math.max(4, longRunKm * 0.85) : 18,
+    // La durée maximale du kinésithérapeute vaut pour CHAQUE sortie, footing compris.
+    ctx.consignes?.kmMax ?? Infinity);
   // Plancher à 4 km SAUF si le budget ne le permet pas : mieux vaut une sortie de moins
   // qu'un dépassement de la cible hebdomadaire.
   const easyKm = Math.min(easyCap, Math.max(rawEasy >= 3 ? kmMinFooting : 3, Math.round(rawEasy)));
   // Jamais pendant la récupération d'après-course : le volume y est volontairement réduit,
   // et « scinde en DEUX sorties » à J+5 d'un marathon disait l'inverse du bandeau.
-  const doubles = rawEasy > easyCap && raceIdx < 0 && !ctx.recuperation;
+  const doubles = rawEasy > easyCap && raceIdx < 0 && !ctx.recuperation && !ctx.consignes;
   // ⚠️ TOUS les créneaux recevaient EXACTEMENT la même séance : même titre, même
   // distance, même texte. Trois footings de suite étaient donc trois fois le même
   // footing — l'athlète l'a signalé, et il avait raison. On fait varier la distance
@@ -846,7 +873,10 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
   } else if ((lvl === "rouge" || hardToday) && week[0].type !== "Repos" && week[0].type !== "Course") {
     week[0] = reecrire({ ...week[0], type: "Récup" }, (l) => ({
       title: PLAN_T[l].recupTitre,
-      detail: PLAN_T[l].recupDetail(warm, cool),
+      // Sous une durée maximale du kinésithérapeute, la récupération entière y tient.
+      detail: ctx.consignes?.dureeMaxMin != null
+        ? PLAN_T[l].recupDetail(5, 5, Math.max(5, Math.min(25, ctx.consignes.dureeMaxMin - 10)))
+        : PLAN_T[l].recupDetail(warm, cool),
       why: hardToday ? PLAN_T[l].recupWhyDejaDur : PLAN_T[l].recupWhyRouge(motifs(l, 2)),
       tags: [PLAN_T[l].tags["Récup"], PLAN_T[l].tags["Z1"]],
     }));

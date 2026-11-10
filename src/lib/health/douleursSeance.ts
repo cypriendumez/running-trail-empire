@@ -36,6 +36,8 @@ export type DouleurSeance = {
   zone: string;
   /** Date de la séance la plus récente où elle a été cochée. */
   date: string;
+  /** Date de la PREMIÈRE séance (encore comptée) où elle a été cochée : « depuis X jours ». */
+  premiere: string;
 };
 
 const DATE = /^\d{4}-\d{2}-\d{2}/;
@@ -53,6 +55,7 @@ export function douleursDeSeance(ressentis: readonly RessentiDouleur[], aujourdh
     .filter((r) => liste(r.pain).includes(AUCUNE_DOULEUR))
     .map(cle).sort().pop() ?? "";
   const vues = new Map<string, string>();
+  const premieres = new Map<string, string>();
   // Du plus récent au plus ancien : une douleur dite passée sur un ressenti éteint aussi ses
   // occurrences PLUS ANCIENNES ; recochée APRÈS, elle compte de nouveau.
   const eteintes = new Set<string>();
@@ -64,9 +67,10 @@ export function douleursDeSeance(ressentis: readonly RessentiDouleur[], aujourdh
     const passees = new Set(liste(r.painPasse));
     for (const z of douleursDeclarees(r.pain)) {
       if (passees.has(z)) { eteintes.add(z); continue; }
-      if (eteintes.has(z) || vues.has(z)) continue;
-      vues.set(z, date);
+      if (eteintes.has(z)) continue;
+      if (!vues.has(z)) vues.set(z, date);
+      premieres.set(z, date);
     }
   }
-  return [...vues].map(([zone, date]) => ({ zone, date }));
+  return [...vues].map(([zone, date]) => ({ zone, date, premiere: premieres.get(zone) ?? date }));
 }

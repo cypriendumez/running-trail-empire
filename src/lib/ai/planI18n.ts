@@ -170,7 +170,7 @@ export type TextesPlan = {
 
   // ── Verdict de fraîcheur du jour ────────────────────────────────────────────
   recupTitre: string;
-  recupDetail: (echauff: number, calme: number) => string;
+  recupDetail: (echauff: number, calme: number, corps?: number) => string;
   recupWhyDejaDur: string;
   recupWhyRouge: (motifs: string) => string;
   allegeeDetailSuffixe: string;
@@ -309,7 +309,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     },
 
     recupTitre: "Récupération",
-    recupDetail: (e, k) => `Échauffement ${e} min très doux FC Z1 → Corps : 25 min en Z1 très facile, piloté à la FRÉQUENCE CARDIAQUE (aucune allure à tenir) → Retour au calme ${k} min FC Z1. Ou repos complet si tu le sens mieux.`,
+    recupDetail: (e, k, c = 25) => `Échauffement ${e} min très doux FC Z1 → Corps : ${c} min en Z1 très facile, piloté à la FRÉQUENCE CARDIAQUE (aucune allure à tenir) → Retour au calme ${k} min FC Z1. Ou repos complet si tu le sens mieux.`,
     recupWhyDejaDur: "Tu as déjà fait une séance exigeante aujourd'hui : on ne double pas. La progression se joue à la récupération.",
     recupWhyRouge: (m) => `Aujourd'hui ton corps demande de la récupération : ${m}. Reporter une séance dure de 24 h ne coûte rien ; la forcer coûte des semaines.`,
     allegeeDetailSuffixe: "\n\n⚠️ Version ALLÉGÉE aujourd'hui : réduis le corps de séance d'environ un tiers.",
@@ -436,7 +436,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     },
 
     recupTitre: "Recovery",
-    recupDetail: (e, k) => `Warm-up ${e} min very gentle HR Z1 → Main set: 25 min at Z1 very easy, driven by HEART RATE (no pace to hold) → Cool-down ${k} min HR Z1. Or complete rest if that feels better.`,
+    recupDetail: (e, k, c = 25) => `Warm-up ${e} min very gentle HR Z1 → Main set: ${c} min at Z1 very easy, driven by HEART RATE (no pace to hold) → Cool-down ${k} min HR Z1. Or complete rest if that feels better.`,
     recupWhyDejaDur: "You have already done a demanding session today: we do not double up. Progress is made in recovery.",
     recupWhyRouge: (m) => `Today your body is asking for recovery: ${m}. Postponing a hard session by 24 h costs nothing; forcing it costs weeks.`,
     allegeeDetailSuffixe: "\n\n⚠️ EASED version today: cut the main set by about a third.",
@@ -563,7 +563,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     },
 
     recupTitre: "Erholung",
-    recupDetail: (e, k) => `Aufwärmen ${e} min sehr sanft HF Z1 → Hauptteil: 25 min in Z1 sehr locker, über die HERZFREQUENZ gesteuert (kein Tempo zu halten) → Auslaufen ${k} min HF Z1. Oder vollständige Ruhe, wenn sich das besser anfühlt.`,
+    recupDetail: (e, k, c = 25) => `Aufwärmen ${e} min sehr sanft HF Z1 → Hauptteil: ${c} min in Z1 sehr locker, über die HERZFREQUENZ gesteuert (kein Tempo zu halten) → Auslaufen ${k} min HF Z1. Oder vollständige Ruhe, wenn sich das besser anfühlt.`,
     recupWhyDejaDur: "Du hast heute schon eine fordernde Einheit gemacht: Wir verdoppeln nicht. Der Fortschritt entsteht in der Erholung.",
     recupWhyRouge: (m) => `Heute verlangt dein Körper Erholung: ${m}. Eine harte Einheit um 24 h zu verschieben kostet nichts; sie zu erzwingen kostet Wochen.`,
     allegeeDetailSuffixe: "\n\n⚠️ Heute REDUZIERTE Fassung: Kürze den Hauptteil um etwa ein Drittel.",
@@ -690,7 +690,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     },
 
     recupTitre: "Recuperación",
-    recupDetail: (e, k) => `Calentamiento ${e} min muy suave FC Z1 → Parte principal: 25 min en Z1 muy fácil, pilotado por FRECUENCIA CARDÍACA (sin ritmo que mantener) → Vuelta a la calma ${k} min FC Z1. O descanso completo si lo sientes mejor.`,
+    recupDetail: (e, k, c = 25) => `Calentamiento ${e} min muy suave FC Z1 → Parte principal: ${c} min en Z1 muy fácil, pilotado por FRECUENCIA CARDÍACA (sin ritmo que mantener) → Vuelta a la calma ${k} min FC Z1. O descanso completo si lo sientes mejor.`,
     recupWhyDejaDur: "Ya has hecho una sesión exigente hoy: no doblamos. El progreso se juega en la recuperación.",
     recupWhyRouge: (m) => `Hoy tu cuerpo pide recuperación: ${m}. Aplazar una sesión dura 24 h no cuesta nada; forzarla cuesta semanas.`,
     allegeeDetailSuffixe: "\n\n⚠️ Versión ALIGERADA hoy: reduce la parte principal en torno a un tercio.",
@@ -817,7 +817,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     },
 
     recupTitre: "Recuperação",
-    recupDetail: (e, k) => `Aquecimento ${e} min muito suave FC Z1 → Parte principal: 25 min em Z1 muito fácil, guiado pela FREQUÊNCIA CARDÍACA (sem ritmo a cumprir) → Retorno à calma ${k} min FC Z1. Ou descanso completo se te souber melhor.`,
+    recupDetail: (e, k, c = 25) => `Aquecimento ${e} min muito suave FC Z1 → Parte principal: ${c} min em Z1 muito fácil, guiado pela FREQUÊNCIA CARDÍACA (sem ritmo a cumprir) → Retorno à calma ${k} min FC Z1. Ou descanso completo se te souber melhor.`,
     recupWhyDejaDur: "Já fizeste hoje uma sessão exigente: não duplicamos. O progresso joga-se na recuperação.",
     recupWhyRouge: (m) => `Hoje o teu corpo pede recuperação: ${m}. Adiar uma sessão dura 24 h não custa nada; forçá-la custa semanas.`,
     allegeeDetailSuffixe: "\n\n⚠️ Versão ALIVIADA hoje: reduz a parte principal em cerca de um terço.",

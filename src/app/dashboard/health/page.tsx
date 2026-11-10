@@ -10,6 +10,8 @@ import { douleursDeSeance, type DouleurSeance } from "@/lib/health/douleursSeanc
 import { PEREMPTION_JOURS } from "@/lib/health/douleurs";
 import { traduireDouleur } from "@/lib/coach/painZonesI18n";
 import { LANGS } from "@/lib/i18n/base";
+import { chargeAvantDouleur, doitConsulter, type ChargeAvant, type DouleurUnifiee } from "@/lib/health/santeDouleurs";
+import { TYPE_CONSIGNES, consignesEnVigueur, type ConsignesKine } from "@/lib/health/consignesKine";
 
 export const metadata = { title: "Santé" };
 
@@ -29,6 +31,13 @@ export default async function HealthPage() {
   let coursesNutrition: CourseNutri[] = [];
   let poidsKg: number | null = null;
   let douleursSeance: (DouleurSeance & { ilYaJours: number; libelle: Record<string, string> })[] = [];
+  // Santé, lot 1 (10/11/2026) : une seule liste, ce que la douleur a changé, quand consulter,
+  // la charge d'avant, et les consignes du kinésithérapeute.
+  let douleurs: (DouleurUnifiee & { libelle?: Record<string, string>; zone?: string })[] = [];
+  let effets: { qualiteRetiree: number; sortieLongue: { prevueKm: number; reduiteKm: number } | null; lignesDroites: boolean } | null = null;
+  let consignes: ConsignesKine | null = null;
+  let charge: ChargeAvant | null = null;
+  let rappel: ReturnType<typeof doitConsulter> = null;
   if (user) {
     // Pour la nutrition, les courses à venir et de quoi PRÉDIRE leur durée — la même VMA effective que le coach
     // (`effectiveVma`, seule définition de l'app) : lus ensemble, en une vague.
@@ -38,7 +47,7 @@ export default async function HealthPage() {
       supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "planned_race").order("created_at", { ascending: false }).limit(50),
       supabase.from("profiles").select("pace_curve,garmin_vo2max,weight_kg").eq("id", user.id).single(),
       supabase.from("performance_baselines").select("vma_kmh").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("workouts").select("distance_km,duration_seconds").eq("user_id", user.id).order("date", { ascending: false }).limit(200),
+      supabase.from("workouts").select("date,sport,distance_km,duration_seconds").eq("user_id", user.id).order("date", { ascending: false }).limit(200),
     ]);
     for (const [nom, r] of [["objectif", objRes], ["courses", planRes], ["profil", profilRes], ["séances", seancesRes]] as const) {
       if (r.error && estUnePanne(r)) console.error("[santé] lecture illisible :", nom, r.error.message);
@@ -113,6 +122,42 @@ export default async function HealthPage() {
         ilYaJours: Math.max(0, Math.round((Date.parse(`${jourJ}T12:00:00Z`) - Date.parse(`${d.date}T12:00:00Z`)) / 86400000)),
         libelle: Object.fromEntries(LANGS.map(({ code }) => [code, traduireDouleur(d.zone, code)])),
       }));
+
+    // ── UNE SEULE LISTE : déclarées (schéma corporel) + cochées après une séance ─────────
+    const depuis = (jour: string) => Math.max(0, Math.round((Date.parse(`${jourJ}T12:00:00Z`) - Date.parse(`${jour}T12:00:00Z`)) / 86400000));
+    douleurs = [
+      ...suivi.map((z) => {
+        const e = etats.find((x) => x.cle === z.cle);
+        return {
+          cle: z.cle, source: "declaree" as const, zone: z.zone,
+          depuisJours: z.depuisJours, derniereIlYaJours: z.derniereIlYaJours,
+          id: e?.id, etat: e?.etat, premier: z.premier, dernier: z.dernier, signalements: z.signalements, tendance: z.tendance,
+        };
+      }),
+      ...douleursSeance.map((d) => ({
+        cle: d.zone, source: "seance" as const, libelle: d.libelle,
+        depuisJours: depuis(d.premiere), derniereIlYaJours: d.ilYaJours,
+      })),
+    ];
+    rappel = doitConsulter(douleurs);
+    // La charge des deux semaines avant la PLUS ANCIENNE douleur encore active.
+    const plusAncienne = douleurs.reduce((m, d) => Math.max(m, d.depuisJours), -1);
+    if (plusAncienne >= 0) {
+      const debut = new Date(`${jourJ}T12:00:00Z`); debut.setUTCDate(debut.getUTCDate() - plusAncienne);
+      charge = chargeAvantDouleur((seancesRes.data ?? []) as { date?: string; distance_km?: number; sport?: string }[], debut.toISOString().slice(0, 10));
+    }
+    // Ce que le coach a retiré, et les consignes saisies (relues pour le formulaire).
+    const [etatRes, consRes] = await Promise.all([
+      supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "auto_coach_state").maybeSingle(),
+      supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", TYPE_CONSIGNES).order("created_at", { ascending: false }).limit(1),
+    ]);
+    for (const [nom, r] of [["état du coach", etatRes], ["consignes", consRes]] as const) {
+      if (r.error && estUnePanne(r)) console.error("[santé] lecture illisible :", nom, r.error.message);
+    }
+    const etat = etatRes.data?.data as { douleurEffets?: typeof effets } | null;
+    effets = douleurs.length ? (etat?.douleurEffets ?? null) : null;
+    consignes = consignesEnVigueur(((consRes.data ?? []) as { data?: unknown }[])[0]?.data, jourJ);
   }
-  return <HealthCenter suivi={suivi} etats={etats} douleursSeance={douleursSeance} enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} />;
+  return <HealthCenter suivi={suivi} douleurs={douleurs} effets={effets} consignes={consignes} charge={charge} rappel={rappel}
+    enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} />;
 }
