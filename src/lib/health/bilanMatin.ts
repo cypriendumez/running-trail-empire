@@ -49,6 +49,9 @@ export function bilanDuJour(lignes: readonly { data?: unknown }[], jour: string)
   return null;
 }
 
+/** Trois bilans francs de suite (aujourd'hui, hier, avant-hier) : on oriente vers un médecin. */
+export const JOURS_FATIGUE_DURABLE = 3;
+
 /** Ce que le bilan fait au plan du jour. */
 export function effetBilan(b: BilanMatin | null): { allege: boolean; stressHaut: boolean } {
   if (!b) return { allege: false, stressHaut: false };
@@ -62,26 +65,26 @@ export const BILAN_T: Record<Lang, {
   fr: {
     motif: (f, j) => `bilan du matin : fatigue ${f}/5, jambes ${j}/5`,
     stress: (s) => `bilan du matin : stress ${s}/5 (affiché, ne retire rien)`,
-    recupWhy: (f, j) => `Ton bilan de ce matin (fatigue ${f}/5, jambes ${j}/5) : la séance dure est remplacée par une sortie facile. Elle revient quand tu te sens mieux.`,
+    recupWhy: (f, j) => `Ton bilan de ce matin (fatigue ${f}/5, jambes ${j}/5) : la séance dure est remplacée par une sortie facile. Elle n'est pas rattrapée de force : le plan repart de ton état des prochains jours.`,
   },
   en: {
     motif: (f, j) => `morning check-in: fatigue ${f}/5, legs ${j}/5`,
     stress: (s) => `morning check-in: stress ${s}/5 (shown, removes nothing)`,
-    recupWhy: (f, j) => `Your check-in this morning (fatigue ${f}/5, legs ${j}/5): the hard session is replaced by an easy run. It comes back when you feel better.`,
+    recupWhy: (f, j) => `Your check-in this morning (fatigue ${f}/5, legs ${j}/5): the hard session is replaced by an easy run. It is not forced back in: the plan starts again from how you feel over the next days.`,
   },
   de: {
     motif: (f, j) => `Morgen-Check: Müdigkeit ${f}/5, Beine ${j}/5`,
     stress: (s) => `Morgen-Check: Stress ${s}/5 (angezeigt, nichts gestrichen)`,
-    recupWhy: (f, j) => `Dein Morgen-Check (Müdigkeit ${f}/5, Beine ${j}/5): Die harte Einheit wird durch einen lockeren Lauf ersetzt. Sie kommt zurück, wenn es dir besser geht.`,
+    recupWhy: (f, j) => `Dein Morgen-Check (Müdigkeit ${f}/5, Beine ${j}/5): Die harte Einheit wird durch einen lockeren Lauf ersetzt. Sie wird nicht erzwungen nachgeholt: Der Plan richtet sich nach deinem Zustand der nächsten Tage.`,
   },
   es: {
     motif: (f, j) => `chequeo matinal: cansancio ${f}/5, piernas ${j}/5`,
     stress: (s) => `chequeo matinal: estrés ${s}/5 (se muestra, no quita nada)`,
-    recupWhy: (f, j) => `Tu chequeo de esta mañana (cansancio ${f}/5, piernas ${j}/5): la sesión dura se sustituye por una salida suave. Volverá cuando te encuentres mejor.`,
+    recupWhy: (f, j) => `Tu chequeo de esta mañana (cansancio ${f}/5, piernas ${j}/5): la sesión dura se sustituye por una salida suave. No se recupera a la fuerza: el plan parte de cómo estés los próximos días.`,
   },
   pt: {
     motif: (f, j) => `check-in da manhã: cansaço ${f}/5, pernas ${j}/5`,
     stress: (s) => `check-in da manhã: stress ${s}/5 (mostrado, não retira nada)`,
-    recupWhy: (f, j) => `O teu check-in desta manhã (cansaço ${f}/5, pernas ${j}/5): a sessão dura é substituída por uma corrida fácil. Volta quando te sentires melhor.`,
+    recupWhy: (f, j) => `O teu check-in desta manhã (cansaço ${f}/5, pernas ${j}/5): a sessão dura é substituída por uma corrida fácil. Não é recuperada à força: o plano parte de como estiveres nos próximos dias.`,
   },
 };

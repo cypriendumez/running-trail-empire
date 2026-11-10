@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { ficheIndicateur, type DonneesFiche } from "@/lib/indicateurs/fiches";
 import type { Fiche } from "@/lib/indicateurs/types";
-import { lireBilan, type BilanMatin } from "@/lib/health/bilanMatin";
+import { lireBilan, effetBilan, JOURS_FATIGUE_DURABLE, type BilanMatin } from "@/lib/health/bilanMatin";
 
 export type ResumeIndicateur = { valeur: string; unite?: string; statut?: { libelle: string; ton: string }; verdict: string; vide?: string };
 export type DonneesRecup = {
@@ -19,6 +19,10 @@ export type DonneesRecup = {
   sommeil: { derniere: { date: string; min: number | null; score: number | null } | null; moyenneMin: number | null; nuits: number };
   fcRepos: number | null;
   panne: boolean;
+  /** Fatigue ou jambes à 4-5/5 trois jours DE SUITE, jusqu'à aujourd'hui : on oriente vers un médecin
+   *  (relecture du directeur scientifique, 10/11/2026 : sans cela, un coureur qui répond 4 chaque
+   *  matin n'aurait plus jamais de séance dure sans que rien le lui signale). */
+  fatigueDurable: boolean;
 };
 
 const decale = (jour: string, n: number) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -40,6 +44,15 @@ export function bilansRecents(lignes: readonly { data?: unknown }[], jour: strin
   return { bilanJour: bilans.find((b) => b.date === jour) ?? null, bilans };
 }
 
+/** Les bilans francs des N derniers jours, sans trou, jusqu'à aujourd'hui inclus. */
+export function fatigueDurable(bilans: readonly BilanMatin[], jour: string, n = JOURS_FATIGUE_DURABLE): boolean {
+  for (let k = 0; k < n; k++) {
+    const b = bilans.find((x) => x.date === decale(jour, -k));
+    if (!b || !effetBilan(b).allege) return false;
+  }
+  return true;
+}
+
 /** Le sommeil : dernière nuit mesurée, moyenne des nuits mesurées des 7 derniers jours. */
 export function resumeSommeil(nuits: DonneesFiche["sommeil"], jour: string): DonneesRecup["sommeil"] {
   const mesurees = nuits.filter((n) => n.date <= jour && (positif(n.total_sleep_min) != null || positif(n.sleep_score) != null))
@@ -54,8 +67,10 @@ export function resumeSommeil(nuits: DonneesFiche["sommeil"], jour: string): Don
 }
 
 export function donneesRecup(d: DonneesFiche & { pannes: string[] }, lignesBilan: readonly { data?: unknown }[], jour: string, bilanPanne: boolean): DonneesRecup {
+  const recents = bilansRecents(lignesBilan, jour);
   return {
-    ...bilansRecents(lignesBilan, jour),
+    ...recents,
+    fatigueDurable: fatigueDurable(recents.bilans, jour),
     forme: resume(ficheIndicateur("forme", d)),
     vfc: resume(ficheIndicateur("vfc", d)),
     sommeil: resumeSommeil(d.sommeil, jour),

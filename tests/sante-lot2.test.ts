@@ -12,7 +12,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { validerBilan, lireBilan, bilanDuJour, effetBilan, BILAN_T } from "../src/lib/health/bilanMatin";
-import { bilansRecents, resumeSommeil } from "../src/lib/health/recuperation";
+import { bilansRecents, resumeSommeil, fatigueDurable } from "../src/lib/health/recuperation";
 import { buildAthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
@@ -152,6 +152,18 @@ async function main() {
     assert.equal(veille.bilanMatin, null, "le bilan de la veille compte");
   });
 
+  await test("le jour de la course, un bilan 5/5 ne retire jamais la course", async () => {
+    const avec = await contexte([BILAN({ fatigue: 5, jambes: 5, stress: 5 })]);
+    const j0 = buildWeekPlan({ ...avec, daysToRace: 0 }, new Date(`${AUJ}T08:00:00`))[0];
+    assert.equal(j0.type, "Course", `la course du jour a été remplacée : ${j0.type} « ${j0.title} »`);
+  });
+
+  await test("le « pourquoi » ne promet pas que la séance revient (le plan glissant ne la rattrape pas de force)", () => {
+    for (const l of ["fr", "en", "de", "es", "pt"] as const) {
+      assert.doesNotMatch(BILAN_T[l].recupWhy(5, 5), /revient|comes back|kommt zurück|Volverá|Volta quando/, `promesse de retour en ${l}`);
+    }
+  });
+
   await test("une lecture du bilan en panne refuse le contexte (pas « aucun bilan »)", () => {
     assert.match(codeOf("src/lib/ai/coachContext.ts"), /if \(estUnePanne\(\{ error: eBilan \}\)\) throw new Error\(`Bilan du matin illisible/, "une panne passerait pour « aucun bilan »");
   });
@@ -178,6 +190,15 @@ async function main() {
     const r = bilansRecents(lignes, AUJ);
     assert.deepEqual(r.bilans.map((b) => b.date), [AUJ, ilYa(2)], `historique faux : ${JSON.stringify(r.bilans)}`);
     assert.equal(r.bilanJour?.fatigue, 3, "le bilan du jour n'est pas le plus récent");
+  });
+
+  await test("trois matins francs DE SUITE jusqu'à aujourd'hui : orientation vers un médecin ; un trou ou un jour léger, non", () => {
+    const b = (k: number, f: number) => ({ date: ilYa(k), fatigue: f, jambes: 1, stress: 1 });
+    assert.equal(fatigueDurable([b(0, 4), b(1, 5), b(2, 4)], AUJ), true);
+    assert.equal(fatigueDurable([b(0, 4), b(1, 5)], AUJ), false, "deux jours suffisent");
+    assert.equal(fatigueDurable([b(0, 4), b(1, 3), b(2, 4)], AUJ), false, "un jour léger au milieu compte");
+    assert.equal(fatigueDurable([b(1, 4), b(2, 5), b(3, 4)], AUJ), false, "une série qui ne va pas jusqu'à aujourd'hui compte");
+    assert.match(codeOf("src/components/health/Recuperation.tsx"), /\{d\.fatigueDurable && <p role="status"[^>]*>\{t\.fatigueDurable\}<\/p>\}/, "l'écran n'oriente plus vers un médecin");
   });
 
   await test("forme et VFC : les MÊMES fiches que les pages Indicateurs ; FC de repos jamais inventée", () => {
