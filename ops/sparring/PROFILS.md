@@ -27,6 +27,8 @@ disponible, canicule.
 | 7 | Emploi du temps chaotique | Jours qui changent chaque semaine, séances manquées | Le plan suit les jours déclarés, une séance manquée ne se « rattrape » pas en doublant | Deux séances dures le lendemain d'un trou | **Partiel** (1 seul jour dispo) |
 | 8 | Élite sub-33' au 10 km | VMA ≈ 20,5, 110 km/sem, 10 km dans 8 sem | Affûtage 1 sem, VMA + seuil, double seuil si l'option est cochée | Affûtage de 3 sem pour un 10 km | Oui (élite) ; ajouter l'objectif 10 km |
 
+**Variante « questionnaire d'aptitude coché »** (profils 4 et 6 en priorité, mais elle vaut pour tous) : une des 7 situations du questionnaire cochée (douleur dans la poitrine à l'effort, malaise, essoufflement anormal, palpitations à l'effort, médecin qui a déconseillé l'effort, proche mort subitement avant 50 ans, maladie cardiaque / hypertension / traitement au long cours) et pas encore d'avis médical déclaré. Un plan sensé : AUCUNE séance d'endurance (course, vélo, natation) sur les 7 jours, renfo doux sans saut, la course du jour retirée avec « avis d'un médecin avant », aucun test VMA même sans VMA mesurée. Absurde : un footing, une sortie longue « facile », le test 6 min. Couvert : `tests/sante-lot3.test.ts` (7 jours de départ, profil sans VMA compris).
+
 ## Ce que `@Sparring` fait à chaque passage (lundi)
 
 1. Lit `ops/memory/LESSONS_LEARNED.md`, puis `git log` depuis son dernier passage sur `src/lib/coach/`, `src/lib/ai/autoPlan.ts`, `src/lib/ai/coachContext.ts`. Rien de changé → `RAS` et arrêt.

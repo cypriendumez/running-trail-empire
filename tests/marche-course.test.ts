@@ -209,12 +209,12 @@ async function main() {
 
   await test("le verrou du test VMA laisse passer le programme, et seulement lui", () => {
     const src = codeNu("src/lib/ai/autoCoach.ts");
-    const verrou = src.slice(src.indexOf("if (!vmaMesuree && !estFondateur) {"), src.indexOf("const ctx = await buildAthleteContext("));
+    const verrou = src.slice(src.indexOf("if (!vmaMesuree && !estFondateur"), src.indexOf("const ctx = await buildAthleteContext("));
     assert.match(verrou, /if \(!\(await marcheCourseDe\(admin, userId\)\)\) \{\s*return prescrireTestVma\(/, "le test VMA est imposé au débutant en marche-course");
     const lecture = src.slice(src.indexOf("async function marcheCourseDe"), src.indexOf("async function prescrireTestVma"));
     assert.match(lecture, /if \(error \|\| \(profil[^)]*\)\?\.peut_courir_30min !== false\) return null;/, "une colonne absente ouvre le programme");
     assert.match(src, /marcheCourse: ctx\.marcheCourse \? \{ etape: ctx\.marcheCourse\.etape, total: ctx\.marcheCourse\.total \} : null/, "l'état du coach ne dit pas le programme");
-    assert.match(codeNu("src/app/dashboard/page.tsx"), /<TestVmaBanner measured=\{vmaMesuree \|\| estFondateur \|\| enMarcheCourse\} \/>/,
+    assert.match(codeNu("src/app/dashboard/page.tsx"), /<TestVmaBanner measured=\{vmaMesuree \|\| estFondateur \|\| enMarcheCourse(?: \|\| sansTestVma)?\} \/>/,
       "le tableau de bord réclame encore le test VMA pendant le programme");
   });
 

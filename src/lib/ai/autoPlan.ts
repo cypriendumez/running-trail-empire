@@ -23,7 +23,7 @@ import { joursSansIntensite } from "@/lib/coach/apresCourse";
 import { axesRenforcement } from "@/lib/coach/renforcement";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
-import { appliquerConsignes } from "@/lib/coach/consignesPlan";
+import { appliquerConsignes, appliquerAptitude } from "@/lib/coach/consignesPlan";
 import { BILAN_T } from "@/lib/health/bilanMatin";
 import { nRaw, type I18nText } from "@/lib/i18n/multi";
 import type { Lang } from "@/lib/i18n/translations";
@@ -129,17 +129,22 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
  * APRÈS les ajustements de l'athlète (autoCoach), qui réécrivent la semaine ensuite.
  */
 export function consignesSurPlan(ctx: AthleteContext, plan: PlanDay[], today = new Date()): PlanDay[] {
-  if (!ctx.consignes) return plan;
+  const aptitude = !!ctx.aptitude?.attente;
+  if (!ctx.consignes && !aptitude) return plan;
   const debut = new Date(today); debut.setHours(0, 0, 0, 0);
   const cs = ctx.courseSecondaire ?? null;
   const objectifIdx = ctx.daysToRace != null && ctx.daysToRace >= 0 && ctx.daysToRace <= 6 ? ctx.daysToRace : -1;
-  return appliquerConsignes(plan, {
-    consignes: ctx.consignes,
+  const commun = {
     allureFacile: ctx.easyPace ?? null,
     // Celles d'aujourd'hui comprises : une sortie non prévue courue ce matin compte.
     sortiesRecentes: (ctx.sortiesRecentes ?? []).filter((d) => d <= iso(debut)),
     courseC: cs?.priorite === "C" && cs.idx !== objectifIdx ? iso(addDays(debut, cs.idx)) : null,
-  });
+  };
+  let semaine = ctx.consignes ? appliquerConsignes(plan, { consignes: ctx.consignes, ...commun }) : plan;
+  // LE QUESTIONNAIRE D'APTITUDE (lot 3, décision de Cyprien) : une situation cochée et pas encore
+  // d'avis médical → AUCUNE séance d'endurance (lib/coach/consignesPlan, `appliquerAptitude`).
+  if (aptitude) semaine = appliquerAptitude(semaine);
+  return semaine;
 }
 
 function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
@@ -750,7 +755,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   const easyKm = Math.min(easyCap, Math.max(rawEasy >= 3 ? kmMinFooting : 3, Math.round(rawEasy)));
   // Jamais pendant la récupération d'après-course : le volume y est volontairement réduit,
   // et « scinde en DEUX sorties » à J+5 d'un marathon disait l'inverse du bandeau.
-  const doubles = rawEasy > easyCap && raceIdx < 0 && !ctx.recuperation && !ctx.consignes;
+  const doubles = rawEasy > easyCap && raceIdx < 0 && !ctx.recuperation && !ctx.consignes && !ctx.aptitude?.attente;
   // ⚠️ TOUS les créneaux recevaient EXACTEMENT la même séance : même titre, même
   // distance, même texte. Trois footings de suite étaient donc trois fois le même
   // footing — l'athlète l'a signalé, et il avait raison. On fait varier la distance

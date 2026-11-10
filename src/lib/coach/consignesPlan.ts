@@ -90,6 +90,7 @@ export type ContexteConsignes = {
   courseC: string | null;
 };
 
+
 const jjmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const decale = (jour: string, n: number) => { const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const kmDeTags = (tags: readonly string[]) => {
@@ -213,6 +214,66 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
     if (c.sortiesRecentes.includes(jour.date)) return jour;
     if (tient(jour.date)) { gardees.push(jour.date); return jour; }
     return repos(jour, (l) => T[l].repos(max, fin));
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LE QUESTIONNAIRE D'APTITUDE EN ATTENTE D'AVIS (lot 3, décision de Cyprien du 10/11/2026) :
+//  AUCUNE séance d'endurance (course, vélo, natation, sport croisé) jusqu'à l'avis d'un médecin —
+//  « sans intensité » ne suffisait pas (relecture du directeur scientifique : une sortie longue
+//  facile garde une forte charge cardiovasculaire). Jours de repos, une marche tranquille reste
+//  possible ; le renforcement reste, sans saut. La course du jour elle-même est retirée du plan.
+// ─────────────────────────────────────────────────────────────────────────────
+const SANS_COURSE: Record<Lang, { why: string; course: string; renfo: string }> = {
+  fr: {
+    why: "Ton questionnaire d'aptitude signale une situation à faire voir à un médecin : en attendant son avis, pas de course. Une marche tranquille reste possible.",
+    course: "Course retirée de ton plan : ton questionnaire d'aptitude demande l'avis d'un médecin avant de la courir.",
+    renfo: "20 min, renforcement DOUX en attendant l'avis d'un médecin : mobilité des hanches et des chevilles, gainage 3×30 s (planche, latéral), pont fessier 2×12, montées de mollets lentes 2×12, équilibre sur une jambe 2×30 s. Rien d'explosif : reste à un effort où tu peux parler.",
+  },
+  en: {
+    why: "Your fitness questionnaire flags something a doctor should look at: until then, no running. A gentle walk is still fine.",
+    course: "Race removed from your plan: your fitness questionnaire calls for a doctor's opinion before running it.",
+    renfo: "20 min, GENTLE strength work until a doctor has seen you: hip and ankle mobility, core 3×30 s (plank, side plank), glute bridges 2×12, slow calf raises 2×12, single-leg balance 2×30 s. Nothing explosive: stay at an effort where you can talk.",
+  },
+  de: {
+    why: "Dein Fitness-Fragebogen nennt etwas, das ärztlich abgeklärt werden sollte: Bis dahin kein Laufen. Ein ruhiger Spaziergang ist möglich.",
+    course: "Wettkampf aus deinem Plan entfernt: Dein Fitness-Fragebogen verlangt vorher eine ärztliche Einschätzung.",
+    renfo: "20 min SANFTES Krafttraining bis zur ärztlichen Einschätzung: Mobilität für Hüfte und Sprunggelenke, Rumpfstabilität 3×30 s (Unterarmstütz, Seitstütz), Glute Bridge 2×12, langsames Wadenheben 2×12, Einbeinstand 2×30 s. Nichts Explosives: bleib bei einer Belastung, bei der du sprechen kannst.",
+  },
+  es: {
+    why: "Tu cuestionario de aptitud señala algo que debe ver un médico: hasta entonces, nada de correr. Un paseo tranquilo sigue siendo posible.",
+    course: "Carrera retirada de tu plan: tu cuestionario de aptitud pide la opinión de un médico antes de correrla.",
+    renfo: "20 min de fuerza SUAVE hasta que te vea un médico: movilidad de caderas y tobillos, core 3×30 s (plancha, lateral), puente de glúteos 2×12, elevaciones lentas de gemelos 2×12, equilibrio sobre una pierna 2×30 s. Nada explosivo: mantén un esfuerzo en el que puedas hablar.",
+  },
+  pt: {
+    why: "O teu questionário de aptidão assinala algo que um médico deve ver: até lá, nada de corrida. Uma caminhada tranquila continua possível.",
+    course: "Prova retirada do teu plano: o teu questionário de aptidão pede a opinião de um médico antes de a correres.",
+    renfo: "20 min de reforço SUAVE até um médico te ver: mobilidade das ancas e dos tornozelos, core 3×30 s (prancha, lateral), ponte de glúteos 2×12, elevações lentas dos gémeos 2×12, equilíbrio numa perna 2×30 s. Nada explosivo: mantém um esforço em que consigas falar.",
+  },
+};
+/** Ce qui reste sous « aucune course » : le repos, le renforcement, la mobilité. */
+const GARDES_SANS_COURSE = new Set(["Repos", "Renfo", "Mobilité"]);
+
+/** Le plan FINI quand l'avis d'un médecin est attendu : aucune séance d'endurance. Idempotent. */
+export function appliquerAptitude(plan: readonly PlanDay[]): PlanDay[] {
+  return plan.map((jour) => {
+    // Le renfo est REMPLACÉ, pas annoté : « aucun saut » à la fin d'un texte qui prescrit des
+    // bondissements, de la corde à sauter ou « 4×1 min sur un footing » ne protégeait personne
+    // (relecture du directeur scientifique, 10/11/2026).
+    if (jour.type === "Renfo") {
+      // …en GARDANT la mise en garde « douleur » qu'un autre chemin y a mise (règle du 09/11/2026 :
+      // chaque renfo dit de sauter ce qui sollicite la zone) — relecture du 10/11/2026.
+      return reecrire(jour, "Renfo", (l) => {
+        const avant = texteDe(jour, l).detail;
+        return { ...texteDe(jour, l), detail: SANS_COURSE[l].renfo + (avant.includes(PLAN_T[l].renfoDouleur) ? PLAN_T[l].renfoDouleur : "") };
+      });
+    }
+    if (GARDES_SANS_COURSE.has(jour.type)) return jour;
+    const course = jour.type === "Course";
+    return reecrire(jour, "Repos", (l) => ({
+      title: PLAN_T[l].reposTitre, detail: PLAN_T[l].reposFinalDetail,
+      why: course ? SANS_COURSE[l].course : SANS_COURSE[l].why, tags: [PLAN_T[l].tags["Repos"]],
+    }));
   });
 }
 
