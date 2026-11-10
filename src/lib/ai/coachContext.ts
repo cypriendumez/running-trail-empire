@@ -49,7 +49,7 @@ import { coursesDeSaison, prochaineCourseA, courseSecondaireDeLaSemaine, courses
 import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { decaleJour } from "@/lib/streak/compute";
 import { niveauDeVma } from "@/lib/running/niveau";
-import { libellesActifs, type Douleur } from "@/lib/health/douleurs";
+import { libellesActifs, PEREMPTION_JOURS, type Douleur } from "@/lib/health/douleurs";
 import { douleursDeSeance } from "@/lib/health/douleursSeance";
 import { pausesDeTrace, pointsStockes, vitesseEnMouvement, dureeCourte } from "@/lib/activities/pauses";
 import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
@@ -455,7 +455,13 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     objectifSeul || essentielle ? nonLu() : sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(30),
     objectifSeul ? nonLu() : sb.from("sleep_data").select("sleep_score,total_sleep_min,deep_sleep_min,rem_sleep_min,body_battery_end,respiration_rate,date").eq("user_id", userId).order("date", { ascending: false }).limit(30),
     fetchWorkouts(sb, userId, objectifSeul, essentielle),
-    sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(5),
+    // Les ressentis des 15 DERNIERS JOURS, pas les cinq derniers : une douleur compte 14 jours
+    // (lib/health/douleursSeance), et un « Aucune douleur » ou un « c'est passé » plus ancien que
+    // le 5e ressenti restait invisible au coach alors que l'écran Santé le voyait (relecture du
+    // 10/11/2026). Les lectures du ressenti (RPE, notes) prennent toujours les plus récents.
+    sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback")
+      .gte("created_at", new Date(Date.now() - (PEREMPTION_JOURS + 1) * 86400000).toISOString())
+      .order("created_at", { ascending: false }).limit(60),
     // Douleurs déclarées depuis l'espace Santé (schéma corporel) — elles n'atteignaient
     // pas le coach, qui ne regardait que le formulaire post-séance.
     sb.from("notifications").select("id, data").eq("user_id", userId).eq("type", "pain_report").order("created_at", { ascending: false }).limit(10),

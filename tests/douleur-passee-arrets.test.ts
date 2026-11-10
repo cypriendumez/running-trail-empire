@@ -33,7 +33,7 @@ console.log("\nLA DOULEUR COCHÉE APRÈS UNE SÉANCE S'ÉTEINT");
 test("le cas réel compte le lendemain, plus au-delà de 14 jours", () => {
   assert.deepEqual(zones(douleursDeSeance([CYPRIEN], "2026-11-10")), ["Articulaire", "Tibia (périoste)"]);
   assert.deepEqual(zones(douleursDeSeance([CYPRIEN], "2026-11-23")), ["Articulaire", "Tibia (périoste)"], "éteinte avant 14 jours");
-  assert.deepEqual(douleursDeSeance([CYPRIEN], "2026-11-24"), [], "une douleur de plus de 14 jours pèse encore");
+  assert.deepEqual(douleursDeSeance([CYPRIEN], "2026-11-24"), [], "au-delà de 14 jours, la douleur compte encore");
 });
 
 test("« c'est passé » l'éteint, et seulement elle", () => {
@@ -94,6 +94,8 @@ test("le coach lit les douleurs par la règle, et le verdict des arrêts", () =>
   const coach = codeOf("src/lib/ai/coachContext.ts");
   assert.match(coach, /\.\.\.douleursDeSeance\(feedback\.map\(\(f\) => f\.data \?\? \{\}\), aujourdhui\(FUSEAU_DEFAUT\)\)\.map\(\(d\) => d\.zone\)/, "le coach relit les douleurs d'après séance sans la règle");
   assert.doesNotMatch(coach, /feedback\.flatMap\(f => f\.data\?\.pain/, "l'ancienne lecture sans fin est revenue");
+  // Relecture du 10/11 : la règle vaut 14 jours, la lecture s'arrêtait aux 5 derniers ressentis.
+  assert.match(coach, /eq\("type", "session_feedback"\)\s*\.gte\("created_at", new Date\(Date\.now\(\) - \(PEREMPTION_JOURS \+ 1\) \* 86400000\)\.toISOString\(\)\)\s*\.order\("created_at", \{ ascending: false \}\)\.limit\(60\)/, "le coach ne lit plus les 15 derniers jours de ressentis");
   assert.match(coach, /const recupQualite = qe \? recupAllongee\(await lireArrets\(seanceQualite\)\) : null;/, "les arrêts de la séance de qualité ne sont plus lus");
   assert.match(coach, /const verdictQualite = verdictExecution\(qe\?\.fadeSec, recupQualite\);/);
   assert.match(coach, /verdictQualite === "non_probant" \? `⏸️/, "le coach ne dit plus que la séance ne prouve rien");
