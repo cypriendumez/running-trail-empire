@@ -280,6 +280,8 @@ export function HealthCenter({ suivi = [], douleurs = [], effets = null, consign
     const fin = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     setCons((c) => (c.jusquAu ? c : { ...c, jusquAu: fin }));
     setConsOuvert(true);
+    // Le bouton disparaît : le focus clavier va au premier champ, pas sur <body>.
+    requestAnimationFrame(() => document.getElementById(`${cid}-duree`)?.focus());
   }
   async function envoyerConsignes(retirer: boolean) {
     setEnCours("consignes");

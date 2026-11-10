@@ -222,7 +222,7 @@ async function main() {
 
   await test("pas de carte sur le tableau de bord (retirée par Cyprien) ; l'onglet Récupération dans Santé", () => {
     // Décision de Cyprien (10/11/2026) : AUCUNE carte du bilan sur le tableau de bord.
-    assert.doesNotMatch(codeOf("src/app/dashboard/page.tsx"), /BilanMatin/, "la carte du bilan est revenue sur le tableau de bord");
+    assert.doesNotMatch(codeOf("src/app/dashboard/page.tsx"), /BilanMatin|TYPE_BILAN/, "la carte (ou sa requête) est revenue sur le tableau de bord");
     const hc = codeOf("src/components/health/HealthCenter.tsx");
     assert.match(hc, /\{tab === "recup" && recup && \(/);
     assert.equal((hc.match(/"tab\.recup": "/g) ?? []).length, 5, "l'onglet n'est pas traduit dans les 5 langues");
