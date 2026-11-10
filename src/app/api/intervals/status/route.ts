@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
 import { configurationOAuth } from "@/lib/intervals/oauth";
+import { premierImportDu } from "@/lib/intervals/premierImport";
 
 /**
  * GET /api/intervals/status
@@ -43,8 +44,19 @@ export async function GET() {
   if (error) return NextResponse.json({ error: "statut_illisible" }, { status: 503 });
 
   const configured = !!identifiantsDe(profile);
+
+  // `premierImport` : la montre est reliée et aucune séance de montre n'est en base. AutoSync
+  // importe alors l'historique de lui-même, au lieu de laisser l'athlète devant une liste
+  // vide et un bouton « Synchroniser » (09/11/2026). Compté seulement pour qui a une montre,
+  // et l'erreur est LUE : un compte illisible répond `null`, pas « rien en base ».
+  const seances = configured
+    ? await supabase.from("workouts").select("id", { count: "exact", head: true })
+        .eq("user_id", user.id).not("external_id", "is", null)
+    : null;
+  const premierImport = premierImportDu(configured, seances);
+
   // `oauth` : le bouton « Autoriser Pacevo sur intervals.icu » peut-il être proposé ? Seulement
   // quand l'identifiant ET le secret de l'application sont dans l'environnement — sinon il
   // mènerait à une erreur. Un booléen : rien de l'application ne sort.
-  return NextResponse.json({ configured, source: configured ? "profile" : null, oauth: !!configurationOAuth() });
+  return NextResponse.json({ configured, source: configured ? "profile" : null, oauth: !!configurationOAuth(), premierImport });
 }

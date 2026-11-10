@@ -5,7 +5,8 @@ import { AlertCircle, Check, CheckCircle2, ExternalLink, Eye, EyeOff, Loader2 } 
 import { QrSvg } from "@/components/ui/QrSvg";
 import { CHAMP, FOCUS } from "./habillage";
 import { APP_STORE_COMPANION, MARQUES, marqueDe, type MarqueId } from "./marquesMontre";
-import { cleMessageErreur, etatCle, verdictSuivi } from "@/lib/intervals/connexionMontre";
+import { cleMessageErreur, etapeAuRetour, etatCle, verdictSuivi } from "@/lib/intervals/connexionMontre";
+import { demanderPremierImport } from "@/lib/intervals/premierImport";
 
 type Tr = (k: string, v?: Record<string, string | number>) => string;
 
@@ -98,6 +99,35 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
     return () => clearInterval(minuterie.current!);
   }, [suiviActif]);
 
+  // ── L'ÉTAPE AVANCE SEULE AU RETOUR D'intervals.icu (09/11/2026) ──
+  // Le frère de Cyprien crée son compte et relie sa COROS dans l'onglet d'intervals.icu,
+  // revient ici… et retrouve « Créer mon compte / J'ai déjà un compte », comme si rien ne
+  // s'était passé. Pacevo ne voit rien d'intervals.icu avant l'autorisation (étape 3) ; mais
+  // on sait qu'il est parti par NOTRE bouton, et qu'il revient : on ouvre l'étape suivante.
+  // ⚠️ Il faut avoir réellement QUITTÉ la page (`absent`) : un clic qui ouvre l'onglet en
+  // arrière-plan ne fait rien avancer tant qu'on n'y est pas allé.
+  const parti = useRef<{ etape: number; absent: boolean } | null>(null);
+  const partir = (etape: number) => { parti.current = { etape, absent: false }; };
+  useEffect(() => {
+    const depart = () => { if (parti.current) parti.current.absent = true; };
+    const retour = () => {
+      const p = parti.current;
+      if (!p || !p.absent) return;
+      parti.current = null;
+      setSous((s) => etapeAuRetour(s, p.etape));
+    };
+    const visibilite = () => { if (document.visibilityState === "hidden") depart(); else retour(); };
+    // Un onglet se cache ; une fenêtre séparée, elle, ne fait que perdre la main.
+    document.addEventListener("visibilitychange", visibilite);
+    window.addEventListener("blur", depart);
+    window.addEventListener("focus", retour);
+    return () => {
+      document.removeEventListener("visibilitychange", visibilite);
+      window.removeEventListener("blur", depart);
+      window.removeEventListener("focus", retour);
+    };
+  }, []);
+
   const m = marqueDe(marque);
 
   // Premier choix de marque : les étapes apparaissent SOUS la grille, souvent hors de
@@ -136,6 +166,9 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
         throw new Error(k ? tr(k) : typeof data?.error === "string" ? data.error : tr("tSaveError"));
       }
       setCompte(typeof data.nom === "string" ? data.nom : null);
+      // Le suivi ci-dessous ne tire que 7 jours : l'historique complet est dû à l'arrivée
+      // sur le tableau de bord (`components/AutoSync`).
+      demanderPremierImport(window.localStorage);
       setSuivi("checking");
       setSuiviActif(true);
       onEnregistre();
@@ -253,7 +286,7 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
                   <div className="mt-4 space-y-4 sm:pl-10">
                     <p className="max-w-prose text-sm leading-relaxed text-zinc-600">{tr("m0Desc")}</p>
                     <div className="flex flex-wrap gap-2">
-                      <a href="https://intervals.icu/signup" target="_blank" rel="noopener noreferrer" className={`btn-brand ${lien}`}>
+                      <a href="https://intervals.icu/signup" target="_blank" rel="noopener noreferrer" onClick={() => partir(0)} className={`btn-brand ${lien}`}>
                         {tr("w0Create")} <ExternalLink aria-hidden="true" className="h-4 w-4" />
                       </a>
                       <button type="button" onClick={() => setSous(1)} className="btn-secondary">{tr("w0Have")}</button>
@@ -285,7 +318,9 @@ export function EtapeMontre({ tr, cid, marque, onMarque, enregistre, onEnregistr
                       <p className="max-w-prose rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">{tr("mPolar")}</p>
                     )}
                     <div className="flex flex-wrap gap-2">
-                      <a href="https://intervals.icu/settings/connections" target="_blank" rel="noopener noreferrer" className={`btn-brand ${lien}`}>
+                      {/* Au retour de cette page, l'étape 3 s'ouvre seule. PAS pour l'Apple Watch
+                          (plus bas) : ses réglages se lisent ici PENDANT qu'on les fait dans l'app. */}
+                      <a href="https://intervals.icu/settings/connections" target="_blank" rel="noopener noreferrer" onClick={() => partir(1)} className={`btn-brand ${lien}`}>
                         {tr("w1Open")} <ExternalLink aria-hidden="true" className="h-4 w-4" />
                       </a>
                       <button type="button" onClick={() => setSous(2)} className="btn-secondary">{tr("w1Done")}</button>

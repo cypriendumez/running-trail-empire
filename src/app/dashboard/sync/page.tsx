@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Watch, RefreshCw, CheckCircle2, Activity, Zap, Heart, Moon, Battery, AlertCircle, ChevronRight, Upload, Info, WifiOff, Clock, Key, Eye, EyeOff, Trash2, ExternalLink, ArrowDown, MousePointerClick, Settings2, Link2, Code2, Footprints, Mountain, Bike, Waves, XCircle, ArrowRight, AlertTriangle, HeartPulse, Droplet, BarChart3, Trophy, type LucideIcon, Smartphone } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { cleMessageErreur, etatCle } from "@/lib/intervals/connexionMontre";
+import { EVENEMENT_MONTRE_RELIEE, EVENEMENT_SYNCHRO, demanderPremierImport } from "@/lib/intervals/premierImport";
 import { SY, SY_NODES, fillY } from "./syncI18n";
 import { cleanActivityName } from "@/lib/utils/activityName";
 
@@ -163,6 +164,10 @@ export default function SyncPage() {
     const manque = (p.get("manque") ?? "").split(",").filter((m) => (FAMILLES_OAUTH as readonly string[]).includes(m));
     setRetourOAuth({ statut: statut as RetourOAuth["statut"], manque, inscription: p.get("depuis") === "inscription" });
     if (statut !== "ok") setActiveTab("setup");
+    // La montre vient d'être reliée : l'historique complet est dû, même si des séances
+    // sont déjà en base (un GPX importé avant). AutoSync s'en charge, sans bouton. Pas si
+    // l'accès aux activités a été décoché : l'import échouerait en boucle.
+    if (statut === "ok" || (statut === "partiel" && !manque.includes("activity"))) demanderPremierImport(window.localStorage);
     window.history.replaceState(null, "", window.location.pathname);
   }, []);
 
@@ -196,6 +201,10 @@ export default function SyncPage() {
       setCredsCompte(typeof data.nom === "string" ? data.nom : null);
       setExistingCreds({ athleteId: typeof data.athleteId === "string" ? data.athleteId : null, apiKeyMasked: keyTrim.slice(0, 4) + "●●●●●●●●●●●●", mode: "cle" });
       checkStatus();
+      // Ici, pas de rechargement de page : AutoSync a retenu « pas de montre » à l'ouverture.
+      // On lui dit que la montre est reliée, et que l'historique est dû.
+      demanderPremierImport(window.localStorage);
+      window.dispatchEvent(new Event(EVENEMENT_MONTRE_RELIEE));
     } catch (err) {
       setCredsError(String(err).replace("Error: ", ""));
     } finally {
@@ -229,6 +238,16 @@ export default function SyncPage() {
   }, [days]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // ⚠️ CETTE LISTE NE SE RELISAIT JAMAIS SEULE (09/11/2026). Elle est chargée par le
+  // navigateur, une fois : ce que la synchronisation automatique importait ensuite n'y
+  // apparaissait qu'après un clic sur « Synchroniser » — ce qu'a dû faire le frère de
+  // Cyprien en arrivant, montre tout juste reliée. AutoSync prévient maintenant.
+  useEffect(() => {
+    const relire = () => { loadData(); };
+    window.addEventListener(EVENEMENT_SYNCHRO, relire);
+    return () => window.removeEventListener(EVENEMENT_SYNCHRO, relire);
+  }, [loadData]);
 
   async function handleSync() {
     setSyncing(true);

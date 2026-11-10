@@ -30,6 +30,29 @@ export function cleMessageErreur(code: unknown): "mErrCle" | "mErrIndispo" | nul
   return null;
 }
 
+/**
+ * L'ÉTAPE AVANCE SEULE AU RETOUR D'intervals.icu (09/11/2026).
+ *
+ * Constaté avec le frère de Cyprien : il clique « Créer mon compte gratuit », crée son compte
+ * et relie sa COROS dans l'onglet d'intervals.icu, revient sur Pacevo… et retrouve la MÊME
+ * question (« Créer mon compte / J'ai déjà un compte »), comme si rien ne s'était passé.
+ *
+ * ⚠️ Pacevo ne voit RIEN de ce qui se passe chez intervals.icu avant l'autorisation de
+ * l'étape 3 : c'est elle qui crée le lien. Ce qu'on sait, en revanche, c'est que l'athlète
+ * est parti par NOTRE bouton et qu'il revient. On avance donc d'un cran à ce retour — et
+ * « Revoir » permet de rouvrir l'étape.
+ *
+ * @param sous        l'étape ouverte au moment du retour
+ * @param etapeDepart l'étape dont le bouton a ouvert intervals.icu
+ * @returns l'étape à ouvrir : la suivante, ou la même si l'athlète a changé d'étape entre-temps
+ */
+export function etapeAuRetour(sous: number, etapeDepart: number): number {
+  if (!Number.isInteger(sous) || !Number.isInteger(etapeDepart)) return sous;
+  // Seules les deux premières étapes mènent quelque part : la troisième EST la connexion.
+  if (etapeDepart < 0 || etapeDepart > 1) return sous;
+  return sous === etapeDepart ? etapeDepart + 1 : sous;
+}
+
 export type Verdict = "attente" | "ok" | "vide";
 
 /**
