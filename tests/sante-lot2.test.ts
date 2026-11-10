@@ -227,7 +227,11 @@ async function main() {
     const hc = codeOf("src/components/health/HealthCenter.tsx");
     assert.match(hc, /\{tab === "recup" && recup && \(/);
     assert.equal((hc.match(/"tab\.recup": "/g) ?? []).length, 5, "l'onglet n'est pas traduit dans les 5 langues");
-    assert.match(codeOf("src/app/dashboard/health/page.tsx"), /recup = donneesRecup\(donnees, \(bilanRes\.data \?\? \[\]\) as \{ data\?: unknown \}\[\], jourAthlete, bilanPanne\);/);
+    const sante = codeOf("src/app/dashboard/health/page.tsx");
+    assert.match(sante, /\? donneesRecup\(donnees, \(bilanRes\.data \?\? \[\]\) as \{ data\?: unknown \}\[\], jourAthlete, bilanPanne\)/);
+    // Indicateurs illisibles : l'onglet se dit en panne au lieu de casser toute la page Santé.
+    assert.match(sante, /chargerDonnees\(supabase, user\.id, lang, jourJ\)\.catch\(/);
+    assert.match(sante, /fcRepos: null, panne: true, fatigueDurable: false \}/);
   });
 
   await test("douleur à la reprise : « pas couru avant » plutôt que « 0 km, -100 % »", () => {

@@ -18,7 +18,7 @@ import { jourLocal } from "@/lib/streak/compute";
 import { normLang } from "@/lib/i18n/base";
 import { chargerDonnees } from "@/lib/indicateurs/donnees";
 import { TYPE_BILAN } from "@/lib/health/bilanMatin";
-import { donneesRecup, type DonneesRecup } from "@/lib/health/recuperation";
+import { donneesRecup, bilansRecents, type DonneesRecup } from "@/lib/health/recuperation";
 
 export const metadata = { title: "Santé" };
 
@@ -173,11 +173,18 @@ export default async function HealthPage() {
     const lang = normLang(String((profilRes.data as { preferred_language?: string } | null)?.preferred_language ?? "fr"));
     const [bilanRes, donnees] = await Promise.all([
       supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", TYPE_BILAN).order("created_at", { ascending: false }).limit(30),
-      chargerDonnees(supabase, user.id, lang, jourJ),
+      // Une exception ne casse pas toute la page Santé : l'onglet Récupération se dit en panne.
+      chargerDonnees(supabase, user.id, lang, jourJ).catch((e) => {
+        console.error("[santé] indicateurs de récupération illisibles :", e instanceof Error ? e.message : String(e));
+        return null;
+      }),
     ]);
     const bilanPanne = !!bilanRes.error && estUnePanne(bilanRes);
     if (bilanPanne) console.error("[santé] lecture illisible : bilan du matin", bilanRes.error?.message);
-    recup = donneesRecup(donnees, (bilanRes.data ?? []) as { data?: unknown }[], jourAthlete, bilanPanne);
+    recup = donnees
+      ? donneesRecup(donnees, (bilanRes.data ?? []) as { data?: unknown }[], jourAthlete, bilanPanne)
+      : { ...bilansRecents((bilanRes.data ?? []) as { data?: unknown }[], jourAthlete), forme: null, vfc: null,
+          sommeil: { derniere: null, moyenneMin: null, nuits: 0 }, fcRepos: null, panne: true, fatigueDurable: false };
   }
   return <HealthCenter suivi={suivi} douleurs={douleurs} effets={effets} consignes={consignes} charge={charge} rappel={rappel}
     enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} recup={recup} />;

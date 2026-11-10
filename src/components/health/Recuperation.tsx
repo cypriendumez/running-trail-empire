@@ -21,7 +21,7 @@ const T: Record<Lang, {
   fatigueDurable: string; historique: string; aucunBilan: string; date: string; fatigue: string; jambes: string; stress: string; panne: string; vide: string;
 }> = {
   fr: {
-    fatigueDurable: "Trois matins de suite avec une fatigue ou des jambes à 4 ou 5 sur 5 : ton plan reste léger, mais si cela dure malgré le repos, parles-en à un médecin.",
+    fatigueDurable: "Trois matins de suite avec une fatigue ou des jambes à 4 ou 5 sur 5 : chaque jour, ta séance dure est remplacée par une sortie facile. Si cela dure malgré le repos, parles-en à un médecin.",
     indicateurs: "Tes indicateurs de récupération", avertissement: "Ce sont des indicateurs d'entraînement, pas un examen de santé : ils règlent ta charge. Une fatigue qui dure plusieurs semaines malgré le repos se montre à un médecin.",
     forme: "Fraîcheur", vfc: "Variabilité cardiaque (VFC)", sommeil: "Sommeil", fcRepos: "FC de repos de référence", detail: "Voir le détail",
     derniereNuit: "Dernière nuit synchronisée ({d})", moyenne: "Moyenne des nuits mesurées sur 7 jours ({n})",
@@ -31,7 +31,7 @@ const T: Record<Lang, {
     panne: "Une partie de tes données n'a pas pu être lue : ces indicateurs sont incomplets.", vide: "Pas assez de données.",
   },
   en: {
-    fatigueDurable: "Three mornings in a row with fatigue or legs at 4 or 5 out of 5: your plan stays light, but if it lasts despite rest, talk to a doctor.",
+    fatigueDurable: "Three mornings in a row with fatigue or legs at 4 or 5 out of 5: each day, your hard session is replaced by an easy run. If it lasts despite rest, talk to a doctor.",
     indicateurs: "Your recovery indicators", avertissement: "These are training indicators, not a health check: they set your load. Fatigue that lasts several weeks despite rest should be seen by a doctor.",
     forme: "Freshness", vfc: "Heart rate variability (HRV)", sommeil: "Sleep", fcRepos: "Reference resting HR", detail: "See details",
     derniereNuit: "Last synced night ({d})", moyenne: "Average of measured nights over 7 days ({n})",
@@ -41,7 +41,7 @@ const T: Record<Lang, {
     panne: "Part of your data could not be read: these indicators are incomplete.", vide: "Not enough data.",
   },
   de: {
-    fatigueDurable: "Drei Morgen hintereinander mit Müdigkeit oder Beinen bei 4 oder 5 von 5: Dein Plan bleibt leicht, aber wenn es trotz Ruhe anhält, sprich mit einer Ärztin oder einem Arzt.",
+    fatigueDurable: "Drei Morgen hintereinander mit Müdigkeit oder Beinen bei 4 oder 5 von 5: Jeden Tag wird deine harte Einheit durch einen lockeren Lauf ersetzt. Hält es trotz Ruhe an, sprich mit einer Ärztin oder einem Arzt.",
     indicateurs: "Deine Erholungswerte", avertissement: "Das sind Trainingswerte, keine Gesundheitsuntersuchung: Sie steuern deine Belastung. Müdigkeit, die trotz Ruhe mehrere Wochen anhält, gehört zum Arzt.",
     forme: "Frische", vfc: "Herzfrequenzvariabilität (HRV)", sommeil: "Schlaf", fcRepos: "Referenz-Ruhepuls", detail: "Details ansehen",
     derniereNuit: "Letzte synchronisierte Nacht ({d})", moyenne: "Durchschnitt der gemessenen Nächte über 7 Tage ({n})",
@@ -51,7 +51,7 @@ const T: Record<Lang, {
     panne: "Ein Teil deiner Daten konnte nicht gelesen werden: Diese Werte sind unvollständig.", vide: "Nicht genug Daten.",
   },
   es: {
-    fatigueDurable: "Tres mañanas seguidas con cansancio o piernas en 4 o 5 sobre 5: tu plan sigue siendo suave, pero si dura pese al descanso, coméntalo con un médico.",
+    fatigueDurable: "Tres mañanas seguidas con cansancio o piernas en 4 o 5 sobre 5: cada día, tu sesión dura se sustituye por una salida suave. Si dura pese al descanso, coméntalo con un médico.",
     indicateurs: "Tus indicadores de recuperación", avertissement: "Son indicadores de entrenamiento, no un examen de salud: regulan tu carga. Un cansancio que dura varias semanas pese al descanso se consulta con un médico.",
     forme: "Frescura", vfc: "Variabilidad cardiaca (VFC)", sommeil: "Sueño", fcRepos: "FC en reposo de referencia", detail: "Ver el detalle",
     derniereNuit: "Última noche sincronizada ({d})", moyenne: "Media de las noches medidas en 7 días ({n})",
@@ -61,7 +61,7 @@ const T: Record<Lang, {
     panne: "Una parte de tus datos no se ha podido leer: estos indicadores están incompletos.", vide: "No hay suficientes datos.",
   },
   pt: {
-    fatigueDurable: "Três manhãs seguidas com cansaço ou pernas a 4 ou 5 em 5: o teu plano mantém-se leve, mas se durar apesar do descanso, fala com um médico.",
+    fatigueDurable: "Três manhãs seguidas com cansaço ou pernas a 4 ou 5 em 5: cada dia, a tua sessão dura é substituída por uma corrida fácil. Se durar apesar do descanso, fala com um médico.",
     indicateurs: "Os teus indicadores de recuperação", avertissement: "São indicadores de treino, não um exame de saúde: regulam a tua carga. Um cansaço que dura várias semanas apesar do descanso deve ser visto por um médico.",
     forme: "Frescura", vfc: "Variabilidade cardíaca (VFC)", sommeil: "Sono", fcRepos: "FC em repouso de referência", detail: "Ver o detalhe",
     derniereNuit: "Última noite sincronizada ({d})", moyenne: "Média das noites medidas em 7 dias ({n})",

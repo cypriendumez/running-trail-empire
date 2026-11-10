@@ -789,7 +789,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     .eq("user_id", userId).eq("type", TYPE_BILAN).order("created_at", { ascending: false }).limit(3);
   if (estUnePanne({ error: eBilan })) throw new Error(`Bilan du matin illisible : ${eBilan?.code ?? "?"} ${eBilan?.message ?? ""}`);
   // Le jour de Paris, ou le LENDEMAIN : le matin d'un coureur d'Asie ou d'Océanie tombe encore la
-  //    veille à Paris (relecture du 10/11/2026). Un bilan de la veille, lui, ne compte jamais.
+  //    veille à Paris (relecture du 10/11/2026). Limite assumée, faute de fuseau de l'athlète ici :
+  //    pendant SA nuit, le bilan de son matin précédent peut encore valoir « jour de Paris » ; il ne
+  //    fait qu'alléger, et le plan est recalculé dès son nouveau bilan.
   const jourParis = aujourdhui(FUSEAU_DEFAUT);
   const lendemainParis = (() => { const d = new Date(`${jourParis}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); })();
   const lignesB = (lignesBilan ?? []) as { data?: unknown }[];
