@@ -135,9 +135,16 @@ async function main() {
     const page = codeOf("src/app/dashboard/health/page.tsx");
     assert.match(page, /aptitude = !apt \? "absent" : avisAttendu\(apt\) \? "attente" : "ok";/);
     assert.match(codeOf("src/components/health/HealthCenter.tsx"), /<CarteAptitude etat=\{aptitude\} \/>/);
+    // Lecture en panne : l'écran le dit (le coach, lui, refuse son contexte) — relecture du 10/11/2026.
+    assert.match(page, /if \(eApt\) \{\s*console\.error\([^)]*\);\s*aptitude = "panne";/, "une panne de lecture se tait de nouveau");
+    const carte = codeOf("src/components/health/CarteAptitude.tsx");
+    assert.match(carte, /if \(etat === "panne"\) \{\s*return <p role="alert"[^>]*>\{t\.panne\}<\/p>;/);
+    assert.match(carte, /if \(etat === "ok" && !modifier\) return <div>\{lienModifier\}<\/div>;/, "plus moyen de corriger ses réponses");
+    assert.match(codeOf("src/app/onboarding/page.tsx"), /\{aptOui\.length > 0 && <p[^>]*>\{APTITUDE_UI\[[^\]]*\]\.urgence\}<\/p>\}/, "l'inscription n'affiche plus l'urgence");
     for (const l of ["fr", "en", "de", "es", "pt"] as const) {
       assert.equal(Object.keys(APTITUDE_UI[l].questions).length, 5, `questions incomplètes en ${l}`);
       assert.match(APTITUDE_UI[l].attente, /112/, `pas de numéro d'urgence en ${l}`);
+      assert.match(APTITUDE_UI[l].urgence, /112/, `pas de numéro d'urgence à l'inscription en ${l}`);
     }
   });
 

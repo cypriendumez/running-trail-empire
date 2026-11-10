@@ -196,7 +196,7 @@ export function HealthCenter({ suivi = [], douleurs = [], effets = null, consign
   /** Santé › Récupération (lot 2) : bilan du matin et indicateurs, calculés côté serveur. */
   recup?: DonneesRecup | null;
   /** Le questionnaire d'aptitude (lot 3) : à remplir, en attente d'avis médical, ou rien à afficher. */
-  aptitude?: "absent" | "attente" | "ok";
+  aptitude?: "absent" | "attente" | "ok" | "panne";
 }) {
   // Chaque libellé est relié à son champ : sans cela, un lecteur d'écran annonce
   // le placeholder — ou rien — à la place du texte affiché.

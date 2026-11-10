@@ -17,14 +17,26 @@ import { APTITUDE_UI } from "@/lib/health/aptitudeI18n";
  * et un bouton permet de déclarer l'avis d'un médecin. `"ok"` : rien n'est affiché.
  * L'écran ne dit « plan à jour » que si la route l'a recalculé.
  */
-export function CarteAptitude({ etat }: { etat: "absent" | "attente" | "ok" }) {
+export function CarteAptitude({ etat }: { etat: "absent" | "attente" | "ok" | "panne" }) {
   const { lang } = useT();
   const t = APTITUDE_UI[(lang as Lang) in APTITUDE_UI ? (lang as Lang) : "fr"];
   const router = useRouter();
   const [oui, setOui] = useState<QuestionAptitude[]>([]);
   const [aucune, setAucune] = useState(false);
   const [enCours, setEnCours] = useState(false);
-  if (etat === "ok") return null;
+  // Corriger une réponse (cochée par erreur, ou nouvelle situation) sans fausse déclaration d'avis.
+  const [modifier, setModifier] = useState(false);
+  const lienModifier = (
+    <button type="button" onClick={() => setModifier(true)} className="text-[12.5px] font-medium text-emerald-700 underline-offset-2 hover:underline">
+      {t.modifier}
+    </button>
+  );
+
+  // Lecture en panne : on le DIT (le coach, lui, refuse son contexte et ne recalcule pas).
+  if (etat === "panne") {
+    return <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">{t.panne}</p>;
+  }
+  if (etat === "ok" && !modifier) return <div>{lienModifier}</div>;
 
   async function envoyer(corps: Record<string, unknown>, succes: string) {
     setEnCours(true);
@@ -41,7 +53,7 @@ export function CarteAptitude({ etat }: { etat: "absent" | "attente" | "ok" }) {
     }
   }
 
-  if (etat === "attente") {
+  if (etat === "attente" && !modifier) {
     return (
       <section role="status" className="rounded-2xl border border-red-200 bg-red-50/60 p-4">
         <div className="flex items-start gap-2.5">
@@ -58,6 +70,7 @@ export function CarteAptitude({ etat }: { etat: "absent" | "attente" | "ok" }) {
           </button>
           <p className="text-[11.5px] text-zinc-500">{t.avisAide}</p>
         </div>
+        <div className="mt-2">{lienModifier}</div>
       </section>
     );
   }
@@ -86,6 +99,7 @@ export function CarteAptitude({ etat }: { etat: "absent" | "attente" | "ok" }) {
           {t.aucune}
         </label>
       </div>
+      {oui.length > 0 && <p className="mt-2 text-[12.5px] font-medium text-red-800">{t.urgence}</p>}
       <button type="button" disabled={!repondu || enCours} onClick={() => envoyer({ oui }, oui.length ? t.okAttente : t.ok)}
         className="mt-3 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">
         {enCours && <Loader2 className="h-4 w-4 animate-spin" />}{t.envoyer}

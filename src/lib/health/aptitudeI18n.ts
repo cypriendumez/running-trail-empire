@@ -6,7 +6,7 @@ import type { QuestionAptitude } from "@/lib/health/aptitude";
 export const APTITUDE_UI: Record<Lang, {
   titre: string; aide: string; questions: Record<QuestionAptitude, string>; aucune: string;
   envoyer: string; attenteTitre: string; attente: string; avisBouton: string; avisAide: string;
-  ok: string; okAttente: string; okAvis: string; recalcul: string; erreur: string;
+  ok: string; okAttente: string; okAvis: string; recalcul: string; erreur: string; panne: string; modifier: string; urgence: string;
 }> = {
   fr: {
     titre: "Avant de t'entraîner fort", aide: "Coche ce qui t'est déjà arrivé. Ces questions ne posent aucun diagnostic : elles disent seulement quand voir un médecin avant les séances intenses.",
@@ -25,6 +25,9 @@ export const APTITUDE_UI: Record<Lang, {
     avisAide: "C'est toi qui le déclares : Pacevo ne reçoit aucun document médical.",
     ok: "Réponses enregistrées.", okAttente: "Réponses enregistrées : pas d'intensité en attendant l'avis d'un médecin.", okAvis: "C'est noté : les séances dures reviennent dans ton plan.",
     recalcul: "Ton plan en tiendra compte à son prochain recalcul.", erreur: "Réponses non enregistrées, réessaie dans un instant.",
+    panne: "Ton questionnaire d'aptitude n'a pas pu être lu : réessaie dans un instant. En attendant, ton plan n'est pas recalculé.",
+    modifier: "Modifier mes réponses au questionnaire d'aptitude",
+    urgence: "En cas de douleur dans la poitrine, de malaise ou d'essoufflement inhabituel pendant un effort : arrête-toi et appelle le 15 ou le 112.",
   },
   en: {
     titre: "Before training hard", aide: "Tick anything that has happened to you. These questions make no diagnosis: they only tell you when to see a doctor before intense sessions.",
@@ -43,6 +46,9 @@ export const APTITUDE_UI: Record<Lang, {
     avisAide: "You declare it yourself: Pacevo receives no medical document.",
     ok: "Answers saved.", okAttente: "Answers saved: no intensity until a doctor has given an opinion.", okAvis: "Noted: hard sessions are back in your plan.",
     recalcul: "Your plan will take it into account at its next recalculation.", erreur: "Answers not saved, try again in a moment.",
+    panne: "Your fitness questionnaire could not be read: try again in a moment. Until then, your plan is not recalculated.",
+    modifier: "Change my fitness questionnaire answers",
+    urgence: "If you get chest pain, feel faint or unusually breathless during exercise: stop and call 112.",
   },
   de: {
     titre: "Bevor du intensiv trainierst", aide: "Kreuze an, was dir schon passiert ist. Diese Fragen stellen keine Diagnose: Sie sagen nur, wann du vor intensiven Einheiten zum Arzt solltest.",
@@ -61,6 +67,9 @@ export const APTITUDE_UI: Record<Lang, {
     avisAide: "Du erklärst es selbst: Pacevo erhält kein medizinisches Dokument.",
     ok: "Antworten gespeichert.", okAttente: "Antworten gespeichert: keine Intensität bis zur ärztlichen Einschätzung.", okAvis: "Notiert: Die harten Einheiten kommen zurück in deinen Plan.",
     recalcul: "Dein Plan berücksichtigt das bei der nächsten Neuberechnung.", erreur: "Antworten nicht gespeichert, versuche es gleich noch einmal.",
+    panne: "Dein Fitness-Fragebogen konnte nicht gelesen werden: Versuche es gleich noch einmal. Bis dahin wird dein Plan nicht neu berechnet.",
+    modifier: "Meine Antworten zum Fitness-Fragebogen ändern",
+    urgence: "Bei Brustschmerz, Schwäche oder ungewöhnlicher Atemnot während einer Belastung: aufhören und 112 anrufen.",
   },
   es: {
     titre: "Antes de entrenar fuerte", aide: "Marca lo que ya te haya pasado. Estas preguntas no hacen ningún diagnóstico: solo indican cuándo ver a un médico antes de las sesiones intensas.",
@@ -79,6 +88,9 @@ export const APTITUDE_UI: Record<Lang, {
     avisAide: "Lo declaras tú: Pacevo no recibe ningún documento médico.",
     ok: "Respuestas guardadas.", okAttente: "Respuestas guardadas: sin intensidad hasta la opinión de un médico.", okAvis: "Anotado: las sesiones duras vuelven a tu plan.",
     recalcul: "Tu plan lo tendrá en cuenta en su próximo recálculo.", erreur: "Respuestas no guardadas, inténtalo de nuevo en un momento.",
+    panne: "No se ha podido leer tu cuestionario de aptitud: inténtalo de nuevo en un momento. Mientras tanto, tu plan no se recalcula.",
+    modifier: "Modificar mis respuestas al cuestionario de aptitud",
+    urgence: "Si durante un esfuerzo tienes dolor en el pecho, un mareo o una falta de aire inusual: para y llama al 112.",
   },
   pt: {
     titre: "Antes de treinares forte", aide: "Assinala o que já te aconteceu. Estas perguntas não fazem nenhum diagnóstico: só indicam quando ver um médico antes dos treinos intensos.",
@@ -97,5 +109,8 @@ export const APTITUDE_UI: Record<Lang, {
     avisAide: "És tu que o declaras: o Pacevo não recebe nenhum documento médico.",
     ok: "Respostas guardadas.", okAttente: "Respostas guardadas: sem intensidade até à opinião de um médico.", okAvis: "Anotado: os treinos duros voltam ao teu plano.",
     recalcul: "O teu plano vai ter isso em conta no próximo recálculo.", erreur: "Respostas não guardadas, tenta novamente daqui a pouco.",
+    panne: "Não foi possível ler o teu questionário de aptidão: tenta novamente daqui a pouco. Entretanto, o teu plano não é recalculado.",
+    modifier: "Alterar as minhas respostas ao questionário de aptidão",
+    urgence: "Se durante um esforço sentires dor no peito, tontura ou falta de ar invulgar: para e liga 112.",
   },
 };

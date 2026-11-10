@@ -633,6 +633,7 @@ export default function OnboardingPage() {
                 <Cases id={`${cid}-apt`} disposition="flex flex-col gap-2" valeurs={aptOui}
                   onToggle={(v) => { setAptAucune(false); setAptOui((o) => (o.includes(v as QuestionAptitude) ? o.filter((x) => x !== v) : [...o, v as QuestionAptitude])); }}
                   options={QUESTIONS_APTITUDE.map((q) => ({ v: q, l: APTITUDE_UI[(lang as Lang) in APTITUDE_UI ? (lang as Lang) : "fr"].questions[q] }))} />
+                {aptOui.length > 0 && <p className="mt-3 text-[13px] font-medium text-red-800">{APTITUDE_UI[(lang as Lang) in APTITUDE_UI ? (lang as Lang) : "fr"].urgence}</p>}
               </Question>
               <div className="px-5 pb-6 sm:px-7">
                 <label htmlFor={`${cid}-apt-aucune`} className="relative block cursor-pointer">

@@ -50,7 +50,7 @@ export default async function HealthPage() {
   let recup: DonneesRecup | null = null;
   // Santé, lot 3 : le questionnaire d'aptitude (absent pour un inscrit d'avant, ou en attente d'avis).
   // Lecture en panne : rien n'est affiché (le coach, lui, refuse son contexte et le dit).
-  let aptitude: "absent" | "attente" | "ok" = "ok";
+  let aptitude: "absent" | "attente" | "ok" | "panne" = "ok";
   if (user) {
     // Pour la nutrition, les courses à venir et de quoi PRÉDIRE leur durée — la même VMA effective que le coach
     // (`effectiveVma`, seule définition de l'app) : lus ensemble, en une vague.
@@ -187,8 +187,10 @@ export default async function HealthPage() {
     if (bilanPanne) console.error("[santé] lecture illisible : bilan du matin", bilanRes.error?.message);
     const { data: lignesApt, error: eApt } = await supabase.from("notifications").select("data")
       .eq("user_id", user.id).eq("type", TYPE_APTITUDE).order("created_at", { ascending: false }).limit(1);
-    if (eApt) console.error("[santé] questionnaire d'aptitude illisible :", eApt.message);
-    else {
+    if (eApt) {
+      console.error("[santé] questionnaire d'aptitude illisible :", eApt.message);
+      aptitude = "panne";
+    } else {
       const apt = lireAptitude(((lignesApt ?? []) as { data?: unknown }[])[0]?.data);
       aptitude = !apt ? "absent" : avisAttendu(apt) ? "attente" : "ok";
     }
