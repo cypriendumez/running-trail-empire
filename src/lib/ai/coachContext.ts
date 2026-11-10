@@ -54,6 +54,7 @@ import { douleursDeSeance } from "@/lib/health/douleursSeance";
 import { pausesDeTrace, pointsStockes, vitesseEnMouvement, dureeCourte } from "@/lib/activities/pauses";
 import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { TYPE_CONSIGNES, consignesEnVigueur, kmPourDuree, type ConsignesKine } from "@/lib/health/consignesKine";
+import { TYPE_BILAN, BILAN_T, bilanDuJour, effetBilan, type BilanMatin } from "@/lib/health/bilanMatin";
 import { recupAllongee, verdictExecution } from "@/lib/coach/arretsQualite";
 import { arretsMemorises, memoriserArrets } from "@/lib/activities/cacheArrets";
 import { estUnePanne } from "@/lib/dashboard/lectures";
@@ -307,6 +308,8 @@ export type AthleteContext = {
   /** Dates (AAAA-MM-JJ) des sorties de course des 7 derniers jours, une par sortie : le nombre
    *  de sorties fixé par le kinésithérapeute se compte sur 7 jours GLISSANTS. */
   sortiesRecentes?: string[];
+  /** Le bilan du matin de CE jour (lib/health/bilanMatin) et ce qu'il fait au plan ; `null` sans bilan. */
+  bilanMatin?: (BilanMatin & { allege: boolean; stressHaut: boolean }) | null;
   /** Disponibilités déclarées : nb de séances de course/semaine et jours praticables (0 = dim). */
   availability: { daysPerWeek: number; days: number[] };
   /** Prévisions RÉELLES à 7 jours (Open-Meteo) — vide si la position est inconnue. */
@@ -778,6 +781,22 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     .eq("user_id", userId).eq("type", TYPE_CONSIGNES).order("created_at", { ascending: false }).limit(1);
   if (estUnePanne({ error: eConsignes })) throw new Error(`Consignes du kiné illisibles : ${eConsignes?.code ?? "?"} ${eConsignes?.message ?? ""}`);
   const consignes = consignesEnVigueur(((lignesConsignes ?? []) as { data?: unknown }[])[0]?.data, aujourdhui(FUSEAU_DEFAUT));
+  // ── LE BILAN DU MATIN (Santé, lot 2) : celui de CE jour seulement. Une lecture en panne n'est
+  //    pas « aucun bilan » : on refuse de bâtir le contexte, comme pour les consignes.
+  //    Jour de PARIS ici (le fuseau de l'athlète n'est pas connu du contexte) : la route l'écrit au
+  //    jour de l'athlète, identique hors des heures autour de minuit pour un fuseau lointain.
+  const { data: lignesBilan, error: eBilan } = await sb.from("notifications").select("data")
+    .eq("user_id", userId).eq("type", TYPE_BILAN).order("created_at", { ascending: false }).limit(3);
+  if (estUnePanne({ error: eBilan })) throw new Error(`Bilan du matin illisible : ${eBilan?.code ?? "?"} ${eBilan?.message ?? ""}`);
+  // Le jour de Paris, ou le LENDEMAIN : le matin d'un coureur d'Asie ou d'Océanie tombe encore la
+  //    veille à Paris (relecture du 10/11/2026). Limite assumée, faute de fuseau de l'athlète ici :
+  //    pendant SA nuit, le bilan de son matin précédent peut encore valoir « jour de Paris » ; il ne
+  //    fait qu'alléger, et le plan est recalculé dès son nouveau bilan.
+  const jourParis = aujourdhui(FUSEAU_DEFAUT);
+  const lendemainParis = (() => { const d = new Date(`${jourParis}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); })();
+  const lignesB = (lignesBilan ?? []) as { data?: unknown }[];
+  const bilan = bilanDuJour(lignesB, lendemainParis) ?? bilanDuJour(lignesB, jourParis);
+  const effetDuBilan = effetBilan(bilan);
   const declaredPains = libellesActifs(
     ((painRes.data ?? []) as { id?: string; data: Douleur | null }[]).map((n) => ({ ...(n.data ?? {}), id: n.id })),
     aujourdhui(FUSEAU_DEFAUT),
@@ -1528,6 +1547,13 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Le programme marche-course est un cadre, pas une fatigue : il se dit sans colorer le feu.
   if (marcheCourseMotif) infoFlags.push(marcheCourseMotif);
   if (secondaireMotif) infoFlags.push(secondaireMotif);
+  // Le bilan du matin : fatigue ou jambes à 4-5/5 colorent le feu (et allègent la séance dure du
+  // jour, autoPlan) ; le stress seul s'affiche sans rien retirer. Jamais de rouge sur le ressenti.
+  // ⚠️ AFFICHÉ, PAS COMPTÉ DANS LE FEU (relecture du 10/11/2026) : en orange, il faisait passer un
+  //    coureur déjà « jaune » à « orange », ce qui coupe la sortie longue de TOUTE la semaine.
+  //    Le bilan ne parle que d'aujourd'hui : seule la séance dure du jour change (autoPlan).
+  if (bilan && effetDuBilan.allege) infoFlags.push(tr((l) => BILAN_T[l].motif(bilan.fatigue, bilan.jambes)));
+  if (bilan && effetDuBilan.stressHaut) infoFlags.push(tr((l) => BILAN_T[l].stress(bilan.stress)));
   if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.map((x) => traduireDouleur(x, l)).join(", "))));
   // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
   // Le feu rouge annule l'intensité du JOUR. Comme le plan est republié chaque jour et
@@ -2663,6 +2689,7 @@ ${catalog}`;
     douleursActives: pains,
     effetsDouleur,
     consignes: consignes ? { ...consignes, kmMax: kmConsigne } : null,
+    bilanMatin: bilan ? { ...bilan, ...effetDuBilan } : null,
     sortiesRecentes: (() => {
       const jour = aujourdhui(FUSEAU_DEFAUT);
       const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 7);

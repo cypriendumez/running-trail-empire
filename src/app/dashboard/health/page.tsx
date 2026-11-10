@@ -12,6 +12,13 @@ import { traduireDouleur } from "@/lib/coach/painZonesI18n";
 import { LANGS } from "@/lib/i18n/base";
 import { chargeAvantDouleur, doitConsulter, type ChargeAvant, type DouleurUnifiee } from "@/lib/health/santeDouleurs";
 import { TYPE_CONSIGNES, consignesEnVigueur, type ConsignesKine } from "@/lib/health/consignesKine";
+import { cookies } from "next/headers";
+import { fuseauOuDefaut } from "@/lib/time/fuseau";
+import { jourLocal } from "@/lib/streak/compute";
+import { normLang } from "@/lib/i18n/base";
+import { chargerDonnees } from "@/lib/indicateurs/donnees";
+import { TYPE_BILAN } from "@/lib/health/bilanMatin";
+import { donneesRecup, bilansRecents, type DonneesRecup } from "@/lib/health/recuperation";
 
 export const metadata = { title: "Santé" };
 
@@ -38,6 +45,8 @@ export default async function HealthPage() {
   let consignes: ConsignesKine | null = null;
   let charge: ChargeAvant | null = null;
   let rappel: ReturnType<typeof doitConsulter> = null;
+  // Santé, lot 2 (10/11/2026) : l'onglet Récupération et le bilan du matin.
+  let recup: DonneesRecup | null = null;
   if (user) {
     // Pour la nutrition, les courses à venir et de quoi PRÉDIRE leur durée — la même VMA effective que le coach
     // (`effectiveVma`, seule définition de l'app) : lus ensemble, en une vague.
@@ -45,7 +54,7 @@ export default async function HealthPage() {
     const [objRes, planRes, profilRes, baseRes, seancesRes] = await Promise.all([
       supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
       supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "planned_race").order("created_at", { ascending: false }).limit(50),
-      supabase.from("profiles").select("pace_curve,garmin_vo2max,weight_kg").eq("id", user.id).single(),
+      supabase.from("profiles").select("pace_curve,garmin_vo2max,weight_kg,preferred_language").eq("id", user.id).single(),
       supabase.from("performance_baselines").select("vma_kmh").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("workouts").select("date,sport,distance_km,duration_seconds").eq("user_id", user.id).order("date", { ascending: false }).limit(200),
     ]);
@@ -157,7 +166,26 @@ export default async function HealthPage() {
     const etat = etatRes.data?.data as { douleurEffets?: typeof effets } | null;
     effets = douleurs.length ? (etat?.douleurEffets ?? null) : null;
     consignes = consignesEnVigueur(((consRes.data ?? []) as { data?: unknown }[])[0]?.data, jourJ);
+
+    // ── RÉCUPÉRATION : le bilan du matin au jour de l'ATHLÈTE (son fuseau, comme la route et le
+    //    tableau de bord) ; forme, VFC et sommeil par les MÊMES calculs que les pages Indicateurs.
+    const jourAthlete = jourLocal(new Date(), fuseauOuDefaut(decodeURIComponent((await cookies()).get("pacevo_tz")?.value ?? "")));
+    const lang = normLang(String((profilRes.data as { preferred_language?: string } | null)?.preferred_language ?? "fr"));
+    const [bilanRes, donnees] = await Promise.all([
+      supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", TYPE_BILAN).order("created_at", { ascending: false }).limit(30),
+      // Une exception ne casse pas toute la page Santé : l'onglet Récupération se dit en panne.
+      chargerDonnees(supabase, user.id, lang, jourJ).catch((e) => {
+        console.error("[santé] indicateurs de récupération illisibles :", e instanceof Error ? e.message : String(e));
+        return null;
+      }),
+    ]);
+    const bilanPanne = !!bilanRes.error && estUnePanne(bilanRes);
+    if (bilanPanne) console.error("[santé] lecture illisible : bilan du matin", bilanRes.error?.message);
+    recup = donnees
+      ? donneesRecup(donnees, (bilanRes.data ?? []) as { data?: unknown }[], jourAthlete, bilanPanne)
+      : { ...bilansRecents((bilanRes.data ?? []) as { data?: unknown }[], jourAthlete), forme: null, vfc: null,
+          sommeil: { derniere: null, moyenneMin: null, nuits: 0 }, fcRepos: null, panne: true, fatigueDurable: false };
   }
   return <HealthCenter suivi={suivi} douleurs={douleurs} effets={effets} consignes={consignes} charge={charge} rappel={rappel}
-    enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} />;
+    enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} recup={recup} />;
 }

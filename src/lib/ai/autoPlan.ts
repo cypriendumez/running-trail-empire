@@ -24,6 +24,7 @@ import { axesRenforcement } from "@/lib/coach/renforcement";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
 import { appliquerConsignes } from "@/lib/coach/consignesPlan";
+import { BILAN_T } from "@/lib/health/bilanMatin";
 import { nRaw, type I18nText } from "@/lib/i18n/multi";
 import type { Lang } from "@/lib/i18n/translations";
 
@@ -841,6 +842,11 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // ── 7. Le jour J est arbitré par la FRAÎCHEUR RÉELLE, pas par le squelette.
   const lvl = ctx.readiness.level;
   const isHardToday = /VMA|Seuil|Spécifique|Sortie longue/i.test(week[0].type);
+  // LE BILAN DU MATIN (Santé, lot 2, décision de Cyprien du 10/11/2026) : fatigue ou jambes à 4-5/5
+  // → la séance DURE du jour devient une récupération facile. Les autres jours ne bougent pas : le
+  // bilan ne parle que d'aujourd'hui. Le feu, lui, n'en devient pas rouge.
+  const bilan = ctx.bilanMatin ?? null;
+  const bilanAllege = !!bilan?.allege;
   const hardToday = ctx.lastHardDaysAgo === 0;   // une séance dure a DÉJÀ eu lieu aujourd'hui
 
   /**
@@ -870,14 +876,16 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // plus de sens — on n'ajoute rien (relecture du 09/11/2026).
   if (week[0].type === "Course" && lvl === "rouge" && !hardToday) {
     week[0] = reecrire(week[0], (l, avant) => ({ ...avant, why: `${avant.why}${PLAN_T[l].courseFeuRouge(motifs(l, 2))}` }));
-  } else if ((lvl === "rouge" || hardToday) && week[0].type !== "Repos" && week[0].type !== "Course") {
+  } else if ((lvl === "rouge" || hardToday || (bilanAllege && isHardToday)) && week[0].type !== "Repos" && week[0].type !== "Course") {
     week[0] = reecrire({ ...week[0], type: "Récup" }, (l) => ({
       title: PLAN_T[l].recupTitre,
       // Sous une durée maximale du kinésithérapeute, la récupération entière y tient.
       detail: ctx.consignes?.dureeMaxMin != null
         ? PLAN_T[l].recupDetail(5, 5, Math.max(5, Math.min(25, ctx.consignes.dureeMaxMin - 10)))
         : PLAN_T[l].recupDetail(warm, cool),
-      why: hardToday ? PLAN_T[l].recupWhyDejaDur : PLAN_T[l].recupWhyRouge(motifs(l, 2)),
+      why: hardToday ? PLAN_T[l].recupWhyDejaDur
+        : lvl === "rouge" || !bilan ? PLAN_T[l].recupWhyRouge(motifs(l, 2))
+        : BILAN_T[l].recupWhy(bilan.fatigue, bilan.jambes),
       tags: [PLAN_T[l].tags["Récup"], PLAN_T[l].tags["Z1"]],
     }));
   } else if (lvl === "orange" && isHardToday) {
