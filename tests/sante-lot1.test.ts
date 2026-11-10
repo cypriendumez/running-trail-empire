@@ -416,6 +416,8 @@ async function main() {
   });
 
   await test("le carnet : une page imprimable, aucune donnée envoyée, une panne dite", () => {
+    // L'effort de la séance (RPE) n'est jamais présenté comme l'intensité d'une douleur.
+    assert.doesNotMatch(codeOf("src/app/dashboard/health/carnet/page.tsx"), /niveau:[^\n]*rpe/, "le carnet donne le RPE de la séance comme intensité de la douleur");
     const carnet = codeOf("src/app/dashboard/health/carnet/page.tsx");
     assert.match(carnet, /\{enPanne && <p/, "une lecture ratée n'est pas dite sur le carnet");
     assert.doesNotMatch(carnet, /fetch\(|resend|envoyerEmail/i, "le carnet envoie des données");
