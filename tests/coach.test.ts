@@ -5682,7 +5682,7 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // serveur), et le verrou ne se déclenche que si la VMA manque ET que ce n'est pas lui.
     const src = codeOf("src/lib/ai/autoCoach.ts");
     assert.ok(/estAdmin\(/.test(src), "le verrou VMA n'exempte pas le compte admin (estAdmin absent)");
-    assert.ok(/if \(!vmaMesuree && !estFondateur\)/.test(src),
+    assert.ok(/if \(!vmaMesuree && !estFondateur(?: && !avisMedicalAttendu)?\)/.test(src),
       "la condition du verrou n'exclut pas le fondateur (le test serait imposé à l'admin)");
   });
 
