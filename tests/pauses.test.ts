@@ -132,7 +132,7 @@ test("l'analyse, le coach et la page de séance appellent le calcul des arrêts"
   assert.match(route, /from\("activity_tracks"\)\.select\("points"\)\.eq\("workout_id", workoutId\)/, "la route ne lit plus la trace");
   assert.match(route, /intervalles, contexte, flux, arrets\)/, "les arrêts ne partent plus aux faits");
   const coach = codeOf("src/lib/ai/coachContext.ts");
-  assert.match(coach, /const arretsDerniere = await/, "le coach ne lit plus les arrêts de la dernière séance");
+  assert.match(coach, /const arretsDerniere = [^;]*await lireArrets\(runs\[0\]\)/, "le coach ne lit plus les arrêts de la dernière séance");
   assert.match(coach, /if \(arretsDerniere\?\.liste\.length\) \{\s*const n = /, "les arrêts ne sont plus dits dans la dernière séance");
   assert.match(coach, /const COLONNES_ESSENTIELLES = "id,/, "sans l'identifiant de séance, la trace ne peut pas être lue");
   const page = codeOf("src/app/dashboard/activite/page.tsx");

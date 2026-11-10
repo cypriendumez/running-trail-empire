@@ -25,7 +25,7 @@ const H: Record<string, Record<string, string>> = {
     "k.hint": "Touche une zone sur le corps ou dans la liste, ajuste l'intensité, puis enregistre-la : ton plan s'adapte.",
     "k.pain": "Douleur", "k.painLight": "Gêne légère", "k.painHard": "Très douloureux",
     "k.noZone": "Aucune zone sélectionnée",
-    "k.suivi": "Suivi de tes douleurs", "k.suiviNone": "Aucune douleur déclarée ces 60 derniers jours.", "k.suiviSince": "depuis {n} j", "k.suiviToday": "aujourd'hui", "k.suiviAgo": "il y a {n} j", "trend.amelioration": "en amélioration", "trend.aggravation": "en aggravation", "trend.stable": "stable", "trend.inconnue": "1re déclaration", "chat.s1": "J'ai une douleur qui revient à chaque sortie longue.", "chat.s2": "Comment adapter ma semaine avec cette douleur ?", "chat.s3": "Quels exercices de prévention pour mes tendons ?",
+    "k.suivi": "Suivi de tes douleurs", "k.seance": "Signalées après tes séances", "k.seanceAide": "Cochées dans ton ressenti d'après séance. Le coach en tient compte 14 jours, ou jusqu'à ce que tu dises « c'est passé ».", "k.suiviNone": "Aucune douleur déclarée ces 60 derniers jours.", "k.suiviSince": "depuis {n} j", "k.suiviToday": "aujourd'hui", "k.suiviAgo": "il y a {n} j", "trend.amelioration": "en amélioration", "trend.aggravation": "en aggravation", "trend.stable": "stable", "trend.inconnue": "1re déclaration", "chat.s1": "J'ai une douleur qui revient à chaque sortie longue.", "chat.s2": "Comment adapter ma semaine avec cette douleur ?", "chat.s3": "Quels exercices de prévention pour mes tendons ?",
     "k.annuler": "Annuler", "k.etatQ": "{z} — où en es-tu ?", "k.mieux": "Ça va mieux", "k.pire": "Ça empire", "k.passe": "C'est passé", "k.etatOk": "C'est noté — ton coach en tient compte.", "k.etatPasse": "Noté : cette douleur ne bride plus ton plan.", "k.etatErr": "Mise à jour impossible. Réessaie.",
     "k.mapOpen": "Où as-tu mal ? Montrer le schéma", "k.mapClose": "Masquer le schéma", "k.zoneChip": "{zone} · {n}/10",
     "bilan.proba.haute": "probable", "bilan.proba.moyenne": "possible", "bilan.proba.faible": "peu probable",
@@ -40,7 +40,7 @@ const H: Record<string, Record<string, string>> = {
     "k.hint": "Tap a zone on the body or in the list, set the intensity, then save it: your plan adapts.",
     "k.pain": "Pain", "k.painLight": "Mild discomfort", "k.painHard": "Very painful",
     "k.noZone": "No zone selected",
-    "k.suivi": "Your pain history", "k.suiviNone": "No pain reported in the last 60 days.", "k.suiviSince": "for {n} d", "k.suiviToday": "today", "k.suiviAgo": "{n} d ago", "trend.amelioration": "improving", "trend.aggravation": "worsening", "trend.stable": "stable", "trend.inconnue": "1st report", "chat.s1": "I get a recurring pain on every long run.", "chat.s2": "How should I adjust my week with this pain?", "chat.s3": "Which prevention exercises for my tendons?",
+    "k.suivi": "Your pain history", "k.seance": "Reported after your sessions", "k.seanceAide": "Ticked in your post-session feedback. The coach takes them into account for 14 days, or until you say “it's gone”.", "k.suiviNone": "No pain reported in the last 60 days.", "k.suiviSince": "for {n} d", "k.suiviToday": "today", "k.suiviAgo": "{n} d ago", "trend.amelioration": "improving", "trend.aggravation": "worsening", "trend.stable": "stable", "trend.inconnue": "1st report", "chat.s1": "I get a recurring pain on every long run.", "chat.s2": "How should I adjust my week with this pain?", "chat.s3": "Which prevention exercises for my tendons?",
     "k.annuler": "Undo", "k.etatQ": "{z} — how is it now?", "k.mieux": "Getting better", "k.pire": "Getting worse", "k.passe": "It's gone", "k.etatOk": "Noted — your coach takes it into account.", "k.etatPasse": "Noted: this pain no longer holds your plan back.", "k.etatErr": "Couldn't update. Try again.",
     "k.mapOpen": "Where does it hurt? Show the body map", "k.mapClose": "Hide the body map", "k.zoneChip": "{zone} · {n}/10",
     "bilan.proba.haute": "likely", "bilan.proba.moyenne": "possible", "bilan.proba.faible": "unlikely",
@@ -55,7 +55,7 @@ const H: Record<string, Record<string, string>> = {
     "k.hint": "Tippe eine Zone am Körper oder in der Liste an, stelle die Stärke ein und speichere sie: dein Plan passt sich an.",
     "k.pain": "Schmerz", "k.painLight": "Leichtes Unbehagen", "k.painHard": "Sehr schmerzhaft",
     "k.noZone": "Keine Zone ausgewählt",
-    "k.suivi": "Verlauf deiner Schmerzen", "k.suiviNone": "In den letzten 60 Tagen keine Schmerzen gemeldet.", "k.suiviSince": "seit {n} T", "k.suiviToday": "heute", "k.suiviAgo": "vor {n} T", "trend.amelioration": "bessert sich", "trend.aggravation": "verschlechtert sich", "trend.stable": "stabil", "trend.inconnue": "1. Meldung", "chat.s1": "Bei jedem langen Lauf kommt derselbe Schmerz zurück.", "chat.s2": "Wie passe ich meine Woche mit diesem Schmerz an?", "chat.s3": "Welche Präventionsübungen für meine Sehnen?",
+    "k.suivi": "Verlauf deiner Schmerzen", "k.seance": "Nach deinen Einheiten gemeldet", "k.seanceAide": "In deinem Feedback nach der Einheit angekreuzt. Der Coach berücksichtigt sie 14 Tage lang oder bis du „Ist weg“ sagst.", "k.suiviNone": "In den letzten 60 Tagen keine Schmerzen gemeldet.", "k.suiviSince": "seit {n} T", "k.suiviToday": "heute", "k.suiviAgo": "vor {n} T", "trend.amelioration": "bessert sich", "trend.aggravation": "verschlechtert sich", "trend.stable": "stabil", "trend.inconnue": "1. Meldung", "chat.s1": "Bei jedem langen Lauf kommt derselbe Schmerz zurück.", "chat.s2": "Wie passe ich meine Woche mit diesem Schmerz an?", "chat.s3": "Welche Präventionsübungen für meine Sehnen?",
     "k.annuler": "Rückgängig", "k.etatQ": "{z} — wie ist es jetzt?", "k.mieux": "Wird besser", "k.pire": "Wird schlimmer", "k.passe": "Ist weg", "k.etatOk": "Notiert — dein Coach berücksichtigt es.", "k.etatPasse": "Notiert: dieser Schmerz bremst deinen Plan nicht mehr.", "k.etatErr": "Aktualisierung nicht möglich. Versuch es nochmal.",
     "k.mapOpen": "Wo tut es weh? Körperschema zeigen", "k.mapClose": "Körperschema ausblenden", "k.zoneChip": "{zone} · {n}/10",
     "bilan.proba.haute": "wahrscheinlich", "bilan.proba.moyenne": "möglich", "bilan.proba.faible": "unwahrscheinlich",
@@ -70,7 +70,7 @@ const H: Record<string, Record<string, string>> = {
     "k.hint": "Toca una zona en el cuerpo o en la lista, ajusta la intensidad y guárdala: tu plan se adapta.",
     "k.pain": "Dolor", "k.painLight": "Molestia leve", "k.painHard": "Muy doloroso",
     "k.noZone": "Ninguna zona seleccionada",
-    "k.suivi": "Seguimiento de tus dolores", "k.suiviNone": "Ningún dolor declarado en los últimos 60 días.", "k.suiviSince": "desde hace {n} d", "k.suiviToday": "hoy", "k.suiviAgo": "hace {n} d", "trend.amelioration": "mejorando", "trend.aggravation": "empeorando", "trend.stable": "estable", "trend.inconnue": "1.ª declaración", "chat.s1": "Tengo un dolor que vuelve en cada tirada larga.", "chat.s2": "¿Cómo adapto mi semana con este dolor?", "chat.s3": "¿Qué ejercicios de prevención para mis tendones?",
+    "k.suivi": "Seguimiento de tus dolores", "k.seance": "Señalados tras tus sesiones", "k.seanceAide": "Marcados en tu sensación tras la sesión. El entrenador los tiene en cuenta 14 días, o hasta que digas «ya pasó».", "k.suiviNone": "Ningún dolor declarado en los últimos 60 días.", "k.suiviSince": "desde hace {n} d", "k.suiviToday": "hoy", "k.suiviAgo": "hace {n} d", "trend.amelioration": "mejorando", "trend.aggravation": "empeorando", "trend.stable": "estable", "trend.inconnue": "1.ª declaración", "chat.s1": "Tengo un dolor que vuelve en cada tirada larga.", "chat.s2": "¿Cómo adapto mi semana con este dolor?", "chat.s3": "¿Qué ejercicios de prevención para mis tendones?",
     "k.annuler": "Deshacer", "k.etatQ": "{z}: ¿cómo va?", "k.mieux": "Va mejor", "k.pire": "Va peor", "k.passe": "Ya pasó", "k.etatOk": "Anotado: tu entrenador lo tiene en cuenta.", "k.etatPasse": "Anotado: este dolor ya no frena tu plan.", "k.etatErr": "No se pudo actualizar. Reinténtalo.",
     "k.mapOpen": "¿Dónde te duele? Mostrar el esquema", "k.mapClose": "Ocultar el esquema", "k.zoneChip": "{zone} · {n}/10",
     "bilan.proba.haute": "probable", "bilan.proba.moyenne": "posible", "bilan.proba.faible": "poco probable",
@@ -85,7 +85,7 @@ const H: Record<string, Record<string, string>> = {
     "k.hint": "Toca numa zona do corpo ou da lista, ajusta a intensidade e guarda-a: o teu plano adapta-se.",
     "k.pain": "Dor", "k.painLight": "Desconforto ligeiro", "k.painHard": "Muito doloroso",
     "k.noZone": "Nenhuma zona selecionada",
-    "k.suivi": "Acompanhamento das tuas dores", "k.suiviNone": "Nenhuma dor declarada nos últimos 60 dias.", "k.suiviSince": "há {n} d", "k.suiviToday": "hoje", "k.suiviAgo": "há {n} d", "trend.amelioration": "a melhorar", "trend.aggravation": "a piorar", "trend.stable": "estável", "trend.inconnue": "1.ª declaração", "chat.s1": "Tenho uma dor que volta em cada treino longo.", "chat.s2": "Como adapto a minha semana com esta dor?", "chat.s3": "Que exercícios de prevenção para os meus tendões?",
+    "k.suivi": "Acompanhamento das tuas dores", "k.seance": "Assinaladas depois dos teus treinos", "k.seanceAide": "Assinaladas na tua sensação depois do treino. O treinador tem-nas em conta 14 dias, ou até dizeres «já passou».", "k.suiviNone": "Nenhuma dor declarada nos últimos 60 dias.", "k.suiviSince": "há {n} d", "k.suiviToday": "hoje", "k.suiviAgo": "há {n} d", "trend.amelioration": "a melhorar", "trend.aggravation": "a piorar", "trend.stable": "estável", "trend.inconnue": "1.ª declaração", "chat.s1": "Tenho uma dor que volta em cada treino longo.", "chat.s2": "Como adapto a minha semana com esta dor?", "chat.s3": "Que exercícios de prevenção para os meus tendões?",
     "k.annuler": "Anular", "k.etatQ": "{z} — como está agora?", "k.mieux": "Está melhor", "k.pire": "Está pior", "k.passe": "Já passou", "k.etatOk": "Registado — o teu treinador tem isso em conta.", "k.etatPasse": "Registado: esta dor já não trava o teu plano.", "k.etatErr": "Não foi possível atualizar. Tenta de novo.",
     "k.mapOpen": "Onde te dói? Mostrar o esquema", "k.mapClose": "Esconder o esquema", "k.zoneChip": "{zone} · {n}/10",
     "bilan.proba.haute": "provável", "bilan.proba.moyenne": "possível", "bilan.proba.faible": "pouco provável",
@@ -168,8 +168,12 @@ const TON_TENDANCE: Record<Tendance, string> = {
 // le partage de position en direct reste sur la Carte.
 type Tab = "kine" | "nutrition" | "poids";
 
-export function HealthCenter({ suivi = [], etats = [], enPanne = false, coursesNutrition = [], poidsKg = null }: {
+export function HealthCenter({ suivi = [], etats = [], douleursSeance = [], enPanne = false, coursesNutrition = [], poidsKg = null }: {
   suivi?: SuiviZone[];
+  /** Les douleurs cochées après une séance que le coach compte encore (lib/health/douleursSeance). */
+  /** `libelle` est traduit côté serveur : la table des zones tire tout le dictionnaire `T`,
+   *  qui n'a rien à faire dans le bundle de cet écran (chargé à la demande ailleurs). */
+  douleursSeance?: { zone: string; date: string; ilYaJours: number; libelle: Partial<Record<string, string>> }[];
   /** Pour chaque zone, la déclaration la plus récente et son état déclaré. */
   etats?: { cle: string; id: string; etat: string }[];
   /** La lecture des douleurs a ÉCHOUÉ : l'historique est vide par accident. */
@@ -214,6 +218,29 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, coursesN
       if (!r.ok || !j?.ok) { toast.error(tr("k.etatErr")); return; }
       setMajEtats((m) => ({ ...m, [id]: etat }));
       toast.success(tr(etat === "resolu" ? "k.etatPasse" : "k.etatOk"));
+    } catch {
+      toast.error(tr("k.etatErr"));
+    } finally {
+      setEnCours(null);
+    }
+  }
+  /**
+   * « C'est passé » pour une douleur cochée après une séance (/api/health/douleur-seance).
+   * Comme pour les douleurs déclarées : l'écran ne change qu'une fois l'écriture faite, et
+   * un clic de trop se reprend (« Annuler ») tant qu'on reste sur l'écran.
+   */
+  const [seancePassees, setSeancePassees] = useState<Record<string, boolean>>({});
+  async function majDouleurSeance(zone: string, passee: boolean) {
+    setEnCours(`seance:${zone}`);
+    try {
+      const r = await fetch("/api/health/douleur-seance", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zone, annuler: !passee }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) { toast.error(tr("k.etatErr")); return; }
+      setSeancePassees((m) => ({ ...m, [zone]: passee }));
+      if (passee) toast.success(tr("k.etatPasse"));
     } catch {
       toast.error(tr("k.etatErr"));
     } finally {
@@ -485,6 +512,46 @@ export function HealthCenter({ suivi = [], etats = [], enPanne = false, coursesN
                   </div>
                 )}
               </div>
+
+            {/* ══ LES DOULEURS COCHÉES APRÈS UNE SÉANCE ════════════════════════════════
+                ⚠️ Elles pesaient sur le plan sans fin et sans bouton pour les éteindre
+                (Cyprien, 09/11/2026). Le coach les compte 14 jours, sauf « c'est passé ». */}
+            {douleursSeance.length > 0 && (
+              <div className="bento-card space-y-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-amber-600" />
+                  <h3 className="text-sm font-semibold text-zinc-900">{tr("k.seance")}</h3>
+                </div>
+                <p className="text-[11px] text-zinc-500">{tr("k.seanceAide")}</p>
+                <div className="space-y-1.5">
+                  {douleursSeance.map((d) => {
+                    const passee = seancePassees[d.zone] === true;
+                    return (
+                      <div key={d.zone} className="flex flex-wrap items-center gap-2 rounded-xl bg-zinc-50 px-2.5 py-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[13px] font-medium text-zinc-900">{d.libelle[lang] ?? d.zone}</div>
+                          <div className="text-[11px] text-zinc-400">{d.ilYaJours <= 0 ? tr("k.suiviToday") : tr("k.suiviAgo", { n: d.ilYaJours })}</div>
+                        </div>
+                        {passee ? (
+                          <>
+                            <span className="text-[11px] font-medium text-emerald-700">{tr("k.etatPasse")}</span>
+                            <button type="button" disabled={enCours === `seance:${d.zone}`} onClick={() => majDouleurSeance(d.zone, false)}
+                              className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-600 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-50 disabled:opacity-50">
+                              {tr("k.annuler")}
+                            </button>
+                          </>
+                        ) : (
+                          <button type="button" disabled={enCours === `seance:${d.zone}`} onClick={() => majDouleurSeance(d.zone, true)}
+                            className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100 disabled:opacity-50">
+                            {tr("k.passe")}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             </div>
 

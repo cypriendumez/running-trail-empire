@@ -8,6 +8,8 @@ import { effectiveVma, bestVmaFromWorkouts } from "@/lib/running/fitness";
 import { coursesPourNutrition, type CourseNutri } from "@/lib/health/coursesNutrition";
 import { douleursDeSeance, type DouleurSeance } from "@/lib/health/douleursSeance";
 import { PEREMPTION_JOURS } from "@/lib/health/douleurs";
+import { traduireDouleur } from "@/lib/coach/painZonesI18n";
+import { LANGS } from "@/lib/i18n/base";
 
 export const metadata = { title: "Santé" };
 
@@ -26,7 +28,7 @@ export default async function HealthPage() {
   let enPanne = false;
   let coursesNutrition: CourseNutri[] = [];
   let poidsKg: number | null = null;
-  let douleursSeance: DouleurSeance[] = [];
+  let douleursSeance: (DouleurSeance & { ilYaJours: number; libelle: Record<string, string> })[] = [];
   if (user) {
     // Pour la nutrition, les courses à venir et de quoi PRÉDIRE leur durée — la même VMA effective que le coach
     // (`effectiveVma`, seule définition de l'app) : lus ensemble, en une vague.
@@ -102,7 +104,15 @@ export default async function HealthPage() {
       enPanne = true;
       console.error("[santé] ressentis illisibles :", eRess.message);
     }
-    douleursSeance = douleursDeSeance(((ress ?? []) as { data: Record<string, unknown> | null }[]).map((r) => r.data ?? {}), aujourdhui(FUSEAU_DEFAUT));
+    // L'ancienneté se calcule ICI, côté serveur, avec le fuseau commun : la calculer dans le
+    // navigateur ferait différer le rendu serveur la nuit (erreur React #418, lib/time).
+    const jourJ = aujourdhui(FUSEAU_DEFAUT);
+    douleursSeance = douleursDeSeance(((ress ?? []) as { data: Record<string, unknown> | null }[]).map((r) => r.data ?? {}), jourJ)
+      .map((d) => ({
+        ...d,
+        ilYaJours: Math.max(0, Math.round((Date.parse(`${jourJ}T12:00:00Z`) - Date.parse(`${d.date}T12:00:00Z`)) / 86400000)),
+        libelle: Object.fromEntries(LANGS.map(({ code }) => [code, traduireDouleur(d.zone, code)])),
+      }));
   }
   return <HealthCenter suivi={suivi} etats={etats} douleursSeance={douleursSeance} enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} />;
 }
