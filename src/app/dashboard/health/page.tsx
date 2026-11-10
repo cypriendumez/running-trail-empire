@@ -199,6 +199,6 @@ export default async function HealthPage() {
       : { ...bilansRecents((bilanRes.data ?? []) as { data?: unknown }[], jourAthlete), forme: null, vfc: null,
           sommeil: { derniere: null, moyenneMin: null, nuits: 0 }, fcRepos: null, panne: true, fatigueDurable: false };
   }
-  return <HealthCenter aptitude={aptitude} suivi={suivi} douleurs={douleurs} effets={effets} consignes={consignes} charge={charge} rappel={rappel}
-    enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} recup={recup} />;
+  return <HealthCenter suivi={suivi} douleurs={douleurs} effets={effets} consignes={consignes} charge={charge} rappel={rappel}
+    enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} recup={recup} aptitude={aptitude} />;
 }
