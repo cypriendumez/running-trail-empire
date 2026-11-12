@@ -5664,7 +5664,9 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // qui classe l'effort, celle qui calcule les zones) retiennent donc la plus haute.
     const src = codeOf("src/lib/ai/coachContext.ts");
     // 12/11/2026 : la condition est passée dans `fcMaxSource` (plus de repli à 190).
-    assert.ok(/const fcMaxSource[^\n]*= \(maxHrDeclare != null \|\| obsMaxHr0 > 150\) \? "mesures"[\s\S]{0,200}?const fcMaxEst[^\n]*= fcMaxSource === "mesures"\s*\? Math\.max\(maxHrDeclare \?\? 0, obsMaxHr0 > 150 \? obsMaxHr0 : 0\)/.test(src),
+    // La FC moyenne relevée y sert aussi de plancher (`obsFcPlancher`, 12/11/2026).
+    assert.ok(/const obsFcPlancher = Math\.max\(obsMaxHr0, obsFcMoy\);/.test(src)
+      && /const fcMaxSource[^\n]*= \(maxHrDeclare != null \|\| obsFcPlancher > 150\) \? "mesures"[\s\S]{0,200}?const fcMaxEst[^\n]*= fcMaxSource === "mesures"\s*\? Math\.max\(maxHrDeclare \?\? 0, obsFcPlancher > 150 \? obsFcPlancher : 0\)/.test(src),
       "fcMaxEst retient la FC déclarée même si une FC plus haute a été enregistrée");
     assert.ok(/const maxHrEff = \(maxHr != null \|\| obsMaxHr0 > 150\)[\s\S]{0,120}?Math\.max\(maxHr/.test(src),
       "maxHrEff retient la FC déclarée même si une FC plus haute a été enregistrée");

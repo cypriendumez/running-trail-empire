@@ -150,6 +150,33 @@ async function main() {
     assert.match(avec, /PENTE RÉELLE DE L'ATHLÈTE \(mesurée/, "précondition : ces séances doivent produire une pente");
   });
 
+  // Relecture du 12/11 (second tour) : une séance importée sans `max_hr` mais à 175 bpm de moyenne
+  // passait pour un footing une fois le 190 retiré. Une moyenne relevée est un battement réel : la
+  // FC max est au moins aussi haute, elle sert de plancher MESURÉ.
+  await test("sans max_hr enregistré, une FC moyenne de 175 sert de plancher : la séance reste dure", async () => {
+    const sansMax = SEANCES_CALMES.map((w, i) => i === 0
+      ? { ...w, distance_km: 8, duration_seconds: 1920, avg_hr: 175, max_hr: null }
+      : { ...w, max_hr: null });
+    const ctx = await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL, age: null }], performance_baselines: [], workouts: sansMax, notifications: [] }), "u");
+    assert.match(ctx.text, /FC max ~175 \(obs\.\)/, "la FC moyenne relevée n'a pas servi de plancher");
+    assert.match(ctx.text, /Intense \(VMA\/course\) 8km/, "la séance à 175 bpm de moyenne passe pour un footing");
+  });
+
+  // La VMA estimée sans FC max : le filtre « effort vraiment maximal » ne peut plus trier, des
+  // footings comptent comme des efforts. Décision : c'est acceptable PARCE QUE l'erreur va vers le
+  // bas (allures plus lentes) — ce test le fige : jamais plus haute qu'avec une FC max connue.
+  await test("sans FC max, la VMA estimée n'est jamais plus haute qu'avec une FC max connue (mêmes séances)", async () => {
+    const vmaDe = async (profil: Ligne) => {
+      const t = (await buildAthleteContext(fauxClient({ profiles: [profil], performance_baselines: [], workouts: SEANCES_CALMES, notifications: [] }), "u")).text;
+      const m = t.match(/- VMA : ([\d.]+) km\/h ⚠️ ESTIMÉE/);
+      assert.ok(m, `précondition : VMA estimée absente (${profil.age})`);
+      return Number(m![1]);
+    };
+    const sans = await vmaDe({ ...PROFIL, age: null }), avec = await vmaDe({ ...PROFIL, age: 30 });
+    console.log(`      (VMA estimée : ${sans} sans FC max, ${avec} avec 220 − 30)`);
+    assert.ok(sans <= avec, `sans FC max, la VMA estimée MONTE (${sans} > ${avec}) : allures plus rapides sur une donnée manquante`);
+  });
+
   await test("le code : sans source, `fcMaxEst` vaut null (plus de « : 190 »)", () => {
     const src = codeNu("src/lib/ai/coachContext.ts");
     assert.match(src, /: fcMaxSource === "age" \? 220 - \(ageConnu as number\) : null;/, "le repli de FC max n'est plus null");
