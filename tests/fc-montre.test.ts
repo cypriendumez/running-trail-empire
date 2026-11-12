@@ -388,6 +388,9 @@ test("les lectures de séances de la VMA lisent leur erreur (une panne ne fait p
   assert.match(code("src/app/dashboard/layout.tsx"), /\{ data: seancesVma, error: eSeancesVma \}, \{ data: testVma, error: eTestVma \}[\s\S]{0,1600}if \(eSeancesVma \|\| eTestVma\) console\.error/, "en-tête : la panne des séances de la VMA n'est plus lue");
   for (const f of ["src/app/dashboard/shop/page.tsx", "src/app/dashboard/shop/[slug]/page.tsx"])
     assert.match(code(f), /if \(seancesRes\.error\) console\.error\(/, `${f} : la panne des séances n'est plus lue`);
+  assert.match(code("src/app/dashboard/jour-j/page.tsx"), /if \(seancesRes\.error\) await journaliserEchec\(/, "Jour J : la panne des séances n'est plus lue");
+  assert.match(code("src/app/dashboard/plans/page.tsx"), /\[woRes, baseRes, profRes\]\.map\(\(r\) => estUnePanne\(r\) \? r\.error : null\)[\s\S]{0,80}if \(ePanne\) console\.error/, "Plans : la panne des lectures n'est plus lue");
+  assert.match(code("src/app/dashboard/profile/page.tsx"), /const ePanneProfil = eRecentWk \?\? eProfil \?\? \(eBaseline && eBaseline\.code !== "PGRST116" \? eBaseline : null\);\s*if \(ePanneProfil\) console\.error/, "Profil : la panne des lectures n'est plus lue");
 });
 
 test("UN seul calcul de « meilleur effort » dans tout src/ : `effortDesSeances` (12/11/2026)", () => {

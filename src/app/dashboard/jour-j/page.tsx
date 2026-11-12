@@ -59,6 +59,8 @@ export default async function PageJourJ() {
   const objectif = objectifEnCours(objRes.data?.data as Obj | null, jour);
   if (!objectif || !(Number(objectif.distanceKm) > 0) || !(Number(objectif.targetSeconds) > 0)) return <SansObjectifJourJ t={t} />;
 
+  // Une panne n'est pas « aucune séance » (12/11/2026) : VMA, prédiction et pente reposent dessus.
+  if (seancesRes.error) await journaliserEchec(null, { source: "jour-j", message: `séances illisibles : ${seancesRes.error.message}`, userId: user.id });
   const seances = (seancesRes.data ?? []) as unknown as { date: string; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; max_hr?: number | null }[];
   const joursRestants = ecartJours(jour, objectif.raceDate);
   // L'amélioration d'ici la course : la pente MESURÉE de l'athlète, comme le coach.

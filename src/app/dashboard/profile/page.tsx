@@ -20,13 +20,13 @@ export default async function ProfilePage() {
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
   const [
-    { data: profile },
-    { data: baseline },
+    { data: profile, error: eProfil },
+    { data: baseline, error: eBaseline },
     { data: shoes },
     { data: workoutsYear },
     { data: workoutsMonth },
     { data: goals },
-    { data: recentWk },
+    { data: recentWk, error: eRecentWk },
     { data: ligneAbo },
     fcMaxCommune,
   ] = await Promise.all([
@@ -45,6 +45,10 @@ export default async function ProfilePage() {
     fcMaxDeLAthlete(supabase, user!.id),
   ]);
 
+  // Une panne n'est pas « aucune donnée » (12/11/2026) : la VMA et les zones retomberaient en silence.
+  // « Aucun test » (PGRST116 d'un `.single()` sans ligne) n'est pas une panne.
+  const ePanneProfil = eRecentWk ?? eProfil ?? (eBaseline && eBaseline.code !== "PGRST116" ? eBaseline : null);
+  if (ePanneProfil) console.error("[profil] lecture illisible :", ePanneProfil.message);
   // VMA estimée depuis les meilleurs efforts SOUTENUS (FC élevée) + FC max observée.
   const rw = (recentWk ?? []) as { date?: string; weather_temp_c?: number | null; distance_km?: number | null; duration_seconds?: number | null; type?: string | null; sport?: string | null; avg_hr?: number | null; max_hr?: number | null }[];
   // Les ZONES affichées, elles, ne prennent qu'une vraie FC max : la commune ; sans elle, pas de
