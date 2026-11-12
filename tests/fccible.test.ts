@@ -33,7 +33,7 @@ function codeOf(path: string): string {
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
 }
 /** Le cas réel qui a déclenché tout ça. */
-const REEL = { maxObservee: 212, repos: 63, seuil: 192, age: 20 };
+const REEL = { maxObservee: 212, repos: 63, seuil: 192 };
 
 console.log("\nLA RÉFÉRENCE — une mesure passe avant toute formule");
 
@@ -45,16 +45,18 @@ test("la FC max mesurée l'emporte sur l'âge", () => {
 
 test("un capteur qui décroche n'est pas un record", () => {
   // Une FC max « observée » sous 150 est un artefact, pas une performance.
-  const r = referencesFc({ maxObservee: 120, seuil: 192, age: 20 });
+  const r = referencesFc({ maxObservee: 120, seuil: 192 });
   assert.notEqual(r.max, 120);
   assert.equal(r.source, "seuil", "on retombe sur le seuil, qui reste une MESURE");
   assert.equal(r.max, Math.round(192 / 0.92));
 });
 
-test("l'âge n'est qu'un dernier recours", () => {
-  const r = referencesFc({ age: 20 });
-  assert.equal(r.max, 200);
-  assert.equal(r.source, "age");
+test("l'âge ne donne JAMAIS de FC max (Cyprien, 12/11/2026 : « la refuser partout »)", () => {
+  // 220 − âge se trompe de 10 à 12 bpm pour un individu. Un appelant qui passerait encore un âge
+  // n'obtient rien : la FC max reste inconnue, et c'est dit.
+  const r = referencesFc({ age: 20 } as Parameters<typeof referencesFc>[0]);
+  assert.equal(r.max, null, "une FC max est tirée de l'âge");
+  assert.equal(r.source, "aucune");
 });
 
 test("sans rien, on ne prétend rien", () => {

@@ -12,6 +12,7 @@ import { computeLoad } from "@/lib/dashboard/charge";
 import { decaleJour } from "@/lib/streak/compute";
 import { intervallesDeSeance, fluxDeSeance } from "@/lib/intervals/performance";
 import { identifiantsDe, type ProfilIdentifiants } from "@/lib/intervals/identifiants";
+import { fcMaxConnue } from "@/lib/coach/fcCible";
 import { getAccountLang } from "@/lib/i18n/serverLang";
 import { journaliserEchec } from "@/lib/journal/echecServeur";
 import { pausesDeTrace, pointsStockes, vitesseEnMouvement } from "@/lib/activities/pauses";
@@ -104,8 +105,8 @@ export async function POST(req: Request) {
   const [profilRes, baseRes, compRes, prescritRes, objRes] = await Promise.all([
     // Les identifiants intervals.icu servent à relire les intervalles (analyse complète) ;
     // ils restent ici, côté serveur, et ne repartent jamais vers le navigateur.
-    supabase.from("profiles").select("age, intervals_athlete_id, intervals_api_key").eq("id", user.id).maybeSingle(),
-    supabase.from("performance_baselines").select("max_hr").eq("user_id", user.id)
+    supabase.from("profiles").select("max_hr, garmin_metrics, intervals_athlete_id, intervals_api_key").eq("id", user.id).maybeSingle(),
+    supabase.from("performance_baselines").select("max_hr,lt_hr").eq("user_id", user.id)
       .order("tested_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("workouts").select("date,distance_km,duration_seconds,avg_pace_min_km,gap_min_km,avg_hr,max_hr")
       .eq("user_id", user.id).eq("sport", s.sport ?? "run").neq("id", workoutId)
@@ -125,15 +126,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Analyse momentanément indisponible, réessaie dans un moment." }, { status: 503 });
   }
   const comparables = (compRes.data ?? []) as unknown as SeanceBrute[];
-  // ⚠️ MÊME SOURCE DE FC MAX QUE LE COACH : mesure de référence, sinon le maximum
-  // réellement observé, sinon la formule d'âge. Deux sources divergentes donneraient deux
-  // verdicts d'intensité pour la même séance selon l'écran.
+  // ⚠️ LA MÊME FC MAX QUE LE COACH, Jour J et le bilan (`fcMaxConnue`, 12/11/2026) : la plus haute
+  // entre la déclarée (test, profil, sinon montre) et le pic réellement observé (> 150), sinon le
+  // seuil mesuré ÷ 0,92 — et PLUS JAMAIS 220 − âge (Cyprien : « la refuser partout »). Sans FC
+  // max, l'intensité de la séance n'est pas jugée sur un chiffre inventé.
   const obsMax = Math.max(0, ...comparables.map((w) => Number(w.max_hr) || 0), Number(s.max_hr) || 0);
-  const age = Number((profilRes.data as { age?: number | null } | null)?.age);
-  const fcMax = Number((baseRes.data as { max_hr?: number | null } | null)?.max_hr)
-    || (obsMax > 150 ? obsMax : 0)
-    || (Number.isFinite(age) && age > 0 ? 220 - age : 0)
-    || null;
+  const baseFc = baseRes.data as { max_hr?: number | null; lt_hr?: number | null } | null;
+  const profFc = profilRes.data as { max_hr?: number | null; garmin_metrics?: Record<string, unknown> | null } | null;
+  const fcMax = fcMaxConnue({
+    declaree: Number(baseFc?.max_hr) || Number(profFc?.max_hr) || null, montre: profFc?.garmin_metrics?.maxHR,
+    observee: obsMax, seuil: Number(profFc?.garmin_metrics?.lthr) || Number(baseFc?.lt_hr) || null,
+  }).max;
 
   const p = prescritRes.data?.[0] as { title?: string; body?: string; data?: { sessionType?: string; subtitle?: string } } | undefined;
   // ── Les intervalles, pour l'analyse COMPLÈTE seulement : un appel à intervals.icu de plus,

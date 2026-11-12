@@ -1,7 +1,7 @@
 import type { createClient } from "@/lib/supabase/server";
 import { sansAllureInconnue } from "@/lib/coach/allureInconnue";
 import { picsSaison, avecSaison } from "@/lib/coach/ciblesFcServeur";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, airFroid, PIC_FC_JOURS, type CiblesFc } from "@/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, fcMaxConnue, airFroid, PIC_FC_JOURS, type CiblesFc } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { menuSelonDenivele, preferenceDenivele } from "@/lib/coach/denivele";
@@ -657,24 +657,19 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     num((fcMaxRes.data as { max_hr?: number } | null)?.max_hr) ?? 0);
   // FC max DE RÉFÉRENCE : celle du test (baseline) d'abord, sinon celle saisie à l'inscription,
   // sinon celle de la MONTRE (réglage intervals.icu porté par ses séances Garmin, 07/11/2026).
-  const maxHrDeclare = maxDeReference(num(b?.max_hr) ?? num(p?.max_hr),
-    (((p as Record<string, unknown> | null)?.garmin_metrics) as Record<string, unknown> | null)?.maxHR);
-  // ⚠️ JAMAIS SOUS UNE VALEUR RÉELLEMENT ATTEINTE. Une FC max déclarée à 190 alors que la
-  // montre a enregistré 205 est fausse par construction — on ne peut pas avoir un maximum
-  // inférieur à un battement qu'on a réellement produit. On retient donc la plus haute des
-  // deux, et on ne retombe sur l'âge que si l'athlète n'a NI déclaré NI couru.
-  // ⚠️ SANS DÉCLARATION, SANS MESURE ET SANS ÂGE : `null`, PLUS 190 (12/11/2026). Le repli à 190
-  // estimait la VMA depuis les séances, classait les efforts « durs » et partait à l'IA sous la
-  // forme « ~190 (obs.) » — un chiffre inventé présenté comme observé. Le null est GARDÉ
-  // explicitement là où il dégraderait le plan : relecture d'exécution et pente (plus bas).
-  // ⚠️ JAMAIS UNE FC MOYENNE EN GUISE DE FC MAX (relecture du 12/11/2026) : essayé comme
-  // « plancher » quand `max_hr` manque, il faisait d'un footing à 155 bpm un effort à 100 %
-  // « Intense », y compris avec l'âge connu. Sans FC max, la séance est jugée sur son TYPE.
-  const ageConnu = num(p?.age);
-  const fcMaxSource: "mesures" | "age" | null = (maxHrDeclare != null || obsMaxHr0 > 150) ? "mesures" : ageConnu != null ? "age" : null;
-  const fcMaxEst: number | null = fcMaxSource === "mesures"
-    ? Math.max(maxHrDeclare ?? 0, obsMaxHr0 > 150 ? obsMaxHr0 : 0)
-    : fcMaxSource === "age" ? 220 - (ageConnu as number) : null;
+  const gmFc = ((p as Record<string, unknown> | null)?.garmin_metrics ?? null) as Record<string, unknown> | null;
+  const maxHrDeclare = maxDeReference(num(b?.max_hr) ?? num(p?.max_hr), gmFc?.maxHR);
+  // ⚠️ LA FC MAX : UNE SEULE DÉFINITION, `fcMaxConnue` (lib/coach/fcCible, 12/11/2026), la même
+  // pour le classement des séances, la VMA estimée, les zones, la discipline des footings, Jour J,
+  // le bilan, le Ghost Runner et la montre. Jamais sous un battement réellement atteint (la plus
+  // haute entre déclarée et pic > 150), sinon le seuil mesuré ÷ 0,92, sinon `null` :
+  //  · PLUS 190 (12/11/2026) — il partait à l'IA comme « ~190 (obs.) » ;
+  //  · PLUS 220 − ÂGE (Cyprien, 12/11/2026 : « la refuser partout ») ;
+  //  · jamais une FC MOYENNE (un footing à 155 bpm devenait un effort à 100 %).
+  // Sans FC max : séances jugées sur leur TYPE, ni relecture d'exécution ni pente (plus bas).
+  const fcMaxRef = fcMaxConnue({ declaree: maxHrDeclare, observee: obsMaxHr0, seuil: num(gmFc?.lthr) ?? num(b?.lt_hr) });
+  const fcMaxSource = fcMaxRef.source;
+  const fcMaxEst: number | null = fcMaxRef.max;
   // ── LES CIBLES DE FC MESURÉES (07/11/2026) ─────────────────────────────────
   // FC max réellement atteinte ou déclarée, FC de repos déclarée sinon celle de la montre,
   // seuil mesuré. Les footings récents (≥ 20 min, 60 jours) servent à suivre l'athlète
@@ -954,12 +949,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // ⚠️ MÊME RÈGLE QU'EN HAUT (fcMaxEst) : la plus haute entre ce qui est DÉCLARÉ et ce qui
   // a été RÉELLEMENT enregistré. Prendre la déclaration seule faisait calculer toutes les
   // zones sous la réalité pour qui s'est sous-estimé à l'inscription.
-  const maxHrEff = (maxHr != null || obsMaxHr0 > 150)
-    ? Math.max(maxHr ?? 0, obsMaxHr0 > 150 ? obsMaxHr0 : 0)
-    // Le seuil vaut ~92 % de la FC max chez un athlète entraîné : bien meilleur repli
-    // que l'âge (ici 209 déduit contre 209 réellement observés).
-    : (lthrMeasured != null && lthrMeasured > 120 ? Math.round(lthrMeasured / 0.92) : null)
-    ?? (num(p?.age) ? 220 - num(p!.age)! : null);
+  // 12/11/2026 : la MÊME valeur que `fcMaxEst` (fcMaxConnue) — plus de repli sur l'âge.
+  const maxHrEff = fcMaxEst;
   const restHrEff = restHr ?? num(gm?.restingHR) ?? null;
   const hrZone = (lo: number, hi: number) => {
     // Zone de seuil : ancrée sur la mesure, pas sur un pourcentage d'un maximum.
@@ -1212,10 +1203,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const predictions = vma ? `5K ~${predict(5, 93)} · 10K ~${predict(10, 90)} · semi ~${predict(21.1, 85)} · marathon ~${predict(42.2, 80)}` : null;
 
   // ── BOUCLE ADAPTATIVE — prescrit (séances coach) vs réalisé (workouts) ──
-  // FC de repli si pas de baseline : FC max observée en séance, sinon estimée par l'âge.
-  const obsMaxHr = Math.max(0, ...workouts.map(w => num(w.max_hr) ?? 0));
-  const ageNum = num(p?.age);
-  const fcMax = maxHr ?? (obsMaxHr > 120 ? obsMaxHr : null) ?? (ageNum ? 220 - ageNum : null);
+  // 12/11/2026 : la MÊME FC max que partout (fcMaxConnue). C'était `maxHr ?? observée > 120 ?? âge` :
+  // une déclarée inférieure au pic réel l'emportait, et l'âge servait encore de repli.
+  const fcMax = fcMaxEst;
   // ⚠️ PLUS DE FC DE REPOS INVENTÉE (c'était `restHr ?? 55`) : sans FC de repos déclarée ni
   // mesurée par la montre, le plafond de Karvonen n'a pas de base, et on le dit (« n/c »).
   const fcRest = restHrEff;
@@ -2517,7 +2507,7 @@ ${elev ? `- ${elev.rule}` : ""}
 ${tempRule ? `- MÉTÉO AUJOURD'HUI : ${tempRule}` : ""}${hotDays.length ? `\n- 🔥 CHALEUR ANNONCÉE : ${hotDays.slice(0, 4).map(f => `${f.date.slice(8)}/${f.date.slice(5, 7)} ${Math.round(f.tempMax)}°C`).join(" · ")} → déplace les séances de qualité de ces jours-là tôt le matin, ou échange-les avec un jour plus frais de la semaine. Prévois-le MAINTENANT, pas la veille.` : ""}
 
 CAPACITÉS (tests)
-- VMA : ${vma ?? "?"} km/h${vmaIsEst ? ` ⚠️ ESTIMÉE depuis ses séances (aucun test VMA enregistré) → recommande-lui un test VMA pour affiner, et reste un cran prudent sur la 1re séance VMA` : ""} · FC max ${maxHr ?? (vmaIsEst && fcMaxEst ? `~${fcMaxEst} (${fcMaxSource === "age" ? "formule de l'âge, pas une mesure" : "obs."})` : "?")} · FC repos ${restHr ?? "?"} · FC seuil ${ltHr ?? "?"}
+- VMA : ${vma ?? "?"} km/h${vmaIsEst ? ` ⚠️ ESTIMÉE depuis ses séances (aucun test VMA enregistré) → recommande-lui un test VMA pour affiner, et reste un cran prudent sur la 1re séance VMA` : ""} · FC max ${maxHr ?? (vmaIsEst && fcMaxEst ? `~${fcMaxEst} (${fcMaxSource === "seuil" ? "déduite du seuil mesuré" : "obs."})` : "?")} · FC repos ${restHr ?? "?"} · FC seuil ${ltHr ?? "?"}
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}

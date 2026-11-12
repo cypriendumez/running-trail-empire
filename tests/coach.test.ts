@@ -5663,11 +5663,13 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // avoir un maximum inférieur à un battement réellement produit. Les deux chaînes (celle
     // qui classe l'effort, celle qui calcule les zones) retiennent donc la plus haute.
     const src = codeOf("src/lib/ai/coachContext.ts");
-    // 12/11/2026 : la condition est passée dans `fcMaxSource` (plus de repli à 190).
-    assert.ok(/const fcMaxSource[^\n]*= \(maxHrDeclare != null \|\| obsMaxHr0 > 150\) \? "mesures"[\s\S]{0,200}?const fcMaxEst[^\n]*= fcMaxSource === "mesures"\s*\? Math\.max\(maxHrDeclare \?\? 0, obsMaxHr0 > 150 \? obsMaxHr0 : 0\)/.test(src),
-      "fcMaxEst retient la FC déclarée même si une FC plus haute a été enregistrée");
-    assert.ok(/const maxHrEff = \(maxHr != null \|\| obsMaxHr0 > 150\)[\s\S]{0,120}?Math\.max\(maxHr/.test(src),
-      "maxHrEff retient la FC déclarée même si une FC plus haute a été enregistrée");
+    // 12/11/2026 : la règle vit dans `fcMaxConnue` (lib/coach/fcCible, prouvée par tests/fc-montre
+    // et tests/fccible) ; ici, le coach lui passe BIEN la déclarée ET le pic observé, et les zones
+    // comme la discipline des footings lisent la MÊME valeur.
+    assert.ok(/const fcMaxRef = fcMaxConnue\(\{ declaree: maxHrDeclare, observee: obsMaxHr0, seuil: [^}]*\}\);[\s\S]{0,120}?const fcMaxEst: number \| null = fcMaxRef\.max;/.test(src),
+      "fcMaxEst ne passe plus par fcMaxConnue avec la déclarée et le pic observé");
+    assert.ok(/const maxHrEff = fcMaxEst;/.test(src), "les zones ont de nouveau leur propre FC max");
+    assert.ok(/const fcMax = fcMaxEst;/.test(src), "la discipline des footings a de nouveau sa propre FC max");
     // La FC déclarée au PROFIL (migration 029) doit être lue, sinon le champ de l'inscription
     // est un champ qui jette ce qu'on lui donne.
     // 07/11/2026 : la montre (réglage intervals.icu) sert de repli via `maxDeReference`.

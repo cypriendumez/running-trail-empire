@@ -118,16 +118,20 @@ async function main() {
     return ctx.text.match(/- VMA : [^\n]*/)?.[0] ?? "(ligne absente)";
   };
 
-  await test("sans âge, sans FC déclarée ni mesurée : « FC max ? », jamais un chiffre présenté comme observé", async () => {
-    const l = await ligneFc({ ...PROFIL, age: null });
-    assert.match(l, /ESTIMÉE/, `précondition : la VMA doit être estimée depuis les séances (${l})`);
-    assert.match(l, /FC max \? ·/, `une FC max est inventée : ${l}`);
-    assert.doesNotMatch(l, /\b190\b|\(obs\.\)/, `une FC max inventée passe pour observée : ${l}`);
+  // 12/11/2026 (Cyprien : « refuser 220 − âge partout ») : l'âge ne donne plus de FC max non plus.
+  await test("sans FC déclarée ni mesurée, âge connu ou non : « FC max ? », jamais un chiffre inventé", async () => {
+    for (const age of [null, 30]) {
+      const l = await ligneFc({ ...PROFIL, age });
+      assert.match(l, /ESTIMÉE/, `précondition (âge ${age}) : la VMA doit être estimée depuis les séances (${l})`);
+      assert.match(l, /FC max \? ·/, `âge ${age} : une FC max est inventée : ${l}`);
+      assert.doesNotMatch(l, /\b190\b|\(obs\.\)|formule/, `âge ${age} : une FC max inventée passe pour mesurée : ${l}`);
+    }
   });
 
-  await test("avec l'âge seul : 220 − âge, dit comme une formule et non comme une mesure", async () => {
-    const l = await ligneFc({ ...PROFIL, age: 30 });
-    assert.match(l, /FC max ~190 \(formule de l'âge, pas une mesure\)/, l);
+  await test("seuil mesuré seul : FC max = seuil ÷ 0,92, dite « déduite du seuil mesuré »", async () => {
+    // Le seuil vaut ~92 % de la FC max : un repli adossé à une MESURE (montre), pas une formule.
+    const l = await ligneFc({ ...PROFIL, age: 30, garmin_metrics: { lthr: 175 } });
+    assert.match(l, /FC max ~190 \(déduite du seuil mesuré\)/, l);
   });
 
   // Relecture du 12/11 : sans FC max, deux filtres « sorties faciles » ne filtraient plus rien.
@@ -144,8 +148,8 @@ async function main() {
     const sans = await texte({ ...PROFIL, age: null });
     assert.doesNotMatch(sans, /RELECTURE DE L'EXÉCUTION/, "la relecture tourne sans FC max : elle mêle séances dures et faciles");
     assert.doesNotMatch(sans, /PENTE RÉELLE DE L'ATHLÈTE \(mesurée/, "une pente est mesurée sans pouvoir trier les sorties faciles");
-    // Contre-épreuve : avec l'âge, les mêmes séances donnent bien une relecture et une pente.
-    const avec = await texte({ ...PROFIL, age: 30 });
+    // Contre-épreuve : avec une FC max DÉCLARÉE, les mêmes séances donnent bien une relecture et une pente.
+    const avec = await texte({ ...PROFIL, age: null, max_hr: 190 });
     assert.match(avec, /RELECTURE DE L'EXÉCUTION/, "précondition : ces séances doivent produire une relecture");
     assert.match(avec, /PENTE RÉELLE DE L'ATHLÈTE \(mesurée/, "précondition : ces séances doivent produire une pente");
   });
@@ -172,19 +176,23 @@ async function main() {
       const vmaDe = async (profil: Ligne) => {
         const t = (await buildAthleteContext(fauxClient({ profiles: [profil], performance_baselines: [], workouts: [...seances], notifications: [] }), "u")).text;
         const m = t.match(/- VMA : ([\d.]+) km\/h ⚠️ ESTIMÉE/);
-        assert.ok(m, `précondition (${nom}) : VMA estimée absente (âge ${profil.age})`);
+        assert.ok(m, `précondition (${nom}) : VMA estimée absente (FC max ${profil.max_hr ?? "inconnue"})`);
         return Number(m![1]);
       };
-      const sans = await vmaDe({ ...PROFIL, age: null }), avec = await vmaDe({ ...PROFIL, age: 30 });
-      console.log(`      (${nom} : VMA estimée ${sans} sans FC max, ${avec} avec 220 − 30)`);
+      const sans = await vmaDe({ ...PROFIL, age: 30 }), avec = await vmaDe({ ...PROFIL, age: 30, max_hr: 190 });
+      console.log(`      (${nom} : VMA estimée ${sans} sans FC max, ${avec} avec une FC max déclarée à 190)`);
       assert.ok(sans <= avec, `${nom} : sans FC max, la VMA estimée MONTE (${sans} > ${avec}) : allures plus rapides sur une donnée manquante`);
     }
   });
 
-  await test("le code : sans source, `fcMaxEst` vaut null (plus de « : 190 »)", () => {
-    const src = codeNu("src/lib/ai/coachContext.ts");
-    assert.match(src, /: fcMaxSource === "age" \? 220 - \(ageConnu as number\) : null;/, "le repli de FC max n'est plus null");
-    assert.doesNotMatch(src, /:\s*190\s*\)?;/, "un repli « : 190 » est de retour dans le coach");
+  await test("le code : ni « : 190 » ni « 220 − âge » nulle part où une FC max se calcule", () => {
+    for (const f of ["src/lib/ai/coachContext.ts", "src/lib/coach/fcCible.ts", "src/app/dashboard/jour-j/page.tsx",
+      "src/lib/ai/bilanDonnees.ts", "src/app/api/ai/analyse-seance/route.ts", "src/components/ghost-runner/GhostRunner.tsx"]) {
+      const src = codeNu(f);
+      assert.doesNotMatch(src, /:\s*190\s*\)?;/, `${f} : un repli « : 190 » est de retour`);
+      assert.doesNotMatch(src, /220\s*-\s*[\w(]/, `${f} : 220 − âge est de retour`);
+    }
+    assert.doesNotMatch(codeNu("src/lib/coach/fcCible.ts"), /e\.age\b/, "referencesFc relit l'âge");
   });
 
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

@@ -17,6 +17,7 @@ import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { predictRaceSec } from "@/lib/running/fitness";
 import { socleDesSeances } from "@/lib/dashboard/forme";
 import { serieVfc, COLONNES_VFC } from "@/lib/health/vfc";
+import { fcMaxConnue, picFcObserve } from "@/lib/coach/fcCible";
 
 /** La ligne où le bilan rédigé est mémorisé (une par athlète, avec l'empreinte de ses faits). */
 export const TYPE_BILAN = "ai_bilan";
@@ -34,8 +35,8 @@ export async function faitsDeLaSemaine(sb: SupabaseClient, userId: string, jour:
     sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).gte("date", decaleJour(jour, -34)).lte("date", jour),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "race_objective").maybeSingle(),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "auto_coach_state").maybeSingle(),
-    sb.from("performance_baselines").select("vma_kmh,max_hr,tested_at").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
-    sb.from("profiles").select("garmin_vo2max,pace_curve").eq("id", userId).maybeSingle(),
+    sb.from("performance_baselines").select("vma_kmh,max_hr,lt_hr,tested_at").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
+    sb.from("profiles").select("garmin_vo2max,pace_curve,max_hr,garmin_metrics").eq("id", userId).maybeSingle(),
   ]);
   if (seancesRes.error) {
     console.error("[bilan] séances illisibles :", seancesRes.error.message);
@@ -53,8 +54,17 @@ export async function faitsDeLaSemaine(sb: SupabaseClient, userId: string, jour:
   const objBrut = objRes.data?.data as (Course & { targetSeconds?: number; precedente?: Course | null }) | null;
   const objectif = objectifEnCours(objBrut as { race: string; raceDate: string; distanceKm: number; targetSeconds: number } | null, jour);
   const recup = (etatRes.data?.data as { recuperation?: { course?: string; reprise?: string } | null } | null)?.recuperation;
-  const fcObservee = Math.max(0, ...seances.map((s) => Number(s.max_hr) || 0));
-  const fcMax = Number((baseRes.data as { max_hr?: number | null } | null)?.max_hr) || (fcObservee > 120 ? fcObservee : null);
+  // ⚠️ LA MÊME FC MAX QUE LE COACH (`fcMaxConnue`, lib/coach/fcCible, 12/11/2026) : la plus haute
+  // entre la déclarée (test, profil, sinon montre) et le pic réellement atteint (> 150), sinon le
+  // seuil mesuré ÷ 0,92, sinon inconnue — jamais l'âge. C'était « test, sinon pic > 120 » : un
+  // coureur lisait une pente ici et une autre (ou aucune) côté coach.
+  const base = baseRes.data as { max_hr?: number | null; lt_hr?: number | null } | null;
+  const prof = profilRes.data as { max_hr?: number | null; garmin_metrics?: Record<string, unknown> | null } | null;
+  const gm = prof?.garmin_metrics ?? null;
+  const fcMax = fcMaxConnue({
+    declaree: Number(base?.max_hr) || Number(prof?.max_hr) || null, montre: gm?.maxHR,
+    observee: picFcObserve(seances, jour), seuil: Number(gm?.lthr) || Number(base?.lt_hr) || null,
+  }).max;
 
   return faitsDuBilan({
     aujourdhui: jour,

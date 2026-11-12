@@ -11,6 +11,7 @@ import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { socleDesSeances } from "@/lib/dashboard/forme";
 import { efficaciteParBloc, tendanceEfficacite, ameliorationAttendue } from "@/lib/running/progression";
+import { fcMaxConnue, picFcObserve } from "@/lib/coach/fcCible";
 import { isRun } from "@/lib/intervals/sport";
 import { forecastWithElevation } from "@/lib/weather/openMeteo";
 import { packJourJ } from "@/lib/coach/jourJ";
@@ -37,7 +38,7 @@ export default async function PageJourJ() {
   if (!user) redirect("/login");
 
   const { data: profil } = await sb.from("profiles")
-    .select(`${COLONNES_ACCES}, preferred_language, weight_kg, garmin_vo2max, pace_curve, last_lat, last_lon`)
+    .select(`${COLONNES_ACCES}, preferred_language, weight_kg, garmin_vo2max, pace_curve, last_lat, last_lon, max_hr, garmin_metrics`)
     .eq("id", user.id).maybeSingle();
   const p = profil as Record<string, unknown> | null;
   const lang = normLang(String(p?.preferred_language ?? "fr"));
@@ -48,7 +49,7 @@ export default async function PageJourJ() {
   const [objRes, seancesRes, baseRes] = await Promise.all([
     sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
     sb.from("workouts").select(COLS).eq("user_id", user.id).gte("date", decaleJour(jour, -182)).order("date", { ascending: false }),
-    sb.from("performance_baselines").select("vma_kmh,max_hr,tested_at").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
+    sb.from("performance_baselines").select("vma_kmh,max_hr,lt_hr,tested_at").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   type Obj = { race: string; raceDate: string; distanceKm: number; targetSeconds: number; officielle?: boolean };
   const objectif = objectifEnCours(objRes.data?.data as Obj | null, jour);
@@ -63,8 +64,16 @@ export default async function PageJourJ() {
   });
   const joursRestants = ecartJours(jour, objectif.raceDate);
   // L'amélioration d'ici la course : la pente MESURÉE de l'athlète, comme le coach.
-  const fcObservee = Math.max(0, ...seances.map((s) => Number(s.max_hr) || 0));
-  const fcMax = Number((baseRes.data as { max_hr?: number | null } | null)?.max_hr) || (fcObservee > 120 ? fcObservee : null);
+  // ⚠️ LA MÊME FC MAX QUE LE COACH (`fcMaxConnue`, lib/coach/fcCible, 12/11/2026) : la plus haute
+  // entre la déclarée (test, profil, sinon montre) et le pic réellement atteint (> 150), sinon le
+  // seuil mesuré ÷ 0,92, sinon inconnue — jamais l'âge. C'était « test, sinon pic > 120 » : un
+  // coureur lisait une pente ici et une autre (ou aucune) côté coach.
+  const base = baseRes.data as { max_hr?: number | null; lt_hr?: number | null } | null;
+  const gm = (p?.garmin_metrics ?? null) as Record<string, unknown> | null;
+  const fcMax = fcMaxConnue({
+    declaree: Number(base?.max_hr) || Number(p?.max_hr) || null, montre: gm?.maxHR,
+    observee: picFcObserve(seances, jour), seuil: Number(gm?.lthr) || Number(base?.lt_hr) || null,
+  }).max;
   const tendance = tendanceEfficacite(efficaciteParBloc(seances.filter((s) => isRun(s.sport)), fcMax, Date.parse(`${jour}T12:00:00Z`)));
 
   // La course dans le catalogue — nom ET date exacts, sinon rien n'est supposé.

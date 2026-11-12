@@ -145,7 +145,8 @@ test("le chronotype a disparu du questionnaire et de la consigne de l'IA", () =>
 
 test("Ghost Runner lit la FC max déclarée à l'inscription", () => {
   const src = code("src/components/ghost-runner/GhostRunner.tsx");
-  assert.ok(/maxDeclaree: baseline\?\.max_hr \?\? \(profile as unknown as \{ max_hr\?: number \} \| null\)\?\.max_hr/.test(src),
+  // 12/11/2026 : enveloppée dans `maxDeReference` (la montre en repli), sans changer l'ordre test → profil.
+  assert.ok(/maxDeclaree: maxDeReference\(baseline\?\.max_hr \?\? \(profile as unknown as \{ max_hr\?: number \} \| null\)\?\.max_hr/.test(src),
     "Ghost Runner ignore la FC max déclarée au profil");
 });
 

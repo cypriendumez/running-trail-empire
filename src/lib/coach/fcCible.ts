@@ -30,7 +30,7 @@ export type ReferencesFc = {
   repos: number | null;
   /** Seuil mesuré (LTHR). Absent chez la plupart des montres. */
   seuil: number | null;
-  source: "mesures" | "seuil" | "age" | "aucune";
+  source: "mesures" | "seuil" | "aucune";
 };
 
 export type PlageFc = { lo: number; hi: number };
@@ -61,7 +61,7 @@ const nb = (v: unknown): number | null =>
 const dans = (v: unknown, lo: number, hi: number): number | null => { const n = nb(v); return n != null && n >= lo && n <= hi ? n : null; };
 
 export function referencesFc(e: {
-  maxDeclaree?: unknown; maxObservee?: unknown; repos?: unknown; seuil?: unknown; age?: unknown;
+  maxDeclaree?: unknown; maxObservee?: unknown; repos?: unknown; seuil?: unknown;
 }): ReferencesFc {
   const seuil = dans(e.seuil, 100, 230);
   const declaree = dans(e.maxDeclaree, 100, 240);
@@ -79,9 +79,35 @@ export function referencesFc(e: {
   // Le seuil vaut ~92 % de la FC max chez un athlète entraîné : bien meilleur repli
   // que l'âge, et il reste adossé à une mesure.
   if (seuil != null && seuil > 120) return { max: Math.round(seuil / 0.92), repos, seuil, source: "seuil" };
-  const age = nb(e.age);
-  if (age != null && age > 5 && age < 100) return { max: 220 - age, repos, seuil, source: "age" };
+  // ⚠️ PLUS JAMAIS 220 − ÂGE (Cyprien, 12/11/2026 : « la refuser partout »). La formule se trompe
+  // de 10 à 12 bpm pour un individu ; le coach l'utilisait, Jour J et le bilan non, et un même
+  // coureur lisait deux projections. Sans mesure, la FC max est INCONNUE, partout.
   return { max: null, repos, seuil, source: "aucune" };
+}
+
+/**
+ * LA FC MAX CONNUE — UNE seule définition pour le coach (classement des séances, VMA estimée,
+ * zones, discipline des footings), Jour J, le bilan de la semaine, le Ghost Runner et la montre.
+ * Avant le 12/11/2026, quatre chaînes : déclarée/observée > 150/âge (coach), observée > 120
+ * (Jour J, bilan, discipline), seuil/âge (zones) — un coureur lisait des chiffres différents
+ * selon l'écran. Ordre : la plus haute entre la DÉCLARÉE (test, profil, sinon montre) et le pic
+ * RÉELLEMENT atteint (> 150), sinon le seuil mesuré ÷ 0,92, sinon `null`.
+ */
+export function fcMaxConnue(e: { declaree?: unknown; montre?: unknown; observee?: unknown; seuil?: unknown }): { max: number | null; source: ReferencesFc["source"] } {
+  const r = referencesFc({ maxDeclaree: maxDeReference(e.declaree, e.montre), maxObservee: e.observee, seuil: e.seuil });
+  return { max: r.max, source: r.source };
+}
+
+/** Le pic de FC réellement atteint sur les {@link PIC_FC_JOURS} jours qui finissent le jour civil `jour`. */
+export function picFcObserve(seances: readonly { date?: string | null; max_hr?: unknown }[], jour: string): number | null {
+  const fin = Date.parse(`${jour}T12:00:00Z`);
+  let pic = 0;
+  for (const s of seances ?? []) {
+    const t = Date.parse(`${String(s.date ?? "").slice(0, 10)}T12:00:00Z`);
+    const v = Number(s.max_hr);
+    if (Number.isFinite(t) && fin - t >= 0 && fin - t <= PIC_FC_JOURS * 86400000 && Number.isFinite(v) && v > pic) pic = v;
+  }
+  return pic > 0 ? pic : null;
 }
 
 /** Milieu de zone, en fraction de réserve cardiaque. Étroit par construction. */

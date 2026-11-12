@@ -11,7 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, airFroid, BAISSE_HIVER_BPM, SEUIL_FROID_C } from "../src/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, airFroid, BAISSE_HIVER_BPM, SEUIL_FROID_C, fcMaxConnue, picFcObserve } from "../src/lib/coach/fcCible";
 import { avecSaison } from "../src/lib/coach/ciblesFcServeur";
 import { stepsForType, parseReps, buildWorkoutDescription } from "../src/lib/watch/intervals";
 
@@ -39,7 +39,8 @@ test("le compte de Cyprien : footing 143-153, récup 133-143, footing « dur » 
 });
 
 test("sans FC max mesurée (âge seul), aucune cible : la montre garde ses zones", () => {
-  assert.equal(ciblesFcAthlete(referencesFc({ age: 22 }), FOOTINGS), null);
+  // 12/11/2026 : l'âge n'est même plus lu — un ancien appelant qui le passerait n'obtient rien.
+  assert.equal(ciblesFcAthlete(referencesFc({ age: 22 } as Parameters<typeof referencesFc>[0]), FOOTINGS), null);
   assert.equal(ciblesFcAthlete(referencesFc({}), FOOTINGS), null);
 });
 
@@ -157,7 +158,7 @@ test("la synchro garde la FC max de la montre ; coach et envois lisent 6 mois et
     assert.match(code(f), /maxHR: Number\(lastRun(Act)?\?\.athlete_max_hr\) \|\| null,/, `${f} ne garde plus la FC max de la montre`);
   const c = code("src/lib/ai/coachContext.ts");
   assert.match(c, /\.not\("max_hr", "is", null\)\.gte\("date", new Date\(Date\.now\(\) - PIC_FC_JOURS \* 86400000\)/, "le coach relit le pic de TOUT l'historique");
-  assert.match(c, /const maxHrDeclare = maxDeReference\(num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\),\s*\(\(\(p as Record<string, unknown> \| null\)\?\.garmin_metrics\) as Record<string, unknown> \| null\)\?\.maxHR\)/, "le coach ignore la FC max de la montre");
+  assert.match(c, /const gmFc = \(\(p as Record<string, unknown> \| null\)\?\.garmin_metrics \?\? null\) as Record<string, unknown> \| null;\s*const maxHrDeclare = maxDeReference\(num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\), gmFc\?\.maxHR\);/, "le coach ignore la FC max de la montre");
   assert.match(c, /\.filter\(w => now - new Date\(String\(w\.date\)\.slice\(0, 10\) \+ "T12:00:00Z"\)\.getTime\(\) <= PIC_FC_JOURS \* 86400000\)/, "les 60 séances lues peuvent remonter au-delà de 6 mois");
   const srv = code("src/lib/coach/ciblesFcServeur.ts");
   assert.match(srv, /\.gte\("date", new Date\(maintenant - PIC_FC_JOURS \* 86400000\)/);
@@ -190,8 +191,8 @@ test("les cibles suivent la saison : en janvier, footing et plafond descendent d
   const hiver = ciblesFcAthlete(avecSaison(REFS, { recent: 200, anDernier: 202 }), FOOTINGS)!;
   assert.ok(hiver.plafondFooting < ete.plafondFooting, `plafond ${hiver.plafondFooting} contre ${ete.plafondFooting}`);
   assert.ok(ete.plafondFooting - hiver.plafondFooting <= 8, "la saison ne doit pas effondrer les zones");
-  // Des pics plus bas que 220 − âge : recaler une estimation d'âge sur eux la ferait passer pour une mesure.
-  assert.equal(avecSaison(referencesFc({ age: 22 }), { recent: 190, anDernier: 185 }).max, 198, "une FC max tirée de l'âge n'est pas recalée sur la saison");
+  // Sans FC max mesurée (l'âge ne compte plus, 12/11/2026), la saison n'en fabrique pas une.
+  assert.equal(avecSaison(referencesFc({ age: 22 } as Parameters<typeof referencesFc>[0]), { recent: 190, anDernier: 185 }).max, null, "la saison invente une FC max");
   assert.equal(avecSaison(REFS, null), REFS, "une lecture ratée garde la référence");
 });
 
@@ -227,7 +228,7 @@ test("−5 bpm pour qui n'a pas d'hiver enregistré, par temps froid ; son effor
   assert.equal(fcMaxSaison(212, 200, 202, true), 202, "avec un hiver enregistré, ce sont SES données qui comptent, pas la baisse");
   assert.equal(fcMaxSaison(null, 190, null, true), null);
   assert.equal(avecSaison(REFS, { recent: null, anDernier: null }, true).max, 207);
-  assert.equal(avecSaison(referencesFc({ age: 22 }), { recent: null, anDernier: null }, true).max, 198, "une FC max tirée de l'âge ne bouge pas");
+  assert.equal(avecSaison(referencesFc({ age: 22 } as Parameters<typeof referencesFc>[0]), { recent: null, anDernier: null }, true).max, null, "l'air froid invente une FC max");
 });
 
 test("le coach et les envois lisent la météo de sa position, avant les cibles de FC", () => {
@@ -260,6 +261,40 @@ test("une FC max de montre plus basse que nos cibles : on garde ses zones plutô
 test("« air froid » : une case vide n'est pas 0 °C", () => {
   assert.equal(airFroid([{ tempMin: "", tempMax: "" }, { tempMin: "", tempMax: "" }, { tempMin: "", tempMax: "" }] as never), false);
   assert.equal(airFroid([{ tempMin: "1", tempMax: "2" }, { tempMin: 1, tempMax: 2 }, { tempMin: 1, tempMax: 2 }] as never), false, "du texte n'est pas une prévision");
+});
+
+test("UNE seule FC max : coach, zones, discipline, Jour J, bilan, analyse de séance et Ghost Runner (12/11/2026)", () => {
+  // Avant : quatre chaînes (déclarée/pic > 150/âge ; test/pic > 120 ; seuil/âge ; test/pic/âge).
+  // Un même coureur lisait une pente côté coach et aucune sur Jour J. Chaque site d'appel passe
+  // désormais par `fcMaxConnue` (ou `maxDeReference` + `referencesFc` côté client), sans l'âge.
+  const sites: [string, RegExp][] = [
+    ["src/lib/ai/coachContext.ts", /fcMaxConnue\(\{ declaree: maxHrDeclare, observee: obsMaxHr0,/],
+    ["src/app/dashboard/jour-j/page.tsx", /fcMaxConnue\(\{\s*declaree: Number\(base\?\.max_hr\) \|\| Number\(p\?\.max_hr\) \|\| null, montre: gm\?\.maxHR,\s*observee: picFcObserve\(seances, jour\)/],
+    ["src/lib/ai/bilanDonnees.ts", /fcMaxConnue\(\{\s*declaree: Number\(base\?\.max_hr\) \|\| Number\(prof\?\.max_hr\) \|\| null, montre: gm\?\.maxHR,\s*observee: picFcObserve\(seances, jour\)/],
+    ["src/app/api/ai/analyse-seance/route.ts", /fcMaxConnue\(\{\s*declaree: Number\(baseFc\?\.max_hr\) \|\| Number\(profFc\?\.max_hr\) \|\| null, montre: profFc\?\.garmin_metrics\?\.maxHR,/],
+    ["src/components/ghost-runner/GhostRunner.tsx", /maxDeclaree: maxDeReference\([^\n]*, gm\?\.maxHR\),/],
+  ];
+  for (const [f, re] of sites) assert.match(code(f), re, `${f} : la FC max ne passe plus par la définition commune`);
+  // Les sélections lisent bien ce que la définition commune consomme.
+  assert.match(code("src/lib/ai/bilanDonnees.ts"), /select\("garmin_vo2max,pace_curve,max_hr,garmin_metrics"\)/, "le bilan ne lit plus la FC max du profil ni de la montre");
+  assert.match(code("src/lib/ai/bilanDonnees.ts"), /select\("vma_kmh,max_hr,lt_hr,tested_at"\)/, "le bilan ne lit plus le seuil mesuré");
+  assert.match(code("src/app/api/ai/analyse-seance/route.ts"), /select\("max_hr, garmin_metrics, intervals_athlete_id, intervals_api_key"\)/, "l'analyse ne lit plus la FC max du profil ni de la montre");
+  // Le coach : zones et discipline des footings lisent la MÊME valeur.
+  const c = code("src/lib/ai/coachContext.ts");
+  assert.match(c, /const maxHrEff = fcMaxEst;/, "les zones ont retrouvé leur propre FC max");
+  assert.match(c, /const fcMax = fcMaxEst;/, "la discipline des footings a retrouvé sa propre FC max");
+});
+
+test("picFcObserve : le pic des 6 derniers mois, pas celui d'avant ni d'après", () => {
+  const s = [{ date: "2026-11-01", max_hr: 180 }, { date: "2026-03-01", max_hr: 210 }, { date: "2026-11-20", max_hr: 220 }, { date: "2026-10-01", max_hr: null }];
+  assert.equal(picFcObserve(s, "2026-11-12"), 180, "un pic de plus de 6 mois (ou futur) compte encore");
+  assert.equal(picFcObserve([], "2026-11-12"), null);
+  assert.equal(fcMaxConnue({ observee: 180 }).max, 180);
+  assert.equal(fcMaxConnue({ declaree: 175, observee: 180 }).max, 180, "jamais sous le pic réellement atteint");
+  assert.equal(fcMaxConnue({ montre: 195, observee: 180 }).max, 195, "la montre sert de FC max déclarée");
+  assert.equal(fcMaxConnue({ observee: 145 }).max, null, "un pic de 145 n'est pas une FC max");
+  assert.equal(fcMaxConnue({ seuil: 175 }).source, "seuil");
+  assert.deepEqual(fcMaxConnue({}), { max: null, source: "aucune" });
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
