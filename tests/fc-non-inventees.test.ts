@@ -108,6 +108,34 @@ async function main() {
     assert.equal((i18n.match(/"hr\.maxInconnue":/g) ?? []).length, 5, "le message manque dans une langue");
   });
 
+  console.log("\nLE COACH N'INVENTE PAS DE FC MAX QUAND RIEN N'EST CONNU (12/11/2026)");
+
+  // Ni FC max déclarée, ni battement au-dessus de 150, ni test VMA : la VMA est estimée depuis
+  // les séances et le prompt affichait « FC max ~190 (obs.) » — 190 venait d'un repli codé en dur.
+  const SEANCES_CALMES = SEANCES.map((w) => ({ ...w, avg_hr: 132, max_hr: 145 }));
+  const ligneFc = async (profil: Ligne) => {
+    const ctx = await buildAthleteContext(fauxClient({ profiles: [profil], performance_baselines: [], workouts: SEANCES_CALMES, notifications: [] }), "u");
+    return ctx.text.match(/- VMA : [^\n]*/)?.[0] ?? "(ligne absente)";
+  };
+
+  await test("sans âge, sans FC déclarée ni mesurée : « FC max ? », jamais un chiffre présenté comme observé", async () => {
+    const l = await ligneFc({ ...PROFIL, age: null });
+    assert.match(l, /ESTIMÉE/, `précondition : la VMA doit être estimée depuis les séances (${l})`);
+    assert.match(l, /FC max \? ·/, `une FC max est inventée : ${l}`);
+    assert.doesNotMatch(l, /\b190\b|\(obs\.\)/, `une FC max inventée passe pour observée : ${l}`);
+  });
+
+  await test("avec l'âge seul : 220 − âge, dit comme une formule et non comme une mesure", async () => {
+    const l = await ligneFc({ ...PROFIL, age: 30 });
+    assert.match(l, /FC max ~190 \(formule de l'âge, pas une mesure\)/, l);
+  });
+
+  await test("le code : sans source, `fcMaxEst` vaut null (plus de « : 190 »)", () => {
+    const src = codeNu("src/lib/ai/coachContext.ts");
+    assert.match(src, /: fcMaxSource === "age" \? 220 - \(ageConnu as number\) : null;/, "le repli de FC max n'est plus null");
+    assert.doesNotMatch(src, /:\s*190\s*\)?;/, "un repli « : 190 » est de retour dans le coach");
+  });
+
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
   if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
 }

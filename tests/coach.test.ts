@@ -5663,7 +5663,8 @@ console.log("\nLA SÉRIE — la boucle quotidienne ne doit JAMAIS contredire le 
     // avoir un maximum inférieur à un battement réellement produit. Les deux chaînes (celle
     // qui classe l'effort, celle qui calcule les zones) retiennent donc la plus haute.
     const src = codeOf("src/lib/ai/coachContext.ts");
-    assert.ok(/const fcMaxEst = \(maxHrDeclare != null \|\| obsMaxHr0 > 150\)[\s\S]{0,120}?Math\.max\(maxHrDeclare/.test(src),
+    // 12/11/2026 : la condition est passée dans `fcMaxSource` (plus de repli à 190).
+    assert.ok(/const fcMaxSource[^\n]*= \(maxHrDeclare != null \|\| obsMaxHr0 > 150\) \? "mesures"[\s\S]{0,200}?const fcMaxEst[^\n]*= fcMaxSource === "mesures"\s*\? Math\.max\(maxHrDeclare \?\? 0, obsMaxHr0 > 150 \? obsMaxHr0 : 0\)/.test(src),
       "fcMaxEst retient la FC déclarée même si une FC plus haute a été enregistrée");
     assert.ok(/const maxHrEff = \(maxHr != null \|\| obsMaxHr0 > 150\)[\s\S]{0,120}?Math\.max\(maxHr/.test(src),
       "maxHrEff retient la FC déclarée même si une FC plus haute a été enregistrée");
