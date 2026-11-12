@@ -22,6 +22,7 @@ import { donneesRecup, bilansRecents, type DonneesRecup } from "@/lib/health/rec
 import { TYPE_APTITUDE, lireAptitude, avisAttendu, aRenouveler } from "@/lib/health/aptitude";
 import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 export const metadata = { title: "Santé" };
 
@@ -66,9 +67,8 @@ export default async function HealthPage() {
       // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
       fcMaxDeLAthlete(supabase, user.id),
     ]);
-    for (const [nom, r] of [["objectif", objRes], ["courses", planRes], ["profil", profilRes], ["séances", seancesRes]] as const) {
-      if (r.error && estUnePanne(r)) console.error("[santé] lecture illisible :", nom, r.error.message);
-    }
+    // Journalisées dans error_logs (12/11/2026), le test de référence compris (`vma_kmh`, première source de la VMA).
+    await signalerLectures("sante", user.id, [["objectif", objRes], ["courses", planRes], ["profil", profilRes], ["seances", seancesRes], ["repere", baseRes]]);
     const { vma } = effectiveVma({
       vmaStored: baseRes.data?.vma_kmh ?? null,
       paceCurveBest: (profilRes.data?.pace_curve as { best?: { m: number; sec: number }[] } | null)?.best ?? null,

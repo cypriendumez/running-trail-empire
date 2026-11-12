@@ -12,6 +12,7 @@ import { offresPour, meilleure, type Offre } from "@/lib/shop/offres";
 import { effectiveVma } from "@/lib/running/fitness";
 import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -40,8 +41,8 @@ export default async function ModelePage({ params }: { params: Promise<{ slug: s
     fcMaxDeLAthlete(supabase, user.id),
   ]);
 
-  // Une panne n'est pas « aucune séance » : la VMA de la recommandation retomberait en silence (12/11/2026).
-  if (seancesRes.error) console.error("[fiche boutique] séances illisibles :", seancesRes.error.message);
+  // Une panne n'est pas « aucune donnée » : la VMA de la recommandation retomberait en silence (12/11/2026).
+  await signalerLectures("fiche-boutique", user.id, [["seances", seancesRes], ["repere", baseRes], ["profil", profilRes]]);
   const seances = seancesRes.data ?? [];
   const lang = langueDuCompte(profilRes.data?.preferred_language);
   const { vma } = effectiveVma({

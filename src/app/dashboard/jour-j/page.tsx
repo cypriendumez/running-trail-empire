@@ -11,13 +11,13 @@ import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { socleDesSeances } from "@/lib/dashboard/forme";
 import { efficaciteParBloc, tendanceEfficacite, ameliorationAttendue } from "@/lib/running/progression";
-import { journaliserEchec } from "@/lib/journal/echecServeur";
 import { fcMaxConnue, picFcObserve, seuilMesure } from "@/lib/coach/fcCible";
 import { isRun } from "@/lib/intervals/sport";
 import { forecastWithElevation } from "@/lib/weather/openMeteo";
 import { packJourJ } from "@/lib/coach/jourJ";
 import { JOURJ_T } from "@/lib/coach/jourJI18n";
 import { PackJourJVue, VerrouJourJ, SansObjectifJourJ } from "@/components/jourJ/PackJourJVue";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 /**
  * /dashboard/jour-j — LE PACK JOUR J (Premium), voir `lib/coach/jourJ`.
@@ -38,7 +38,7 @@ export default async function PageJourJ() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profil } = await sb.from("profiles")
+  const { data: profil, error: eProfil } = await sb.from("profiles")
     .select(`${COLONNES_ACCES}, preferred_language, weight_kg, garmin_vo2max, pace_curve, last_lat, last_lon`)
     .eq("id", user.id).maybeSingle();
   const p = profil as Record<string, unknown> | null;
@@ -55,12 +55,14 @@ export default async function PageJourJ() {
     sb.from("performance_baselines").select("vma_kmh,max_hr,lt_hr,tested_at").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
     sb.from("profiles").select("max_hr, garmin_metrics").eq("id", user.id).maybeSingle(),
   ]);
+  // Toutes les lectures de la page, journalisées dans error_logs (12/11/2026) — AVANT le retour « sans
+  // objectif » : une panne de l'objectif n'est pas « aucun objectif ». « Aucune ligne » n'est pas une panne.
+  await signalerLectures("jour-j", user.id, [["profil", { error: eProfil }], ["objectif", objRes], ["seances", seancesRes],
+    ["repere", baseRes], ["fc-profil", fcProfilRes]]);
   type Obj = { race: string; raceDate: string; distanceKm: number; targetSeconds: number; officielle?: boolean };
   const objectif = objectifEnCours(objRes.data?.data as Obj | null, jour);
   if (!objectif || !(Number(objectif.distanceKm) > 0) || !(Number(objectif.targetSeconds) > 0)) return <SansObjectifJourJ t={t} />;
 
-  // Une panne n'est pas « aucune séance » (12/11/2026) : VMA, prédiction et pente reposent dessus.
-  if (seancesRes.error) await journaliserEchec(null, { source: "jour-j", message: `séances illisibles : ${seancesRes.error.message}`, userId: user.id });
   const seances = (seancesRes.data ?? []) as unknown as { date: string; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; max_hr?: number | null }[];
   const joursRestants = ecartJours(jour, objectif.raceDate);
   // L'amélioration d'ici la course : la pente MESURÉE de l'athlète, comme le coach.
@@ -71,7 +73,6 @@ export default async function PageJourJ() {
   // Une panne de lecture n'est pas « FC max inconnue » : elle est journalisée, et la pente n'est
   // alors pas calculée (la page dit « progression supposée », ce qui reste vrai).
   const ePanneFc = baseRes.error ?? fcProfilRes.error;
-  if (ePanneFc) await journaliserEchec(null, { source: "jour-j", message: `FC max illisible : ${ePanneFc.message}`, userId: user.id });
   const base = baseRes.data as { max_hr?: number | null; lt_hr?: number | null } | null;
   const fcProfil = fcProfilRes.data as { max_hr?: number | null; garmin_metrics?: Record<string, unknown> | null } | null;
   const gm = fcProfil?.garmin_metrics ?? null;

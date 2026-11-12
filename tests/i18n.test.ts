@@ -119,9 +119,6 @@ const HORS_TRADUCTION: Record<string, string> = {
   // Cyprien en français). Il n'est jamais affiché à l'athlète : le message qu'il voit, lui,
   // est celui du `toast.error` d'origine, déjà traduit, que l'enveloppe laisse intact.
   "Échec affiché :": "libellé du journal d'erreurs (onglet Bugs de l'admin), jamais affiché à l'athlète",
-  // Jour J (12/11/2026) : la panne de lecture des séances part dans `error_logs` (journaliserEchec),
-  // lu par Cyprien en français ; l'athlète n'en voit rien.
-  "séances illisibles :": "message du journal d'erreurs (error_logs), jamais affiché à l'athlète",
   // L'image de partage social : une seule image, statique, déclarée locale fr_FR dans les
   // métadonnées. Ses chaînes suivent le slogan de la landing et changent avec lui — c'est
   // normal qu'il faille les mettre à jour ici quand le slogan bouge, et c'est même le but :

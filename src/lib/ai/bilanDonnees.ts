@@ -18,6 +18,7 @@ import { predictRaceSec } from "@/lib/running/fitness";
 import { socleDesSeances } from "@/lib/dashboard/forme";
 import { serieVfc, COLONNES_VFC } from "@/lib/health/vfc";
 import { fcMaxConnue, picFcObserve, seuilMesure } from "@/lib/coach/fcCible";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 /** La ligne où le bilan rédigé est mémorisé (une par athlète, avec l'empreinte de ses faits). */
 export const TYPE_BILAN = "ai_bilan";
@@ -39,7 +40,7 @@ export async function faitsDeLaSemaine(sb: SupabaseClient, userId: string, jour:
     sb.from("profiles").select("garmin_vo2max,pace_curve,max_hr,garmin_metrics").eq("id", userId).maybeSingle(),
   ]);
   if (seancesRes.error) {
-    console.error("[bilan] séances illisibles :", seancesRes.error.message);
+    await signalerLectures("bilan", userId, [["seances", seancesRes]]);
     return null;
   }
   const seances = (seancesRes.data ?? []) as unknown as (Parameters<typeof faitsDuBilan>[0]["seances"][number] & { max_hr?: number | null; type?: string | null; weather_temp_c?: number | null })[];
@@ -55,7 +56,7 @@ export async function faitsDeLaSemaine(sb: SupabaseClient, userId: string, jour:
   // ⚠️ Une panne n'est pas « FC max inconnue » (12/11/2026) : sans ces deux lectures, pas de bilan
   // plutôt qu'un bilan qui affirmerait ne pas connaître la FC max (même règle que les séances).
   if (baseRes.error || profilRes.error) {
-    console.error("[bilan] repères de FC illisibles :", (baseRes.error ?? profilRes.error)?.message);
+    await signalerLectures("bilan", userId, [["repere", baseRes], ["profil", profilRes]]);
     return null;
   }
   const base = baseRes.data as { max_hr?: number | null; lt_hr?: number | null } | null;

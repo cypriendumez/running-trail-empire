@@ -295,7 +295,8 @@ test("UNE seule FC max : coach, zones, discipline, montre, Jour J, bilan, analys
   assert.match(code("src/lib/ai/bilanDonnees.ts"), /select\("vma_kmh,max_hr,lt_hr,tested_at"\)/, "le bilan ne lit plus le seuil mesuré");
   assert.match(code("src/lib/ai/bilanDonnees.ts"), /if \(baseRes\.error \|\| profilRes\.error\) \{[\s\S]{0,160}return null;/, "le bilan ne lit plus l'erreur des lectures de FC");
   assert.match(code("src/app/dashboard/jour-j/page.tsx"), /sb\.from\("profiles"\)\.select\("max_hr, garmin_metrics"\)/, "Jour J ne lit plus la FC du profil à part (elle mettrait en jeu la porte d'accès)");
-  assert.match(code("src/app/dashboard/jour-j/page.tsx"), /const ePanneFc = baseRes\.error \?\? fcProfilRes\.error;\s*if \(ePanneFc\) await journaliserEchec/, "Jour J ne lit plus l'erreur des lectures de FC");
+  assert.match(code("src/app/dashboard/jour-j/page.tsx"), /\["repere", baseRes\], \["fc-profil", fcProfilRes\]/, "Jour J ne lit plus l'erreur des lectures de FC");
+  assert.match(code("src/app/dashboard/jour-j/page.tsx"), /const fcMax = ePanneFc \? null : fcMaxConnue/, "Jour J calcule une FC max sur une lecture en panne");
   assert.match(code("src/app/api/ai/analyse-seance/route.ts"), /objRes\.error \?\? picRes\.error;/, "l'analyse ne lit plus l'erreur du pic de FC");
   assert.match(code("src/app/dashboard/ghost-runner/page.tsx"), /const eBase = baselineRes\.error && baselineRes\.error\.code !== "PGRST116" \? baselineRes\.error : null;\s*const ePanneFc = ePic \?\? eRecentes \?\? profileRes\.error \?\? eBase;\s*if \(ePanneFc\) await journaliserEchecUneFois/, "le Ghost Runner ne lit plus l'erreur du pic, des footings, du profil ou du test de référence");
   // Le coach : zones et discipline des footings lisent la MÊME valeur ; le seuil des zones aussi.
@@ -383,14 +384,33 @@ test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien,
   }
 });
 
-test("les lectures de séances de la VMA lisent leur erreur (une panne ne fait pas retomber la VMA en silence)", () => {
-  assert.match(code("src/app/dashboard/page.tsx"), /lecturesEnEchec\(\[[\s\S]{0,400}\["vma", seancesVmaRes\],/, "tableau de bord : la panne des séances de la VMA n'est plus lue");
-  assert.match(code("src/app/dashboard/layout.tsx"), /\{ data: seancesVma, error: eSeancesVma \}, \{ data: testVma, error: eTestVma \}[\s\S]{0,1600}if \(eSeancesVma \|\| eTestVma\) console\.error/, "en-tête : la panne des séances de la VMA n'est plus lue");
-  for (const f of ["src/app/dashboard/shop/page.tsx", "src/app/dashboard/shop/[slug]/page.tsx"])
-    assert.match(code(f), /if \(seancesRes\.error\) console\.error\(/, `${f} : la panne des séances n'est plus lue`);
-  assert.match(code("src/app/dashboard/jour-j/page.tsx"), /if \(seancesRes\.error\) await journaliserEchec\(/, "Jour J : la panne des séances n'est plus lue");
-  assert.match(code("src/app/dashboard/plans/page.tsx"), /\[woRes, baseRes, profRes\]\.map\(\(r\) => estUnePanne\(r\) \? r\.error : null\)[\s\S]{0,80}if \(ePanne\) console\.error/, "Plans : la panne des lectures n'est plus lue");
-  assert.match(code("src/app/dashboard/profile/page.tsx"), /const ePanneProfil = eRecentWk \?\? eProfil \?\? \(eBaseline && eBaseline\.code !== "PGRST116" \? eBaseline : null\);\s*if \(ePanneProfil\) console\.error/, "Profil : la panne des lectures n'est plus lue");
+test("chaque écran de VMA signale ses pannes dans error_logs : séances, test de référence, profil (12/11/2026)", () => {
+  // Relecture du 12/11 : des lectures en panne passaient pour « aucune donnée », et les autres ne finissaient
+  // que dans les journaux du serveur. Une seule porte (`signalerLectures`) : error_logs, une fois par jour.
+  const attendus: [string, string, string[]][] = [
+    ["src/app/dashboard/layout.tsx", "entete", ["profil", "seances", "repere"]],
+    ["src/app/dashboard/page.tsx", "dashboard", ["profil", "seances", "vma", "repere"]],
+    ["src/lib/indicateurs/donnees.ts", "indicateurs", ["profil", "seances", "repere", "vma"]],
+    ["src/app/dashboard/jour-j/page.tsx", "jour-j", ["profil", "objectif", "seances", "repere", "fc-profil"]],
+    ["src/app/dashboard/plans/page.tsx", "plans", ["seances", "repere", "profil"]],
+    ["src/app/dashboard/profile/page.tsx", "profil", ["seances", "profil", "repere"]],
+    ["src/app/dashboard/health/page.tsx", "sante", ["seances", "repere", "profil"]],
+    ["src/app/dashboard/shop/page.tsx", "boutique", ["seances", "repere", "profil"]],
+    ["src/app/dashboard/shop/[slug]/page.tsx", "fiche-boutique", ["seances", "repere", "profil"]],
+  ];
+  for (const [f, ecran, noms] of attendus) {
+    const c = code(f);
+    const appel = c.match(new RegExp(`await signalerLectures\\("${ecran}",[\\s\\S]*?\\]\\);`))?.[0];
+    assert.ok(appel, `${f} : ses pannes ne passent plus par signalerLectures`);
+    for (const n of noms) assert.ok(appel!.includes(`["${n}",`), `${f} : la lecture « ${n} » n'est plus signalée`);
+    // Les anciens messages des lectures de la VMA, qui ne partaient que dans les journaux du serveur.
+    assert.doesNotMatch(c, /console\.error\("\[(en-tête\] VMA|plans\] lecture|profil\] lecture|boutique\] séances|fiche boutique\] séances|tableau de bord\] lectures)/, `${f} : une panne de la VMA ne part encore que dans les journaux du serveur`);
+  }
+  // Jour J signale ses pannes AVANT le retour « sans objectif » : une panne de l'objectif n'est pas « aucun objectif ».
+  const jj = code("src/app/dashboard/jour-j/page.tsx");
+  assert.ok(jj.indexOf('await signalerLectures("jour-j"') < jj.indexOf("return <SansObjectifJourJ"), "Jour J journalise après le retour « sans objectif »");
+  // Le bilan journalise avant de renoncer.
+  assert.match(code("src/lib/ai/bilanDonnees.ts"), /await signalerLectures\("bilan", userId, \[\["repere", baseRes\], \["profil", profilRes\]\]\);\s*return null;/);
 });
 
 test("UN seul calcul de « meilleur effort » dans tout src/ : `effortDesSeances` (12/11/2026)", () => {

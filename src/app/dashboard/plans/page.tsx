@@ -6,7 +6,7 @@ import { robustWeeklyKm } from "@/lib/running/volume";
 import { niveauDeVma } from "@/lib/plans/catalogue";
 import { PlansView } from "./PlansView";
 import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
-import { estUnePanne } from "@/lib/dashboard/lectures";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Plans d'entraînement" };
@@ -39,8 +39,7 @@ export default async function PlansPage() {
   ]);
 
   // Une panne n'est pas « aucune donnée » (12/11/2026) : le niveau et le volume affichés retomberaient en silence.
-  const ePanne = [woRes, baseRes, profRes].map((r) => estUnePanne(r) ? r.error : null).find(Boolean);
-  if (ePanne) console.error("[plans] lecture illisible :", ePanne.message);
+  await signalerLectures("plans", user.id, [["seances", woRes], ["repere", baseRes], ["profil", profRes]]);
   const wks = (woRes.data ?? []) as { date: string; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; max_hr?: number | null }[];
   const vma = effectiveVma({
     vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,

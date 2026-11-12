@@ -10,6 +10,7 @@ import { offresParEan } from "@/lib/shop/offres";
 import { langueDuCompte } from "@/lib/shop/langue";
 import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 export const metadata = { title: "Comparateur" };
 
@@ -44,8 +45,8 @@ export default async function ShopPage() {
     fcMaxDeLAthlete(supabase, user.id),
   ]);
 
-  // Une panne n'est pas « aucune séance » : la VMA de la recommandation retomberait en silence (12/11/2026).
-  if (seancesRes.error) console.error("[boutique] séances illisibles :", seancesRes.error.message);
+  // Une panne n'est pas « aucune donnée » : la VMA de la recommandation retomberait en silence (12/11/2026).
+  await signalerLectures("boutique", user.id, [["seances", seancesRes], ["repere", baseRes], ["profil", profilRes]]);
   const seances = seancesRes.data ?? [];
   const lang = langueDuCompte(profilRes.data?.preferred_language);
   const tx = (k: string, p?: Record<string, string | number>) => texteShop(lang, k, p);

@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext } from "../src/lib/ai/coachContext";
 import { fcMaxDeLAthlete } from "../src/lib/coach/fcMaxServeur";
+import { signalerLectures } from "../src/lib/dashboard/lecturesServeur";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
 let passed = 0; const fails: string[] = [];
@@ -264,6 +265,16 @@ async function main() {
     assert.equal(await lire({ id: "u", max_hr: null }, [{ user_id: "u", max_hr: 201, tested_at: ilYa(30) }]), 201, "la FC max du test est ignorée");
     const sansRien = await fcMaxDeLAthlete(fauxClient({ profiles: [{ id: "u", max_hr: null, age: 30 }], performance_baselines: [], workouts: [] }), "u");
     assert.equal(sansRien, null, "une FC max est inventée (âge ?) sans aucune mesure");
+  });
+
+  await test("signalerLectures : « aucune ligne » n'est pas une panne ; une vraie panne est nommée (12/11/2026)", async () => {
+    assert.deepEqual(await signalerLectures("test", null, [["repere", { error: { code: "PGRST116" } }], ["seances", { error: null }], ["profil", null]]), [],
+      "« aucune ligne » (ou une lecture réussie) passe pour une panne");
+    const erreurs = console.error; console.error = () => {};
+    try {
+      assert.deepEqual(await signalerLectures("test", null, [["repere", { error: { code: "PGRST301", message: "timeout" } }], ["seances", { error: null }]]), ["repere"],
+        "une vraie panne n'est pas nommée");
+    } finally { console.error = erreurs; }
   });
 
   await test("le code : ni « : 190 » ni « 220 − âge » nulle part où une FC max se calcule", () => {

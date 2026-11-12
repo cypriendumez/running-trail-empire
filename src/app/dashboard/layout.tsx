@@ -23,6 +23,7 @@ import { EcranLancement } from "@/components/layout/EcranLancement";
 import { MiseAJour } from "@/components/layout/MiseAJour";
 import { DecorLancement } from "@/components/layout/DecorLancement";
 import { aConsenti } from "@/lib/auth/consentement";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -39,7 +40,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // deux machines ne sont pas le même jour.
   const fuseau = decodeURIComponent((await cookies()).get("pacevo_tz")?.value ?? "");
 
-  const [{ data: profile }, { count: unreadMessages }, { data: settingsRow }, { data: seancesVma, error: eSeancesVma }, { data: testVma, error: eTestVma }, fcMaxVma] = await Promise.all([
+  const [{ data: profile, error: eProfil }, { count: unreadMessages }, { data: settingsRow }, { data: seancesVma, error: eSeancesVma }, { data: testVma, error: eTestVma }, fcMaxVma] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("notifications").select("id", { count: "exact", head: true })
       // La pastille compte AUSSI les messages d'athlètes : un message qu'on ne voit pas
@@ -56,8 +57,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
     fcMaxDeLAthlete(supabase, user.id),
   ]);
-  // Une panne de lecture n'est pas « aucune séance » : le niveau affiché retomberait en silence (12/11/2026).
-  if (eSeancesVma || eTestVma) console.error("[en-tête] VMA illisible :", (eSeancesVma ?? eTestVma)?.message);
+  // Une panne de lecture n'est pas « aucune donnée » : le niveau affiché retomberait en silence.
+  // Journalisée dans error_logs (12/11/2026) ; « aucune ligne » n'est pas une panne.
+  await signalerLectures("entete", user.id, [["profil", { error: eProfil }], ["seances", { error: eSeancesVma }], ["repere", { error: eTestVma }]]);
   const niveau = niveauDeVma(vmaAffichee({
     seances: (seancesVma ?? []) as Parameters<typeof vmaAffichee>[0]["seances"],
     baseline: testVma,

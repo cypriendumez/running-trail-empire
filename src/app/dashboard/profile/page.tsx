@@ -8,6 +8,7 @@ import { effectiveVma } from "@/lib/running/fitness";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { isRun } from "@/lib/intervals/sport";
 import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 export const metadata = { title: "Mon profil" };
 
@@ -47,8 +48,7 @@ export default async function ProfilePage() {
 
   // Une panne n'est pas « aucune donnée » (12/11/2026) : la VMA et les zones retomberaient en silence.
   // « Aucun test » (PGRST116 d'un `.single()` sans ligne) n'est pas une panne.
-  const ePanneProfil = eRecentWk ?? eProfil ?? (eBaseline && eBaseline.code !== "PGRST116" ? eBaseline : null);
-  if (ePanneProfil) console.error("[profil] lecture illisible :", ePanneProfil.message);
+  await signalerLectures("profil", user!.id, [["seances", { error: eRecentWk }], ["profil", { error: eProfil }], ["repere", { error: eBaseline }]]);
   // VMA estimée depuis les meilleurs efforts SOUTENUS (FC élevée) + FC max observée.
   const rw = (recentWk ?? []) as { date?: string; weather_temp_c?: number | null; distance_km?: number | null; duration_seconds?: number | null; type?: string | null; sport?: string | null; avg_hr?: number | null; max_hr?: number | null }[];
   // Les ZONES affichées, elles, ne prennent qu'une vraie FC max : la commune ; sans elle, pas de

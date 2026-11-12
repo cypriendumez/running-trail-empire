@@ -58,7 +58,10 @@ test("le tableau de bord ne réimplémente pas la distinction", () => {
   // Une seconde copie du critère finirait par diverger — c'est ce qui a donné trois
   // définitions différentes de « série » ailleurs dans le projet.
   const page = codeNu("src/app/dashboard/page.tsx");
-  assert.ok(/lecturesEnEchec\(/.test(page), "la page ne passe plus par le module partagé");
+  // 12/11/2026 : par `signalerLectures` (lib/dashboard/lecturesServeur), qui s'appuie sur `estUnePanne`
+  // de ce module et journalise dans error_logs.
+  assert.ok(/await signalerLectures\("dashboard",/.test(page), "la page ne passe plus par le module partagé");
+  assert.match(codeNu("src/lib/dashboard/lecturesServeur.ts"), /estUnePanne\(/, "le signaleur réimplémente la distinction");
   assert.ok(!/PGRST116/.test(page), "le code d'erreur est recopié dans la page");
   for (const attendu of ["profileRes", "workoutsRes", "chargeRes", "prRes"]) {
     assert.ok(new RegExp(`,\\s*${attendu}\\s*\\]`).test(page),

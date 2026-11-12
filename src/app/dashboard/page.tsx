@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { fuseauOuDefaut } from "@/lib/time/fuseau";
 import { createClient } from "@/lib/supabase/server";
-import { lecturesEnEchec } from "@/lib/dashboard/lectures";
 import type { AnalyseMemorisee } from "@/lib/dashboard/derniereAnalyse";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
@@ -24,6 +23,7 @@ import { accesDe } from "@/lib/billing/access";
 import { estAdmin } from "@/lib/admin/acces";
 import { serieVfc } from "@/lib/health/vfc";
 import type { HRVData } from "@/types";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
@@ -238,15 +238,13 @@ export default async function DashboardPage() {
   // n'a pas de dictionnaire. C'est le composant client, qui connaît la langue, qui les
   // traduit. La distinction panne / absence vit dans `lib/dashboard/lectures`, où elle
   // est éprouvable — c'est là que le projet range ses calculs affichés.
-  const donneesIncompletes = lecturesEnEchec([
+  // 12/11/2026 : les lectures de LA VMA (ses 60 séances, le test de référence) en font partie, et la
+  // panne part dans error_logs (signalerLectures), plus seulement dans les journaux du serveur.
+  const donneesIncompletes = await signalerLectures("dashboard", user!.id, [
     ["profil", profileRes], ["seances", workoutsRes],
     ["charge", chargeRes], ["records", prRes],
-    // Les 60 séances de LA VMA (12/11/2026) : une panne ne doit pas faire retomber la VMA en silence.
-    ["vma", seancesVmaRes],
+    ["vma", seancesVmaRes], ["repere", baseRes],
   ]);
-  if (donneesIncompletes.length) {
-    console.error("[tableau de bord] lectures en échec :", donneesIncompletes.join(", "));
-  }
 
   // VMA MESURÉE ? = une ligne performance_baselines avec vma_kmh > 0 (même signal que le
   // verrou du coach et effectiveVma). Tant qu'elle manque, le coach ne prescrit que le test
