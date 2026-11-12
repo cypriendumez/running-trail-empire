@@ -538,13 +538,11 @@ test("le coureur VOIT la panne : bandeau commun sur chaque écran de VMA, 5 lang
 });
 
 test("getAccountLang : jamais « fr » par défaut — profil illisible ou langue absente → le navigateur (12/11/2026)", () => {
+  // Le comportement s'EXÉCUTE dans tests/langue-compte.test.ts ; ici, la source ne réintroduit pas « fr ».
   const src = code("src/lib/i18n/serverLang.ts");
   const corps = src.slice(src.indexOf("export async function getAccountLang"), src.indexOf("export async function getPublicLang"));
-  assert.ok(corps.length > 50, "getAccountLang introuvable");
+  assert.ok(corps.includes("langueDuCompte(sb, userId)") && corps.includes("export async function langueDuCompte"), "getAccountLang ne passe plus par langueDuCompte");
   assert.doesNotMatch(corps, /"fr"/, "getAccountLang retombe encore sur « fr »");
-  assert.match(corps, /const \{ data, error \} = await sb\.from\("profiles"\)\.select\("preferred_language"\)\.eq\("id", userId\)\.maybeSingle\(\);/, "l'erreur de lecture n'est plus lue (ou « aucune ligne » redevient une erreur)");
-  assert.match(corps, /return langueEcran\(/, "la langue absente ne passe plus par langueEcran");
-  assert.match(corps, /catch \(e\) \{[\s\S]*return getPublicLang\(\);/, "une exception retombe sur autre chose que le navigateur");
   assert.doesNotMatch(code("src/app/dashboard/trail/page.tsx"), /getAccountLang\(sb, user\.id\) : "fr"/, "Trail : « fr » sans utilisateur");
 });
 

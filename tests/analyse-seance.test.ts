@@ -203,7 +203,7 @@ test("l'analyse est écrite dans la langue du compte", () => {
   // L'invite imposait « en français » : un client allemand voyait le bouton traduit et
   // recevait une analyse en français.
   const src = codeAnalyse();
-  assert.match(src, /getAccountLang\(supabase, user\.id\)/, "la langue du compte n'est plus lue");
+  assert.match(src, /const \{ lang, profilLu \} = await langueDuCompte\(supabase, user\.id\);/, "la langue du compte n'est plus lue");
   assert.match(src, /\$\{LANGUE\[lang\]\}/, "l'invite ne demande plus la langue de l'athlète");
   // ⚠️ LES FAITS AUSSI. La date y est écrite en toutes lettres : figée en français, elle
   // repartait en français dans une analyse allemande. Mutation qui restait verte sans ça.

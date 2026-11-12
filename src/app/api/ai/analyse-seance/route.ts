@@ -13,7 +13,7 @@ import { decaleJour } from "@/lib/streak/compute";
 import { intervallesDeSeance, fluxDeSeance } from "@/lib/intervals/performance";
 import { identifiantsDe, type ProfilIdentifiants } from "@/lib/intervals/identifiants";
 import { fcMaxConnue, seuilMesure, PIC_FC_JOURS } from "@/lib/coach/fcCible";
-import { getAccountLang } from "@/lib/i18n/serverLang";
+import { langueDuCompte } from "@/lib/i18n/serverLang";
 import { journaliserEchec } from "@/lib/journal/echecServeur";
 import { pausesDeTrace, pointsStockes, vitesseEnMouvement } from "@/lib/activities/pauses";
 
@@ -209,7 +209,7 @@ export async function POST(req: Request) {
   // ── 5. Le modèle. Il rédige, il ne calcule pas.
   // ⚠️ LA LANGUE DU COMPTE, PAS LE FRANÇAIS EN DUR. L'invite imposait « en français » :
   // un client allemand voyait le bouton traduit et recevait une analyse française.
-  const lang = await getAccountLang(supabase, user.id);
+  const { lang, profilLu } = await langueDuCompte(supabase, user.id);
   const invite = inviteAnalyse(faits, lang, complet);
 
   const r = await generateContent(
@@ -224,6 +224,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: r.ok ? "Réponse vide du modèle." : r.error }, { status: r.ok ? 502 : (r.status ?? 502) });
   }
   const texte = r.text.trim();
+
+  // Profil illisible : la langue est un repli (navigateur). Le cache ignore la langue : mémorisée,
+  // cette analyse serait resservie À JAMAIS dans une langue que le coureur n'a pas choisie (13/11/2026).
+  if (!profilLu) {
+    console.warn("[analyse-seance] profil illisible : analyse servie dans la langue du navigateur, non mémorisée");
+    return NextResponse.json({ ok: true, texte, memorise: false, tronquee: r.tronquee === true, complete: complet });
+  }
 
   // ── 6. Mémorisation. Une séance passée ne change plus : on ne la repaiera jamais.
   //      ⚠️ L'ERREUR EST LUE. Supabase RETOURNE ses erreurs sans lever : un `try/catch`
