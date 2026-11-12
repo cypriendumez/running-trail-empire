@@ -48,7 +48,7 @@ export default async function PageJourJ() {
   const pannesProfil = await signalerLectures("jour-j", user.id, [["profil", { error: eProfil }]]);
   // …et DITE : sans profil lisible, on ne sait pas s'il est abonné. Afficher le verrou « Premium »
   // à un abonné serait faux (relecture du 12/11/2026) : on dit que la lecture a échoué, c'est tout.
-  if (pannesProfil.length) return <div className="mx-auto max-w-2xl"><BandeauPanne lectures={pannesProfil} lang={await getPublicLang()} /></div>;
+  if (pannesProfil.length) return <div className="mx-auto max-w-2xl"><BandeauPanne lectures={pannesProfil} lang={await getPublicLang()} seul /></div>;
   const p = profil as Record<string, unknown> | null;
   const lang = normLang(String(p?.preferred_language ?? "fr"));
   const t = JOURJ_T[lang];
@@ -70,7 +70,7 @@ export default async function PageJourJ() {
   type Obj = { race: string; raceDate: string; distanceKm: number; targetSeconds: number; officielle?: boolean };
   const objectif = objectifEnCours(objRes.data?.data as Obj | null, jour);
   // Objectif illisible : on le DIT, au lieu d'inviter à en fixer un qu'il a peut-être déjà (12/11/2026).
-  if (pannes.includes("objectif")) return <div className="mx-auto max-w-2xl"><BandeauPanne lectures={pannes} lang={lang} /></div>;
+  if (pannes.includes("objectif")) return <div className="mx-auto max-w-2xl"><BandeauPanne lectures={pannes} lang={lang} seul /></div>;
   if (!objectif || !(Number(objectif.distanceKm) > 0) || !(Number(objectif.targetSeconds) > 0)) return <SansObjectifJourJ t={t} />;
 
   const seances = (seancesRes.data ?? []) as unknown as { date: string; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; max_hr?: number | null }[];

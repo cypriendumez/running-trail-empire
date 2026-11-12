@@ -12,7 +12,7 @@
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BandeauPanne } from "../src/components/dashboard/BandeauPanne";
-import { T } from "../src/lib/i18n/translations";
+import { T, fill } from "../src/lib/i18n/translations";
 import { execSync } from "node:child_process";
 import { vmaAffichee, effortDesSeances, acclimatationDesSeances, SEANCES_VMA } from "../src/lib/dashboard/vmaAffichee";
 import { readFileSync } from "node:fs";
@@ -421,9 +421,19 @@ test("chaque écran de VMA signale ses pannes dans error_logs : séances, test d
   const jjv = code("src/app/dashboard/jour-j/page.tsx");
   assert.ok(jjv.indexOf('await signalerLectures("jour-j", user.id, [["profil", { error: eProfil }]]);') >= 0
     && jjv.indexOf('await signalerLectures("jour-j", user.id, [["profil"') < jjv.indexOf("return <VerrouJourJ"), "Jour J : la panne du profil n'est signalée qu'après le verrou");
-  // Le bandeau du tableau de bord nomme chaque lecture : chaque nom a son libellé dans les 5 langues.
-  const appelTdb = code("src/app/dashboard/page.tsx").match(/await signalerLectures\("dashboard",[\s\S]*?\]\);/)?.[0] ?? "";
-  for (const [, nom] of appelTdb.matchAll(/\["([\w-]+)",/g)) for (const lang of ["fr", "en", "de", "es", "pt"] as const)
+  // Chaque bandeau nomme chaque lecture : tout nom passé à signalerLectures, sur le tableau de bord ET sur
+  // chaque écran de VMA, a son libellé dans les 5 langues (relecture du 12/11 : pic, footings, courses et
+  // fc-profil retombaient sur « tes données »).
+  const nomsSignales = new Set<string>();
+  for (const f of ["src/app/dashboard/page.tsx", "src/app/dashboard/plans/page.tsx", "src/app/dashboard/profile/page.tsx",
+    "src/app/dashboard/health/page.tsx", "src/app/dashboard/shop/page.tsx", "src/app/dashboard/shop/[slug]/page.tsx",
+    "src/app/dashboard/ghost-runner/page.tsx", "src/app/dashboard/cours/page.tsx", "src/app/dashboard/jour-j/page.tsx"]) {
+    const appels = [...code(f).matchAll(/await signalerLectures\("[\w-]+",[\s\S]*?\]\);/g)].map((m) => m[0]);
+    assert.ok(appels.length, `${f} : aucun appel à signalerLectures trouvé`);
+    for (const appel of appels) for (const [, nom] of appel.matchAll(/\["([\w-]+)",/g)) nomsSignales.add(nom);
+  }
+  for (const nom of ["pic", "footings", "courses", "fc-profil", "objectif", "repere"]) assert.ok(nomsSignales.has(nom), `lecture « ${nom} » introuvable : le relevé des noms est cassé`);
+  for (const nom of nomsSignales) for (const lang of ["fr", "en", "de", "es", "pt"] as const)
     assert.ok(T[lang][`dash.inc.${nom}`], `« ${nom} » n'a pas de libellé dash.inc en ${lang} : le bandeau dirait « tes données »`);
   // Jour J signale ses pannes AVANT le retour « sans objectif » : une panne de l'objectif n'est pas « aucun objectif ».
   const jj = code("src/app/dashboard/jour-j/page.tsx");
@@ -505,6 +515,20 @@ test("le coureur VOIT la panne : bandeau commun sur chaque écran de VMA, 5 lang
   const iPanneObj = jj.indexOf('if (pannes.includes("objectif")) return');
   assert.ok(iPanneObj > 0 && iPanneObj < jj.indexOf("return <SansObjectifJourJ"), "Jour J invite à fixer un objectif sur une panne de l'objectif");
   for (const lang of ["fr", "en", "de", "es", "pt"] as const) assert.ok(T[lang]["dash.inc.objectif"], `« ton objectif » manque en ${lang}`);
+  // Bandeau SEUL (Jour J sans profil ou sans objectif lisible) : pas de « ci-dessous » quand rien n'est
+  // dessous, et un chemin de retour (relecture du 12/11/2026).
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) {
+    const seul = renderToStaticMarkup(BandeauPanne({ lectures: ["objectif"], lang, seul: true })!);
+    assert.ok(seul.includes(T[lang]["dash.inc.objectif"]) && seul.includes('href="/dashboard"') && seul.includes(T[lang]["act.retour"]), `${lang} : bandeau seul incomplet (${seul})`);
+    assert.ok(!seul.includes(fill(T[lang]["dash.incomplet"], { quoi: T[lang]["dash.inc.objectif"] })), `${lang} : le bandeau seul parle des chiffres « ci-dessous »`);
+    assert.ok(!renderToStaticMarkup(BandeauPanne({ lectures: ["vma"], lang })!).includes('href="/dashboard"'), `${lang} : le bandeau au-dessus d'une page offre un retour`);
+  }
+  assert.doesNotMatch(T.fr["dash.incomplet.seul"], /ci-dessous/, "le bandeau seul dit « ci-dessous »");
+  assert.match(jj, /if \(pannesProfil\.length\) return <div className="mx-auto max-w-2xl"><BandeauPanne lectures=\{pannesProfil\} lang=\{await getPublicLang\(\)\} seul \/>/, "Jour J (profil illisible) : le bandeau seul parle des chiffres « ci-dessous »");
+  assert.match(jj, /if \(pannes\.includes\("objectif"\)\) return <div className="mx-auto max-w-2xl"><BandeauPanne lectures=\{pannes\} lang=\{lang\} seul \/>/, "Jour J (objectif illisible) : le bandeau seul parle des chiffres « ci-dessous »");
+  // Fiche boutique : le bandeau dans la colonne de FicheModele, pas sur toute la largeur.
+  assert.match(code("src/app/dashboard/shop/[slug]/page.tsx"), /<div className="mx-auto w-full max-w-\[1180px\] sm:px-6 sm:pt-6"><BandeauPanne /, "fiche boutique : le bandeau sort de la colonne");
+  assert.match(code("src/components/shop/FicheModele.tsx"), /className="mx-auto w-full max-w-\[1180px\] sm:px-6/, "FicheModele a changé de colonne : réaligner le bandeau de la fiche");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
