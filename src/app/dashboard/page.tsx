@@ -15,6 +15,7 @@ import type { Objective } from "@/components/dashboard/ObjectiveCard";
 import { objectifEnCours } from "@/lib/coach/prochaineCourse";
 import { loadRisk } from "@/lib/running/fitness";
 import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
+import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { validerRecordDeclare, type RecordDeclare } from "@/lib/dashboard/records";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { seancesSansRessenti } from "@/lib/dashboard/ressenti";
@@ -50,7 +51,7 @@ export default async function DashboardPage() {
   // séance de demain s'affichait comme « Séance du jour ». Le même jour que la série.
   const today = streakToday;
 
-  const [profileRes, hrvRes, workoutsRes, planRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes, analysesRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes, analysesRes, fcMaxVma] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -122,6 +123,8 @@ export default async function DashboardPage() {
     // Les analyses de séance MÉMORISÉES (`/api/ai/analyse-seance`) : la carte « Analyse IA »
     // les lit, elle n'en déclenche aucune — chaque analyse est un appel payant au modèle.
     supabase.from("notifications").select("body,data").eq("user_id", user!.id).eq("type", "seance_analyse").order("created_at", { ascending: false }).limit(20),
+    // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
+    fcMaxDeLAthlete(supabase, user!.id),
   ]);
   if (garageRes.error) console.error("[accueil] garage illisible :", garageRes.error.message);
   if (declaresRes.error) console.error("[accueil] records déclarés illisibles :", declaresRes.error.message);
@@ -182,6 +185,7 @@ export default async function DashboardPage() {
     seances: wks,
     baseline: baseRes.data as { vma_kmh?: number | null; tested_at?: string | null } | null,
     profil: profileRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null,
+    fcMax: fcMaxVma,
   });
   // Sur l'historique de charge d'UN AN (pas les 40 dernières séances) et au jour de
   // l'athlète (pas celui de Paris) : la même série que la carte Charge & affûtage.

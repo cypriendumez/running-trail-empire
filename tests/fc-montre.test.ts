@@ -11,7 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, airFroid, BAISSE_HIVER_BPM, SEUIL_FROID_C, fcMaxConnue, picFcObserve, seuilMesure } from "../src/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, airFroid, BAISSE_HIVER_BPM, SEUIL_FROID_C, fcMaxConnue, picFcObserve, seuilMesure, fcMaxPourEfforts } from "../src/lib/coach/fcCible";
 import { avecSaison } from "../src/lib/coach/ciblesFcServeur";
 import { stepsForType, parseReps, buildWorkoutDescription } from "../src/lib/watch/intervals";
 
@@ -322,6 +322,33 @@ test("picFcObserve : le pic des 6 derniers mois, pas celui d'avant ni d'après",
   assert.equal(fcMaxConnue({ observee: 145 }).max, null, "un pic de 145 n'est pas une FC max");
   assert.equal(fcMaxConnue({ seuil: 175 }).source, "seuil");
   assert.deepEqual(fcMaxConnue({}), { max: null, source: "aucune" });
+});
+
+test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien, 12/11/2026)", () => {
+  // Repli de PANNE seulement (`undefined`) : l'ancien pic > 120 des séances lues. `null` reste null.
+  assert.equal(fcMaxPourEfforts(188, [{ max_hr: 205 }]), 188, "un pic des séances passe devant la FC max commune");
+  assert.equal(fcMaxPourEfforts(null, [{ max_hr: 205 }]), null, "FC max inconnue remplacée par un pic des séances");
+  assert.equal(fcMaxPourEfforts(undefined, [{ max_hr: 175 }, { max_hr: 140 }]), 175, "en panne, l'ancien repli a disparu");
+  assert.equal(fcMaxPourEfforts(undefined, [{ max_hr: 110 }]), null);
+  const v = code("src/lib/dashboard/vmaAffichee.ts");
+  assert.match(v, /meilleurEffort\(\[\.\.\.i\.seances\], fcMaxPourEfforts\(i\.fcMax, i\.seances\)\)/, "vmaAffichee trie de nouveau avec son propre pic");
+  assert.doesNotMatch(v, /obsMaxHr/, "vmaAffichee recalcule son propre pic");
+  // Chaque écran passe la FC max COMMUNE (lue par fcMaxDeLAthlete, ou déjà calculée par fcMaxConnue).
+  const sites: [string, RegExp[]][] = [
+    ["src/app/dashboard/layout.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fcMax: fcMaxVma,/]],
+    ["src/app/dashboard/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /fcMax: fcMaxVma,/]],
+    ["src/lib/indicateurs/donnees.ts", [/fcMaxDeLAthlete\(sb, userId\),/, /profil: p, fcMax: fcMaxVma \}/]],
+    ["src/app/dashboard/jour-j/page.tsx", [/fcMax: ePanneFc \? undefined : fcMax,/]],
+    ["src/lib/ai/bilanDonnees.ts", [/profil: profilRes\.data as [^\n]*,\s*fcMax,\s*\}\);/]],
+    ["src/lib/ai/coachContext.ts", [/const fcMaxVma = fcMaxPourEfforts\(await fcMaxDeLAthlete\(sb, userId\), wks\);/, /fromRuns: bestVmaFromWorkouts\(wks, fcMaxVma\),/]],
+    ["src/app/dashboard/plans/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /bestVmaFromWorkouts\(wks, fcMaxPourEfforts\(fcMaxVma, wks\)\)/]],
+    ["src/app/dashboard/profile/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /const obsMaxHr = fcMaxPourEfforts\(fcMaxCommune, rw\);/, /fcMax: obsMaxHr,/]],
+    ["src/components/profile/ProfileSettings.tsx", [/const maxHr = fitness\?\.fcMax \?\? 0;/]],
+    ["src/app/api/admin/analyze-session/route.ts", [/const histFcMax = fcMaxPourEfforts\(await fcMaxDeLAthlete\(admin, user_id\), recentRes\.data \?\? \[\]\);/]],
+  ];
+  for (const [f, res] of sites) for (const re of res) assert.match(code(f), re, `${f} : la VMA (ou la FC max affichée) ne reçoit plus la FC max commune (${re.source.slice(0, 50)}…)`);
+  // Plus aucun pic maison (> 120 / > 150) hors de fcCible.
+  for (const [f] of sites) assert.doesNotMatch(code(f), /(obsMax|histMax|fcObservee)\w* *> *1[25]0/, `${f} : un pic maison est de retour`);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

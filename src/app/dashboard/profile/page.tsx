@@ -5,6 +5,8 @@ import { indexLeger } from "@/lib/shop/indexLeger";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { TYPE_ETAT_ABO, litEtatAbo } from "@/lib/billing/etatAbonnement";
 import { bestVmaFromWorkouts, effectiveVma } from "@/lib/running/fitness";
+import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
+import { fcMaxPourEfforts } from "@/lib/coach/fcCible";
 import { isRun } from "@/lib/intervals/sport";
 
 export const metadata = { title: "Mon profil" };
@@ -26,6 +28,7 @@ export default async function ProfilePage() {
     { data: goals },
     { data: recentWk },
     { data: ligneAbo },
+    fcMaxCommune,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("performance_baselines").select("*").eq("user_id", user!.id).order("tested_at", { ascending: false }).limit(1).single(),
@@ -38,12 +41,15 @@ export default async function ProfilePage() {
     // en cours, échec de paiement. Sans lui, l'écran ne peut répondre à aucune des trois
     // questions que se pose un abonné (cf. `lib/billing/etatAbonnement`).
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", TYPE_ETAT_ABO).maybeSingle(),
+    // La FC max COMMUNE (12/11/2026) : elle trie les efforts de la VMA et cale les zones affichées.
+    fcMaxDeLAthlete(supabase, user!.id),
   ]);
 
   // VMA estimée depuis les meilleurs efforts SOUTENUS (FC élevée) + FC max observée.
   const rw = (recentWk ?? []) as { distance_km?: number | null; duration_seconds?: number | null; type?: string | null; sport?: string | null; avg_hr?: number | null; max_hr?: number | null }[];
-  const obsMaxHrRaw = Math.max(0, ...rw.map(w => Number(w.max_hr ?? 0)));
-  const obsMaxHr = obsMaxHrRaw > 120 ? obsMaxHrRaw : null;
+  // 12/11/2026 : la FC max COMMUNE (déclarée, pic des 6 mois, seuil) — c'était le pic > 120 des
+  // 120 derniers jours. En cas de panne de lecture, l'ancien repli (`fcMaxPourEfforts`).
+  const obsMaxHr = fcMaxPourEfforts(fcMaxCommune, rw);
   // MÊME ORDRE DE FIABILITÉ QUE LE COACH : meilleurs efforts mesurés d'abord, et
   // course à pied uniquement. Sans cela le profil affichait une VMA que le plan
   // d'entraînement contredisait — et une sortie vélo pouvait la produire.
@@ -99,7 +105,7 @@ export default async function ProfilePage() {
       shoes={shoes ?? []}
       goals={goals ?? []}
       stats={{ kmYear, kmMonth, sessionsMonth, longestRun, streak, bySport }}
-      fitness={{ estimatedVma, vmaSource, obsMaxHr, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
+      fitness={{ estimatedVma, vmaSource, fcMax: obsMaxHr, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
       userId={user!.id}
       catalogue={indexLeger()}
       etatAbo={litEtatAbo((ligneAbo as { data?: unknown } | null)?.data ?? null)}

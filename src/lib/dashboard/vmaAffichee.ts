@@ -5,6 +5,7 @@
  * exactement l'histoire de `effectiveVma` (quatre chaînes, quatre chiffres).
  */
 import { meilleurEffort, effectiveVma, type MeilleurEffort } from "@/lib/running/fitness";
+import { fcMaxPourEfforts } from "@/lib/coach/fcCible";
 
 /** D'où vient la VMA affichée (dates au format AAAA-MM-JJ). */
 export type SourceVma =
@@ -20,14 +21,17 @@ export function vmaAffichee(i: {
   seances: readonly SeanceVma[];
   baseline: { vma_kmh?: number | null; tested_at?: string | null } | null;
   profil: { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null;
+  /** La FC max COMMUNE (`fcMaxConnue` / `fcMaxDeLAthlete`) ; `undefined` = lecture en panne. */
+  fcMax: number | null | undefined;
 }): { vma: number; source: SourceVma | null; effort: MeilleurEffort | null } {
-  const obsMaxHr = Math.max(0, ...i.seances.map((w) => Number(w.max_hr ?? 0)));
   const garminVo2 = Number(i.profil?.garmin_vo2max) || 0;
   // VMA : test → efforts réels (reflète l'allure de course) → dérivée de la VO2max Garmin (repli).
   // MÊME calcul que le coach — la même fonction, pas une chaîne parallèle. Celle-ci
   // ignorait purement et simplement la courbe d'allure : le tableau de bord annonçait
   // 18,7 km/h pendant que le plan était calé sur 17,3, pour le même athlète.
-  const effort = meilleurEffort([...i.seances], obsMaxHr > 120 ? obsMaxHr : null);
+  // 12/11/2026 : les efforts sont triés avec la FC max COMMUNE, plus avec le pic > 120 des seules
+  // séances lues (sans fenêtre de date ni FC déclarée).
+  const effort = meilleurEffort([...i.seances], fcMaxPourEfforts(i.fcMax, i.seances));
   const calc = effectiveVma({
     vmaStored: Number(i.baseline?.vma_kmh) || null,
     paceCurveBest: i.profil?.pace_curve?.best,

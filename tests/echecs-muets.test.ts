@@ -52,7 +52,7 @@ function fauxClient(repondre: (op: Op) => Rep | "lever") {
       const op: Op = { table, action: "select" };
       const b: Record<string, unknown> = {};
       const chaine = () => b;
-      for (const m of ["eq", "gte", "lte", "in", "limit", "order", "maybeSingle", "single", "neq"]) b[m] = chaine;
+      for (const m of ["eq", "gte", "lte", "in", "limit", "order", "maybeSingle", "single", "neq", "not"]) b[m] = chaine;
       b.select = () => b;
       for (const a of ["insert", "update", "upsert", "delete"] as const) b[a] = (v?: unknown) => { op.action = a; op.valeur = v; return b; };
       b.then = (ok: (r: Rep) => unknown, ko?: (e: unknown) => unknown) => {

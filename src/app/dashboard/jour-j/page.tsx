@@ -60,12 +60,6 @@ export default async function PageJourJ() {
   if (!objectif || !(Number(objectif.distanceKm) > 0) || !(Number(objectif.targetSeconds) > 0)) return <SansObjectifJourJ t={t} />;
 
   const seances = (seancesRes.data ?? []) as unknown as { date: string; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; max_hr?: number | null }[];
-  // La VMA : le MÊME calcul que la carte du tableau de bord (40 dernières séances).
-  const { vma } = vmaAffichee({
-    seances: seances.slice(0, 40) as Parameters<typeof vmaAffichee>[0]["seances"],
-    baseline: baseRes.data as { vma_kmh?: number | null; tested_at?: string | null } | null,
-    profil: p as Parameters<typeof vmaAffichee>[0]["profil"],
-  });
   const joursRestants = ecartJours(jour, objectif.raceDate);
   // L'amélioration d'ici la course : la pente MESURÉE de l'athlète, comme le coach.
   // ⚠️ LA MÊME FC MAX QUE LE COACH (`fcMaxConnue`, lib/coach/fcCible, 12/11/2026) : la plus haute
@@ -84,6 +78,14 @@ export default async function PageJourJ() {
     observee: picFcObserve(seances, jour), seuil: seuilMesure(base?.lt_hr, gm?.lthr),
   }).max;
   const tendance = tendanceEfficacite(efficaciteParBloc(seances.filter((s) => isRun(s.sport)), fcMax, Date.parse(`${jour}T12:00:00Z`)));
+  // La VMA : le MÊME calcul que la carte du tableau de bord (40 dernières séances), efforts triés
+  // avec la MÊME FC max (12/11/2026) — `undefined` en cas de panne : l'ancien repli.
+  const { vma } = vmaAffichee({
+    seances: seances.slice(0, 40) as Parameters<typeof vmaAffichee>[0]["seances"],
+    baseline: baseRes.data as { vma_kmh?: number | null; tested_at?: string | null } | null,
+    profil: p as Parameters<typeof vmaAffichee>[0]["profil"],
+    fcMax: ePanneFc ? undefined : fcMax,
+  });
 
   // La course dans le catalogue — nom ET date exacts, sinon rien n'est supposé.
   const { data: course } = estOfficielle(objectif)

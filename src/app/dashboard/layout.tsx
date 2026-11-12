@@ -4,6 +4,7 @@ import { T, normLang } from "@/lib/i18n/translations";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
+import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { niveauDeVma } from "@/lib/running/niveau";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import { FileAttenteCourses } from "@/components/courses/FileAttenteCourses";
@@ -38,7 +39,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // deux machines ne sont pas le même jour.
   const fuseau = decodeURIComponent((await cookies()).get("pacevo_tz")?.value ?? "");
 
-  const [{ data: profile }, { count: unreadMessages }, { data: settingsRow }, { data: seancesVma }, { data: testVma }] = await Promise.all([
+  const [{ data: profile }, { count: unreadMessages }, { data: settingsRow }, { data: seancesVma }, { data: testVma }, fcMaxVma] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("notifications").select("id", { count: "exact", head: true })
       // La pastille compte AUSSI les messages d'athlètes : un message qu'on ne voit pas
@@ -51,11 +52,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
       .eq("user_id", user.id).order("date", { ascending: false }).limit(40),
     supabase.from("performance_baselines").select("vma_kmh,tested_at").eq("user_id", user.id)
       .order("tested_at", { ascending: false }).limit(1).maybeSingle(),
+    // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
+    fcMaxDeLAthlete(supabase, user.id),
   ]);
   const niveau = niveauDeVma(vmaAffichee({
     seances: (seancesVma ?? []) as Parameters<typeof vmaAffichee>[0]["seances"],
     baseline: testVma,
     profil: profile as Parameters<typeof vmaAffichee>[0]["profil"],
+    fcMax: fcMaxVma,
   }).vma);
   const avatarColor = String(((settingsRow?.data ?? {}) as Record<string, unknown>).avatarColor ?? "emerald");
   const brutMasquees = ((settingsRow?.data ?? {}) as Record<string, unknown>).notifsMasquees;

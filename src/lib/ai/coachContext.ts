@@ -1,7 +1,8 @@
 import type { createClient } from "@/lib/supabase/server";
 import { sansAllureInconnue } from "@/lib/coach/allureInconnue";
 import { picsSaison, avecSaison } from "@/lib/coach/ciblesFcServeur";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, fcMaxConnue, estSortieFacile, PART_FC_FACILE, PART_FC_DURE, airFroid, PIC_FC_JOURS, type CiblesFc, seuilMesure } from "@/lib/coach/fcCible";
+import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, fcMaxConnue, estSortieFacile, PART_FC_FACILE, PART_FC_DURE, fcMaxPourEfforts, airFroid, PIC_FC_JOURS, type CiblesFc, seuilMesure } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { menuSelonDenivele, preferenceDenivele } from "@/lib/coach/denivele";
@@ -2763,13 +2764,14 @@ export async function getEffectiveVma(sb: SupabaseClient, userId: string): Promi
   const prof = profRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null;
   // Course à pied uniquement : une sortie vélo produirait une VMA fantaisiste.
   const wks = ((woRes.data ?? []) as Wk[]).filter(w => isRun(w.sport));
-  const obsMaxHr = Math.max(0, ...wks.map((w) => Number(w.max_hr ?? 0)));
+  // Efforts triés avec la FC max COMMUNE (12/11/2026) — c'était le pic > 120 des seules séances lues.
+  const fcMaxVma = fcMaxPourEfforts(await fcMaxDeLAthlete(sb, userId), wks);
   // EXACTEMENT le calcul du coach — c'est la même fonction, pas « la même logique »
   // recopiée. Les deux ne peuvent donc plus diverger, ce qui était le cas ici.
   return effectiveVma({
     vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
     paceCurveBest: prof?.pace_curve?.best,
     garminVo2: Number(prof?.garmin_vo2max) || null,
-    fromRuns: bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null),
+    fromRuns: bestVmaFromWorkouts(wks, fcMaxVma),
   }).vma;
 }

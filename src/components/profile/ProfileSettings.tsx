@@ -342,7 +342,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
   shoes: Record<string, unknown>[];
   goals: Record<string, unknown>[];
   stats: Stats;
-  fitness?: { estimatedVma: number | null; vmaSource?: VmaSource; obsMaxHr: number | null; garminVo2max?: number | null;
+  fitness?: { estimatedVma: number | null; vmaSource?: VmaSource; /** La FC max COMMUNE (`fcMaxDeLAthlete`), pas un simple pic. */ fcMax: number | null; garminVo2max?: number | null;
     garmin?: { vo2max?: number | null; restingHR?: number | null; lthr?: number | null; thresholdPaceSecPerKm?: number | null; ctl?: number | null; atl?: number | null; vo2maxHistory?: { date: string; v: number }[] | null } | null };
   userId: string;
   /** État Stripe mémorisé par le webhook : prélèvement, résiliation, échec. */
@@ -776,7 +776,9 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
     finally { setExporting(false); }
   }
 
-  const maxHr = Number(baseline?.max_hr ?? 0) || (fitness?.obsMaxHr ?? 0);
+  // 12/11/2026 : la FC max COMMUNE (calculée côté serveur, `fcMaxDeLAthlete`), qui prend déjà la
+  // plus haute entre le test, le profil, la montre et le pic des 6 mois. C'était « test, sinon pic ».
+  const maxHr = fitness?.fcMax ?? 0;
   const zones = maxHr > 0 ? calcZones(maxHr, tr) : null;
 
   // VO2max = mesure Garmin (montre) ; métriques riches Garmin (FC repos, seuil, forme).

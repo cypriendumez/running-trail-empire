@@ -14,6 +14,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext } from "../src/lib/ai/coachContext";
+import { fcMaxDeLAthlete } from "../src/lib/coach/fcMaxServeur";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
 let passed = 0; const fails: string[] = [];
@@ -235,6 +236,18 @@ async function main() {
     const recents = SEANCES_CALMES.map((w) => ({ ...w, max_hr: 172 }));
     const t = (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL }], performance_baselines: [], workouts: [vieux, ...recents], notifications: [] }), "u")).text;
     assert.match(t, /FC max ~172 \(obs\.\)/, `le pic de 8 mois a relevé la FC max (ou elle a disparu) : ${t.match(/FC max [^·]*/)?.[0]}`);
+  });
+
+  await test("fcMaxDeLAthlete (VMA affichée, profil, plans) : déclarée, pic des 6 mois, jamais un vieux pic", async () => {
+    const vieux = { user_id: "u", date: ilYa(245), max_hr: 205 }, recent = { user_id: "u", date: ilYa(10), max_hr: 190 };
+    const lire = (profil: Ligne, base: Ligne[]) => fcMaxDeLAthlete(fauxClient({ profiles: [profil], performance_baselines: base, workouts: [vieux, recent] }), "u");
+    assert.equal(await lire({ id: "u", max_hr: null }, []), 190, "le pic de 8 mois (205) relève la FC max");
+    assert.equal(await lire({ id: "u", max_hr: 195 }, []), 195, "la FC max déclarée au profil est ignorée");
+    assert.equal(await lire({ id: "u", max_hr: 180 }, []), 190, "la déclarée passe sous le pic réellement atteint");
+    assert.equal(await lire({ id: "u", max_hr: null, garmin_metrics: { maxHR: 199 } }, []), 199, "la FC max de la montre est ignorée");
+    assert.equal(await lire({ id: "u", max_hr: null }, [{ user_id: "u", max_hr: 201, tested_at: ilYa(30) }]), 201, "la FC max du test est ignorée");
+    const sansRien = await fcMaxDeLAthlete(fauxClient({ profiles: [{ id: "u", max_hr: null, age: 30 }], performance_baselines: [], workouts: [] }), "u");
+    assert.equal(sansRien, null, "une FC max est inventée (âge ?) sans aucune mesure");
   });
 
   await test("le code : ni « : 190 » ni « 220 − âge » nulle part où une FC max se calcule", () => {

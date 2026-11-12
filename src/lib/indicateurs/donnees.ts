@@ -12,6 +12,7 @@ import type { HRVData, Workout } from "@/types";
 import type { DonneesFiche } from "./fiches";
 import type { SeanceCharge } from "@/lib/dashboard/charge";
 import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
+import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 import { objectifEnCours } from "@/lib/coach/prochaineCourse";
 import { computeStreak, coursesDeLObjectif, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
@@ -27,7 +28,7 @@ const PANNE: Record<Lang, string> = {
 };
 
 export async function chargerDonnees(sb: SupabaseClient, userId: string, lang: Lang, aujourdhui: string): Promise<DonneesFiche & { pannes: string[] }> {
-  const [profil, seances, historique, vfc, sommeil, charge, base, obj, plan, serieSeances, seriePlan, serieRessentis] = await Promise.all([
+  const [profil, seances, historique, vfc, sommeil, charge, base, obj, plan, serieSeances, seriePlan, serieRessentis, fcMaxVma] = await Promise.all([
     sb.from("profiles").select("resting_hr, garmin_vo2max, pace_curve").eq("id", userId).maybeSingle(),
     sb.from("workouts").select("*").eq("user_id", userId).order("date", { ascending: false }).limit(40),
     sb.from("workouts").select("date, sport, distance_km").eq("user_id", userId).gte("date", decale(aujourdhui, -120)).order("date", { ascending: false }).limit(1000),
@@ -45,6 +46,8 @@ export async function chargerDonnees(sb: SupabaseClient, userId: string, lang: L
     sb.from("notifications").select("created_at,data").eq("user_id", userId).eq("type", "coach_session")
       .gte("data->>date", decale(aujourdhui, -20)).order("created_at", { ascending: false }).limit(200),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(60),
+    // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
+    fcMaxDeLAthlete(sb, userId),
   ]);
   const enPanne = [profil, seances, historique, vfc, sommeil, charge, base, obj, plan, serieSeances, seriePlan, serieRessentis].filter((r) => r.error);
   for (const r of enPanne) console.error("[indicateurs] lecture impossible :", r.error?.message);
@@ -62,7 +65,7 @@ export async function chargerDonnees(sb: SupabaseClient, userId: string, lang: L
     metriqueVfc: serie.metrique,
     sommeil: (sommeil.data ?? []) as DonneesFiche["sommeil"],
     charge: (charge.data ?? []) as SeanceCharge[],
-    vma: vmaAffichee({ seances: ws, baseline: base.data as { vma_kmh?: number | null; tested_at?: string | null } | null, profil: p }),
+    vma: vmaAffichee({ seances: ws, baseline: base.data as { vma_kmh?: number | null; tested_at?: string | null } | null, profil: p, fcMax: fcMaxVma }),
     // Une course passée n'est plus l'objectif : la vitesse se juge alors sur la VMA, comme
     // sur la carte du tableau de bord (`objectifEnCours`, même règle des deux côtés).
     objectif: o && o.raceDate && o.distanceKm ? objectifEnCours(o, aujourdhui) : null,

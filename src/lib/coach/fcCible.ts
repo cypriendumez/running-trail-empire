@@ -92,9 +92,9 @@ export function referencesFc(e: {
  * (Jour J, bilan, discipline), seuil/âge (zones) — un coureur lisait des chiffres différents
  * selon l'écran. Ordre : la plus haute entre la DÉCLARÉE (test, profil, sinon montre) et le pic
  * RÉELLEMENT atteint (> 150), sinon le seuil mesuré ÷ 0,92, sinon `null`.
- * ⚠️ HORS PÉRIMÈTRE (12/11/2026) : le tri des « efforts maximaux » de la VMA estimée affichée
- * (`vmaAffichee`, `getEffectiveVma`, pages Plans et Profil) garde son pic > 120 sur ses séances —
- * le changer déplacerait la VMA affichée aux coureurs ; c'est un lot à part, à arbitrer.
+ * Le tri des « efforts maximaux » de la VMA estimée passe aussi par elle (Cyprien, 12/11/2026 ;
+ * mesuré avant : aucune VMA affichée ne bougeait chez les 6 coureurs actifs) — voir
+ * `fcMaxPourEfforts` et `fcMaxDeLAthlete` (lib/coach/fcMaxServeur).
  */
 export function fcMaxConnue(e: { declaree?: unknown; montre?: unknown; observee?: unknown; seuil?: unknown }): { max: number | null; source: ReferencesFc["source"] } {
   const r = referencesFc({ maxDeclaree: maxDeReference(e.declaree, e.montre), maxObservee: e.observee, seuil: e.seuil });
@@ -128,6 +128,17 @@ export function estSortieFacile(fcMoyenne: unknown, fcMax: number | null | undef
 export function seuilMesure(test: unknown, montre: unknown): number | null {
   const v = (x: unknown) => { const n = Number(x); return x != null && x !== "" && Number.isFinite(n) && n >= 100 && n <= 230 ? n : null; };
   return v(test) ?? v(montre);
+}
+
+/**
+ * La FC max qui trie les « efforts maximaux » de la VMA estimée : la FC max COMMUNE. `undefined`
+ * (lecture en panne) n'est pas « inconnue » : on garde alors l'ancien repli (pic > 120 des séances
+ * lues) plutôt que de calculer sans aucun tri.
+ */
+export function fcMaxPourEfforts(fcMax: number | null | undefined, seances: readonly { max_hr?: unknown }[]): number | null {
+  if (fcMax !== undefined) return fcMax;
+  const pic = Math.max(0, ...(seances ?? []).map((s) => Number(s.max_hr) || 0));
+  return pic > 120 ? pic : null;
 }
 
 /** Le pic de FC réellement atteint sur les {@link PIC_FC_JOURS} jours qui finissent le jour civil `jour`. */

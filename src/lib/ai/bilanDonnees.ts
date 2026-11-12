@@ -44,12 +44,6 @@ export async function faitsDeLaSemaine(sb: SupabaseClient, userId: string, jour:
   }
   const seances = (seancesRes.data ?? []) as unknown as (Parameters<typeof faitsDuBilan>[0]["seances"][number] & { max_hr?: number | null; type?: string | null; weather_temp_c?: number | null })[];
 
-  // La VMA et la prédiction : le MÊME calcul que la carte du tableau de bord (40 dernières séances).
-  const { vma } = vmaAffichee({
-    seances: seances.slice(0, 40) as Parameters<typeof vmaAffichee>[0]["seances"],
-    baseline: baseRes.data as { vma_kmh?: number | null; tested_at?: string | null } | null,
-    profil: profilRes.data as Parameters<typeof vmaAffichee>[0]["profil"],
-  });
   type Course = { race?: string; raceDate?: string; distanceKm?: number };
   const objBrut = objRes.data?.data as (Course & { targetSeconds?: number; precedente?: Course | null }) | null;
   const objectif = objectifEnCours(objBrut as { race: string; raceDate: string; distanceKm: number; targetSeconds: number } | null, jour);
@@ -71,6 +65,14 @@ export async function faitsDeLaSemaine(sb: SupabaseClient, userId: string, jour:
     declaree: Number(base?.max_hr) || Number(prof?.max_hr) || null, montre: gm?.maxHR,
     observee: picFcObserve(seances, jour), seuil: seuilMesure(base?.lt_hr, gm?.lthr),
   }).max;
+  // La VMA et la prédiction : le MÊME calcul que la carte du tableau de bord (40 dernières séances),
+  // efforts triés avec la MÊME FC max (12/11/2026).
+  const { vma } = vmaAffichee({
+    seances: seances.slice(0, 40) as Parameters<typeof vmaAffichee>[0]["seances"],
+    baseline: baseRes.data as { vma_kmh?: number | null; tested_at?: string | null } | null,
+    profil: profilRes.data as Parameters<typeof vmaAffichee>[0]["profil"],
+    fcMax,
+  });
 
   return faitsDuBilan({
     aujourdhui: jour,
