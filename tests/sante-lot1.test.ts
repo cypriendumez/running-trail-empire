@@ -374,6 +374,13 @@ async function main() {
     const decalee = q.find((d) => d.type !== "Repos");
     assert.ok(decalee && /décalée ici/.test(decalee.why) && decalee.i18n?.en?.why.includes("moved here"), "le pourquoi ne dit pas que la sortie a été décalée");
     assert.deepEqual(appliquerConsignes(q, { consignes: consignes({ seancesMaxSemaine: 2 }), allureFacile: "5'00", sortiesRecentes: [ilYa(1), ilYa(2)], courseC: null }), q, "réappliqué, le contrôle déplace encore");
+    // Idempotence AVEC une durée maximale (fuzz du relecteur : le pourquoi « décalée ici » disparaissait).
+    for (const duree of [30, 45, 60]) {
+      const cd = { consignes: consignes({ seancesMaxSemaine: 2, dureeMaxMin: duree }), allureFacile: "5'00", sortiesRecentes: [ilYa(1), ilYa(2)], courseC: null };
+      const une = appliquerConsignes(f, cd);
+      assert.ok(une.some((d) => /décalée ici/.test(d.why)), `précondition (${duree} min) : aucune sortie décalée`);
+      assert.deepEqual(appliquerConsignes(une, cd), une, `réappliqué avec ${duree} min, le plan change`);
+    }
     // Site d'appel : consignesSurPlan passe les jours déclarés MOINS ceux que l'athlète rate.
     assert.match(codeOf("src/lib/ai/autoPlan.ts"), /joursDispo: ctx\.availability\?\.days\?\.filter\(\(d\) => !\(ctx\.skippedWeekdays \?\? \[\]\)\.includes\(d\)\),/, "les jours disponibles ne passent plus (ou incluent les jours ratés)");
     // Et le vrai plan : 2 jours déclarés, aucune sortie hors de ces jours.

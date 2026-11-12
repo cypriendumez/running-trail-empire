@@ -163,8 +163,11 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
   const fin = jjmm(consignes.jusquAu);
   const footing = (jour: PlanDay) => {
     const corps = corpsFooting(consignes.dureeMaxMin, jour, c.allureFacile);
+    // Déjà réécrit par ce contrôle (réapplication après les ajustements) : son « pourquoi » est gardé —
+    // sinon celui d'une sortie DÉCALÉE retombait sur le texte générique (relecture, fuzz de 20 000 semaines).
+    const deja = jour.title === T.fr.titre;
     return reecrire(jour, "Récup", (l) => ({
-      title: T[l].titre, detail: PLAN_T[l].recupDetail(5, 5, corps), why: T[l].why(fin),
+      title: T[l].titre, detail: PLAN_T[l].recupDetail(5, 5, corps), why: deja ? texteDe(jour, l).why : T[l].why(fin),
       tags: [PLAN_T[l].tags["Récup"], PLAN_T[l].tags["Z1"], `${corps + 10} min`],
     }));
   };
