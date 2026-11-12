@@ -97,7 +97,7 @@ export default async function CoursPage() {
   return (
     <div className="min-h-screen bg-zinc-50">
       {/* Une panne est DITE au coureur (12/11/2026) : ses allures personnalisées disparaîtraient sans un mot. */}
-      <div className="mx-auto max-w-4xl px-4 pt-4"><BandeauPanne lectures={pannes} lang={langBandeau ?? normLang(lang)} /></div>
+      <BandeauPanne lectures={pannes} lang={langBandeau ?? normLang(lang)} cadre="mx-auto max-w-4xl px-4 pt-4" />
       {/* Hero — resserré le 21/09/2026 (Cyprien : « trop grand, il prend trop de place ») :
           padding 40→20 px, titre 4xl→3xl, sous-titre plus petit et limité à 2 lignes sur
           téléphone. */}

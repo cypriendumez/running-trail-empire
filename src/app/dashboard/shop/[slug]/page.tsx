@@ -76,7 +76,7 @@ export default async function ModelePage({ params }: { params: Promise<{ slug: s
   // Une panne est DITE au coureur (12/11/2026) : l'avis sur ce modèle repose sur sa VMA.
   return (
     <>
-      <div className="mx-auto w-full max-w-[1180px] sm:px-6 sm:pt-6"><BandeauPanne lectures={pannes} lang={await langueEcran(profilRes.data?.preferred_language)} /></div>
+      <BandeauPanne lectures={pannes} lang={await langueEcran(profilRes.data?.preferred_language)} cadre="mx-auto w-full max-w-[1180px] sm:-mb-6 sm:px-6 sm:pt-6" />
       <FicheModele m={m} avis={avis} bouts={bouts} manquantes={manquantes} proches={proches}
         offres={offres} offresLisibles={offresLisibles} best={best} tx={tx} langue={lang} />
     </>

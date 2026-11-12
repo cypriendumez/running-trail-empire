@@ -9,7 +9,6 @@ import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
-import { normLang } from "@/lib/i18n/base";
 import { langueEcran } from "@/lib/i18n/serverLang";
 
 // « Enregistrer » dans la navigation depuis le 21/09/2026 (Cyprien), comme l'onglet du
