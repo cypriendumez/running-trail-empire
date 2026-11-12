@@ -17,7 +17,7 @@ import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { predictRaceSec } from "@/lib/running/fitness";
 import { socleDesSeances } from "@/lib/dashboard/forme";
 import { serieVfc, COLONNES_VFC } from "@/lib/health/vfc";
-import { fcMaxConnue, picFcObserve } from "@/lib/coach/fcCible";
+import { fcMaxConnue, picFcObserve, seuilMesure } from "@/lib/coach/fcCible";
 
 /** La ligne où le bilan rédigé est mémorisé (une par athlète, avec l'empreinte de ses faits). */
 export const TYPE_BILAN = "ai_bilan";
@@ -58,12 +58,18 @@ export async function faitsDeLaSemaine(sb: SupabaseClient, userId: string, jour:
   // entre la déclarée (test, profil, sinon montre) et le pic réellement atteint (> 150), sinon le
   // seuil mesuré ÷ 0,92, sinon inconnue — jamais l'âge. C'était « test, sinon pic > 120 » : un
   // coureur lisait une pente ici et une autre (ou aucune) côté coach.
+  // ⚠️ Une panne n'est pas « FC max inconnue » (12/11/2026) : sans ces deux lectures, pas de bilan
+  // plutôt qu'un bilan qui affirmerait ne pas connaître la FC max (même règle que les séances).
+  if (baseRes.error || profilRes.error) {
+    console.error("[bilan] repères de FC illisibles :", (baseRes.error ?? profilRes.error)?.message);
+    return null;
+  }
   const base = baseRes.data as { max_hr?: number | null; lt_hr?: number | null } | null;
   const prof = profilRes.data as { max_hr?: number | null; garmin_metrics?: Record<string, unknown> | null } | null;
   const gm = prof?.garmin_metrics ?? null;
   const fcMax = fcMaxConnue({
     declaree: Number(base?.max_hr) || Number(prof?.max_hr) || null, montre: gm?.maxHR,
-    observee: picFcObserve(seances, jour), seuil: Number(gm?.lthr) || Number(base?.lt_hr) || null,
+    observee: picFcObserve(seances, jour), seuil: seuilMesure(base?.lt_hr, gm?.lthr),
   }).max;
 
   return faitsDuBilan({

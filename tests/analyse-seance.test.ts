@@ -57,6 +57,8 @@ test("une séance à 86 % de la FC max est DURE, quoi qu'en dise la montre", () 
   assert.equal(PART_FC_FACILE, 0.80, "seuil facile : décision d'entraîneur, commune à toute l'application");
   assert.equal(faitsDeSeance({ ...SEANCE, avg_hr: 165 }, { fcMax: 212 }).intensite, "facile", "un footing à 77,8 % passe pour modéré");
   assert.equal(faitsDeSeance({ ...SEANCE, avg_hr: 170 }, { fcMax: 212 }).intensite, "moderee", "une sortie à 80,2 % passe pour facile");
+  // Frontière sur la part NON arrondie : 159/200 = 79,5 % est facile, comme partout ailleurs.
+  assert.equal(faitsDeSeance({ ...SEANCE, avg_hr: 159 }, { fcMax: 200 }).intensite, "facile", "79,5 % arrondi à 80 passe pour modéré");
 });
 
 test("sans FC max connue, aucune intensité n'est affirmée", () => {

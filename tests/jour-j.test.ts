@@ -160,9 +160,9 @@ test("la pente de Jour J passe par la règle unique : FC max sans valeur par dé
   const src = codeNu("src/app/dashboard/jour-j/page.tsx");
   // 12/11/2026 : la MÊME FC max que le coach (`fcMaxConnue`) — déclarée (test, profil, montre),
   // pic des 6 mois, seuil — et rien d'autre (ni âge, ni valeur par défaut).
-  assert.match(src, /const fcMax = fcMaxConnue\(\{\s*declaree: Number\(base\?\.max_hr\) \|\| Number\(p\?\.max_hr\) \|\| null, montre: gm\?\.maxHR,\s*observee: picFcObserve\(seances, jour\), seuil: [^}]*\}\)\.max;/,
+  assert.match(src, /const fcMax = ePanneFc \? null : fcMaxConnue\(\{\s*declaree: Number\(base\?\.max_hr\) \|\| Number\(fcProfil\?\.max_hr\) \|\| null, montre: gm\?\.maxHR,\s*observee: picFcObserve\(seances, jour\), seuil: [^}]*\}\)\.max;/,
     "la FC max de Jour J a quitté la définition commune (ou reçu une valeur par défaut)");
-  assert.match(src, /max_hr, garmin_metrics`\)/, "Jour J ne lit plus la FC max du profil ni celle de la montre");
+  assert.match(src, /select\("max_hr, garmin_metrics"\)/, "Jour J ne lit plus la FC max du profil ni celle de la montre");
   assert.match(src, /tendanceEfficacite\(efficaciteParBloc\([^;]*?, fcMax, /, "Jour J ne passe plus sa FC max à la mesure de pente");
 });
 

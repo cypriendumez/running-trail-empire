@@ -12,7 +12,7 @@ import {
 import { toast } from "sonner";
 import type { UserProfile, PerformanceBaseline } from "@/types";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { referencesFc, plageFc, cibleEndurance, maxDeReference } from "@/lib/coach/fcCible";
+import { referencesFc, plageFc, cibleEndurance, maxDeReference, seuilMesure } from "@/lib/coach/fcCible";
 import { GX, GUIDE, GUIDE_TIP, SPEECH_LANG, fillG } from "./ghostI18n";
 import { messageLecture } from "@/lib/watch/intervals";
 import { jourCivil } from "@/lib/time/fuseau";
@@ -961,7 +961,8 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     maxDeclaree: maxDeReference(baseline?.max_hr ?? (profile as unknown as { max_hr?: number } | null)?.max_hr, gm?.maxHR),
     maxObservee: fcMaxObservee,
     repos: (profile as unknown as { resting_hr?: number } | null)?.resting_hr ?? gm?.restingHR,
-    seuil: gm?.lthr,
+    // 12/11/2026 : la MÊME source de seuil que le coach (test, puis montre).
+    seuil: seuilMesure((baseline as unknown as { lt_hr?: number } | null)?.lt_hr, gm?.lthr),
   });
   // ⚠️ PLUS DE 190 INVENTÉ (07/11/2026). `refsFc.max ?? 190` affichait des zones en bpm
   // calculées sur une FC max que personne n'a mesurée — exactement la valeur par défaut

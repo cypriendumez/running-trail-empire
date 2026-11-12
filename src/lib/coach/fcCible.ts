@@ -92,6 +92,9 @@ export function referencesFc(e: {
  * (Jour J, bilan, discipline), seuil/âge (zones) — un coureur lisait des chiffres différents
  * selon l'écran. Ordre : la plus haute entre la DÉCLARÉE (test, profil, sinon montre) et le pic
  * RÉELLEMENT atteint (> 150), sinon le seuil mesuré ÷ 0,92, sinon `null`.
+ * ⚠️ HORS PÉRIMÈTRE (12/11/2026) : le tri des « efforts maximaux » de la VMA estimée affichée
+ * (`vmaAffichee`, `getEffectiveVma`, pages Plans et Profil) garde son pic > 120 sur ses séances —
+ * le changer déplacerait la VMA affichée aux coureurs ; c'est un lot à part, à arbitrer.
  */
 export function fcMaxConnue(e: { declaree?: unknown; montre?: unknown; observee?: unknown; seuil?: unknown }): { max: number | null; source: ReferencesFc["source"] } {
   const r = referencesFc({ maxDeclaree: maxDeReference(e.declaree, e.montre), maxObservee: e.observee, seuil: e.seuil });
@@ -115,6 +118,16 @@ export const PART_FC_DURE = 0.85;
 export function estSortieFacile(fcMoyenne: unknown, fcMax: number | null | undefined): boolean {
   const fc = Number(fcMoyenne);
   return fcMoyenne != null && Number.isFinite(fc) && fc > 0 && fcMax != null && fcMax > 0 && fc / fcMax < PART_FC_FACILE;
+}
+
+/**
+ * LE SEUIL MESURÉ (LTHR) — une seule source, le TEST d'abord, puis la MONTRE, comme la FC max
+ * (directeur scientifique, 12/11/2026). Avant, le coach prenait la montre d'abord, les cibles de la
+ * montre le test seul et le Ghost Runner la montre seule : un même coureur avait deux FC max.
+ */
+export function seuilMesure(test: unknown, montre: unknown): number | null {
+  const v = (x: unknown) => { const n = Number(x); return x != null && x !== "" && Number.isFinite(n) && n >= 100 && n <= 230 ? n : null; };
+  return v(test) ?? v(montre);
 }
 
 /** Le pic de FC réellement atteint sur les {@link PIC_FC_JOURS} jours qui finissent le jour civil `jour`. */

@@ -76,7 +76,7 @@ export function PackJourJVue({ pack, t, lang, nom, date, joursRestants, dplusM }
             <p className="mt-3 text-sm leading-relaxed text-zinc-700">
               {c.verdict === "irrealiste" && c.projeteSec != null ? t.verdict.irrealiste(temps(c.projeteSec)) : c.verdict === "irrealiste" ? t.verdict.inconnu : t.verdict[c.verdict]}
             </p>
-            {c.projeteSec != null && (
+            {c.projeteSec != null && joursRestants >= 7 && (
               // Sans pente mesurée, la projection repose sur une HYPOTHÈSE : on le dit (12/11/2026).
               <p className="mt-1 text-xs leading-relaxed text-zinc-500">
                 {c.progressionMesuree ? t.progressionMesuree : t.progressionSupposee(n(GAIN_GENERIQUE_SEMAINE * 100))}

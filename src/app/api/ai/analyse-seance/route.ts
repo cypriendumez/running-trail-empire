@@ -12,7 +12,7 @@ import { computeLoad } from "@/lib/dashboard/charge";
 import { decaleJour } from "@/lib/streak/compute";
 import { intervallesDeSeance, fluxDeSeance } from "@/lib/intervals/performance";
 import { identifiantsDe, type ProfilIdentifiants } from "@/lib/intervals/identifiants";
-import { fcMaxConnue } from "@/lib/coach/fcCible";
+import { fcMaxConnue, seuilMesure, PIC_FC_JOURS } from "@/lib/coach/fcCible";
 import { getAccountLang } from "@/lib/i18n/serverLang";
 import { journaliserEchec } from "@/lib/journal/echecServeur";
 import { pausesDeTrace, pointsStockes, vitesseEnMouvement } from "@/lib/activities/pauses";
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
   const s = seance as unknown as SeanceBrute;
 
   // ── 4. Le contexte qui rend l'analyse utile : repères, comparables, prescrit.
-  const [profilRes, baseRes, compRes, prescritRes, objRes] = await Promise.all([
+  const [profilRes, baseRes, compRes, prescritRes, objRes, picRes] = await Promise.all([
     // Les identifiants intervals.icu servent à relire les intervalles (analyse complète) ;
     // ils restent ici, côté serveur, et ne repartent jamais vers le navigateur.
     supabase.from("profiles").select("max_hr, garmin_metrics, intervals_athlete_id, intervals_api_key").eq("id", user.id).maybeSingle(),
@@ -114,13 +114,18 @@ export async function POST(req: Request) {
     supabase.from("notifications").select("title,body,data").eq("user_id", user.id)
       .eq("type", "coach_session").eq("data->>date", String(s.date).slice(0, 10)).limit(1),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
+    // Le pic des six derniers mois : la MÊME requête que le coach (12/11/2026). Le pic des 120
+    // comparables n'avait ni fenêtre de date ni autre sport — un pic vieux d'un an comptait ici.
+    supabase.from("workouts").select("max_hr").eq("user_id", user.id).not("max_hr", "is", null)
+      .gte("date", new Date(Date.now() - PIC_FC_JOURS * 86400000).toISOString().slice(0, 10))
+      .order("max_hr", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   // ⚠️ DES REPÈRES ILLISIBLES NE SONT PAS DES REPÈRES ABSENTS (08/11/2026). Sans la FC max de
   // référence ni les comparables, `fcMax` devenait le pic de CETTE seule sortie (dès 150 bpm)
   // et le verdict d'intensité partait faux, sans signe de dégradation ; sans le prescrit,
   // la séance était jugée comme si rien n'était prévu. On n'analyse pas à l'aveugle : 503.
-  const eRepere = profilRes.error ?? baseRes.error ?? compRes.error ?? prescritRes.error ?? objRes.error;
+  const eRepere = profilRes.error ?? baseRes.error ?? compRes.error ?? prescritRes.error ?? objRes.error ?? picRes.error;
   if (eRepere) {
     console.error("[analyse-seance] repères illisibles :", eRepere.message);
     return NextResponse.json({ error: "Analyse momentanément indisponible, réessaie dans un moment." }, { status: 503 });
@@ -130,12 +135,11 @@ export async function POST(req: Request) {
   // entre la déclarée (test, profil, sinon montre) et le pic réellement observé (> 150), sinon le
   // seuil mesuré ÷ 0,92 — et PLUS JAMAIS 220 − âge (Cyprien : « la refuser partout »). Sans FC
   // max, l'intensité de la séance n'est pas jugée sur un chiffre inventé.
-  const obsMax = Math.max(0, ...comparables.map((w) => Number(w.max_hr) || 0), Number(s.max_hr) || 0);
   const baseFc = baseRes.data as { max_hr?: number | null; lt_hr?: number | null } | null;
   const profFc = profilRes.data as { max_hr?: number | null; garmin_metrics?: Record<string, unknown> | null } | null;
   const fcMax = fcMaxConnue({
     declaree: Number(baseFc?.max_hr) || Number(profFc?.max_hr) || null, montre: profFc?.garmin_metrics?.maxHR,
-    observee: obsMax, seuil: Number(profFc?.garmin_metrics?.lthr) || Number(baseFc?.lt_hr) || null,
+    observee: (picRes.data as { max_hr?: number | null } | null)?.max_hr, seuil: seuilMesure(baseFc?.lt_hr, profFc?.garmin_metrics?.lthr),
   }).max;
 
   const p = prescritRes.data?.[0] as { title?: string; body?: string; data?: { sessionType?: string; subtitle?: string } } | undefined;

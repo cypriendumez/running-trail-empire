@@ -11,7 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, airFroid, BAISSE_HIVER_BPM, SEUIL_FROID_C, fcMaxConnue, picFcObserve } from "../src/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, airFroid, BAISSE_HIVER_BPM, SEUIL_FROID_C, fcMaxConnue, picFcObserve, seuilMesure } from "../src/lib/coach/fcCible";
 import { avecSaison } from "../src/lib/coach/ciblesFcServeur";
 import { stepsForType, parseReps, buildWorkoutDescription } from "../src/lib/watch/intervals";
 
@@ -263,26 +263,52 @@ test("« air froid » : une case vide n'est pas 0 °C", () => {
   assert.equal(airFroid([{ tempMin: "1", tempMax: "2" }, { tempMin: 1, tempMax: 2 }, { tempMin: 1, tempMax: 2 }] as never), false, "du texte n'est pas une prévision");
 });
 
-test("UNE seule FC max : coach, zones, discipline, Jour J, bilan, analyse de séance et Ghost Runner (12/11/2026)", () => {
+test("UNE seule FC max : coach, zones, discipline, montre, Jour J, bilan, analyse de séance et Ghost Runner (12/11/2026)", () => {
   // Avant : quatre chaînes (déclarée/pic > 150/âge ; test/pic > 120 ; seuil/âge ; test/pic/âge).
-  // Un même coureur lisait une pente côté coach et aucune sur Jour J. Chaque site d'appel passe
-  // désormais par `fcMaxConnue` (ou `maxDeReference` + `referencesFc` côté client), sans l'âge.
-  const sites: [string, RegExp][] = [
-    ["src/lib/ai/coachContext.ts", /fcMaxConnue\(\{ declaree: maxHrDeclare, observee: obsMaxHr0,/],
-    ["src/app/dashboard/jour-j/page.tsx", /fcMaxConnue\(\{\s*declaree: Number\(base\?\.max_hr\) \|\| Number\(p\?\.max_hr\) \|\| null, montre: gm\?\.maxHR,\s*observee: picFcObserve\(seances, jour\)/],
-    ["src/lib/ai/bilanDonnees.ts", /fcMaxConnue\(\{\s*declaree: Number\(base\?\.max_hr\) \|\| Number\(prof\?\.max_hr\) \|\| null, montre: gm\?\.maxHR,\s*observee: picFcObserve\(seances, jour\)/],
-    ["src/app/api/ai/analyse-seance/route.ts", /fcMaxConnue\(\{\s*declaree: Number\(baseFc\?\.max_hr\) \|\| Number\(profFc\?\.max_hr\) \|\| null, montre: profFc\?\.garmin_metrics\?\.maxHR,/],
-    ["src/components/ghost-runner/GhostRunner.tsx", /maxDeclaree: maxDeReference\([^\n]*, gm\?\.maxHR\),/],
+  // Relecture du 12/11 : vérifier la PRÉSENCE de l'appel ne suffit pas — un site appelait bien
+  // `fcMaxConnue` avec un pic de tout l'historique ou un seuil d'une autre source. On vérifie donc
+  // ce qui lui est PASSÉ : la déclarée (test, profil, montre), le pic des 6 mois, le seuil test → montre.
+  // Le test (lt_hr) d'abord, la montre (lthr) ensuite — dans cet ordre.
+  const SEUIL = /^seuil: seuilMesure\(.*\blt_hr\b.*, [^,]*\blthr\)/;
+  const sites: [string, RegExp[]][] = [
+    ["src/lib/ai/coachContext.ts", [/fcMaxConnue\(\{ declaree: maxHrDeclare, observee: obsMaxHr0, seuil: seuilMesure\(b\?\.lt_hr, gmFc\?\.lthr\) \}\)/,
+      /\.not\("max_hr", "is", null\)\.gte\("date", new Date\(Date\.now\(\) - PIC_FC_JOURS \* 86400000\)/]],
+    ["src/app/dashboard/jour-j/page.tsx", [/fcMaxConnue\(\{\s*declaree: Number\(base\?\.max_hr\) \|\| Number\(fcProfil\?\.max_hr\) \|\| null, montre: gm\?\.maxHR,\s*observee: picFcObserve\(seances, jour\), seuil: seuilMesure\(base\?\.lt_hr, gm\?\.lthr\)/]],
+    ["src/lib/ai/bilanDonnees.ts", [/fcMaxConnue\(\{\s*declaree: Number\(base\?\.max_hr\) \|\| Number\(prof\?\.max_hr\) \|\| null, montre: gm\?\.maxHR,\s*observee: picFcObserve\(seances, jour\), seuil: seuilMesure\(base\?\.lt_hr, gm\?\.lthr\)/]],
+    ["src/app/api/ai/analyse-seance/route.ts", [/fcMaxConnue\(\{\s*declaree: Number\(baseFc\?\.max_hr\) \|\| Number\(profFc\?\.max_hr\) \|\| null, montre: profFc\?\.garmin_metrics\?\.maxHR,\s*observee: \(picRes\.data [^)]*\)\?\.max_hr, seuil: seuilMesure\(baseFc\?\.lt_hr, profFc\?\.garmin_metrics\?\.lthr\)/,
+      /\.not\("max_hr", "is", null\)\s*\.gte\("date", new Date\(Date\.now\(\) - PIC_FC_JOURS \* 86400000\)/]],
+    ["src/app/dashboard/ghost-runner/page.tsx", [/\.gt\("max_hr", 150\)\s*\.gte\("date", new Date\(Date\.now\(\) - PIC_FC_JOURS \* 86400000\)/,
+      /classifyRun\(w, fcMaxCommune\)/, /fcMaxConnue\(\{\s*declaree: Number\(bGr\?\.max_hr\) \|\| Number\(pGr\?\.max_hr\) \|\| null, montre: pGr\?\.garmin_metrics\?\.maxHR,\s*observee: fcMaxObservee, seuil: seuilMesure\(bGr\?\.lt_hr, pGr\?\.garmin_metrics\?\.lthr\)/]],
+    ["src/components/ghost-runner/GhostRunner.tsx", [/maxDeclaree: maxDeReference\([^\n]*, gm\?\.maxHR\),/, /seuil: seuilMesure\(\(baseline as unknown as \{ lt_hr\?: number \} \| null\)\?\.lt_hr, gm\?\.lthr\)/]],
+    ["src/lib/coach/ciblesFcServeur.ts", [/seuil: seuilMesure\(b\?\.lt_hr, garmin\?\.lthr\)/, /\.gte\("date", new Date\(maintenant - PIC_FC_JOURS \* 86400000\)/]],
   ];
-  for (const [f, re] of sites) assert.match(code(f), re, `${f} : la FC max ne passe plus par la définition commune`);
+  for (const [f, res] of sites) for (const re of res) assert.match(code(f), re, `${f} : la FC max ne reçoit plus les entrées communes (${re.source.slice(0, 60)}…)`);
+  // Aucun site ne passe un seuil d'une autre source.
+  for (const [f] of sites) {
+    const c = code(f);
+    for (const m of c.matchAll(/\bseuil: ([^\n]+)/g)) assert.match(`seuil: ${m[1]}`, SEUIL, `${f} : seuil passé hors de seuilMesure (${m[1].slice(0, 60)})`);
+  }
   // Les sélections lisent bien ce que la définition commune consomme.
   assert.match(code("src/lib/ai/bilanDonnees.ts"), /select\("garmin_vo2max,pace_curve,max_hr,garmin_metrics"\)/, "le bilan ne lit plus la FC max du profil ni de la montre");
   assert.match(code("src/lib/ai/bilanDonnees.ts"), /select\("vma_kmh,max_hr,lt_hr,tested_at"\)/, "le bilan ne lit plus le seuil mesuré");
-  assert.match(code("src/app/api/ai/analyse-seance/route.ts"), /select\("max_hr, garmin_metrics, intervals_athlete_id, intervals_api_key"\)/, "l'analyse ne lit plus la FC max du profil ni de la montre");
-  // Le coach : zones et discipline des footings lisent la MÊME valeur.
+  assert.match(code("src/lib/ai/bilanDonnees.ts"), /if \(baseRes\.error \|\| profilRes\.error\) \{[\s\S]{0,160}return null;/, "le bilan ne lit plus l'erreur des lectures de FC");
+  assert.match(code("src/app/dashboard/jour-j/page.tsx"), /sb\.from\("profiles"\)\.select\("max_hr, garmin_metrics"\)/, "Jour J ne lit plus la FC du profil à part (elle mettrait en jeu la porte d'accès)");
+  assert.match(code("src/app/dashboard/jour-j/page.tsx"), /const ePanneFc = baseRes\.error \?\? fcProfilRes\.error;\s*if \(ePanneFc\) await journaliserEchec/, "Jour J ne lit plus l'erreur des lectures de FC");
+  assert.match(code("src/app/api/ai/analyse-seance/route.ts"), /objRes\.error \?\? picRes\.error;/, "l'analyse ne lit plus l'erreur du pic de FC");
+  // Le coach : zones et discipline des footings lisent la MÊME valeur ; le seuil des zones aussi.
   const c = code("src/lib/ai/coachContext.ts");
   assert.match(c, /const maxHrEff = fcMaxEst;/, "les zones ont retrouvé leur propre FC max");
   assert.match(c, /const fcMax = fcMaxEst;/, "la discipline des footings a retrouvé sa propre FC max");
+  assert.match(c, /const lthrMeasured = seuilMesure\(ltHr, gm\?\.lthr\);/, "le seuil des zones a retrouvé sa propre source");
+});
+
+test("seuilMesure : le test d'abord, puis la montre ; hors du domaine humain, rien", () => {
+  assert.equal(seuilMesure(175, 180), 175, "la montre passe devant le test");
+  assert.equal(seuilMesure(null, 180), 180);
+  assert.equal(seuilMesure(1e9, 180), 180, "un seuil absurde est retenu");
+  assert.equal(seuilMesure(null, 40), null);
+  // Même coureur (seuil test 175, montre 180) : coach, Jour J, bilan, montre et Ghost lisent 175 ÷ 0,92.
+  assert.equal(fcMaxConnue({ seuil: seuilMesure(175, 180) }).max, Math.round(175 / 0.92));
 });
 
 test("picFcObserve : le pic des 6 derniers mois, pas celui d'avant ni d'après", () => {

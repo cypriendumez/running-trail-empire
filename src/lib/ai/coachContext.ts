@@ -1,7 +1,7 @@
 import type { createClient } from "@/lib/supabase/server";
 import { sansAllureInconnue } from "@/lib/coach/allureInconnue";
 import { picsSaison, avecSaison } from "@/lib/coach/ciblesFcServeur";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, fcMaxConnue, estSortieFacile, PART_FC_FACILE, PART_FC_DURE, airFroid, PIC_FC_JOURS, type CiblesFc } from "@/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, fcMaxConnue, estSortieFacile, PART_FC_FACILE, PART_FC_DURE, airFroid, PIC_FC_JOURS, type CiblesFc, seuilMesure } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { menuSelonDenivele, preferenceDenivele } from "@/lib/coach/denivele";
@@ -667,7 +667,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   //  · PLUS 220 − ÂGE (Cyprien, 12/11/2026 : « la refuser partout ») ;
   //  · jamais une FC MOYENNE (un footing à 155 bpm devenait un effort à 100 %).
   // Sans FC max : séances jugées sur leur TYPE, ni relecture d'exécution ni pente (plus bas).
-  const fcMaxRef = fcMaxConnue({ declaree: maxHrDeclare, observee: obsMaxHr0, seuil: num(gmFc?.lthr) ?? num(b?.lt_hr) });
+  const fcMaxRef = fcMaxConnue({ declaree: maxHrDeclare, observee: obsMaxHr0, seuil: seuilMesure(b?.lt_hr, gmFc?.lthr) });
   const fcMaxSource = fcMaxRef.source;
   const fcMaxEst: number | null = fcMaxRef.max;
   // ── LES CIBLES DE FC MESURÉES (07/11/2026) ─────────────────────────────────
@@ -695,7 +695,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     avecSaison(referencesFc({
       maxDeclaree: maxHrDeclare, maxObservee: obsMaxHr0,
       repos: num(b?.resting_hr) ?? num(p?.resting_hr) ?? num((((p as Record<string, unknown> | null)?.garmin_metrics) as Record<string, unknown> | null)?.restingHR),
-      seuil: num(b?.lt_hr),
+      seuil: seuilMesure(b?.lt_hr, gmFc?.lthr),
     }), picsDeSaison, airFroid(forecast)),
     workouts.filter((w) => isRun(w.sport) && !isHardType(w.type) && (num(w.duration_seconds) ?? 0) >= 20 * 60
       && now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime() <= 60 * 86400000)
@@ -945,7 +945,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // l'alimentant avec la MEILLEURE FC max disponible ; et on réserve le seuil mesuré
   // à la zone qu'il définit littéralement : le seuil.
   const gm = (p as Record<string, unknown> | null)?.garmin_metrics as Record<string, unknown> | null | undefined;
-  const lthrMeasured = num(gm?.lthr) ?? ltHr;
+  // 12/11/2026 : la MÊME source que la FC max (`seuilMesure` : test, puis montre).
+  const lthrMeasured = seuilMesure(ltHr, gm?.lthr);
   // ⚠️ MÊME RÈGLE QU'EN HAUT (fcMaxEst) : la plus haute entre ce qui est DÉCLARÉ et ce qui
   // a été RÉELLEMENT enregistré. Prendre la déclaration seule faisait calculer toutes les
   // zones sous la réalité pour qui s'est sous-estimé à l'inscription.
@@ -1671,7 +1672,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // sur la plus longue sortie d'une heure ou plus : la semaine d'un marathon, c'est le marathon, et
   // le coach concluait « endurance aérobie insuffisante » sur un effort de course — le défaut du
   // 30/10, encore vivant ici. Sans FC max, aucune sortie n'est réputée facile : pas de verdict.
-  const driftW = runs.find(w => w.cardiac_decoupling != null && estSortieFacile(w.avg_hr, fcMaxEst));
+  // …et JAMAIS le jour d'une course connue (`joursDeCourse`), même courue sous le seuil : comme le bilan.
+  const driftW = runs.find(w => w.cardiac_decoupling != null && !joursDeCourse.has(String(w.date).slice(0, 10)) && estSortieFacile(w.avg_hr, fcMaxEst));
   const drift = driftW ? Number(driftW.cardiac_decoupling) : null;
   if (drift != null && drift >= 8) {
     limiters.push({ key: "endurance", severity: 90,

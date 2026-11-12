@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { classifyRun } from "@/lib/ai/coachContext";
+import { fcMaxConnue, seuilMesure, PIC_FC_JOURS } from "@/lib/coach/fcCible";
 import { GhostRunner } from "@/components/ghost-runner/GhostRunner";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { oneSessionPerSlot } from "@/lib/coach/sessions";
@@ -83,8 +84,11 @@ export default async function GhostRunnerPage() {
   // Les deux lectures ci-dessous ne dépendent que de l'identifiant : en UNE vague, pas
   // deux attentes de plus avant le premier octet (22/09/2026).
   const [{ data: fcRows }, { data: recentes }] = await Promise.all([
+    // ⚠️ LES SIX DERNIERS MOIS (`PIC_FC_JOURS`, 12/11/2026), comme le coach : le pic de TOUT
+    // l'historique relevait les zones d'un pic d'été vieux d'un an — des cibles trop hautes.
     supabase.from("workouts")
       .select("max_hr").eq("user_id", user!.id).gt("max_hr", 150)
+      .gte("date", new Date(Date.now() - PIC_FC_JOURS * 86400000).toISOString().slice(0, 10))
       .order("max_hr", { ascending: false }).limit(1),
     supabase.from("workouts")
       .select("distance_km, duration_seconds, avg_hr, type")
@@ -92,13 +96,20 @@ export default async function GhostRunnerPage() {
       .order("date", { ascending: false }).limit(60),
   ]);
   const fcMaxObservee = (fcRows?.[0] as { max_hr?: number } | undefined)?.max_hr ?? null;
+  const pGr = profileRes.data as { max_hr?: number | null; garmin_metrics?: { maxHR?: number; lthr?: number } | null } | null;
+  const bGr = baselineRes.data as { max_hr?: number | null; lt_hr?: number | null } | null;
+  const fcMaxCommune = fcMaxConnue({
+    declaree: Number(bGr?.max_hr) || Number(pGr?.max_hr) || null, montre: pGr?.garmin_metrics?.maxHR,
+    observee: fcMaxObservee, seuil: seuilMesure(bGr?.lt_hr, pGr?.garmin_metrics?.lthr),
+  }).max;
 
   // FC de ses FOOTINGS réels : la cible d'endurance suit l'athlète quand il court plus
   // facile que la théorie (et seulement dans ce sens — voir `cibleEndurance`).
   // ⚠️ On reclasse les séances au lieu de croire leur étiquette : les imports
   // intervals.icu marquent presque tout en « easy », ce qui rendrait le tri inutile.
   const fcFootings = ((recentes ?? []) as { distance_km: number | null; duration_seconds: number | null; avg_hr: number | null; type: string | null }[])
-    .filter((w) => /Footing|Endurance/.test(classifyRun(w, fcMaxObservee)))
+    // Classés avec la FC max COMMUNE (`fcMaxConnue`), pas le seul pic : la déclarée compte aussi.
+    .filter((w) => /Footing|Endurance/.test(classifyRun(w, fcMaxCommune)))
     .map((w) => w.avg_hr)
     .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
 

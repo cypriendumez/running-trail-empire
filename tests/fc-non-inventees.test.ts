@@ -215,6 +215,28 @@ async function main() {
     assert.match(facile, /DÉRIVE CARDIAQUE \(/, "précondition : la dérive d'une sortie facile doit être dite");
   });
 
+  await test("facteur limitant « dérive » : jamais le jour d'une course connue, même courue à 78 %", async () => {
+    // Sous le seuil facile (148/190 = 78 %), un marathon reste un effort de COURSE : le jour de la
+    // course déclarée (objectif ou course remplacée) est écarté, comme pour la répartition et le bilan.
+    const marathon = { user_id: "u", date: ilYa(1), type: "easy", sport: "run", distance_km: 42.2, duration_seconds: 15000,
+      avg_hr: 148, max_hr: 175, tss: 300, cardiac_decoupling: 9, hr_zone_seconds: [0, 9000, 6000, 0, 0] };
+    const objectif = { user_id: "u", type: "race_objective",
+      data: { race: "Semi de printemps", raceDate: ilYa(-60), distanceKm: 21.1, targetSeconds: 5400,
+        precedente: { race: "Marathon de test", raceDate: ilYa(1), distanceKm: 42.2 } } };
+    const texte = async (notifications: Ligne[]) => (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL, max_hr: 190 }],
+      performance_baselines: [], workouts: [marathon, ...SEANCES_CALMES], notifications }), "u")).text;
+    assert.doesNotMatch(await texte([objectif]), /ENDURANCE AÉROBIE \(dérive/, "le marathon du jour de course devient le facteur limitant « endurance »");
+    // Contre-épreuve : sans course déclarée ce jour-là, la même sortie (78 %, donc facile) compte.
+    assert.match(await texte([]), /ENDURANCE AÉROBIE \(dérive cardiaque \+9 %\)/, "précondition : sans course déclarée, cette sortie facile doit compter");
+  });
+
+  await test("un pic vieux de 8 mois, plus haut que les récents, ne relève pas la FC max du coach", async () => {
+    const vieux = { ...SEANCES_CALMES[0], date: ilYa(245), avg_hr: 180, max_hr: 205 };
+    const recents = SEANCES_CALMES.map((w) => ({ ...w, max_hr: 172 }));
+    const t = (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL }], performance_baselines: [], workouts: [vieux, ...recents], notifications: [] }), "u")).text;
+    assert.match(t, /FC max ~172 \(obs\.\)/, `le pic de 8 mois a relevé la FC max (ou elle a disparu) : ${t.match(/FC max [^·]*/)?.[0]}`);
+  });
+
   await test("le code : ni « : 190 » ni « 220 − âge » nulle part où une FC max se calcule", () => {
     for (const f of ["src/lib/ai/coachContext.ts", "src/lib/coach/fcCible.ts", "src/app/dashboard/jour-j/page.tsx",
       "src/lib/ai/bilanDonnees.ts", "src/app/api/ai/analyse-seance/route.ts", "src/components/ghost-runner/GhostRunner.tsx"]) {

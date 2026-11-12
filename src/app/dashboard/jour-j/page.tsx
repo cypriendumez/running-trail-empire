@@ -11,7 +11,8 @@ import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { socleDesSeances } from "@/lib/dashboard/forme";
 import { efficaciteParBloc, tendanceEfficacite, ameliorationAttendue } from "@/lib/running/progression";
-import { fcMaxConnue, picFcObserve } from "@/lib/coach/fcCible";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
+import { fcMaxConnue, picFcObserve, seuilMesure } from "@/lib/coach/fcCible";
 import { isRun } from "@/lib/intervals/sport";
 import { forecastWithElevation } from "@/lib/weather/openMeteo";
 import { packJourJ } from "@/lib/coach/jourJ";
@@ -38,7 +39,7 @@ export default async function PageJourJ() {
   if (!user) redirect("/login");
 
   const { data: profil } = await sb.from("profiles")
-    .select(`${COLONNES_ACCES}, preferred_language, weight_kg, garmin_vo2max, pace_curve, last_lat, last_lon, max_hr, garmin_metrics`)
+    .select(`${COLONNES_ACCES}, preferred_language, weight_kg, garmin_vo2max, pace_curve, last_lat, last_lon`)
     .eq("id", user.id).maybeSingle();
   const p = profil as Record<string, unknown> | null;
   const lang = normLang(String(p?.preferred_language ?? "fr"));
@@ -46,10 +47,13 @@ export default async function PageJourJ() {
   if (!peut(accesDe(p as { created_at?: string | null; subscription_tier?: string | null } | null).etat, "jour_j")) return <VerrouJourJ t={t} />;
 
   const jour = aujourdhui(fuseauOuDefaut(decodeURIComponent((await cookies()).get("pacevo_tz")?.value ?? "")));
-  const [objRes, seancesRes, baseRes] = await Promise.all([
+  // ⚠️ Les colonnes de FC du profil sont lues À PART (12/11/2026) : ajoutées à la lecture qui porte
+  // la porte d'accès, une panne aurait fermé la page entière. Leur erreur est lue plus bas.
+  const [objRes, seancesRes, baseRes, fcProfilRes] = await Promise.all([
     sb.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
     sb.from("workouts").select(COLS).eq("user_id", user.id).gte("date", decaleJour(jour, -182)).order("date", { ascending: false }),
     sb.from("performance_baselines").select("vma_kmh,max_hr,lt_hr,tested_at").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
+    sb.from("profiles").select("max_hr, garmin_metrics").eq("id", user.id).maybeSingle(),
   ]);
   type Obj = { race: string; raceDate: string; distanceKm: number; targetSeconds: number; officielle?: boolean };
   const objectif = objectifEnCours(objRes.data?.data as Obj | null, jour);
@@ -68,11 +72,16 @@ export default async function PageJourJ() {
   // entre la déclarée (test, profil, sinon montre) et le pic réellement atteint (> 150), sinon le
   // seuil mesuré ÷ 0,92, sinon inconnue — jamais l'âge. C'était « test, sinon pic > 120 » : un
   // coureur lisait une pente ici et une autre (ou aucune) côté coach.
+  // Une panne de lecture n'est pas « FC max inconnue » : elle est journalisée, et la pente n'est
+  // alors pas calculée (la page dit « progression supposée », ce qui reste vrai).
+  const ePanneFc = baseRes.error ?? fcProfilRes.error;
+  if (ePanneFc) await journaliserEchec(null, { source: "jour-j", message: `FC max illisible : ${ePanneFc.message}`, userId: user.id });
   const base = baseRes.data as { max_hr?: number | null; lt_hr?: number | null } | null;
-  const gm = (p?.garmin_metrics ?? null) as Record<string, unknown> | null;
-  const fcMax = fcMaxConnue({
-    declaree: Number(base?.max_hr) || Number(p?.max_hr) || null, montre: gm?.maxHR,
-    observee: picFcObserve(seances, jour), seuil: Number(gm?.lthr) || Number(base?.lt_hr) || null,
+  const fcProfil = fcProfilRes.data as { max_hr?: number | null; garmin_metrics?: Record<string, unknown> | null } | null;
+  const gm = fcProfil?.garmin_metrics ?? null;
+  const fcMax = ePanneFc ? null : fcMaxConnue({
+    declaree: Number(base?.max_hr) || Number(fcProfil?.max_hr) || null, montre: gm?.maxHR,
+    observee: picFcObserve(seances, jour), seuil: seuilMesure(base?.lt_hr, gm?.lthr),
   }).max;
   const tendance = tendanceEfficacite(efficaciteParBloc(seances.filter((s) => isRun(s.sport)), fcMax, Date.parse(`${jour}T12:00:00Z`)));
 

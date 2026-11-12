@@ -288,7 +288,8 @@ test("seule l'ENDURANCE s'ajuste — pas le seuil ni la VMA", () => {
   const page = codeOf("src/app/dashboard/ghost-runner/page.tsx");
   // Les imports intervals.icu étiquettent presque tout en « easy » : croire l'étiquette
   // rendrait le tri inutile, il faut RECLASSER.
-  assert.match(page, /classifyRun\(w, fcMaxObservee\)/, "les séances ne sont plus reclassées avant le tri");
+  // 12/11/2026 : reclassées avec la FC max COMMUNE (déclarée, pic des 6 mois, seuil), pas le seul pic.
+  assert.match(page, /classifyRun\(w, fcMaxCommune\)/, "les séances ne sont plus reclassées avant le tri");
   assert.match(page, /fcFootings=\{fcFootings\}/, "les footings réels ne sont plus transmis");
 });
 
@@ -502,15 +503,15 @@ test("UN seul seuil « facile » : 0,80, un prédicat, aucune autre définition 
   assert.equal(estSortieFacile(159, 200), true);
   assert.equal(estSortieFacile(160, 200), false, "80 % pile n'est plus facile");
   assert.equal(estSortieFacile(164, 200), false, "82 % (marathon loisir) passe pour facile");
-  assert.equal(estSortieFacile(150, null), false, "sans FC max, une sortie est réputée facile");
-  assert.equal(estSortieFacile(null, 200), false, "sans FC moyenne, une sortie est réputée facile");
+  assert.equal(estSortieFacile(150, null), false, "sans FC max, une sortie passe pour facile (elle ne doit pas)");
+  assert.equal(estSortieFacile(null, 200), false, "sans FC moyenne, une sortie passe pour facile (elle ne doit pas)");
   // Une seule définition dans tout src/ ; les autres modules réexportent.
   const defs = execSync("grep -rnE 'export const PART_FC_(FACILE|DURE) *=' src || true", { encoding: "utf8" }).trim().split("\n").filter(Boolean);
   assert.deepEqual(defs.map((l) => l.split(":")[0]).sort(), ["src/lib/coach/fcCible.ts", "src/lib/coach/fcCible.ts"], `seuils redéfinis ailleurs : ${defs.join(" | ")}`);
   const c = codeOf("src/lib/ai/coachContext.ts");
   assert.match(c, /&& estSortieFacile\(fc, fcMaxEst\);/, "la relecture d'exécution a repris son propre seuil");
   assert.match(c, /if \(pct >= PART_FC_FACILE\) return "Allure soutenue";/, "classifyRun a repris son propre seuil");
-  assert.match(c, /runs\.find\(w => w\.cardiac_decoupling != null && estSortieFacile\(w\.avg_hr, fcMaxEst\)\)/, "le limiteur de dérive lit de nouveau n'importe quelle sortie");
+  assert.match(c, /runs\.find\(w => w\.cardiac_decoupling != null && !joursDeCourse\.has\(String\(w\.date\)\.slice\(0, 10\)\) && estSortieFacile\(w\.avg_hr, fcMaxEst\)\)/, "le limiteur de dérive lit de nouveau n'importe quelle sortie (ou le jour d'une course)");
   assert.match(codeOf("src/lib/ai/bilanSemaine.ts"), /const facile = \(s: SeanceBilan\) => !joursDeCourse\.has\(String\(s\.date\)\.slice\(0, 10\)\) && estSortieFacile\(s\.avg_hr, e\.fcMax\);/, "la dérive du bilan a repris son propre seuil");
   assert.match(codeOf("src/lib/running/progression.ts"), /if \(!estSortieFacile\(fc, fcMax\)\) continue;/, "la pente a repris son propre seuil");
 });

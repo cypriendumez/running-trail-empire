@@ -227,9 +227,12 @@ export function faitsDeSeance(
   else if (fcMaxAthlete == null) manques.push("FC maximale de l'athlète inconnue : l'intensité ne peut pas être située");
 
   // ⚠️ L'INTENSITÉ VIENT DE LA FC, PAS DU CHAMP `type` de la montre.
-  const intensite: FaitsSeance["intensite"] = partFcMax == null ? null
-    : partFcMax >= PART_FC_DURE * 100 ? "dure"
-    : partFcMax >= PART_FC_FACILE * 100 ? "moderee" : "facile";
+  // Comparée sur la part NON arrondie (12/11/2026) : arrondie, une séance à 79,5 % devenait « modérée »
+  // ici quand `estSortieFacile` la juge facile partout ailleurs.
+  const part = fcMoy != null && fcMaxAthlete != null ? fcMoy / fcMaxAthlete : null;
+  const intensite: FaitsSeance["intensite"] = part == null ? null
+    : part >= PART_FC_DURE ? "dure"
+    : part >= PART_FC_FACILE ? "moderee" : "facile";
 
   // ── LA SÉANCE EST-ELLE SEULEMENT EXPLOITABLE ? ──────────────────────────────
   // Sans distance NI durée, il n'y a pas de séance : l'analyser reviendrait à commenter
