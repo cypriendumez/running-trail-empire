@@ -364,6 +364,32 @@ async function main() {
     for (const d of plan2.filter((x) => x.type !== "Repos")) assert.notEqual(d.date, posees[0].date, "décalée sur un jour où l'athlète ne court pas");
   });
 
+  await test("une sortie décalée ne remplace jamais un repos protecteur (après une course, lendemain de sortie longue)", () => {
+    const R = (n: number) => jour(n, "Repos", PLAN_T.fr.reposTitre, ["Repos"]);
+    // Cas reproduit par le directeur scientifique : course A le jour 3, 3 sorties juste avant, 4 au plus.
+    const avecCourse = [jour(0, "Endurance", PLAN_T.fr.enduranceTitre, ["Endurance", "8 km"], "Footing facile"),
+      jour(1, "Récup", PLAN_T.fr.avantVeilleTitre, ["Récup"], PLAN_T.fr.avantVeilleDetail), jour(2, "Récup", PLAN_T.fr.veilleTitre, ["Récup"], PLAN_T.fr.veilleDetail),
+      jour(3, "Course", "🏁 Marathon", ["Course", "Objectif"]), R(4), jour(5, "Récup", PLAN_T.fr.recupTitre, ["Récup"], PLAN_T.fr.recupDetail(5, 5)), R(6)];
+    const p = appliquerConsignes(avecCourse, { consignes: consignes({ seancesMaxSemaine: 4 }), allureFacile: "5'00", sortiesRecentes: [ilYa(3), ilYa(2), ilYa(1)], courseC: null });
+    assert.equal(p[4].type, "Repos", `le lendemain de la course porte une sortie : ${p[4].title}`);
+    assert.equal(p[6].type, "Repos", `trois jours après la course, une sortie décalée : ${p[6].title}`);
+    assert.equal(p[3].type, "Course");
+    // Sortie longue puis repos complet : ce repos ne reçoit pas de sortie décalée.
+    const avecLongue = [jour(0, "Endurance", PLAN_T.fr.enduranceTitre, ["Endurance", "8 km"], "Footing facile"), R(1),
+      jour(2, "Sortie longue", "Sortie longue", ["Long", "14 km"]), R(3), R(4), R(5), R(6)];
+    const q = appliquerConsignes(avecLongue, { consignes: consignes({ seancesMaxSemaine: 2 }), allureFacile: "5'00", sortiesRecentes: [ilYa(5), ilYa(6)], courseC: null });
+    assert.equal(q[0].type, "Repos", "précondition : le footing du jour 0 ne tient pas");
+    assert.ok(q.slice(4).some((d) => d.type !== "Repos"), "la sortie retirée n'a pas été décalée sur un jour non protecteur");
+    assert.equal(q[3].type, "Repos", "le lendemain de la sortie longue porte une sortie décalée");
+    assert.equal(q[2].type, "Sortie longue", "la séance du moteur a été évincée par une sortie décalée (deux passes)");
+    // Seul jour de repos restant : le lendemain de la sortie longue. La sortie reste retirée.
+    const Rf = (n: number) => jour(n, "Renfo", "Renfo", ["Renfo"], "Gainage");
+    const seulLendemain = [jour(0, "Endurance", PLAN_T.fr.enduranceTitre, ["Endurance", "8 km"], "Footing facile"), Rf(1),
+      jour(2, "Sortie longue", "Sortie longue", ["Long", "14 km"]), R(3), Rf(4), Rf(5), Rf(6)];
+    const q2 = appliquerConsignes(seulLendemain, { consignes: consignes({ seancesMaxSemaine: 2 }), allureFacile: "5'00", sortiesRecentes: [ilYa(5), ilYa(6)], courseC: null });
+    assert.equal(q2[3].type, "Repos", "la sortie retirée est posée le lendemain de la sortie longue");
+  });
+
   console.log("\nCE QUE LA DOULEUR A CHANGÉ, QUAND CONSULTER, LA CHARGE D'AVANT");
 
   await test("avec une douleur, le contexte dit ce qu'elle a retiré ; sans, il ne dit rien", async () => {

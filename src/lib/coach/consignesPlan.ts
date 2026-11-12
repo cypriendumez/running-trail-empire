@@ -214,26 +214,44 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
   // les sorties sans connaître celles déjà courues : avec 2 sorties au plus et deux sorties ces
   // derniers jours, celles de la semaine tombaient toutes trop tôt et étaient toutes retirées —
   // une semaine entière sans course alors qu'une sortie redevenait possible quelques jours plus
-  // tard. Elle va sur le premier jour de repos plus tardif où elle tient (jour où l'athlète peut
-  // courir, consignes en vigueur), en footing facile.
+  // tard. EN DEUX PASSES (relecture du directeur scientifique) :
+  //   1. les séances du moteur sont validées À LEUR PLACE ; celles qui ne tiennent pas sont retirées ;
+  //   2. chaque sortie retirée cherche, plus tard dans la semaine, un jour de repos qui n'est pas un
+  //      repos PROTECTEUR (3 jours après une course, lendemain d'une séance dure ou d'une sortie
+  //      longue, 48 h avant une course), de préférence sans sortie la veille ni le lendemain, où
+  //      l'athlète court et où elle tient. Sinon elle reste retirée : le repos est le choix sûr.
+  //   La sortie décalée devient un footing facile, jamais plus long que la séance d'origine.
   const sortie = [...apres];
-  const libre = (j: number) => sortie[j].type === "Repos" && enVigueur(sortie[j])
-    && (!c.joursDispo || c.joursDispo.includes(new Date(`${sortie[j].date}T12:00:00Z`).getUTCDay()));
-  const decalees = new Set<number>();  // déjà validées (et comptées) en arrivant : ne pas les rejuger
+  const retirees: number[] = [];
   for (let i = 0; i < sortie.length; i++) {
     const jour = sortie[i];
-    if (decalees.has(i) || PAS_COURSE.has(jour.type) || !enVigueur(jour) || jour.type === "Course") continue;
+    if (PAS_COURSE.has(jour.type) || !enVigueur(jour) || jour.type === "Course") continue;
     // Déjà courue ce jour-là (le jour 0 est gelé dès qu'une séance est enregistrée) : la sortie
     // est dans `sortiesRecentes`, on ne la compte pas deux fois.
     if (c.sortiesRecentes.includes(jour.date)) continue;
     if (tient(jour.date)) { gardees.push(jour.date); continue; }
+    retirees.push(i);
     sortie[i] = repos(jour, (l) => T[l].repos(max, fin));
-    const cible = sortie.findIndex((x, j) => j > i && libre(j) && !sortie.some((y) => y.date === x.date && y !== x && !PAS_COURSE.has(y.type)) && tient(x.date));
-    if (cible >= 0) {
-      gardees.push(sortie[cible].date);
-      decalees.add(cible);
-      sortie[cible] = footing({ ...jour, date: sortie[cible].date, confirmed: sortie[cible].confirmed });
-    }
+  }
+  const DURS = new Set([...TYPES_INTENSES, "Sortie longue", "Course"]);
+  const typesLe = (d: string) => sortie.filter((x) => x.date === d).map((x) => x.type);
+  const court = (d: string) => c.sortiesRecentes.includes(d) || typesLe(d).some((t) => !PAS_COURSE.has(t));
+  const protecteur = (d: string) =>
+    [1, 2, 3].some((k) => typesLe(decale(d, -k)).includes("Course"))   // après une course
+    || typesLe(decale(d, -1)).some((t) => DURS.has(t))                 // lendemain d'une séance dure ou longue
+    || [1, 2].some((k) => typesLe(decale(d, k)).includes("Course"));   // 48 h avant une course
+  const candidat = (j: number, i: number) => j > i && sortie[j].type === "Repos" && enVigueur(sortie[j])
+    && typesLe(sortie[j].date).length === 1
+    && (!c.joursDispo || c.joursDispo.includes(new Date(`${sortie[j].date}T12:00:00Z`).getUTCDay()))
+    && !protecteur(sortie[j].date) && tient(sortie[j].date);
+  for (const i of retirees) {
+    const origine = apres[i];
+    const espace = (j: number) => !court(decale(sortie[j].date, -1)) && !court(decale(sortie[j].date, 1));
+    let cible = sortie.findIndex((_, j) => candidat(j, i) && espace(j));
+    if (cible < 0) cible = sortie.findIndex((_, j) => candidat(j, i));
+    if (cible < 0) continue;
+    gardees.push(sortie[cible].date);
+    sortie[cible] = footing({ ...origine, date: sortie[cible].date, confirmed: sortie[cible].confirmed });
   }
   return sortie;
 }
