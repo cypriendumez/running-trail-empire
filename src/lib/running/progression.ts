@@ -20,6 +20,8 @@
 //  que le module rend toujours de quoi nuancer (nombre de blocs, signal/bruit).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { PART_FC_FACILE, estSortieFacile } from "@/lib/coach/fcCible";
+
 export type CourseEfficacite = {
   date: string; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null;
 };
@@ -32,8 +34,9 @@ export const SEANCES_PAR_BLOC = 3;
 export const BLOCS_MIN = 4;
 /** En dessous, le bruit domine : on refuse de conclure. */
 export const SIGNAL_SUR_BRUIT_MIN = 2;
-/** Au-delà, ce n'est plus une sortie facile : l'efficacité n'y veut plus dire la même chose. */
-export const PART_FC_FACILE = 0.85;
+/** Au-delà, ce n'est plus une sortie facile : l'efficacité n'y veut plus dire la même chose.
+ *  12/11/2026 : la valeur commune (lib/coach/fcCible), 0,80 — c'était 0,85 ici. */
+export { PART_FC_FACILE };
 
 export type Tendance = {
   /** Pente en % d'efficacité par semaine. Négative = l'athlète recule. */
@@ -74,7 +77,7 @@ export function efficaciteParBloc(
     if (km == null || sec == null || fc == null || km < 3 || sec <= 0 || fc < 60) continue;
     // Sorties FACILES seulement : sur une séance dure, la vitesse par battement monte
     // sans que la forme ait changé — on mesurerait l'intensité, pas le progrès.
-    if (fc / fcMax >= PART_FC_FACILE) continue;
+    if (!estSortieFacile(fc, fcMax)) continue;
     const t = Date.parse(String(r.date ?? "").slice(0, 10) + "T12:00:00Z");
     if (!Number.isFinite(t)) continue;
     const bloc = Math.floor((maintenant - t) / (JOURS_BLOC * 86400000));

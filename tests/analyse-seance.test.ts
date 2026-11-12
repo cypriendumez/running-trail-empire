@@ -53,8 +53,10 @@ test("une séance à 86 % de la FC max est DURE, quoi qu'en dise la montre", () 
   assert.equal(PART_FC_DURE, 0.85, "seuil partagé avec le coach : à changer des deux côtés");
   assert.equal(faitsDeSeance(SEANCE, { fcMax: 212 }).intensite, "dure");
   assert.equal(faitsDeSeance({ ...SEANCE, avg_hr: 145 }, { fcMax: 212 }).intensite, "facile");
-  assert.equal(PART_FC_FACILE, 0.75);
-  assert.equal(faitsDeSeance({ ...SEANCE, avg_hr: 170 }, { fcMax: 212 }).intensite, "moderee");
+  // 12/11/2026 : « facile » = sous 0,80, la valeur commune (c'était 0,75 ici, 0,85 dans le bilan).
+  assert.equal(PART_FC_FACILE, 0.80, "seuil facile : décision d'entraîneur, commune à toute l'application");
+  assert.equal(faitsDeSeance({ ...SEANCE, avg_hr: 165 }, { fcMax: 212 }).intensite, "facile", "un footing à 77,8 % passe pour modéré");
+  assert.equal(faitsDeSeance({ ...SEANCE, avg_hr: 170 }, { fcMax: 212 }).intensite, "moderee", "une sortie à 80,2 % passe pour facile");
 });
 
 test("sans FC max connue, aucune intensité n'est affirmée", () => {

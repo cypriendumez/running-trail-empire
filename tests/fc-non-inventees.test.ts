@@ -185,6 +185,36 @@ async function main() {
     }
   });
 
+  console.log("\nUN SEUL SEUIL « FACILE » : 0,80 DE LA FC MAX (directeur scientifique, 12/11/2026)");
+
+  // Six mois de sorties régulières, FC max DÉCLARÉE à 190 : seule la FC moyenne change.
+  const sixMois = (fc: number) => Array.from({ length: 180 }, (_, k) => k + 1).filter((k) => k % 2 === 0).map((k) => ({
+    user_id: "u", date: ilYa(k), type: "easy", sport: "run", distance_km: 10, duration_seconds: 2700 + k * 3,
+    avg_hr: fc, max_hr: 175, tss: 55, hr_zone_seconds: [900, 1800, 0, 0, 0],
+  }));
+  const texteDe = async (workouts: Ligne[]) =>
+    (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL, max_hr: 190 }], performance_baselines: [], workouts, notifications: [] }), "u")).text;
+
+  await test("relecture d'exécution : des footings à 82 % ne recalent pas l'allure facile, à 76 % oui", async () => {
+    // Monter ce seuil ferait entrer des sorties à 80-85 % : l'écart partirait vers le rapide et la
+    // relecture ACCÉLÉRERAIT les footings prescrits (le défaut le plus dangereux pour un coureur).
+    assert.doesNotMatch(await texteDe(sixMois(156)), /RELECTURE DE L'EXÉCUTION/, "des sorties à 82 % de la FC max servent à recaler l'allure facile");
+    assert.match(await texteDe(sixMois(144)), /RELECTURE DE L'EXÉCUTION/, "précondition : des footings à 76 % doivent produire une relecture");
+  });
+
+  await test("facteur limitant « dérive » : jamais sur un marathon couru à 85 %, toujours sur une sortie facile", async () => {
+    // La dérive est calculée sur la plus longue sortie : la semaine d'un marathon, c'est le marathon.
+    // Le coach concluait « endurance aérobie insuffisante » sur un effort de course (défaut du 30/10).
+    const avec = (fc: number) => [{ user_id: "u", date: ilYa(1), type: "easy", sport: "run", distance_km: 42.2, duration_seconds: 15000,
+      avg_hr: fc, max_hr: 180, tss: 300, cardiac_decoupling: 9, hr_zone_seconds: [0, 3000, 6000, 6000, 0] }, ...SEANCES_CALMES];
+    const marathon = await texteDe(avec(162));
+    assert.doesNotMatch(marathon, /ENDURANCE AÉROBIE \(dérive/, "un marathon à 85 % devient le facteur limitant « endurance »");
+    assert.doesNotMatch(marathon, /DÉRIVE CARDIAQUE \(/, "la dérive d'un marathon à 85 % est présentée comme une dérive d'endurance");
+    const facile = await texteDe(avec(133));
+    assert.match(facile, /ENDURANCE AÉROBIE \(dérive cardiaque \+9 %\)/, "précondition : une sortie facile à 9 % de dérive doit être le facteur limitant");
+    assert.match(facile, /DÉRIVE CARDIAQUE \(/, "précondition : la dérive d'une sortie facile doit être dite");
+  });
+
   await test("le code : ni « : 190 » ni « 220 − âge » nulle part où une FC max se calcule", () => {
     for (const f of ["src/lib/ai/coachContext.ts", "src/lib/coach/fcCible.ts", "src/app/dashboard/jour-j/page.tsx",
       "src/lib/ai/bilanDonnees.ts", "src/app/api/ai/analyse-seance/route.ts", "src/components/ghost-runner/GhostRunner.tsx"]) {

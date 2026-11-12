@@ -98,6 +98,25 @@ export function fcMaxConnue(e: { declaree?: unknown; montre?: unknown; observee?
   return { max: r.max, source: r.source };
 }
 
+/**
+ * LES DEUX SEUILS D'INTENSITÉ, en part de la FC max — UNE définition pour toute l'application
+ * (directeur scientifique, 12/11/2026). Avant : « facile » valait 0,75 (analyse de séance), 0,80
+ * (relecture d'exécution, `classifyRun`) et 0,85 (pente, dérive du bilan) ; une sortie à 82 % était
+ * « dure » pour le plan et « facile » pour la pente. 0,80 = frontière endurance / allure marathon
+ * chez Daniels, au milieu du seuil aérobie (77-82 %). À 0,85, un marathon loisir (80-88 %) passait
+ * pour une sortie facile : c'est le défaut du 30/10.
+ */
+export const PART_FC_FACILE = 0.80;
+/** Au-delà, la séance est DURE (seuil, tempo, VMA, course). Entre les deux : « modérée ». */
+export const PART_FC_DURE = 0.85;
+
+/** Une sortie est FACILE si sa FC moyenne est sous {@link PART_FC_FACILE} d'une FC max CONNUE.
+ *  Sans l'une ou l'autre, elle ne l'est pas : on ne sait pas, on ne suppose pas. */
+export function estSortieFacile(fcMoyenne: unknown, fcMax: number | null | undefined): boolean {
+  const fc = Number(fcMoyenne);
+  return fcMoyenne != null && Number.isFinite(fc) && fc > 0 && fcMax != null && fcMax > 0 && fc / fcMax < PART_FC_FACILE;
+}
+
 /** Le pic de FC réellement atteint sur les {@link PIC_FC_JOURS} jours qui finissent le jour civil `jour`. */
 export function picFcObserve(seances: readonly { date?: string | null; max_hr?: unknown }[], jour: string): number | null {
   const fin = Date.parse(`${jour}T12:00:00Z`);

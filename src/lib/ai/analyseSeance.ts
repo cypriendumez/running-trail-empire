@@ -20,12 +20,11 @@ import { parseReps, parsePaceSec, FOURCHETTE_QUALITE_SEC } from "@/lib/watch/int
 import { serieDeRepetitions, blocPrincipal, type DetailIntervalles, type FluxSeance } from "@/lib/intervals/performance";
 import type { PausesSeance } from "@/lib/activities/pauses";
 
-/** Part de la FC max au-delà de laquelle une séance est DURE. Même valeur que le reste
- *  du coach (`PART_FC_DURE` dans coachContext) : deux seuils divergents donneraient deux
- *  verdicts différents sur la même séance selon l'écran. */
-export const PART_FC_DURE = 0.85;
-/** En deçà, la séance est un footing. Entre les deux, elle est « modérée ». */
-export const PART_FC_FACILE = 0.75;
+/** Les seuils d'intensité : LES MÊMES que partout (lib/coach/fcCible, 12/11/2026) — deux seuils
+ *  divergents donneraient deux verdicts sur la même séance selon l'écran. « Facile » valait 0,75
+ *  ici, 0,80 dans le coach et 0,85 dans le bilan. */
+import { PART_FC_DURE, PART_FC_FACILE } from "@/lib/coach/fcCible";
+export { PART_FC_DURE, PART_FC_FACILE };
 /** Écart de distance sous lequel deux séances sont jugées comparables. */
 export const ECART_DISTANCE = 0.15;
 /** En dessous, un classement ne veut rien dire. */

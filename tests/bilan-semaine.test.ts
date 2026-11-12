@@ -167,6 +167,16 @@ test("sans FC max : ni dérive ni pente (on ne trie pas les sorties faciles), et
   assert.doesNotMatch(lignesDuBilan(sans), /Dérive cardiaque moyenne/);
 });
 
+test("un marathon loisir couru à 83 % de la FC max n'est pas une sortie facile : sa dérive ne compte pas", () => {
+  // 12/11/2026 : seuil commun 0,80. À 0,85, ce marathon (166/200) entrait dans la dérive d'endurance.
+  const marathon = sortie("2026-11-06", 42.2, 250, { avg_hr: 166, cardiac_decoupling: 9 });
+  const f = faitsDuBilan({ ...ENTREE, seances: [marathon, ...ENTREE.seances] });
+  assert.deepEqual(f.derive, faitsDuBilan(ENTREE).derive, `un effort à 83 % a pesé dans la dérive (${JSON.stringify(f.derive)})`);
+  // Contre-épreuve : la même sortie à 78 % (156/200) compte.
+  const facile = faitsDuBilan({ ...ENTREE, seances: [{ ...marathon, avg_hr: 156 }, ...ENTREE.seances] });
+  assert.equal(facile.derive.n, faitsDuBilan(ENTREE).derive.n + 1, "une sortie à 78 % n'est plus comptée facile");
+});
+
 test("avec FC max, une sortie SANS FC moyenne n'entre pas dans la dérive (on ne sait pas si elle était facile)", () => {
   const sansFc = sortie("2026-11-06", 12, 60, { avg_hr: null, cardiac_decoupling: 9.9 });
   const f = faitsDuBilan({ ...ENTREE, seances: [sansFc, ...ENTREE.seances] });

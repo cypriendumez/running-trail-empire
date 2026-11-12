@@ -1,7 +1,7 @@
 import type { createClient } from "@/lib/supabase/server";
 import { sansAllureInconnue } from "@/lib/coach/allureInconnue";
 import { picsSaison, avecSaison } from "@/lib/coach/ciblesFcServeur";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, fcMaxConnue, airFroid, PIC_FC_JOURS, type CiblesFc } from "@/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, fcMaxConnue, estSortieFacile, PART_FC_FACILE, PART_FC_DURE, airFroid, PIC_FC_JOURS, type CiblesFc } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { menuSelonDenivele, preferenceDenivele } from "@/lib/coach/denivele";
@@ -205,7 +205,7 @@ function estimateVmaFromRuns(workouts: Wk[], fcMaxEst: number | null, now: numbe
  * dure vieille de 65 jours alors qu'elle datait de 13, et il espaçait donc les qualités
  * à partir d'un passé imaginaire. Une seule constante désormais, pour les deux.
  */
-export const PART_FC_DURE = 0.85;
+export { PART_FC_DURE };
 
 export function classifyRun(w: { distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; type?: string | null }, fcMax: number | null): string {
   const km = w.distance_km ?? 0, sec = w.duration_seconds ?? 0;
@@ -215,7 +215,7 @@ export function classifyRun(w: { distance_km?: number | null; duration_seconds?:
   if (pct != null) {
     if (pct >= 0.90) return "Intense (VMA/course)";
     if (pct >= PART_FC_DURE) return "Seuil/Tempo";
-    if (pct >= 0.80) return "Allure soutenue";
+    if (pct >= PART_FC_FACILE) return "Allure soutenue";
     if (pct >= 0.70) return "Endurance";
     return "Footing facile";
   }
@@ -1667,7 +1667,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
       action: "réduis le nombre de séances jusqu'à ce qu'il les tienne TOUTES pendant trois semaines. Un plan suivi à 60 % vaut moins qu'un plan deux fois plus léger suivi à 100 %." });
   }
   // 2. ENDURANCE AÉROBIE — la dérive cardiaque dit s'il tiendra la distance.
-  const driftW = runs.find(w => w.cardiac_decoupling != null);
+  // ⚠️ SUR UNE SORTIE FACILE SEULEMENT (directeur scientifique, 12/11/2026). La dérive est calculée
+  // sur la plus longue sortie d'une heure ou plus : la semaine d'un marathon, c'est le marathon, et
+  // le coach concluait « endurance aérobie insuffisante » sur un effort de course — le défaut du
+  // 30/10, encore vivant ici. Sans FC max, aucune sortie n'est réputée facile : pas de verdict.
+  const driftW = runs.find(w => w.cardiac_decoupling != null && estSortieFacile(w.avg_hr, fcMaxEst));
   const drift = driftW ? Number(driftW.cardiac_decoupling) : null;
   if (drift != null && drift >= 8) {
     limiters.push({ key: "endurance", severity: 90,
@@ -2232,7 +2236,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         const km = num(w.distance_km), sec = num(w.duration_seconds), fc = num(w.avg_hr);
         const age = now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime();
         return km != null && km >= 4 && sec != null && sec > 0 && age <= 90 * 86400000
-          && fc != null && fc / fcMaxEst < 0.80;
+          && estSortieFacile(fc, fcMaxEst);
       })
       .map((w) => ({
         allureSecKm: num(w.gap_min_km) != null ? num(w.gap_min_km)! * 60 : num(w.duration_seconds)! / num(w.distance_km)!,
@@ -2511,7 +2515,7 @@ CAPACITÉS (tests)
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
-${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${limiter ? `- 🎯 SON FACTEUR LIMITANT, à ce stade, c'est ${limiter.label}. ${limiter.action} C'est LA priorité : une séance qui ne s'adresse pas à ce point précis est une séance de perdue. ${limiters.length > 1 ? `Viennent ensuite : ${limiters.slice(1, 3).map(l => l.label).join(" ; ")}.` : ""}\n` : ""}${noHistory ? "- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne. Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n" : ""}${(() => { const d = runs.find(w => w.cardiac_decoupling != null); if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
+${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${limiter ? `- 🎯 SON FACTEUR LIMITANT, à ce stade, c'est ${limiter.label}. ${limiter.action} C'est LA priorité : une séance qui ne s'adresse pas à ce point précis est une séance de perdue. ${limiters.length > 1 ? `Viennent ensuite : ${limiters.slice(1, 3).map(l => l.label).join(" ; ")}.` : ""}\n` : ""}${noHistory ? "- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne. Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n" : ""}${(() => { const d = driftW; if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
   const lines: string[] = [];
   // Cadence : sous 170 pas/min, l'appui est long et la foulée « aérienne » — surcoût
   // d'impact et de temps de contact. On ne juge pas dans l'absolu (elle dépend de la

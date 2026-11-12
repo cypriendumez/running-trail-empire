@@ -15,7 +15,8 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { referencesFc, plageFc, plageLisible, cibleEndurance, LARGEUR_MAX, FOOTINGS_MIN, ECART_MIN, PLANCHER_RESERVE } from "../src/lib/coach/fcCible";
+import { execSync } from "node:child_process";
+import { referencesFc, plageFc, plageLisible, cibleEndurance, LARGEUR_MAX, FOOTINGS_MIN, ECART_MIN, PLANCHER_RESERVE, estSortieFacile, PART_FC_FACILE as PART_FC_FACILE_COMMUN, PART_FC_DURE as PART_FC_DURE_COMMUN } from "../src/lib/coach/fcCible";
 import { repartirFootings, varianteFooting, AMPLITUDE } from "../src/lib/coach/footings";
 import { robustWeeklyKm, type RunLike } from "../src/lib/running/volume";
 import { PART_FC_DURE } from "../src/lib/ai/coachContext";
@@ -491,6 +492,27 @@ test("le constat nomme la BONNE cause", () => {
   const i18n = readFileSync("src/lib/ai/planI18n.ts", "utf8");
   for (const cle of ["manqueVolume", "manqueVolumeAllege"])
     assert.equal(i18n.split(`${cle}:`).length - 1, 6, `${cle} : 5 langues + le type attendus`);
+});
+
+test("UN seul seuil « facile » : 0,80, un prédicat, aucune autre définition (12/11/2026)", () => {
+  // Avant : 0,75 (analyse de séance), 0,80 (relecture, classifyRun), 0,85 (pente, dérive du bilan).
+  assert.equal(PART_FC_FACILE_COMMUN, 0.80, "seuil facile : décision d'entraîneur (frontière endurance / allure marathon)");
+  assert.equal(PART_FC_DURE_COMMUN, 0.85, "seuil dur : décision d'entraîneur");
+  // Frontière, FC max 200 (valeurs en dur, jamais déduites de la constante).
+  assert.equal(estSortieFacile(159, 200), true);
+  assert.equal(estSortieFacile(160, 200), false, "80 % pile n'est plus facile");
+  assert.equal(estSortieFacile(164, 200), false, "82 % (marathon loisir) passe pour facile");
+  assert.equal(estSortieFacile(150, null), false, "sans FC max, une sortie est réputée facile");
+  assert.equal(estSortieFacile(null, 200), false, "sans FC moyenne, une sortie est réputée facile");
+  // Une seule définition dans tout src/ ; les autres modules réexportent.
+  const defs = execSync("grep -rnE 'export const PART_FC_(FACILE|DURE) *=' src || true", { encoding: "utf8" }).trim().split("\n").filter(Boolean);
+  assert.deepEqual(defs.map((l) => l.split(":")[0]).sort(), ["src/lib/coach/fcCible.ts", "src/lib/coach/fcCible.ts"], `seuils redéfinis ailleurs : ${defs.join(" | ")}`);
+  const c = codeOf("src/lib/ai/coachContext.ts");
+  assert.match(c, /&& estSortieFacile\(fc, fcMaxEst\);/, "la relecture d'exécution a repris son propre seuil");
+  assert.match(c, /if \(pct >= PART_FC_FACILE\) return "Allure soutenue";/, "classifyRun a repris son propre seuil");
+  assert.match(c, /runs\.find\(w => w\.cardiac_decoupling != null && estSortieFacile\(w\.avg_hr, fcMaxEst\)\)/, "le limiteur de dérive lit de nouveau n'importe quelle sortie");
+  assert.match(codeOf("src/lib/ai/bilanSemaine.ts"), /const facile = \(s: SeanceBilan\) => estSortieFacile\(s\.avg_hr, e\.fcMax\);/, "la dérive du bilan a repris son propre seuil");
+  assert.match(codeOf("src/lib/running/progression.ts"), /if \(!estSortieFacile\(fc, fcMax\)\) continue;/, "la pente a repris son propre seuil");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

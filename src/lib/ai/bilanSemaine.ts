@@ -14,7 +14,8 @@
 //  ⚠️ JOURS CIVILS DE L'ATHLÈTE, JAMAIS L'HORLOGE. « La semaine » est faite des sept cases
 //  de calendrier qui finissent aujourd'hui, chez lui (voir lib/dashboard/fenetre).
 // ─────────────────────────────────────────────────────────────────────────────
-import { efficaciteParBloc, tendanceEfficacite, PART_FC_FACILE } from "@/lib/running/progression";
+import { efficaciteParBloc, tendanceEfficacite } from "@/lib/running/progression";
+import { estSortieFacile } from "@/lib/coach/fcCible";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { decaleJour, ecartJours } from "@/lib/streak/compute";
 import { isRun } from "@/lib/intervals/sport";
@@ -90,10 +91,11 @@ export function faitsDuBilan(e: EntreeBilan): FaitsBilan {
   // et SEULEMENT les sorties faciles. ⚠️ Constaté sur le vrai compte le 30/10/2026 : la seule dérive
   // de la semaine était celle du MARATHON couru à fond (5,5 %), comparée à des footings (2,6 %) —
   // et le bilan concluait « l'endurance cède ». À effort de course, le cœur monte : ce n'est pas
-  // une dérive d'endurance. Même seuil que l'efficacité aérobie (PART_FC_FACILE).
+  // une dérive d'endurance. Même seuil que partout (`estSortieFacile`, 0,80 depuis le 12/11/2026 :
+  // à 0,85, un marathon loisir couru à 80-85 % comptait encore).
   // ⚠️ SANS FC MAX (ou sans FC moyenne), la sortie n'est PAS réputée facile (12/11/2026) : on ne
   // peut pas la trier, et la dérive du marathon redevenait une « dérive d'endurance ».
-  const facile = (s: SeanceBilan) => e.fcMax != null && fini(s.avg_hr) && s.avg_hr < e.fcMax * PART_FC_FACILE;
+  const facile = (s: SeanceBilan) => estSortieFacile(s.avg_hr, e.fcMax);
   const sansFcMax = e.fcMax == null ? " — FC max inconnue : impossible de trier les sorties faciles" : "";
   const deriveSemaine = semaine.filter(facile).map((s) => s.cardiac_decoupling).filter(fini);
   const deriveAvant = avant.filter(facile).map((s) => s.cardiac_decoupling).filter(fini);
