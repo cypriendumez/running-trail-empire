@@ -10,6 +10,8 @@
  *   npx tsx tests/fc-montre.test.ts
  */
 import assert from "node:assert/strict";
+import { renderToStaticMarkup } from "react-dom/server";
+import { BandeauPanne } from "../src/components/dashboard/BandeauPanne";
 import { T } from "../src/lib/i18n/translations";
 import { execSync } from "node:child_process";
 import { vmaAffichee, effortDesSeances, acclimatationDesSeances, SEANCES_VMA } from "../src/lib/dashboard/vmaAffichee";
@@ -460,6 +462,37 @@ test("effortDesSeances : 60 séances, course seulement, FC max commune, chaleur 
   const chaudAcclimate = effortDesSeances([run(2, 10, 2700, { weather_temp_c: 30 }), ...acclimate], 190)!.vma;
   assert.ok(chaudAcclimate < chaud, "l'acclimatation à la chaleur n'est plus prise en compte");
   assert.ok(acclimatationDesSeances(acclimate) < 1 && acclimatationDesSeances([]) === 1);
+});
+
+test("le coureur VOIT la panne : bandeau commun sur chaque écran de VMA, 5 langues (12/11/2026)", () => {
+  // Rendu réel : rien sans panne ; sinon une phrase qui nomme ce qui manque.
+  assert.equal(BandeauPanne({ lectures: [], lang: "fr" }), null, "un bandeau s'affiche sans panne");
+  const fr = renderToStaticMarkup(BandeauPanne({ lectures: ["vma", "repere", "vma"], lang: "fr" })!);
+  assert.ok(fr.includes("ta VMA, ton test VMA") && fr.includes("pas pu être chargées") && fr.includes('role="alert"'), `bandeau : ${fr}`);
+  assert.ok(renderToStaticMarkup(BandeauPanne({ lectures: ["inconnu"], lang: "fr" })!).includes("tes données"), "un nom sans libellé affiche sa clé brute");
+  assert.doesNotMatch(renderToStaticMarkup(BandeauPanne({ lectures: ["fc-profil", "seances"], lang: "fr" })!), /dash\.inc\./, "une clé brute s'affiche");
+  for (const lang of ["en", "de", "es", "pt"] as const) {
+    const h = renderToStaticMarkup(BandeauPanne({ lectures: ["vma"], lang })!);
+    assert.ok(h.includes(T[lang]["dash.inc.vma"]) && !h.includes("{quoi}"), `${lang} : bandeau incomplet (${h})`);
+  }
+  // Chaque écran le reçoit avec les noms rendus par signalerLectures.
+  for (const [f, re] of [
+    ["src/app/dashboard/plans/page.tsx", /const pannes = await signalerLectures\("plans"[\s\S]*<BandeauPanne lectures=\{pannes\}/],
+    ["src/app/dashboard/profile/page.tsx", /const pannes = await signalerLectures\("profil"[\s\S]*<BandeauPanne lectures=\{pannes\}/],
+    ["src/app/dashboard/health/page.tsx", /pannesVma = await signalerLectures\("sante"[\s\S]*<BandeauPanne lectures=\{pannesVma\}/],
+    ["src/app/dashboard/shop/page.tsx", /const pannes = await signalerLectures\("boutique"[\s\S]*<BandeauPanne lectures=\{pannes\}/],
+    ["src/app/dashboard/shop/[slug]/page.tsx", /const pannes = await signalerLectures\("fiche-boutique"[\s\S]*<BandeauPanne lectures=\{pannes\}/],
+    ["src/app/dashboard/ghost-runner/page.tsx", /const pannes = await signalerLectures\("ghost-runner"[\s\S]*<BandeauPanne lectures=\{pannes\}/],
+    ["src/app/dashboard/cours/page.tsx", /pannes = await signalerLectures\("cours"[\s\S]*<BandeauPanne lectures=\{pannes\}/],
+    ["src/app/dashboard/jour-j/page.tsx", /const pannes = await signalerLectures\("jour-j"[\s\S]*<BandeauPanne lectures=\{pannes\} lang=\{lang\} \/><\/div>\s*<PackJourJVue/],
+  ] as const) assert.match(code(f), re, `${f} : la panne n'est plus dite au coureur`);
+  // Jour J : profil illisible → la panne, JAMAIS le verrou « Premium » ; objectif illisible → jamais « fixe ton objectif ».
+  const jj = code("src/app/dashboard/jour-j/page.tsx");
+  const iPanneProfil = jj.indexOf("if (pannesProfil.length) return");
+  assert.ok(iPanneProfil > 0 && iPanneProfil < jj.indexOf("return <VerrouJourJ"), "Jour J affiche le verrou Premium sur une panne du profil");
+  const iPanneObj = jj.indexOf('if (pannes.includes("objectif")) return');
+  assert.ok(iPanneObj > 0 && iPanneObj < jj.indexOf("return <SansObjectifJourJ"), "Jour J invite à fixer un objectif sur une panne de l'objectif");
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) assert.ok(T[lang]["dash.inc.objectif"], `« ton objectif » manque en ${lang}`);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

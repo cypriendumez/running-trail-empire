@@ -7,6 +7,8 @@ import { niveauDeVma } from "@/lib/plans/catalogue";
 import { PlansView } from "./PlansView";
 import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
+import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
+import { getPublicLang } from "@/lib/i18n/serverLang";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Plans d'entraînement" };
@@ -39,7 +41,7 @@ export default async function PlansPage() {
   ]);
 
   // Une panne n'est pas « aucune donnée » (12/11/2026) : le niveau et le volume affichés retomberaient en silence.
-  await signalerLectures("plans", user.id, [["seances", woRes], ["repere", baseRes], ["profil", profRes]]);
+  const pannes = await signalerLectures("plans", user.id, [["seances", woRes], ["repere", baseRes], ["profil", profRes]]);
   const wks = (woRes.data ?? []) as { date: string; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; max_hr?: number | null }[];
   const vma = effectiveVma({
     vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
@@ -54,5 +56,11 @@ export default async function PlansPage() {
   // au lieu d'afficher un volume de départ qui n'existe pas.
   const volume = robustWeeklyKm(wks)?.km ?? 0;
 
-  return <PlansView niveau={niveauDeVma(vma)} volumeKm={Math.round(volume)} />;
+  // Une panne est DITE au coureur (12/11/2026) : son niveau et son volume seraient faux sans un mot.
+  return (
+    <>
+      <BandeauPanne lectures={pannes} lang={await getPublicLang()} />
+      <PlansView niveau={niveauDeVma(vma)} volumeKm={Math.round(volume)} />
+    </>
+  );
 }

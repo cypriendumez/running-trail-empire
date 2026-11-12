@@ -18,6 +18,8 @@ import { packJourJ } from "@/lib/coach/jourJ";
 import { JOURJ_T } from "@/lib/coach/jourJI18n";
 import { PackJourJVue, VerrouJourJ, SansObjectifJourJ } from "@/components/jourJ/PackJourJVue";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
+import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
+import { getPublicLang } from "@/lib/i18n/serverLang";
 
 /**
  * /dashboard/jour-j — LE PACK JOUR J (Premium), voir `lib/coach/jourJ`.
@@ -43,7 +45,10 @@ export default async function PageJourJ() {
     .eq("id", user.id).maybeSingle();
   // La lecture qui porte la PORTE D'ACCÈS est signalée AVANT le verrou (relecture du 12/11/2026) : en
   // panne, un abonné verrait « Premium » sans qu'aucune trace ne parte dans error_logs.
-  await signalerLectures("jour-j", user.id, [["profil", { error: eProfil }]]);
+  const pannesProfil = await signalerLectures("jour-j", user.id, [["profil", { error: eProfil }]]);
+  // …et DITE : sans profil lisible, on ne sait pas s'il est abonné. Afficher le verrou « Premium »
+  // à un abonné serait faux (relecture du 12/11/2026) : on dit que la lecture a échoué, c'est tout.
+  if (pannesProfil.length) return <div className="mx-auto max-w-2xl"><BandeauPanne lectures={pannesProfil} lang={await getPublicLang()} /></div>;
   const p = profil as Record<string, unknown> | null;
   const lang = normLang(String(p?.preferred_language ?? "fr"));
   const t = JOURJ_T[lang];
@@ -60,10 +65,12 @@ export default async function PageJourJ() {
   ]);
   // Toutes les lectures de la page, journalisées dans error_logs (12/11/2026) — AVANT le retour « sans
   // objectif » : une panne de l'objectif n'est pas « aucun objectif ». « Aucune ligne » n'est pas une panne.
-  await signalerLectures("jour-j", user.id, [["objectif", objRes], ["seances", seancesRes],
+  const pannes = await signalerLectures("jour-j", user.id, [["objectif", objRes], ["seances", seancesRes],
     ["repere", baseRes], ["fc-profil", fcProfilRes]]);
   type Obj = { race: string; raceDate: string; distanceKm: number; targetSeconds: number; officielle?: boolean };
   const objectif = objectifEnCours(objRes.data?.data as Obj | null, jour);
+  // Objectif illisible : on le DIT, au lieu d'inviter à en fixer un qu'il a peut-être déjà (12/11/2026).
+  if (pannes.includes("objectif")) return <div className="mx-auto max-w-2xl"><BandeauPanne lectures={pannes} lang={lang} /></div>;
   if (!objectif || !(Number(objectif.distanceKm) > 0) || !(Number(objectif.targetSeconds) > 0)) return <SansObjectifJourJ t={t} />;
 
   const seances = (seancesRes.data ?? []) as unknown as { date: string; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; max_hr?: number | null }[];
@@ -119,8 +126,12 @@ export default async function PageJourJ() {
     meteo: prevision ? { tempC: prevision.tempMax, humidite: prevision.humidity, ventKmh: prevision.windMaxKmh } : null,
   });
 
+  // Séances ou test de référence illisibles : le pack s'affiche, mais le coureur sait qu'il est incomplet.
   return (
-    <PackJourJVue pack={pack} t={t} lang={lang} nom={objectif.race} date={objectif.raceDate} joursRestants={joursRestants}
-      dplusM={c?.elevation_gain_m != null ? Number(c.elevation_gain_m) : null} />
+    <>
+      <div className="mx-auto max-w-2xl"><BandeauPanne lectures={pannes} lang={lang} /></div>
+      <PackJourJVue pack={pack} t={t} lang={lang} nom={objectif.race} date={objectif.raceDate} joursRestants={joursRestants}
+        dplusM={c?.elevation_gain_m != null ? Number(c.elevation_gain_m) : null} />
+    </>
   );
 }

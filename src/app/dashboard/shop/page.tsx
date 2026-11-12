@@ -11,6 +11,7 @@ import { langueDuCompte } from "@/lib/shop/langue";
 import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
+import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
 
 export const metadata = { title: "Comparateur" };
 
@@ -46,7 +47,7 @@ export default async function ShopPage() {
   ]);
 
   // Une panne n'est pas « aucune donnée » : la VMA de la recommandation retomberait en silence (12/11/2026).
-  await signalerLectures("boutique", user.id, [["seances", seancesRes], ["repere", baseRes], ["profil", profilRes]]);
+  const pannes = await signalerLectures("boutique", user.id, [["seances", seancesRes], ["repere", baseRes], ["profil", profilRes]]);
   const seances = seancesRes.data ?? [];
   const lang = langueDuCompte(profilRes.data?.preferred_language);
   const tx = (k: string, p?: Record<string, string | number>) => texteShop(lang, k, p);
@@ -72,6 +73,8 @@ export default async function ShopPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1180px] sm:px-6 sm:py-6">
+      {/* Une panne est DITE au coureur (12/11/2026) : la recommandation repose sur sa VMA. */}
+      <BandeauPanne lectures={pannes} lang={lang} />
       <header className="mb-6">
         <h1 className="text-[26px] font-semibold tracking-tight text-zinc-900 sm:text-[32px]">{tx("shop.titre")}</h1>
         <p className="mt-1.5 max-w-2xl text-[14px] leading-relaxed text-zinc-500">
