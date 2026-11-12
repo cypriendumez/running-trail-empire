@@ -36,7 +36,7 @@ const TYPES_INTENSES = new Set(["VMA", "Seuil", "Spécifique", "Côtes", "Tempo"
 
 const T: Record<Lang, {
   titre: string; why: (d: string) => string; repos: (n: number, d: string) => string;
-  mc: (d: string) => string; course: (d: string) => string; renfo: string;
+  mc: (d: string) => string; course: (d: string) => string; renfo: string; decale: (n: number, d: string) => string;
 }> = {
   fr: {
     titre: "Footing encadré par ton kiné",
@@ -45,6 +45,7 @@ const T: Record<Lang, {
     mc: (d) => `Cette séance de marche-course dépasse la durée fixée par ton kinésithérapeute (jusqu'au ${d}) : demande-lui comment l'adapter.`,
     course: (d) => ` ⚠️ Cette course tombe pendant les consignes de ton kinésithérapeute (jusqu'au ${d}) : demande-lui son accord avant de la courir.`,
     renfo: " Consigne de ton kiné : aucun saut ni bondissement.",
+    decale: (n, d) => `Consignes de ton kinésithérapeute jusqu'au ${d} : ${n} sortie${n > 1 ? "s" : ""} au plus sur 7 jours. Cette sortie a été décalée ici, en footing très facile, pour tenir cette limite.`,
   },
   en: {
     titre: "Run within your physio's limits",
@@ -53,6 +54,7 @@ const T: Record<Lang, {
     mc: (d) => `This walk-run session goes beyond the duration set by your physiotherapist (until ${d}): ask them how to adapt it.`,
     course: (d) => ` ⚠️ This race falls within your physiotherapist's instructions (until ${d}): ask for their go-ahead before running it.`,
     renfo: " Your physio's instruction: no jumps or bounds.",
+    decale: (n, d) => `Your physiotherapist's instructions until ${d}: ${n} run${n > 1 ? "s" : ""} at most over 7 days. This run was moved here, as a very easy run, to stay within that limit.`,
   },
   de: {
     titre: "Lauf im Rahmen deiner Physiotherapie",
@@ -61,6 +63,7 @@ const T: Record<Lang, {
     mc: (d) => `Diese Geh-Lauf-Einheit überschreitet die von deiner Physiotherapie festgelegte Dauer (bis ${d}): Frag nach, wie sie angepasst werden soll.`,
     course: (d) => ` ⚠️ Dieser Wettkampf fällt in die Vorgaben deiner Physiotherapie (bis ${d}): Hol dir vorher ihr Einverständnis.`,
     renfo: " Vorgabe deiner Physiotherapie: keine Sprünge.",
+    decale: (n, d) => `Vorgaben deiner Physiotherapie bis ${d}: höchstens ${n} Lauf${n > 1 ? "e" : ""} in 7 Tagen. Dieser Lauf wurde hierher verschoben, als sehr lockerer Lauf, um diese Grenze einzuhalten.`,
   },
   es: {
     titre: "Rodaje dentro de las indicaciones de tu fisio",
@@ -69,6 +72,7 @@ const T: Record<Lang, {
     mc: (d) => `Esta sesión de andar-correr supera la duración fijada por tu fisioterapeuta (hasta el ${d}): pregúntale cómo adaptarla.`,
     course: (d) => ` ⚠️ Esta carrera cae dentro de las indicaciones de tu fisioterapeuta (hasta el ${d}): pídele su visto bueno antes de correrla.`,
     renfo: " Indicación de tu fisio: ningún salto ni bote.",
+    decale: (n, d) => `Indicaciones de tu fisioterapeuta hasta el ${d}: ${n} salida${n > 1 ? "s" : ""} como máximo en 7 días. Esta salida se ha movido aquí, como rodaje muy suave, para respetar ese límite.`,
   },
   pt: {
     titre: "Corrida dentro das indicações do teu fisio",
@@ -77,6 +81,7 @@ const T: Record<Lang, {
     mc: (d) => `Esta sessão de caminhada-corrida ultrapassa a duração fixada pelo teu fisioterapeuta (até ${d}): pergunta-lhe como adaptá-la.`,
     course: (d) => ` ⚠️ Esta prova cai dentro das indicações do teu fisioterapeuta (até ${d}): pede-lhe autorização antes de a correres.`,
     renfo: " Indicação do teu fisio: nenhum salto.",
+    decale: (n, d) => `Indicações do teu fisioterapeuta até ${d}: ${n} corrida${n > 1 ? "s" : ""} no máximo em 7 dias. Esta corrida foi movida para aqui, como corrida muito fácil, para respeitar esse limite.`,
   },
 };
 
@@ -88,6 +93,9 @@ export type ContexteConsignes = {
   sortiesRecentes: string[];
   /** Date d'une course C de la semaine (AAAA-MM-JJ), à transformer en footing ; `null` sinon. */
   courseC: string | null;
+  /** Les jours de la semaine où l'athlète peut courir (0 = dimanche, comme `Date.getDay`) : une sortie
+   *  décalée pour tenir le nombre de sorties n'atterrit que sur l'un d'eux. Absent = tous. */
+  joursDispo?: number[];
 };
 
 
@@ -155,8 +163,11 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
   const fin = jjmm(consignes.jusquAu);
   const footing = (jour: PlanDay) => {
     const corps = corpsFooting(consignes.dureeMaxMin, jour, c.allureFacile);
+    // Déjà réécrit par ce contrôle (réapplication après les ajustements) : son « pourquoi » est gardé —
+    // sinon celui d'une sortie DÉCALÉE retombait sur le texte générique (relecture, fuzz de 20 000 semaines).
+    const deja = jour.title === T.fr.titre;
     return reecrire(jour, "Récup", (l) => ({
-      title: T[l].titre, detail: PLAN_T[l].recupDetail(5, 5, corps), why: T[l].why(fin),
+      title: T[l].titre, detail: PLAN_T[l].recupDetail(5, 5, corps), why: deja ? texteDe(jour, l).why : T[l].why(fin),
       tags: [PLAN_T[l].tags["Récup"], PLAN_T[l].tags["Z1"], `${corps + 10} min`],
     }));
   };
@@ -207,14 +218,55 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
   // Une sortie le jour d jouxte 7 fenêtres : celles qui finissent de d à d + 6 (jusqu'à la fin des consignes).
   const tient = (d: string) => [0, 1, 2, 3, 4, 5, 6].map((k) => decale(d, k)).filter((w) => w <= consignes.jusquAu)
     .every((w) => gardees.filter((x) => x >= decale(w, -6) && x <= w).length < max);
-  return apres.map((jour) => {
-    if (PAS_COURSE.has(jour.type) || !enVigueur(jour) || jour.type === "Course") return jour;
+  // ⚠️ UNE SORTIE QUI NE TIENT PAS EST DÉCALÉE, PAS SEULEMENT RETIRÉE (12/11/2026). Le moteur pose
+  // les sorties sans connaître celles déjà courues : avec 2 sorties au plus et deux sorties ces
+  // derniers jours, celles de la semaine tombaient toutes trop tôt et étaient toutes retirées —
+  // une semaine entière sans course alors qu'une sortie redevenait possible quelques jours plus
+  // tard. EN DEUX PASSES (relecture du directeur scientifique) :
+  //   1. les séances du moteur sont validées À LEUR PLACE ; celles qui ne tiennent pas sont retirées ;
+  //   2. chaque sortie retirée cherche, plus tard dans la semaine, un jour de repos qui n'est pas un
+  //      repos PROTECTEUR (3 jours après une course, lendemain d'une séance dure ou d'une sortie
+  //      longue, 48 h avant une course), de préférence sans sortie la veille ni le lendemain, où
+  //      l'athlète court et où elle tient. Sinon elle reste retirée : le repos est le choix sûr.
+  //   La sortie décalée devient un footing facile, jamais plus long que la séance d'origine.
+  const sortie = [...apres];
+  const retirees: number[] = [];
+  for (let i = 0; i < sortie.length; i++) {
+    const jour = sortie[i];
+    if (PAS_COURSE.has(jour.type) || !enVigueur(jour) || jour.type === "Course") continue;
     // Déjà courue ce jour-là (le jour 0 est gelé dès qu'une séance est enregistrée) : la sortie
     // est dans `sortiesRecentes`, on ne la compte pas deux fois.
-    if (c.sortiesRecentes.includes(jour.date)) return jour;
-    if (tient(jour.date)) { gardees.push(jour.date); return jour; }
-    return repos(jour, (l) => T[l].repos(max, fin));
-  });
+    if (c.sortiesRecentes.includes(jour.date)) continue;
+    if (tient(jour.date)) { gardees.push(jour.date); continue; }
+    retirees.push(i);
+    sortie[i] = repos(jour, (l) => T[l].repos(max, fin));
+  }
+  const DURS = new Set([...TYPES_INTENSES, "Sortie longue", "Course"]);
+  const typesLe = (d: string) => sortie.filter((x) => x.date === d).map((x) => x.type);
+  const court = (d: string) => c.sortiesRecentes.includes(d) || typesLe(d).some((t) => !PAS_COURSE.has(t));
+  const protecteur = (d: string) =>
+    [1, 2, 3].some((k) => typesLe(decale(d, -k)).includes("Course"))   // après une course
+    || typesLe(decale(d, -1)).some((t) => DURS.has(t))                 // lendemain d'une séance dure ou longue
+    || [1, 2].some((k) => typesLe(decale(d, k)).includes("Course"));   // 48 h avant une course
+  const candidat = (j: number, i: number) => j > i && sortie[j].type === "Repos" && enVigueur(sortie[j])
+    && typesLe(sortie[j].date).length === 1
+    && (!c.joursDispo || c.joursDispo.includes(new Date(`${sortie[j].date}T12:00:00Z`).getUTCDay()))
+    && !protecteur(sortie[j].date) && tient(sortie[j].date);
+  for (const i of retirees) {
+    const origine = apres[i];
+    // Une marche-course ne devient jamais un footing continu : un débutant qui ne court pas encore
+    // 30 minutes recevrait de la course continue (relecture). Elle reste retirée.
+    if (origine.type === "Marche/course") continue;
+    const espace = (j: number) => !court(decale(sortie[j].date, -1)) && !court(decale(sortie[j].date, 1));
+    let cible = sortie.findIndex((_, j) => candidat(j, i) && espace(j));
+    if (cible < 0) cible = sortie.findIndex((_, j) => candidat(j, i));
+    if (cible < 0) continue;
+    gardees.push(sortie[cible].date);
+    const decalee = footing({ ...origine, date: sortie[cible].date, confirmed: sortie[cible].confirmed });
+    // Son « pourquoi » dit qu'elle a été décalée pour tenir le nombre de sorties.
+    sortie[cible] = reecrire(decalee, decalee.type, (l) => ({ ...texteDe(decalee, l), why: T[l].decale(max, fin) }));
+  }
+  return sortie;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

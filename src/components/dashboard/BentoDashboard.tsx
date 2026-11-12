@@ -97,6 +97,9 @@ interface Props {
    * FIXE et on le met en forme avec `formatDateCivile`, déterministe des deux côtés.
    */
   jourAujourdhui?: string;
+  /** Questionnaire d'aptitude en attente d'avis médical (ou illisible) : aucune séance proposée
+   *  hors du plan — ni par l'IA, ni par le repli calculé, qui peuvent proposer de l'intensité. */
+  sansCourse?: boolean;
   /** La décision du coach pour la semaine : la phrase du jour ne doit pas la contredire. */
   planCoach?: PlanDuCoach;
   /** Une montre est reliée (clé API ou OAuth intervals.icu) — calculé côté serveur, la clé ne quitte pas le serveur. */
@@ -203,7 +206,7 @@ import type { CleIndicateur } from "@/lib/indicateurs/types";
 /** Une distance, un dénivelé : une valeur absente, négative ou illisible compte pour 0. */
 const positif = (v: number | null | undefined): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
 
-export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, streak, acces, donneesIncompletes, jourAujourdhui, planCoach = null, montreReliee = false, analyses = [], cibleVolumeKm = null }: Props) {
+export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, plan, prWorkouts, recordsDeclares = [], premiereSeance = null, chargeHistory, sleep, coachSession, ressenti, objective, derniereCourse = null, currentVma, sourceVma = null, loadRisk, streak, acces, donneesIncompletes, jourAujourdhui, planCoach = null, montreReliee = false, analyses = [], cibleVolumeKm = null, sansCourse = false }: Props) {
   const { t, lang } = useT();
   // ⚠️ LES NOMBRES À LA LANGUE (06/11/2026). `toFixed` écrivait « 11.4 km/h » et « 15.0 km »
   // en allemand, espagnol, portugais et français, où la décimale est une virgule. Et
@@ -305,6 +308,8 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
   const [aiTried, setAiTried] = useState(false);
   useEffect(() => {
     if (coachSession) return;   // le coach a déjà prescrit → inutile d'appeler l'IA
+    // Avis médical attendu (questionnaire d'aptitude) : l'IA ne propose rien (Santé, lot 3).
+    if (sansCourse) return;
     let cancel = false;
     fetch("/api/ai/session", { method: "POST" })
       .then((r) => r.json())
@@ -313,7 +318,13 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
       .finally(() => { if (!cancel) setAiTried(true); });
     return () => { cancel = true; };
   }, [coachSession]);
-  const displaySession = coachKey ?? aiSession ?? keySession;
+  // ⚠️ SANS PLAN DU JOUR ET AVIS MÉDICAL ATTENDU : ni l'IA ni le repli calculé (qui proposent
+  // VMA ou seuil) — la carte dit de ne pas courir (questionnaire d'aptitude, 10/11/2026).
+  const sessionAttente: KeySession = {
+    title: t("dash.key.aptTitle"), accent: "#B91C1C", subtitle: t("dash.key.aptSub"),
+    tags: [{ l: t("dash.key.aptTag"), c: "bg-red-50 text-red-700" }], why: t("dash.key.aptWhy"),
+  };
+  const displaySession = coachKey ?? (sansCourse ? sessionAttente : aiSession ?? keySession);
   // ⚠️ « SÉANCE DU JOUR » SEULEMENT SI C'EST AUJOURD'HUI (06/11/2026). Quand la séance du jour
   // manque, la page présente la suivante : elle était annoncée comme celle d'aujourd'hui.
   const dateCoach = String(coachSession?.date ?? "").slice(0, 10);
@@ -404,7 +415,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="metric-label">{t("dash.key.title")}</div>
-          {aiSession ? (
+          {sansCourse ? null : aiSession ? (
             <span className="text-[11px] text-zinc-400">{t("dash.key.aiCoach")}</span>
           ) : !aiTried ? (
             <span className="animate-pulse text-[11px] text-zinc-300">{t("dash.key.aiLoading")}</span>

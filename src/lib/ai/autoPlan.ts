@@ -139,6 +139,8 @@ export function consignesSurPlan(ctx: AthleteContext, plan: PlanDay[], today = n
     // Celles d'aujourd'hui comprises : une sortie non prévue courue ce matin compte.
     sortiesRecentes: (ctx.sortiesRecentes ?? []).filter((d) => d <= iso(debut)),
     courseC: cs?.priorite === "C" && cs.idx !== objectifIdx ? iso(addDays(debut, cs.idx)) : null,
+    // Les jours où il court VRAIMENT : déclarés, moins ceux qu'il rate systématiquement (comme autoCoach).
+    joursDispo: ctx.availability?.days?.filter((d) => !(ctx.skippedWeekdays ?? []).includes(d)),
   };
   let semaine = ctx.consignes ? appliquerConsignes(plan, { consignes: ctx.consignes, ...commun }) : plan;
   // LE QUESTIONNAIRE D'APTITUDE (lot 3, décision de Cyprien) : une situation cochée et pas encore

@@ -310,6 +310,7 @@ export default async function DashboardPage() {
       streak={streak}
       acces={acces}
       jourAujourdhui={streakToday}
+      sansCourse={sansTestVma}
     />
     <InviteAvis afficher={inviterAvis} />
     </>

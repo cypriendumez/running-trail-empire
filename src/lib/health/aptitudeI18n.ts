@@ -129,3 +129,12 @@ export const APTITUDE_UI: Record<Lang, {
     urgence: "Se durante um esforço sentires dor no peito, tontura ou falta de ar invulgar: para e liga 112.",
   },
 };
+
+/** La réponse du chat des cours pendant l'attente d'avis (aucun entraînement proposé). */
+export const APTITUDE_CHAT: Record<Lang, string> = {
+  fr: "Ton questionnaire d'aptitude signale une situation à faire voir à un médecin : en attendant son avis, je ne te propose aucun entraînement. Tu peux le déclarer dans Santé dès que tu l'as vu. En cas de douleur dans la poitrine, de malaise ou d'essoufflement inhabituel : arrête-toi et appelle le 15 ou le 112.",
+  en: "Your fitness questionnaire flags something a doctor should look at: until they have given their opinion, I won't suggest any training. You can declare it in Health once you have seen them. If you get chest pain, feel faint or unusually breathless: stop and call 112.",
+  de: "Dein Fitness-Fragebogen nennt etwas, das ärztlich abgeklärt werden sollte: Bis dahin schlage ich dir kein Training vor. Du kannst die Einschätzung unter Gesundheit angeben, sobald du beim Arzt warst. Bei Brustschmerz, Schwäche oder ungewöhnlicher Atemnot: aufhören und 112 anrufen.",
+  es: "Tu cuestionario de aptitud señala algo que debe ver un médico: hasta su opinión, no te propongo ningún entrenamiento. Puedes declararla en Salud en cuanto lo hayas visto. Si tienes dolor en el pecho, un mareo o una falta de aire inusual: para y llama al 112.",
+  pt: "O teu questionário de aptidão assinala algo que um médico deve ver: até à opinião dele, não te proponho nenhum treino. Podes declará-la em Saúde assim que o vires. Se sentires dor no peito, tontura ou falta de ar invulgar: para e liga 112.",
+};
