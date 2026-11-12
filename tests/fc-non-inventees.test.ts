@@ -246,6 +246,9 @@ async function main() {
       const t = (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL, age: null }], performance_baselines: [], workouts, notifications: [] }), "u")).text;
       return Number(t.match(/- VMA : ([\d.]+) km\/h ⚠️ ESTIMÉE/)?.[1]);
     };
+    // Précondition : le cas « sans FC max » est bien celui exercé (pics à 145, aucune déclarée, montre ni seuil).
+    const ctx = (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL, age: null }], performance_baselines: [], workouts: [aberrante, ...SEANCES_CALMES], notifications: [] }), "u")).text;
+    assert.match(ctx, /FC max \? ·/, "précondition : ce test doit tourner SANS FC max connue");
     const sans = await vmaDe(SEANCES_CALMES), avec = await vmaDe([aberrante, ...SEANCES_CALMES]);
     assert.ok(sans > 0, "précondition : une VMA estimée doit exister");
     assert.equal(avec, sans, `une sortie aberrante à FC basse fait la VMA du coach (${sans} → ${avec})`);

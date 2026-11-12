@@ -10,6 +10,7 @@
  *   npx tsx tests/fc-montre.test.ts
  */
 import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
 import { vmaAffichee } from "../src/lib/dashboard/vmaAffichee";
 import { readFileSync } from "node:fs";
 import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, airFroid, BAISSE_HIVER_BPM, SEUIL_FROID_C, fcMaxConnue, picFcObserve, seuilMesure, fcMaxPourEfforts } from "../src/lib/coach/fcCible";
@@ -335,7 +336,8 @@ test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien,
   // Le cycliste qui vient au running (profil 5) : sans FC max, un vélo rapide ne fait JAMAIS la VMA affichée.
   const jour = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
   const courses = [1, 3, 5, 8].map((n) => ({ date: jour(n), sport: "run", type: "easy", distance_km: 10, duration_seconds: 3300, avg_hr: 135, max_hr: 148 }));
-  const velo = { date: jour(2), sport: "bike", type: "ride", distance_km: 40, duration_seconds: 5760, avg_hr: 115, max_hr: 140 };
+  // Vélo SANS cardio : le tri par la FC ne l'écarte pas (FC moyenne absente) — seul le filtre « course » le peut.
+  const velo = { date: jour(2), sport: "bike", type: "ride", distance_km: 40, duration_seconds: 5760, avg_hr: null, max_hr: null };
   for (const fcMax of [null, undefined] as const) {
     const sans = vmaAffichee({ seances: courses, baseline: null, profil: null, fcMax }).vma;
     const avec = vmaAffichee({ seances: [velo, ...courses], baseline: null, profil: null, fcMax }).vma;
@@ -355,14 +357,23 @@ test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien,
     ["src/lib/ai/coachContext.ts", [/const fcMaxVma = fcMaxPourEfforts\(await fcMaxDeLAthlete\(sb, userId\), wks\);/, /fromRuns: bestVmaFromWorkouts\(wks, fcMaxVma\),/]],
     ["src/app/dashboard/plans/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /bestVmaFromWorkouts\(wks\.filter\(\(w\) => isRun\(w\.sport\)\), fcMaxPourEfforts\(fcMaxVma, wks\.filter\(\(w\) => isRun\(w\.sport\)\)\)\)/]],
     ["src/app/dashboard/layout.tsx", [/select\("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c"\)/]],
-    ["src/app/dashboard/profile/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /const obsMaxHr = fcMaxPourEfforts\(fcMaxCommune, rw\);/,
+    ["src/app/dashboard/profile/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /const obsMaxHr = fcMaxPourEfforts\(fcMaxCommune, rw\.filter\(w => isRun\(w\.sport\)\)\);/,
+      /const fcMaxPanne = fcMaxCommune === undefined && fcMaxZones == null;/, /fcMax: fcMaxZones, fcMaxPanne,/,
       /const fcMaxZones = fcMaxCommune !== undefined \? fcMaxCommune : \(Number\(\(baseline as \{ max_hr\?: number \} \| null\)\?\.max_hr\) \|\| null\);/, /fcMax: fcMaxZones,/]],
-    ["src/components/profile/ProfileSettings.tsx", [/const maxHr = fitness\?\.fcMax \?\? 0;/, /\{!zones && \([\s\S]{0,300}tr\("perf\.zonesInconnues"\)/]],
-    ["src/app/api/admin/analyze-session/route.ts", [/const histFcMax = fcMaxPourEfforts\(await fcMaxDeLAthlete\(admin, user_id\), recentRes\.data \?\? \[\]\);/]],
+    ["src/components/profile/ProfileSettings.tsx", [/const maxHr = fitness\?\.fcMax \?\? 0;/, /\{!zones && \([\s\S]{0,300}tr\(fitness\?\.fcMaxPanne \? "perf\.zonesPanne" : "perf\.zonesInconnues"\)/]],
+    ["src/app/api/admin/analyze-session/route.ts", [/const histFcMax = \(await fcMaxDeLAthlete\(admin, user_id\)\) \?\? null;/]],
   ];
   for (const [f, res] of sites) for (const re of res) assert.match(code(f), re, `${f} : la VMA (ou la FC max affichée) ne reçoit plus la FC max commune (${re.source.slice(0, 50)}…)`);
   // Plus aucun pic maison (> 120 / > 150) hors de fcCible.
   for (const [f] of sites) assert.doesNotMatch(code(f), /(obsMax|histMax|fcObservee)\w* *> *1[25]0/, `${f} : un pic maison est de retour`);
+  // La valeur de TRI des efforts (un simple pic) ne CLASSE jamais une intensité ni ne s'affiche (directeur
+  // scientifique, 12/11/2026) : ni `classifyRun(…, fcMaxPourEfforts(…))`, ni une variable qui en vient.
+  const toutSrc = execSync("grep -rln 'fcMaxPourEfforts' src || true", { encoding: "utf8" }).trim().split("\n").filter(Boolean);
+  for (const f of toutSrc) {
+    const c = code(f);
+    assert.doesNotMatch(c, /classifyRun\([^)]*fcMaxPourEfforts/, `${f} : la valeur de tri classe une intensité`);
+    for (const m of c.matchAll(/const (\w+) = fcMaxPourEfforts\(/g)) assert.doesNotMatch(c, new RegExp(`classifyRun\\([^)]*\\b${m[1]}\\b`), `${f} : ${m[1]} (valeur de tri) classe une intensité`);
+  }
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

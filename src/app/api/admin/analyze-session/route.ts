@@ -12,7 +12,6 @@ import { identifiantsDe } from "@/lib/intervals/identifiants";
 import { COLONNES_VFC, precisionMetrique, serieVfc } from "@/lib/health/vfc";
 import { enteteIntervals } from "@/lib/intervals/auth";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
-import { fcMaxPourEfforts } from "@/lib/coach/fcCible";
 
 const BASE = "https://intervals.icu/api/v1";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -173,8 +172,9 @@ export async function POST(req: Request) {
     }
     // Historique RECLASSÉ par allure/FC (les imports arrivent tous en « easy ») → débrief juste.
     // 12/11/2026 : la FC max COMMUNE (`fcMaxDeLAthlete` : test, profil, montre, pic des 6 mois, seuil),
-    // la même que celle que le coureur voit — c'était « test, sinon pic > 150 des 20 dernières ».
-    const histFcMax = fcMaxPourEfforts(await fcMaxDeLAthlete(admin, user_id), recentRes.data ?? []);
+    // la même que celle que le coureur voit. Elle CLASSE l'intensité : jamais la valeur de tri des
+    // efforts (`fcMaxPourEfforts`, un simple pic) — sur une panne ou sans FC max, rien, pas un pic.
+    const histFcMax = (await fcMaxDeLAthlete(admin, user_id)) ?? null;
     const histTxt = recent.map((w) => `${w.date} ${classifyRun(w, histFcMax)} ${w.distance_km ?? "?"}km FC ${w.avg_hr ?? "?"} charge ${w.tss ?? "?"}`).join("\n  ") || "aucune";
     const sp = n(a.average_speed);
 
