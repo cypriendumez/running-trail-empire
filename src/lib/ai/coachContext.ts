@@ -667,18 +667,13 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // estimait la VMA depuis les séances, classait les efforts « durs » et partait à l'IA sous la
   // forme « ~190 (obs.) » — un chiffre inventé présenté comme observé. Le null est GARDÉ
   // explicitement là où il dégraderait le plan : relecture d'exécution et pente (plus bas).
-  // Une FC MOYENNE relevée est aussi un battement réellement produit : la FC max est au moins
-  // aussi haute. Elle sert de plancher quand `max_hr` manque (import sans FC max) — sinon une
-  // séance à 175 bpm de moyenne passait pour un footing (relecture du 12/11/2026). Avec un
-  // `max_hr` présent, elle ne change rien : une moyenne ne dépasse jamais le maximum.
-  const obsFcMoy = Math.max(0, ...workouts
-    .filter(w => now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime() <= PIC_FC_JOURS * 86400000)
-    .map(w => num(w.avg_hr) ?? 0));
-  const obsFcPlancher = Math.max(obsMaxHr0, obsFcMoy);
+  // ⚠️ JAMAIS UNE FC MOYENNE EN GUISE DE FC MAX (relecture du 12/11/2026) : essayé comme
+  // « plancher » quand `max_hr` manque, il faisait d'un footing à 155 bpm un effort à 100 %
+  // « Intense », y compris avec l'âge connu. Sans FC max, la séance est jugée sur son TYPE.
   const ageConnu = num(p?.age);
-  const fcMaxSource: "mesures" | "age" | null = (maxHrDeclare != null || obsFcPlancher > 150) ? "mesures" : ageConnu != null ? "age" : null;
+  const fcMaxSource: "mesures" | "age" | null = (maxHrDeclare != null || obsMaxHr0 > 150) ? "mesures" : ageConnu != null ? "age" : null;
   const fcMaxEst: number | null = fcMaxSource === "mesures"
-    ? Math.max(maxHrDeclare ?? 0, obsFcPlancher > 150 ? obsFcPlancher : 0)
+    ? Math.max(maxHrDeclare ?? 0, obsMaxHr0 > 150 ? obsMaxHr0 : 0)
     : fcMaxSource === "age" ? 220 - (ageConnu as number) : null;
   // ── LES CIBLES DE FC MESURÉES (07/11/2026) ─────────────────────────────────
   // FC max réellement atteinte ou déclarée, FC de repos déclarée sinon celle de la montre,

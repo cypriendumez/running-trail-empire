@@ -150,16 +150,16 @@ async function main() {
     assert.match(avec, /PENTE RÉELLE DE L'ATHLÈTE \(mesurée/, "précondition : ces séances doivent produire une pente");
   });
 
-  // Relecture du 12/11 (second tour) : une séance importée sans `max_hr` mais à 175 bpm de moyenne
-  // passait pour un footing une fois le 190 retiré. Une moyenne relevée est un battement réel : la
-  // FC max est au moins aussi haute, elle sert de plancher MESURÉ.
-  await test("sans max_hr enregistré, une FC moyenne de 175 sert de plancher : la séance reste dure", async () => {
-    const sansMax = SEANCES_CALMES.map((w, i) => i === 0
-      ? { ...w, distance_km: 8, duration_seconds: 1920, avg_hr: 175, max_hr: null }
-      : { ...w, max_hr: null });
-    const ctx = await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL, age: null }], performance_baselines: [], workouts: sansMax, notifications: [] }), "u");
-    assert.match(ctx.text, /FC max ~175 \(obs\.\)/, "la FC moyenne relevée n'a pas servi de plancher");
-    assert.match(ctx.text, /Intense \(VMA\/course\) 8km/, "la séance à 175 bpm de moyenne passe pour un footing");
+  // Relecture du 12/11 (troisième tour) : un « plancher » tiré de la FC MOYENNE quand `max_hr`
+  // manque faisait d'un footing à 155 bpm un effort à 100 % de la FC max, âge connu ou non.
+  // Une moyenne n'est pas un maximum : sans FC max, la séance se juge sur son type.
+  await test("une FC moyenne ne devient jamais la FC max : footings à 155 bpm sans max_hr = footings", async () => {
+    const footings155 = SEANCES_CALMES.map((w) => ({ ...w, avg_hr: 155, max_hr: null }));
+    for (const age of [null, 30]) {
+      const t = (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL, age }], performance_baselines: [], workouts: footings155, notifications: [] }), "u")).text;
+      assert.doesNotMatch(t, /FC max ~155/, `âge ${age} : la FC moyenne est devenue la FC max`);
+      assert.doesNotMatch(t, /Intense \(VMA\/course\)|Seuil\/Tempo/, `âge ${age} : des footings à 155 bpm passent pour des séances dures`);
+    }
   });
 
   // La VMA estimée sans FC max : le filtre « effort vraiment maximal » ne peut plus trier, des
