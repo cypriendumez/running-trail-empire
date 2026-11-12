@@ -95,7 +95,13 @@ export function faitsDuBilan(e: EntreeBilan): FaitsBilan {
   // à 0,85, un marathon loisir couru à 80-85 % comptait encore).
   // ⚠️ SANS FC MAX (ou sans FC moyenne), la sortie n'est PAS réputée facile (12/11/2026) : on ne
   // peut pas la trier, et la dérive du marathon redevenait une « dérive d'endurance ».
-  const facile = (s: SeanceBilan) => estSortieFacile(s.avg_hr, e.fcMax);
+  // ⚠️ ET JAMAIS LE JOUR D'UNE COURSE (directeur scientifique, 12/11/2026) : une course connue
+  // (objectif, course précédente) courue sur au moins la moitié de sa distance est un effort de
+  // course, même sous le seuil — on ne s'en remet pas au seul pourcentage de FC max.
+  const joursDeCourse = new Set(e.courses
+    .filter((c) => c.distanceKm > 0 && e.seances.some((s) => String(s.date).slice(0, 10) === String(c.date).slice(0, 10) && (s.distance_km ?? 0) >= c.distanceKm * 0.5))
+    .map((c) => String(c.date).slice(0, 10)));
+  const facile = (s: SeanceBilan) => !joursDeCourse.has(String(s.date).slice(0, 10)) && estSortieFacile(s.avg_hr, e.fcMax);
   const sansFcMax = e.fcMax == null ? " — FC max inconnue : impossible de trier les sorties faciles" : "";
   const deriveSemaine = semaine.filter(facile).map((s) => s.cardiac_decoupling).filter(fini);
   const deriveAvant = avant.filter(facile).map((s) => s.cardiac_decoupling).filter(fini);

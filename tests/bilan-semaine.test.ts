@@ -32,9 +32,11 @@ const ENTREE: EntreeBilan = {
   aujourdhui: AUJ,
   seances: [
     // Cette semaine (2 → 8 novembre) : trois sorties, et un vélo qui ne compte pas dans le volume.
-    sortie("2026-11-08", 15, 75, { hr_zone_seconds: [600, 3600, 300, 0, 0], cardiac_decoupling: 3.1 }),
+    // Le 08/11, jour du Semi de Bondues (15 km courus sur 21,1) : jour de COURSE, sa dérive ne
+    // compterait pas (12/11/2026) — elle n'est donc pas posée ici.
+    sortie("2026-11-08", 15, 75, { hr_zone_seconds: [600, 3600, 300, 0, 0] }),
     sortie("2026-11-05", 10, 48, { hr_zone_seconds: [300, 2400, 180, 0, 0], cardiac_decoupling: 4.3 }),
-    sortie("2026-11-03", 8, 40, { hr_zone_seconds: [600, 1200, 300, 300, 0] }),
+    sortie("2026-11-03", 8, 40, { hr_zone_seconds: [600, 1200, 300, 300, 0], cardiac_decoupling: 3.1 }),
     // Une sortie à effort de course (FC moyenne 189 pour 200 de max) : sa dérive n'est pas une dérive d'endurance.
     sortie("2026-11-02", 12, 50, { avg_hr: 189, cardiac_decoupling: 5.5 }),
     { date: "2026-11-04", sport: "bike", distance_km: 30, duration_seconds: 3600, avg_hr: 120 },
@@ -165,6 +167,18 @@ test("sans FC max : ni dérive ni pente (on ne trie pas les sorties faciles), et
   assert.ok(sans.inconnus.some((x) => /dérive cardiaque[\s\S]*FC max inconnue/.test(x)), "le bilan ne dit pas que la FC max manque (dérive)");
   assert.ok(sans.inconnus.some((x) => /efficacité aérobie[\s\S]*FC max inconnue/.test(x)), "le bilan ne dit pas que la FC max manque (pente)");
   assert.doesNotMatch(lignesDuBilan(sans), /Dérive cardiaque moyenne/);
+});
+
+test("le jour d'une course connue, la dérive ne compte pas, même sous le seuil facile", () => {
+  // Une course courue à 75 % (sous 0,80) reste un effort de course : on ne s'en remet pas au seul seuil.
+  const semi = sortie("2026-11-08", 21.1, 110, { avg_hr: 150, cardiac_decoupling: 8 });
+  const seances = [semi, ...ENTREE.seances.filter((s) => s.date !== "2026-11-08")];
+  const base = faitsDuBilan(ENTREE).derive.n;
+  const f = faitsDuBilan({ ...ENTREE, seances });
+  assert.equal(f.derive.n, base, `la dérive du semi couru le jour de la course est comptée (${JSON.stringify(f.derive)})`);
+  // Contre-épreuve : sans course déclarée ce jour-là, la même sortie (75 %, donc facile) compte.
+  const g = faitsDuBilan({ ...ENTREE, courses: [], seances });
+  assert.equal(g.derive.n, base + 1, "précondition : sans course ce jour-là, cette sortie facile doit compter");
 });
 
 test("un marathon loisir couru à 83 % de la FC max n'est pas une sortie facile : sa dérive ne compte pas", () => {

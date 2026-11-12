@@ -28,7 +28,10 @@ export type EntreeJourJ = {
   vma: number | null;
   socle: Socle | null;
   /** Amélioration attendue d'ici la course (fraction), mesurée sur la pente de l'athlète. */
-  ameliorationMesuree: number | null;
+  ameliorationAttendue: number | null;
+  /** La pente de l'athlète a-t-elle été MESURÉE ? Sinon l'amélioration ci-dessus est l'hypothèse
+   *  générique (+0,4 %/semaine) — et l'écran doit le dire (directeur scientifique, 12/11/2026). */
+  progressionMesuree: boolean;
   /** Dénivelé positif et terrain, quand la course est retrouvée dans le catalogue. */
   dplusM: number | null;
   terrain: string | null;
@@ -48,6 +51,8 @@ export type PackJourJ = {
     verdict: RaceProjection["verdict"] | "inconnu";
     /** L'allure à tenir : celle de l'objectif, sauf s'il est hors de portée (alors la projection). */
     allureSecKm: number | null;
+    /** La projection repose-t-elle sur la progression MESURÉE de l'athlète, ou sur une hypothèse ? */
+    progressionMesuree: boolean;
   };
   /** Course courte (jusqu'au 10 km) ou longue : la consigne de départ n'est pas la même. */
   strategie: "courte" | "longue";
@@ -80,7 +85,7 @@ export function packJourJ(e: EntreeJourJ): PackJourJ {
 
   // ── Le chrono : le MÊME calcul que le verdict de la carte d'objectif ─────────
   const proj = !trail && e.vma && e.vma > 0
-    ? raceProjection(e.vma, d, e.objectif.viseSec, Math.max(0, e.joursRestants) / 7, e.ameliorationMesuree, e.socle)
+    ? raceProjection(e.vma, d, e.objectif.viseSec, Math.max(0, e.joursRestants) / 7, e.ameliorationAttendue, e.socle)
     : null;
   // L'allure EXACTE (non arrondie) : arrondie à la seconde, 3'12 sur 5 km donnait 16'00 à
   // l'arrivée pour un objectif de 15'59. On n'arrondit qu'à l'affichage.
@@ -118,6 +123,7 @@ export function packJourJ(e: EntreeJourJ): PackJourJ {
       projeteSec: proj?.projectedSec ?? null,
       verdict: proj?.verdict ?? "inconnu",
       allureSecKm: allureCible,
+      progressionMesuree: e.progressionMesuree,
     },
     strategie: d <= 10.5 ? "courte" : "longue",
     passages,

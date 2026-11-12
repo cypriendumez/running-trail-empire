@@ -511,7 +511,7 @@ test("UN seul seuil « facile » : 0,80, un prédicat, aucune autre définition 
   assert.match(c, /&& estSortieFacile\(fc, fcMaxEst\);/, "la relecture d'exécution a repris son propre seuil");
   assert.match(c, /if \(pct >= PART_FC_FACILE\) return "Allure soutenue";/, "classifyRun a repris son propre seuil");
   assert.match(c, /runs\.find\(w => w\.cardiac_decoupling != null && estSortieFacile\(w\.avg_hr, fcMaxEst\)\)/, "le limiteur de dérive lit de nouveau n'importe quelle sortie");
-  assert.match(codeOf("src/lib/ai/bilanSemaine.ts"), /const facile = \(s: SeanceBilan\) => estSortieFacile\(s\.avg_hr, e\.fcMax\);/, "la dérive du bilan a repris son propre seuil");
+  assert.match(codeOf("src/lib/ai/bilanSemaine.ts"), /const facile = \(s: SeanceBilan\) => !joursDeCourse\.has\(String\(s\.date\)\.slice\(0, 10\)\) && estSortieFacile\(s\.avg_hr, e\.fcMax\);/, "la dérive du bilan a repris son propre seuil");
   assert.match(codeOf("src/lib/running/progression.ts"), /if \(!estSortieFacile\(fc, fcMax\)\) continue;/, "la pente a repris son propre seuil");
 });
 

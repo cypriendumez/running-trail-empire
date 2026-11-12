@@ -93,7 +93,9 @@ export default async function PageJourJ() {
     joursRestants,
     vma: vma > 0 ? vma : null,
     socle: socleDesSeances(seances as Parameters<typeof socleDesSeances>[0], jour),
-    ameliorationMesuree: ameliorationAttendue(Math.max(0, joursRestants) / 7, tendance),
+    ameliorationAttendue: ameliorationAttendue(Math.max(0, joursRestants) / 7, tendance),
+    // Sans pente mesurée, l'amélioration est SUPPOSÉE : la page le dit (12/11/2026).
+    progressionMesuree: tendance != null,
     dplusM: c?.elevation_gain_m != null ? Number(c.elevation_gain_m) : null,
     terrain: c?.terrain ?? c?.type ?? null,
     poidsKg: Number(p?.weight_kg) > 0 ? Number(p?.weight_kg) : null,

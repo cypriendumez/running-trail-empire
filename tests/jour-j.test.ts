@@ -29,12 +29,12 @@ const codeNu = (p: string) => readFileSync(p, "utf8").replace(/\/\*[\s\S]*?\*\//
 /** Le défi de Cyprien : 5 km en 15'59 le 19/12, VMA 20,1, 50 jours avant. */
 const SUB16: EntreeJourJ = {
   objectif: { nom: "sub 16 min", date: "2026-12-19", distanceKm: 5, viseSec: 959, officielle: false },
-  joursRestants: 50, vma: 20.1, socle: { sortieLongueKm: 42.5, volumeHebdoKm: 66.8 }, ameliorationMesuree: null,
+  joursRestants: 50, vma: 20.1, socle: { sortieLongueKm: 42.5, volumeHebdoKm: 66.8 }, ameliorationAttendue: null, progressionMesuree: false,
   dplusM: null, terrain: null, poidsKg: 64, meteo: null,
 };
 const MARATHON: EntreeJourJ = {
   objectif: { nom: "Marathon de Paris", date: "2027-04-11", distanceKm: 42.195, viseSec: 9600, officielle: true },
-  joursRestants: 160, vma: 20.1, socle: { sortieLongueKm: 32, volumeHebdoKm: 80 }, ameliorationMesuree: 0.03,
+  joursRestants: 160, vma: 20.1, socle: { sortieLongueKm: 32, volumeHebdoKm: 80 }, ameliorationAttendue: 0.03, progressionMesuree: true,
   dplusM: 100, terrain: "route", poidsKg: 64, meteo: null,
 };
 
@@ -164,6 +164,20 @@ test("la pente de Jour J passe par la règle unique : FC max sans valeur par dé
     "la FC max de Jour J a quitté la définition commune (ou reçu une valeur par défaut)");
   assert.match(src, /max_hr, garmin_metrics`\)/, "Jour J ne lit plus la FC max du profil ni celle de la montre");
   assert.match(src, /tendanceEfficacite\(efficaciteParBloc\([^;]*?, fcMax, /, "Jour J ne passe plus sa FC max à la mesure de pente");
+});
+
+test("la projection au jour J dit si la progression est MESURÉE ou SUPPOSÉE (12/11/2026)", () => {
+  // Sans pente mesurée, `ameliorationAttendue` renvoie l'hypothèse générique (+0,4 %/semaine) :
+  // elle déplace le chrono « au jour J » sans que rien ne le dise. Désormais l'écran le dit.
+  const page = codeNu("src/app/dashboard/jour-j/page.tsx");
+  assert.match(page, /progressionMesuree: tendance != null,/, "la page ne dit plus si la pente a été mesurée");
+  const vue = codeNu("src/components/jourJ/PackJourJVue.tsx");
+  assert.match(vue, /c\.progressionMesuree \? t\.progressionMesuree : t\.progressionSupposee\(n\(GAIN_GENERIQUE_SEMAINE \* 100\)\)/,
+    "l'écran ne distingue plus une progression mesurée d'une progression supposée");
+  for (const lang of ["fr", "en", "de", "es", "pt"] as const) {
+    const sup = JOURJ_T[lang].progressionSupposee("0,4");
+    assert.ok(sup.includes("0,4") && JOURJ_T[lang].progressionMesuree.length > 20, `${lang} : texte manquant`);
+  }
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
