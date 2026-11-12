@@ -33,3 +33,13 @@ export async function getPublicLang(): Promise<Lang> {
   const first = accept.split(",")[0]?.split("-")[0]?.trim();
   return normLang(first || "fr");
 }
+
+/**
+ * La langue d'un écran du tableau de bord : celle du COMPTE quand elle a été lue, sinon celle du
+ * navigateur (cookie `pacevo_lang`, puis Accept-Language) — jamais « fr » par défaut. Sert surtout
+ * au bandeau de panne (12/11/2026) : c'est quand le profil est illisible qu'il s'affiche, et un
+ * coureur anglophone le recevait alors en français.
+ */
+export async function langueEcran(prefCompte: unknown): Promise<Lang> {
+  return typeof prefCompte === "string" && prefCompte.trim() ? normLang(prefCompte) : getPublicLang();
+}

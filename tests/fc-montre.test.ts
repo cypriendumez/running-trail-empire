@@ -469,7 +469,7 @@ test("le coureur VOIT la panne : bandeau commun sur chaque écran de VMA, 5 lang
   assert.equal(BandeauPanne({ lectures: [], lang: "fr" }), null, "un bandeau s'affiche sans panne");
   const fr = renderToStaticMarkup(BandeauPanne({ lectures: ["vma", "repere", "vma"], lang: "fr" })!);
   assert.ok(fr.includes("ta VMA, ton test VMA") && fr.includes("pas pu être chargées") && fr.includes('role="alert"'), `bandeau : ${fr}`);
-  assert.ok(renderToStaticMarkup(BandeauPanne({ lectures: ["inconnu"], lang: "fr" })!).includes("tes données"), "un nom sans libellé affiche sa clé brute");
+  assert.ok(renderToStaticMarkup(BandeauPanne({ lectures: ["inconnu"], lang: "fr" })!).includes("tes données"), "un nom sans libellé ne retombe plus sur « tes données »");
   assert.doesNotMatch(renderToStaticMarkup(BandeauPanne({ lectures: ["fc-profil", "seances"], lang: "fr" })!), /dash\.inc\./, "une clé brute s'affiche");
   for (const lang of ["en", "de", "es", "pt"] as const) {
     const h = renderToStaticMarkup(BandeauPanne({ lectures: ["vma"], lang })!);
@@ -486,6 +486,18 @@ test("le coureur VOIT la panne : bandeau commun sur chaque écran de VMA, 5 lang
     ["src/app/dashboard/cours/page.tsx", /pannes = await signalerLectures\("cours"[\s\S]*<BandeauPanne lectures=\{pannes\}/],
     ["src/app/dashboard/jour-j/page.tsx", /const pannes = await signalerLectures\("jour-j"[\s\S]*<BandeauPanne lectures=\{pannes\} lang=\{lang\} \/><\/div>\s*<PackJourJVue/],
   ] as const) assert.match(code(f), re, `${f} : la panne n'est plus dite au coureur`);
+  // LA LANGUE : celle du compte, sinon celle du navigateur — jamais « fr » par défaut quand le profil est illisible
+  // (relecture du 12/11 : un coureur anglophone recevait le bandeau en français sur quatre écrans).
+  for (const [f, re] of [
+    ["src/app/dashboard/plans/page.tsx", /<BandeauPanne lectures=\{pannes\} lang=\{await langueEcran\(\(profRes\.data /],
+    ["src/app/dashboard/profile/page.tsx", /<div className="mx-auto max-w-3xl"><BandeauPanne lectures=\{pannes\} lang=\{await langueEcran\(\(profile /],
+    ["src/app/dashboard/health/page.tsx", /langPage = await langueEcran\(\(profilRes\.data [\s\S]*<BandeauPanne lectures=\{pannesVma\} lang=\{langPage \?\? await langueEcran\(null\)\} \/>/],
+    ["src/app/dashboard/ghost-runner/page.tsx", /<BandeauPanne lectures=\{pannes\} lang=\{await langueEcran\(\(profileRes\.data /],
+    ["src/app/dashboard/cours/page.tsx", /langBandeau = await langueEcran\(profileRes\.data\?\.preferred_language\);[\s\S]*<BandeauPanne lectures=\{pannes\} lang=\{langBandeau \?\? normLang\(lang\)\} \/>/],
+    ["src/app/dashboard/shop/page.tsx", /<BandeauPanne lectures=\{pannes\} lang=\{await langueEcran\(profilRes\.data\?\.preferred_language\)\} \/>/],
+    ["src/app/dashboard/shop/[slug]/page.tsx", /<BandeauPanne lectures=\{pannes\} lang=\{await langueEcran\(profilRes\.data\?\.preferred_language\)\} \/>/],
+  ] as const) assert.match(code(f), re, `${f} : le bandeau ne prend plus la langue du compte (ou du navigateur)`);
+  assert.match(code("src/lib/i18n/serverLang.ts"), /export async function langueEcran\(prefCompte: unknown\): Promise<Lang> \{\s*return typeof prefCompte === "string" && prefCompte\.trim\(\) \? normLang\(prefCompte\) : getPublicLang\(\);/, "langueEcran retombe sur autre chose que la langue du navigateur");
   // Jour J : profil illisible → la panne, JAMAIS le verrou « Premium » ; objectif illisible → jamais « fixe ton objectif ».
   const jj = code("src/app/dashboard/jour-j/page.tsx");
   const iPanneProfil = jj.indexOf("if (pannesProfil.length) return");

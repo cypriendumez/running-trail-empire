@@ -14,6 +14,7 @@ import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
+import { langueEcran } from "@/lib/i18n/serverLang";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -75,7 +76,7 @@ export default async function ModelePage({ params }: { params: Promise<{ slug: s
   // Une panne est DITE au coureur (12/11/2026) : l'avis sur ce modèle repose sur sa VMA.
   return (
     <>
-      <BandeauPanne lectures={pannes} lang={lang} />
+      <BandeauPanne lectures={pannes} lang={await langueEcran(profilRes.data?.preferred_language)} />
       <FicheModele m={m} avis={avis} bouts={bouts} manquantes={manquantes} proches={proches}
         offres={offres} offresLisibles={offresLisibles} best={best} tx={tx} langue={lang} />
     </>

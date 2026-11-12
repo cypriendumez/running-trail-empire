@@ -24,6 +24,7 @@ import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
+import { langueEcran } from "@/lib/i18n/serverLang";
 
 export const metadata = { title: "Santé" };
 
@@ -57,7 +58,7 @@ export default async function HealthPage() {
   let aptitude: "absent" | "attente" | "ok" | "panne" | "renouveler" = "ok";
   // Les lectures de la VMA en panne (12/11/2026) : DITES au coureur, la nutrition en dépend.
   let pannesVma: string[] = [];
-  let langPage: "fr" | "en" | "de" | "es" | "pt" = "fr";
+  let langPage: Awaited<ReturnType<typeof langueEcran>> | null = null;
   if (user) {
     // Pour la nutrition, les courses à venir et de quoi PRÉDIRE leur durée — la même VMA effective que le coach
     // (`effectiveVma`, seule définition de l'app) : lus ensemble, en une vague.
@@ -73,6 +74,7 @@ export default async function HealthPage() {
     ]);
     // Journalisées dans error_logs (12/11/2026), le test de référence compris (`vma_kmh`, première source de la VMA).
     pannesVma = await signalerLectures("sante", user.id, [["objectif", objRes], ["courses", planRes], ["profil", profilRes], ["seances", seancesRes], ["repere", baseRes]]);
+    langPage = await langueEcran((profilRes.data as { preferred_language?: string } | null)?.preferred_language);
     const { vma } = effectiveVma({
       vmaStored: baseRes.data?.vma_kmh ?? null,
       paceCurveBest: (profilRes.data?.pace_curve as { best?: { m: number; sec: number }[] } | null)?.best ?? null,
@@ -185,7 +187,6 @@ export default async function HealthPage() {
     //    tableau de bord) ; forme, VFC et sommeil par les MÊMES calculs que les pages Indicateurs.
     const jourAthlete = jourLocal(new Date(), fuseauOuDefaut(decodeURIComponent((await cookies()).get("pacevo_tz")?.value ?? "")));
     const lang = normLang(String((profilRes.data as { preferred_language?: string } | null)?.preferred_language ?? "fr"));
-    langPage = lang;
     const [bilanRes, donnees] = await Promise.all([
       supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", TYPE_BILAN).order("created_at", { ascending: false }).limit(30),
       // Une exception ne casse pas toute la page Santé : l'onglet Récupération se dit en panne.
@@ -212,7 +213,7 @@ export default async function HealthPage() {
   }
   return (
     <>
-      <BandeauPanne lectures={pannesVma} lang={langPage} />
+      <BandeauPanne lectures={pannesVma} lang={langPage ?? await langueEcran(null)} />
       <HealthCenter suivi={suivi} douleurs={douleurs} effets={effets} consignes={consignes} charge={charge} rappel={rappel}
         enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} recup={recup} aptitude={aptitude} />
     </>

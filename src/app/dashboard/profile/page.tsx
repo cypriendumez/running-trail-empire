@@ -11,6 +11,7 @@ import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
 import { normLang } from "@/lib/i18n/base";
+import { langueEcran } from "@/lib/i18n/serverLang";
 
 export const metadata = { title: "Mon profil" };
 
@@ -111,7 +112,7 @@ export default async function ProfilePage() {
   // Une panne est DITE au coureur (12/11/2026) : sa VMA ou ses zones retomberaient sans un mot.
   return (
     <>
-    <BandeauPanne lectures={pannes} lang={normLang(String((profile as { preferred_language?: string } | null)?.preferred_language ?? "fr"))} />
+    <div className="mx-auto max-w-3xl"><BandeauPanne lectures={pannes} lang={await langueEcran((profile as { preferred_language?: string } | null)?.preferred_language)} /></div>
     <ProfileSettings
       profile={stripProfileSecrets(profile)}
       baseline={baseline}

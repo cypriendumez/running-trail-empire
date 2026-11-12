@@ -12,6 +12,7 @@ import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
+import { langueEcran } from "@/lib/i18n/serverLang";
 
 export const metadata = { title: "Comparateur" };
 
@@ -74,7 +75,7 @@ export default async function ShopPage() {
   return (
     <div className="mx-auto w-full max-w-[1180px] sm:px-6 sm:py-6">
       {/* Une panne est DITE au coureur (12/11/2026) : la recommandation repose sur sa VMA. */}
-      <BandeauPanne lectures={pannes} lang={lang} />
+      <BandeauPanne lectures={pannes} lang={await langueEcran(profilRes.data?.preferred_language)} />
       <header className="mb-6">
         <h1 className="text-[26px] font-semibold tracking-tight text-zinc-900 sm:text-[32px]">{tx("shop.titre")}</h1>
         <p className="mt-1.5 max-w-2xl text-[14px] leading-relaxed text-zinc-500">

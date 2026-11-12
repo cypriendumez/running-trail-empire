@@ -8,7 +8,7 @@ import { PlansView } from "./PlansView";
 import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
-import { getPublicLang } from "@/lib/i18n/serverLang";
+import { langueEcran } from "@/lib/i18n/serverLang";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Plans d'entraînement" };
@@ -31,7 +31,7 @@ export default async function PlansPage() {
   if (!user) redirect("/login");
 
   const [profRes, baseRes, woRes, fcMaxVma] = await Promise.all([
-    supabase.from("profiles").select("garmin_vo2max, pace_curve").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("garmin_vo2max, pace_curve, preferred_language").eq("id", user.id).maybeSingle(),
     supabase.from("performance_baselines").select("vma_kmh").eq("user_id", user.id)
       .order("tested_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("workouts").select("date, type, sport, distance_km, duration_seconds, avg_hr, max_hr, weather_temp_c")
@@ -59,7 +59,7 @@ export default async function PlansPage() {
   // Une panne est DITE au coureur (12/11/2026) : son niveau et son volume seraient faux sans un mot.
   return (
     <>
-      <BandeauPanne lectures={pannes} lang={await getPublicLang()} />
+      <BandeauPanne lectures={pannes} lang={await langueEcran((profRes.data as { preferred_language?: string } | null)?.preferred_language)} />
       <PlansView niveau={niveauDeVma(vma)} volumeKm={Math.round(volume)} />
     </>
   );
