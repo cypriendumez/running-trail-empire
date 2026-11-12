@@ -663,9 +663,18 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // montre a enregistré 205 est fausse par construction — on ne peut pas avoir un maximum
   // inférieur à un battement qu'on a réellement produit. On retient donc la plus haute des
   // deux, et on ne retombe sur l'âge que si l'athlète n'a NI déclaré NI couru.
-  const fcMaxEst = (maxHrDeclare != null || obsMaxHr0 > 150)
+  // ⚠️ SANS DÉCLARATION, SANS MESURE ET SANS ÂGE : `null`, PLUS 190 (12/11/2026). Le repli à 190
+  // estimait la VMA depuis les séances, classait les efforts « durs » et partait à l'IA sous la
+  // forme « ~190 (obs.) » — un chiffre inventé présenté comme observé. Le null est GARDÉ
+  // explicitement là où il dégraderait le plan : relecture d'exécution et pente (plus bas).
+  // ⚠️ JAMAIS UNE FC MOYENNE EN GUISE DE FC MAX (relecture du 12/11/2026) : essayé comme
+  // « plancher » quand `max_hr` manque, il faisait d'un footing à 155 bpm un effort à 100 %
+  // « Intense », y compris avec l'âge connu. Sans FC max, la séance est jugée sur son TYPE.
+  const ageConnu = num(p?.age);
+  const fcMaxSource: "mesures" | "age" | null = (maxHrDeclare != null || obsMaxHr0 > 150) ? "mesures" : ageConnu != null ? "age" : null;
+  const fcMaxEst: number | null = fcMaxSource === "mesures"
     ? Math.max(maxHrDeclare ?? 0, obsMaxHr0 > 150 ? obsMaxHr0 : 0)
-    : (num(p?.age) != null ? 220 - (num(p?.age) as number) : 190);
+    : fcMaxSource === "age" ? 220 - (ageConnu as number) : null;
   // ── LES CIBLES DE FC MESURÉES (07/11/2026) ─────────────────────────────────
   // FC max réellement atteinte ou déclarée, FC de repos déclarée sinon celle de la montre,
   // seuil mesuré. Les footings récents (≥ 20 min, 60 jours) servent à suivre l'athlète
@@ -2164,7 +2173,9 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // blocs de 4 semaines, et on ne conclut que si la tendance ressort du bruit.
   const coursesForme = ((formeRes.data ?? []) as { date: string; sport?: string | null; distance_km: number | null; duration_seconds: number | null; avg_hr: number | null; gap_min_km?: number | null; elevation_gain_m?: number | null }[])
     .filter((w) => isRun(w.sport));
-  const tendanceForme = tendanceEfficacite(efficaciteParBloc(coursesForme, fcMaxEst, now));
+  // ⚠️ SANS FC MAX, AUCUNE PENTE (12/11/2026) : on ne sait plus trier les sorties faciles, et
+  // mêler séances dures et faciles mesurerait l'intensité, pas le progrès (relecture).
+  const tendanceForme = fcMaxEst == null ? null : tendanceEfficacite(efficaciteParBloc(coursesForme, fcMaxEst, now));
   const ameliorationPrevue = ameliorationAttendue(weeksToRace, tendanceForme);
 
   // ── LE TERRAIN DE LA COURSE ─────────────────────────────────────────────────
@@ -2222,13 +2233,16 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const m = String(easyPaceLisible ?? "").match(/(\d+)['’:](\d{2})/);
     return m ? Number(m[1]) * 60 + Number(m[2]) : null;
   })();
-  const relecture = cibleFacileSec == null ? null : relireExecution(
+  // ⚠️ SANS FC MAX, PAS DE RELECTURE (12/11/2026) : impossible de reconnaître les sorties faciles ;
+  // les fractionnés et les courses tireraient l'écart vers le rapide et la correction ACCÉLÉRERAIT
+  // l'allure facile prescrite (relecture du repli à 190, qui rendait ce cas inatteignable).
+  const relecture = cibleFacileSec == null || fcMaxEst == null ? null : relireExecution(
     coursesForme
       .filter((w) => {
         const km = num(w.distance_km), sec = num(w.duration_seconds), fc = num(w.avg_hr);
         const age = now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime();
         return km != null && km >= 4 && sec != null && sec > 0 && age <= 90 * 86400000
-          && (fcMaxEst == null || (fc != null && fc / fcMaxEst < 0.80));
+          && fc != null && fc / fcMaxEst < 0.80;
       })
       .map((w) => ({
         allureSecKm: num(w.gap_min_km) != null ? num(w.gap_min_km)! * 60 : num(w.duration_seconds)! / num(w.distance_km)!,
@@ -2503,7 +2517,7 @@ ${elev ? `- ${elev.rule}` : ""}
 ${tempRule ? `- MÉTÉO AUJOURD'HUI : ${tempRule}` : ""}${hotDays.length ? `\n- 🔥 CHALEUR ANNONCÉE : ${hotDays.slice(0, 4).map(f => `${f.date.slice(8)}/${f.date.slice(5, 7)} ${Math.round(f.tempMax)}°C`).join(" · ")} → déplace les séances de qualité de ces jours-là tôt le matin, ou échange-les avec un jour plus frais de la semaine. Prévois-le MAINTENANT, pas la veille.` : ""}
 
 CAPACITÉS (tests)
-- VMA : ${vma ?? "?"} km/h${vmaIsEst ? ` ⚠️ ESTIMÉE depuis ses séances (aucun test VMA enregistré) → recommande-lui un test VMA pour affiner, et reste un cran prudent sur la 1re séance VMA` : ""} · FC max ${maxHr ?? (vmaIsEst && fcMaxEst ? `~${fcMaxEst} (obs.)` : "?")} · FC repos ${restHr ?? "?"} · FC seuil ${ltHr ?? "?"}
+- VMA : ${vma ?? "?"} km/h${vmaIsEst ? ` ⚠️ ESTIMÉE depuis ses séances (aucun test VMA enregistré) → recommande-lui un test VMA pour affiner, et reste un cran prudent sur la 1re séance VMA` : ""} · FC max ${maxHr ?? (vmaIsEst && fcMaxEst ? `~${fcMaxEst} (${fcMaxSource === "age" ? "formule de l'âge, pas une mesure" : "obs."})` : "?")} · FC repos ${restHr ?? "?"} · FC seuil ${ltHr ?? "?"}
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
