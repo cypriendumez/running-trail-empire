@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { classifyRun } from "@/lib/ai/coachContext";
 import { fcMaxConnue, seuilMesure, PIC_FC_JOURS } from "@/lib/coach/fcCible";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 import { GhostRunner } from "@/components/ghost-runner/GhostRunner";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { oneSessionPerSlot } from "@/lib/coach/sessions";
@@ -83,7 +84,7 @@ export default async function GhostRunnerPage() {
   // écarte les séances où le capteur a décroché plutôt que battu un record.
   // Les deux lectures ci-dessous ne dépendent que de l'identifiant : en UNE vague, pas
   // deux attentes de plus avant le premier octet (22/09/2026).
-  const [{ data: fcRows }, { data: recentes }] = await Promise.all([
+  const [{ data: fcRows, error: ePic }, { data: recentes, error: eRecentes }] = await Promise.all([
     // ⚠️ LES SIX DERNIERS MOIS (`PIC_FC_JOURS`, 12/11/2026), comme le coach : le pic de TOUT
     // l'historique relevait les zones d'un pic d'été vieux d'un an — des cibles trop hautes.
     supabase.from("workouts")
@@ -95,6 +96,10 @@ export default async function GhostRunnerPage() {
       .eq("user_id", user!.id).not("avg_hr", "is", null)
       .order("date", { ascending: false }).limit(60),
   ]);
+  // ⚠️ Une panne n'est pas « aucun pic » (relecture du 12/11/2026) : elle est journalisée. Sans le
+  // pic, la FC max retombe sur la déclarée (ou rien) — plus basse, donc prudente, mais plus muette.
+  const ePanneFc = ePic ?? eRecentes;
+  if (ePanneFc) await journaliserEchec(null, { source: "ghost-runner", message: `FC illisible : ${ePanneFc.message}`, userId: user!.id });
   const fcMaxObservee = (fcRows?.[0] as { max_hr?: number } | undefined)?.max_hr ?? null;
   const pGr = profileRes.data as { max_hr?: number | null; garmin_metrics?: { maxHR?: number; lthr?: number } | null } | null;
   const bGr = baselineRes.data as { max_hr?: number | null; lt_hr?: number | null } | null;

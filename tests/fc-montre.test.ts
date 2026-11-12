@@ -295,6 +295,7 @@ test("UNE seule FC max : coach, zones, discipline, montre, Jour J, bilan, analys
   assert.match(code("src/app/dashboard/jour-j/page.tsx"), /sb\.from\("profiles"\)\.select\("max_hr, garmin_metrics"\)/, "Jour J ne lit plus la FC du profil à part (elle mettrait en jeu la porte d'accès)");
   assert.match(code("src/app/dashboard/jour-j/page.tsx"), /const ePanneFc = baseRes\.error \?\? fcProfilRes\.error;\s*if \(ePanneFc\) await journaliserEchec/, "Jour J ne lit plus l'erreur des lectures de FC");
   assert.match(code("src/app/api/ai/analyse-seance/route.ts"), /objRes\.error \?\? picRes\.error;/, "l'analyse ne lit plus l'erreur du pic de FC");
+  assert.match(code("src/app/dashboard/ghost-runner/page.tsx"), /const ePanneFc = ePic \?\? eRecentes;\s*if \(ePanneFc\) await journaliserEchec/, "le Ghost Runner ne lit plus l'erreur du pic de FC ni des footings");
   // Le coach : zones et discipline des footings lisent la MÊME valeur ; le seuil des zones aussi.
   const c = code("src/lib/ai/coachContext.ts");
   assert.match(c, /const maxHrEff = fcMaxEst;/, "les zones ont retrouvé leur propre FC max");

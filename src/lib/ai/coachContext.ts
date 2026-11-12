@@ -1672,7 +1672,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // sur la plus longue sortie d'une heure ou plus : la semaine d'un marathon, c'est le marathon, et
   // le coach concluait « endurance aérobie insuffisante » sur un effort de course — le défaut du
   // 30/10, encore vivant ici. Sans FC max, aucune sortie n'est réputée facile : pas de verdict.
-  // …et JAMAIS le jour d'une course connue (`joursDeCourse`), même courue sous le seuil : comme le bilan.
+  // …et JAMAIS le jour d'une course connue (`joursDeCourse` : l'objectif et la course qu'il a remplacée),
+  // même courue sous le seuil. Le bilan exige en plus la moitié de la distance courue ce jour-là ; ici,
+  // toute date de course connue est écartée — plus prudent pour un facteur qui oriente le menu.
   const driftW = runs.find(w => w.cardiac_decoupling != null && !joursDeCourse.has(String(w.date).slice(0, 10)) && estSortieFacile(w.avg_hr, fcMaxEst));
   const drift = driftW ? Number(driftW.cardiac_decoupling) : null;
   if (drift != null && drift >= 8) {
