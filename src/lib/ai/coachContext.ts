@@ -2170,7 +2170,9 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // blocs de 4 semaines, et on ne conclut que si la tendance ressort du bruit.
   const coursesForme = ((formeRes.data ?? []) as { date: string; sport?: string | null; distance_km: number | null; duration_seconds: number | null; avg_hr: number | null; gap_min_km?: number | null; elevation_gain_m?: number | null }[])
     .filter((w) => isRun(w.sport));
-  const tendanceForme = tendanceEfficacite(efficaciteParBloc(coursesForme, fcMaxEst, now));
+  // ⚠️ SANS FC MAX, AUCUNE PENTE (12/11/2026) : on ne sait plus trier les sorties faciles, et
+  // mêler séances dures et faciles mesurerait l'intensité, pas le progrès (relecture).
+  const tendanceForme = fcMaxEst == null ? null : tendanceEfficacite(efficaciteParBloc(coursesForme, fcMaxEst, now));
   const ameliorationPrevue = ameliorationAttendue(weeksToRace, tendanceForme);
 
   // ── LE TERRAIN DE LA COURSE ─────────────────────────────────────────────────
@@ -2228,13 +2230,16 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const m = String(easyPaceLisible ?? "").match(/(\d+)['’:](\d{2})/);
     return m ? Number(m[1]) * 60 + Number(m[2]) : null;
   })();
-  const relecture = cibleFacileSec == null ? null : relireExecution(
+  // ⚠️ SANS FC MAX, PAS DE RELECTURE (12/11/2026) : impossible de reconnaître les sorties faciles ;
+  // les fractionnés et les courses tireraient l'écart vers le rapide et la correction ACCÉLÉRERAIT
+  // l'allure facile prescrite (relecture du repli à 190, qui rendait ce cas inatteignable).
+  const relecture = cibleFacileSec == null || fcMaxEst == null ? null : relireExecution(
     coursesForme
       .filter((w) => {
         const km = num(w.distance_km), sec = num(w.duration_seconds), fc = num(w.avg_hr);
         const age = now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime();
         return km != null && km >= 4 && sec != null && sec > 0 && age <= 90 * 86400000
-          && (fcMaxEst == null || (fc != null && fc / fcMaxEst < 0.80));
+          && fc != null && fc / fcMaxEst < 0.80;
       })
       .map((w) => ({
         allureSecKm: num(w.gap_min_km) != null ? num(w.gap_min_km)! * 60 : num(w.duration_seconds)! / num(w.distance_km)!,

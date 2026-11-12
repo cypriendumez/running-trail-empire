@@ -130,6 +130,26 @@ async function main() {
     assert.match(l, /FC max ~190 \(formule de l'âge, pas une mesure\)/, l);
   });
 
+  // Relecture du 12/11 : sans FC max, deux filtres « sorties faciles » ne filtraient plus rien.
+  // Fractionnés et courses entraient dans la relecture d'exécution (qui ACCÉLÉRAIT alors l'allure
+  // facile prescrite) et dans la pente d'efficacité (qui mesurait l'intensité, pas le progrès).
+  await test("sans FC max : ni relecture d'exécution ni pente mesurée (on ne sait pas trier les sorties faciles)", async () => {
+    // 6 mois de sorties de plus en plus rapides à FC égale : assez pour une pente, et des allures
+    // plus vives que la cible facile, de quoi « corriger » vers le rapide.
+    const longues = Array.from({ length: 180 }, (_, k) => k + 1).filter((k) => k % 2 === 0).map((k) => ({
+      user_id: "u", date: ilYa(k), type: "easy", sport: "run", distance_km: 10, duration_seconds: 2700 + k * 3,
+      avg_hr: 132, max_hr: 145, tss: 55, hr_zone_seconds: [900, 1800, 0, 0, 0],
+    }));
+    const texte = async (profil: Ligne) => (await buildAthleteContext(fauxClient({ profiles: [profil], performance_baselines: [], workouts: longues, notifications: [] }), "u")).text;
+    const sans = await texte({ ...PROFIL, age: null });
+    assert.doesNotMatch(sans, /RELECTURE DE L'EXÉCUTION/, "la relecture tourne sans FC max : elle mêle séances dures et faciles");
+    assert.doesNotMatch(sans, /PENTE RÉELLE DE L'ATHLÈTE \(mesurée/, "une pente est mesurée sans pouvoir trier les sorties faciles");
+    // Contre-épreuve : avec l'âge, les mêmes séances donnent bien une relecture et une pente.
+    const avec = await texte({ ...PROFIL, age: 30 });
+    assert.match(avec, /RELECTURE DE L'EXÉCUTION/, "précondition : ces séances doivent produire une relecture");
+    assert.match(avec, /PENTE RÉELLE DE L'ATHLÈTE \(mesurée/, "précondition : ces séances doivent produire une pente");
+  });
+
   await test("le code : sans source, `fcMaxEst` vaut null (plus de « : 190 »)", () => {
     const src = codeNu("src/lib/ai/coachContext.ts");
     assert.match(src, /: fcMaxSource === "age" \? 220 - \(ageConnu as number\) : null;/, "le repli de FC max n'est plus null");
