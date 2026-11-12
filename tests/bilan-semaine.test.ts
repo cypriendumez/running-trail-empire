@@ -167,6 +167,12 @@ test("sans FC max : ni dérive ni pente (on ne trie pas les sorties faciles), et
   assert.doesNotMatch(lignesDuBilan(sans), /Dérive cardiaque moyenne/);
 });
 
+test("avec FC max, une sortie SANS FC moyenne n'entre pas dans la dérive (on ne sait pas si elle était facile)", () => {
+  const sansFc = sortie("2026-11-06", 12, 60, { avg_hr: null, cardiac_decoupling: 9.9 });
+  const f = faitsDuBilan({ ...ENTREE, seances: [sansFc, ...ENTREE.seances] });
+  assert.deepEqual(f.derive, faitsDuBilan(ENTREE).derive, `une sortie sans FC moyenne a pesé dans la dérive (${JSON.stringify(f.derive)})`);
+});
+
 test("ce qui est inconnu n'a pas de ligne : rien n'est mis à zéro", () => {
   const f = faitsDuBilan({ ...ENTREE, sommeil: [], vfc: [], seances: ENTREE.seances.map((x) => ({ ...x, cardiac_decoupling: null })) });
   const l = lignesBilanEmail(f, "fr").join("\n");
