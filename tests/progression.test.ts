@@ -91,8 +91,12 @@ test("les séances DURES sont exclues du calcul", () => {
   const fcMax = 200;
   const dures: CourseEfficacite[] = serieSimulee(6, 5, () => 12, Math.round(fcMax * PART_FC_FACILE) + 5);
   assert.equal(efficaciteParBloc(dures, fcMax, MAINTENANT).length, 0, "des séances dures sont entrées dans la mesure");
-  // …et sans FC max connue, on ne peut pas trier : on garde tout plutôt que d'inventer.
-  assert.ok(efficaciteParBloc(dures, null, MAINTENANT).length > 0);
+  // …et sans FC max connue, on ne peut pas trier : RIEN n'est mesuré (12/11/2026). Garder tout
+  // mêlait séances dures et faciles ; Jour J et le bilan affichaient une pente que le coach refusait.
+  assert.equal(efficaciteParBloc(dures, null, MAINTENANT).length, 0, "sans FC max, des séances non triées entrent dans la mesure");
+  const faciles: CourseEfficacite[] = serieSimulee(6, 5, (b) => 12 - b * 0.2, 140);
+  assert.ok(efficaciteParBloc(faciles, fcMax, MAINTENANT).length > 0, "contre-épreuve : avec la FC max, des sorties faciles se mesurent");
+  assert.equal(efficaciteParBloc(faciles, null, MAINTENANT).length, 0, "sans FC max, même des sorties faciles ne doivent pas se mesurer");
 });
 
 test("marche, vélo mal étiqueté et données absurdes sont écartés", () => {

@@ -91,14 +91,17 @@ export function faitsDuBilan(e: EntreeBilan): FaitsBilan {
   // de la semaine était celle du MARATHON couru à fond (5,5 %), comparée à des footings (2,6 %) —
   // et le bilan concluait « l'endurance cède ». À effort de course, le cœur monte : ce n'est pas
   // une dérive d'endurance. Même seuil que l'efficacité aérobie (PART_FC_FACILE).
-  const facile = (s: SeanceBilan) => e.fcMax == null || !fini(s.avg_hr) || s.avg_hr < e.fcMax * PART_FC_FACILE;
+  // ⚠️ SANS FC MAX (ou sans FC moyenne), la sortie n'est PAS réputée facile (12/11/2026) : on ne
+  // peut pas la trier, et la dérive du marathon redevenait une « dérive d'endurance ».
+  const facile = (s: SeanceBilan) => e.fcMax != null && fini(s.avg_hr) && s.avg_hr < e.fcMax * PART_FC_FACILE;
+  const sansFcMax = e.fcMax == null ? " — FC max inconnue : impossible de trier les sorties faciles" : "";
   const deriveSemaine = semaine.filter(facile).map((s) => s.cardiac_decoupling).filter(fini);
   const deriveAvant = avant.filter(facile).map((s) => s.cardiac_decoupling).filter(fini);
-  if (!deriveSemaine.length) inconnus.push("la dérive cardiaque de cette semaine (aucune sortie facile et continue d'au moins 30 min mesurée)");
+  if (!deriveSemaine.length) inconnus.push(`la dérive cardiaque de cette semaine (aucune sortie facile et continue d'au moins 30 min mesurée${sansFcMax})`);
 
   // Efficacité aérobie : tendance sur des blocs de 4 semaines, retenue seulement si elle ressort du bruit.
   const t = tendanceEfficacite(efficaciteParBloc(runs, e.fcMax, Date.parse(`${e.aujourdhui}T12:00:00Z`)));
-  if (!t) inconnus.push("la tendance d'efficacité aérobie (pas assez de sorties faciles, ou rien qui ressorte du bruit)");
+  if (!t) inconnus.push(`la tendance d'efficacité aérobie (pas assez de sorties faciles, ou rien qui ressorte du bruit${sansFcMax})`);
 
   const sommeilSemaine = moyenne(e.sommeil.filter((s) => dans(s.date, e.aujourdhui, 0, 6)).map((s) => s.sleep_score).filter(fini));
   const sommeilAvant = moyenne(e.sommeil.filter((s) => dans(s.date, e.aujourdhui, 7, 27)).map((s) => s.sleep_score).filter(fini));

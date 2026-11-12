@@ -154,5 +154,14 @@ test("les textes existent dans les cinq langues, avec les mêmes clés", () => {
   for (const l of ["fr", "en", "de", "es", "pt"] as const) assert.ok(T[l]["obj.packJourJ"], `obj.packJourJ manque en ${l}`);
 });
 
+test("la pente de Jour J passe par la règle unique : FC max sans valeur par défaut, aucune mesure sans elle", () => {
+  // 12/11/2026 : sans FC max, la pente mêlait séances dures et faciles. La règle vit dans
+  // `efficaciteParBloc` (tests/progression) ; ici, le site d'appel lui passe la VRAIE FC max ou null.
+  const src = codeNu("src/app/dashboard/jour-j/page.tsx");
+  assert.match(src, /const fcMax = Number\(\(baseRes\.data as \{ max_hr\?: number \| null \} \| null\)\?\.max_hr\) \|\| \(fcObservee > 120 \? fcObservee : null\);/,
+    "la FC max de Jour J a changé de source (ou reçu une valeur par défaut)");
+  assert.match(src, /tendanceEfficacite\(efficaciteParBloc\([^;]*?, fcMax, /, "Jour J ne passe plus sa FC max à la mesure de pente");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }

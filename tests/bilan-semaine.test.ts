@@ -154,6 +154,19 @@ test("Premium : les faits de la semaine écoulée ouvrent l'e-mail, chiffres de 
   assert.ok(!m.html.includes("Découvrir Premium"), "un abonné Premium reçoit l'invitation à Premium");
 });
 
+test("sans FC max : ni dérive ni pente (on ne trie pas les sorties faciles), et le bilan dit pourquoi", () => {
+  // 12/11/2026 : sans FC max, toute sortie passait pour facile. La dérive du semi couru à 189 bpm
+  // redevenait une « dérive d'endurance », et la pente mêlait séances dures et faciles.
+  const avec = faitsDuBilan(ENTREE);
+  assert.equal(avec.derive.n, 2, "précondition : avec la FC max, deux sorties faciles donnent une dérive");
+  const sans = faitsDuBilan({ ...ENTREE, fcMax: null });
+  assert.equal(sans.derive.semaine, null, `sans FC max, une dérive est calculée sur des sorties non triées (${JSON.stringify(sans.derive)})`);
+  assert.equal(sans.derive.avant, null, "sans FC max, la dérive des semaines d'avant est calculée sur des sorties non triées");
+  assert.ok(sans.inconnus.some((x) => /dérive cardiaque[\s\S]*FC max inconnue/.test(x)), "le bilan ne dit pas que la FC max manque (dérive)");
+  assert.ok(sans.inconnus.some((x) => /efficacité aérobie[\s\S]*FC max inconnue/.test(x)), "le bilan ne dit pas que la FC max manque (pente)");
+  assert.doesNotMatch(lignesDuBilan(sans), /Dérive cardiaque moyenne/);
+});
+
 test("ce qui est inconnu n'a pas de ligne : rien n'est mis à zéro", () => {
   const f = faitsDuBilan({ ...ENTREE, sommeil: [], vfc: [], seances: ENTREE.seances.map((x) => ({ ...x, cardiac_decoupling: null })) });
   const l = lignesBilanEmail(f, "fr").join("\n");

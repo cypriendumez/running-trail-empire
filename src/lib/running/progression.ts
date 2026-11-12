@@ -57,6 +57,11 @@ const mediane = (v: number[]): number => {
 export function efficaciteParBloc(
   runs: readonly CourseEfficacite[], fcMax: number | null, maintenant = Date.now(), blocsMax = 9,
 ): { bloc: number; valeur: number; seances: number }[] {
+  // ⚠️ SANS FC MAX, AUCUNE MESURE (12/11/2026). On gardait alors TOUTES les sorties « plutôt que
+  // d'inventer » : la pente mêlait séances dures et faciles, donc l'intensité, pas le progrès. Le
+  // coach refusait déjà de conclure dans ce cas ; Jour J et le bilan de la semaine affichaient
+  // encore une pente. Une seule règle désormais, ici, pour les trois.
+  if (fcMax == null) return [];
   const paquets = new Map<number, number[]>();
   for (const r of runs ?? []) {
     const km = fini(r.distance_km) ? r.distance_km : null;
@@ -65,7 +70,7 @@ export function efficaciteParBloc(
     if (km == null || sec == null || fc == null || km < 3 || sec <= 0 || fc < 60) continue;
     // Sorties FACILES seulement : sur une séance dure, la vitesse par battement monte
     // sans que la forme ait changé — on mesurerait l'intensité, pas le progrès.
-    if (fcMax != null && fc / fcMax >= PART_FC_FACILE) continue;
+    if (fc / fcMax >= PART_FC_FACILE) continue;
     const t = Date.parse(String(r.date ?? "").slice(0, 10) + "T12:00:00Z");
     if (!Number.isFinite(t)) continue;
     const bloc = Math.floor((maintenant - t) / (JOURS_BLOC * 86400000));
