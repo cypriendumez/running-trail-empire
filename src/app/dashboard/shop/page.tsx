@@ -44,6 +44,8 @@ export default async function ShopPage() {
     fcMaxDeLAthlete(supabase, user.id),
   ]);
 
+  // Une panne n'est pas « aucune séance » : la VMA de la recommandation retomberait en silence (12/11/2026).
+  if (seancesRes.error) console.error("[boutique] séances illisibles :", seancesRes.error.message);
   const seances = seancesRes.data ?? [];
   const lang = langueDuCompte(profilRes.data?.preferred_language);
   const tx = (k: string, p?: Record<string, string | number>) => texteShop(lang, k, p);

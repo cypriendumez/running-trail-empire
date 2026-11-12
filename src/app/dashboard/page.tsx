@@ -241,6 +241,8 @@ export default async function DashboardPage() {
   const donneesIncompletes = lecturesEnEchec([
     ["profil", profileRes], ["seances", workoutsRes],
     ["charge", chargeRes], ["records", prRes],
+    // Les 60 séances de LA VMA (12/11/2026) : une panne ne doit pas faire retomber la VMA en silence.
+    ["vma", seancesVmaRes],
   ]);
   if (donneesIncompletes.length) {
     console.error("[tableau de bord] lectures en échec :", donneesIncompletes.join(", "));

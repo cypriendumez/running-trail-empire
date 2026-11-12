@@ -383,6 +383,13 @@ test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien,
   }
 });
 
+test("les lectures de séances de la VMA lisent leur erreur (une panne ne fait pas retomber la VMA en silence)", () => {
+  assert.match(code("src/app/dashboard/page.tsx"), /lecturesEnEchec\(\[[\s\S]{0,400}\["vma", seancesVmaRes\],/, "tableau de bord : la panne des séances de la VMA n'est plus lue");
+  assert.match(code("src/app/dashboard/layout.tsx"), /\{ data: seancesVma, error: eSeancesVma \}, \{ data: testVma, error: eTestVma \}[\s\S]{0,1600}if \(eSeancesVma \|\| eTestVma\) console\.error/, "en-tête : la panne des séances de la VMA n'est plus lue");
+  for (const f of ["src/app/dashboard/shop/page.tsx", "src/app/dashboard/shop/[slug]/page.tsx"])
+    assert.match(code(f), /if \(seancesRes\.error\) console\.error\(/, `${f} : la panne des séances n'est plus lue`);
+});
+
 test("UN seul calcul de « meilleur effort » dans tout src/ : `effortDesSeances` (12/11/2026)", () => {
   // Avant : 40 séances au tableau de bord, 60 au coach, 120 aux Plans, 200 en Santé et en Boutique ;
   // chaleur au coach seulement ; tous sports sans tri en Santé et en Boutique. Un coureur lisait

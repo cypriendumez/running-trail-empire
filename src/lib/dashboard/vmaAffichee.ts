@@ -47,7 +47,7 @@ export function effortDesSeances(seances: readonly SeanceVma[], fcMax: number | 
 }
 
 export function vmaAffichee(i: {
-  /** Les séances lues par le tableau de bord (les 40 dernières). */
+  /** Les séances lues (au moins les {@link SEANCES_VMA} plus récentes, tous sports) : triées et coupées ici. */
   seances: readonly SeanceVma[];
   baseline: { vma_kmh?: number | null; tested_at?: string | null } | null;
   profil: { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null;
