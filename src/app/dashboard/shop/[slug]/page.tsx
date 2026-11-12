@@ -13,6 +13,8 @@ import { effectiveVma } from "@/lib/running/fitness";
 import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
+import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
+import { langueEcran } from "@/lib/i18n/serverLang";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -42,7 +44,7 @@ export default async function ModelePage({ params }: { params: Promise<{ slug: s
   ]);
 
   // Une panne n'est pas « aucune donnée » : la VMA de la recommandation retomberait en silence (12/11/2026).
-  await signalerLectures("fiche-boutique", user.id, [["seances", seancesRes], ["repere", baseRes], ["profil", profilRes]]);
+  const pannes = await signalerLectures("fiche-boutique", user.id, [["seances", seancesRes], ["repere", baseRes], ["profil", profilRes]]);
   const seances = seancesRes.data ?? [];
   const lang = langueDuCompte(profilRes.data?.preferred_language);
   const { vma } = effectiveVma({
@@ -71,8 +73,12 @@ export default async function ModelePage({ params }: { params: Promise<{ slug: s
   try { offres = await offresPour(supabase, m.ean); } catch { offresLisibles = false; }
   const best = meilleure(offres);
 
+  // Une panne est DITE au coureur (12/11/2026) : l'avis sur ce modèle repose sur sa VMA.
   return (
-    <FicheModele m={m} avis={avis} bouts={bouts} manquantes={manquantes} proches={proches}
-      offres={offres} offresLisibles={offresLisibles} best={best} tx={tx} langue={lang} />
+    <>
+      <div className="mx-auto w-full max-w-[1180px] sm:px-6 sm:pt-6"><BandeauPanne lectures={pannes} lang={await langueEcran(profilRes.data?.preferred_language)} /></div>
+      <FicheModele m={m} avis={avis} bouts={bouts} manquantes={manquantes} proches={proches}
+        offres={offres} offresLisibles={offresLisibles} best={best} tx={tx} langue={lang} />
+    </>
   );
 }

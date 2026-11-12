@@ -23,6 +23,8 @@ import { TYPE_APTITUDE, lireAptitude, avisAttendu, aRenouveler } from "@/lib/hea
 import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
+import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
+import { langueEcran } from "@/lib/i18n/serverLang";
 
 export const metadata = { title: "Santé" };
 
@@ -54,6 +56,9 @@ export default async function HealthPage() {
   // Santé, lot 3 : le questionnaire d'aptitude (absent pour un inscrit d'avant, ou en attente d'avis).
   // Lecture en panne : rien n'est affiché (le coach, lui, refuse son contexte et le dit).
   let aptitude: "absent" | "attente" | "ok" | "panne" | "renouveler" = "ok";
+  // Les lectures de la VMA en panne (12/11/2026) : DITES au coureur, la nutrition en dépend.
+  let pannesVma: string[] = [];
+  let langPage: Awaited<ReturnType<typeof langueEcran>> | null = null;
   if (user) {
     // Pour la nutrition, les courses à venir et de quoi PRÉDIRE leur durée — la même VMA effective que le coach
     // (`effectiveVma`, seule définition de l'app) : lus ensemble, en une vague.
@@ -68,7 +73,8 @@ export default async function HealthPage() {
       fcMaxDeLAthlete(supabase, user.id),
     ]);
     // Journalisées dans error_logs (12/11/2026), le test de référence compris (`vma_kmh`, première source de la VMA).
-    await signalerLectures("sante", user.id, [["objectif", objRes], ["courses", planRes], ["profil", profilRes], ["seances", seancesRes], ["repere", baseRes]]);
+    pannesVma = await signalerLectures("sante", user.id, [["objectif", objRes], ["courses", planRes], ["profil", profilRes], ["seances", seancesRes], ["repere", baseRes]]);
+    langPage = await langueEcran((profilRes.data as { preferred_language?: string } | null)?.preferred_language);
     const { vma } = effectiveVma({
       vmaStored: baseRes.data?.vma_kmh ?? null,
       paceCurveBest: (profilRes.data?.pace_curve as { best?: { m: number; sec: number }[] } | null)?.best ?? null,
@@ -205,6 +211,11 @@ export default async function HealthPage() {
       : { ...bilansRecents((bilanRes.data ?? []) as { data?: unknown }[], jourAthlete), forme: null, vfc: null,
           sommeil: { derniere: null, moyenneMin: null, nuits: 0 }, fcRepos: null, panne: true, fatigueDurable: false };
   }
-  return <HealthCenter suivi={suivi} douleurs={douleurs} effets={effets} consignes={consignes} charge={charge} rappel={rappel}
-    enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} recup={recup} aptitude={aptitude} />;
+  return (
+    <>
+      <BandeauPanne lectures={pannesVma} lang={langPage ?? await langueEcran(null)} />
+      <HealthCenter suivi={suivi} douleurs={douleurs} effets={effets} consignes={consignes} charge={charge} rappel={rappel}
+        enPanne={enPanne} coursesNutrition={coursesNutrition} poidsKg={poidsKg} recup={recup} aptitude={aptitude} />
+    </>
+  );
 }

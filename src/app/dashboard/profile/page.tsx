@@ -9,6 +9,9 @@ import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { isRun } from "@/lib/intervals/sport";
 import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
+import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
+import { normLang } from "@/lib/i18n/base";
+import { langueEcran } from "@/lib/i18n/serverLang";
 
 export const metadata = { title: "Mon profil" };
 
@@ -48,7 +51,7 @@ export default async function ProfilePage() {
 
   // Une panne n'est pas « aucune donnée » (12/11/2026) : la VMA et les zones retomberaient en silence.
   // « Aucun test » (PGRST116 d'un `.single()` sans ligne) n'est pas une panne.
-  await signalerLectures("profil", user!.id, [["seances", { error: eRecentWk }], ["profil", { error: eProfil }], ["repere", { error: eBaseline }]]);
+  const pannes = await signalerLectures("profil", user!.id, [["seances", { error: eRecentWk }], ["profil", { error: eProfil }], ["repere", { error: eBaseline }]]);
   // VMA estimée depuis les meilleurs efforts SOUTENUS (FC élevée) + FC max observée.
   const rw = (recentWk ?? []) as { date?: string; weather_temp_c?: number | null; distance_km?: number | null; duration_seconds?: number | null; type?: string | null; sport?: string | null; avg_hr?: number | null; max_hr?: number | null }[];
   // Les ZONES affichées, elles, ne prennent qu'une vraie FC max : la commune ; sans elle, pas de
@@ -106,7 +109,10 @@ export default async function ProfilePage() {
     d.setDate(d.getDate() - 1);
   }
 
+  // Une panne est DITE au coureur (12/11/2026) : sa VMA ou ses zones retomberaient sans un mot.
   return (
+    <>
+    <div className="mx-auto max-w-3xl"><BandeauPanne lectures={pannes} lang={await langueEcran((profile as { preferred_language?: string } | null)?.preferred_language)} /></div>
     <ProfileSettings
       profile={stripProfileSecrets(profile)}
       baseline={baseline}
@@ -118,5 +124,6 @@ export default async function ProfilePage() {
       catalogue={indexLeger()}
       etatAbo={litEtatAbo((ligneAbo as { data?: unknown } | null)?.data ?? null)}
     />
+    </>
   );
 }

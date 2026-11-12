@@ -15,6 +15,8 @@ import { CoursFlashcards } from "@/components/cours/CoursFlashcards";
 import { AskCoachButton } from "@/components/cours/AskCoachButton";
 import { CoursBarreProgression, CoursMarquerLu, CoursSommaireMobile } from "@/components/cours/CoursProgression";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
+import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
+import { langueEcran } from "@/lib/i18n/serverLang";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Cours du coureur" };
@@ -48,6 +50,8 @@ export default async function CoursPage() {
   const { data: { user } } = await supabase.auth.getUser();
   let lang = "fr";
   let vma: number | null = null, maxHr: number | null = null, cadence: number | null = null;
+  let pannes: string[] = [];
+  let langBandeau: Awaited<ReturnType<typeof langueEcran>> | null = null;
   if (user) {
     const [profileRes, baselineRes, workoutsRes] = await Promise.all([
       supabase.from("profiles").select("preferred_language").eq("id", user.id).single(),
@@ -55,8 +59,9 @@ export default async function CoursPage() {
       supabase.from("workouts").select("avg_cadence_spm").eq("user_id", user.id).order("date", { ascending: false }).limit(12),
     ]);
     // Une panne n'est pas « aucune VMA » : les allures personnalisées disparaîtraient en silence (12/11/2026).
-    await signalerLectures("cours", user.id, [["profil", profileRes], ["repere", baselineRes], ["seances", workoutsRes]]);
+    pannes = await signalerLectures("cours", user.id, [["profil", profileRes], ["repere", baselineRes], ["seances", workoutsRes]]);
     lang = normLang(profileRes.data?.preferred_language ?? "fr");
+    langBandeau = await langueEcran(profileRes.data?.preferred_language);
     vma = Number(baselineRes.data?.vma_kmh) || null;
     maxHr = Number(baselineRes.data?.max_hr) || null;
     const cads = (workoutsRes.data ?? []).map((w) => Number(w.avg_cadence_spm)).filter((x) => x > 0);
@@ -91,6 +96,8 @@ export default async function CoursPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
+      {/* Une panne est DITE au coureur (12/11/2026) : ses allures personnalisées disparaîtraient sans un mot. */}
+      <div className="mx-auto max-w-4xl px-4 pt-4"><BandeauPanne lectures={pannes} lang={langBandeau ?? normLang(lang)} /></div>
       {/* Hero — resserré le 21/09/2026 (Cyprien : « trop grand, il prend trop de place ») :
           padding 40→20 px, titre 4xl→3xl, sous-titre plus petit et limité à 2 lignes sur
           téléphone. */}
