@@ -61,9 +61,10 @@ export function efficaciteParBloc(
   // d'inventer » : la pente mêlait séances dures et faciles, donc l'intensité, pas le progrès. Le
   // coach refusait déjà de conclure dans ce cas ; Jour J et le bilan de la semaine affichaient
   // encore une pente. La règle « FC max null → aucune pente » vit ici, pour les trois appelants.
-  // ⚠️ Mais chacun trouve SA FC max : le coach (déclarée, observée > 150, sinon 220 − âge) n'a pas
-  // la même source que Jour J et le bilan (test de référence, sinon observée > 120). Un senior qui
-  // n'a donné que son âge a donc une pente côté coach et aucune côté Jour J (relecture du 12/11).
+  // ⚠️ Mais chacun trouve SA FC max : le coach (la plus haute entre la déclarée et l'observée
+  // > 150, sinon 220 − âge) n'a pas la même source que Jour J et le bilan (test de référence,
+  // sinon observée > 120). Un senior qui n'a donné que son âge a donc une pente côté coach et
+  // aucune côté Jour J (relecture du 12/11).
   if (fcMax == null) return [];
   const paquets = new Map<number, number[]>();
   for (const r of runs ?? []) {
