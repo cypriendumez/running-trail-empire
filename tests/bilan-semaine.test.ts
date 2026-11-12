@@ -32,9 +32,11 @@ const ENTREE: EntreeBilan = {
   aujourdhui: AUJ,
   seances: [
     // Cette semaine (2 → 8 novembre) : trois sorties, et un vélo qui ne compte pas dans le volume.
-    sortie("2026-11-08", 15, 75, { hr_zone_seconds: [600, 3600, 300, 0, 0], cardiac_decoupling: 3.1 }),
+    // Le 08/11, jour du Semi de Bondues (15 km courus sur 21,1) : jour de COURSE, sa dérive ne
+    // compterait pas (12/11/2026) — elle n'est donc pas posée ici.
+    sortie("2026-11-08", 15, 75, { hr_zone_seconds: [600, 3600, 300, 0, 0] }),
     sortie("2026-11-05", 10, 48, { hr_zone_seconds: [300, 2400, 180, 0, 0], cardiac_decoupling: 4.3 }),
-    sortie("2026-11-03", 8, 40, { hr_zone_seconds: [600, 1200, 300, 300, 0] }),
+    sortie("2026-11-03", 8, 40, { hr_zone_seconds: [600, 1200, 300, 300, 0], cardiac_decoupling: 3.1 }),
     // Une sortie à effort de course (FC moyenne 189 pour 200 de max) : sa dérive n'est pas une dérive d'endurance.
     sortie("2026-11-02", 12, 50, { avg_hr: 189, cardiac_decoupling: 5.5 }),
     { date: "2026-11-04", sport: "bike", distance_km: 30, duration_seconds: 3600, avg_hr: 120 },
@@ -152,6 +154,47 @@ test("Premium : les faits de la semaine écoulée ouvrent l'e-mail, chiffres de 
   // Sans texte déjà écrit, un LIEN vers la carte — jamais un texte rédigé pour l'occasion.
   assert.match(m.text, /Lire le bilan du coach : https:\/\/pacevo\.fr\/dashboard/);
   assert.ok(!m.html.includes("Découvrir Premium"), "un abonné Premium reçoit l'invitation à Premium");
+});
+
+test("sans FC max : ni dérive ni pente (on ne trie pas les sorties faciles), et le bilan dit pourquoi", () => {
+  // 12/11/2026 : sans FC max, toute sortie passait pour facile. La dérive du semi couru à 189 bpm
+  // redevenait une « dérive d'endurance », et la pente mêlait séances dures et faciles.
+  const avec = faitsDuBilan(ENTREE);
+  assert.equal(avec.derive.n, 2, "précondition : avec la FC max, deux sorties faciles donnent une dérive");
+  const sans = faitsDuBilan({ ...ENTREE, fcMax: null });
+  assert.equal(sans.derive.semaine, null, `sans FC max, une dérive est calculée sur des sorties non triées (${JSON.stringify(sans.derive)})`);
+  assert.equal(sans.derive.avant, null, "sans FC max, la dérive des semaines d'avant est calculée sur des sorties non triées");
+  assert.ok(sans.inconnus.some((x) => /dérive cardiaque[\s\S]*FC max inconnue/.test(x)), "le bilan ne dit pas que la FC max manque (dérive)");
+  assert.ok(sans.inconnus.some((x) => /efficacité aérobie[\s\S]*FC max inconnue/.test(x)), "le bilan ne dit pas que la FC max manque (pente)");
+  assert.doesNotMatch(lignesDuBilan(sans), /Dérive cardiaque moyenne/);
+});
+
+test("le jour d'une course connue, la dérive ne compte pas, même sous le seuil facile", () => {
+  // Une course courue à 75 % (sous 0,80) reste un effort de course : on ne s'en remet pas au seul seuil.
+  const semi = sortie("2026-11-08", 21.1, 110, { avg_hr: 150, cardiac_decoupling: 8 });
+  const seances = [semi, ...ENTREE.seances.filter((s) => s.date !== "2026-11-08")];
+  const base = faitsDuBilan(ENTREE).derive.n;
+  const f = faitsDuBilan({ ...ENTREE, seances });
+  assert.equal(f.derive.n, base, `la dérive du semi couru le jour de la course est comptée (${JSON.stringify(f.derive)})`);
+  // Contre-épreuve : sans course déclarée ce jour-là, la même sortie (75 %, donc facile) compte.
+  const g = faitsDuBilan({ ...ENTREE, courses: [], seances });
+  assert.equal(g.derive.n, base + 1, "précondition : sans course ce jour-là, cette sortie facile doit compter");
+});
+
+test("un marathon loisir couru à 83 % de la FC max n'est pas une sortie facile : sa dérive ne compte pas", () => {
+  // 12/11/2026 : seuil commun 0,80. À 0,85, ce marathon (166/200) entrait dans la dérive d'endurance.
+  const marathon = sortie("2026-11-06", 42.2, 250, { avg_hr: 166, cardiac_decoupling: 9 });
+  const f = faitsDuBilan({ ...ENTREE, seances: [marathon, ...ENTREE.seances] });
+  assert.deepEqual(f.derive, faitsDuBilan(ENTREE).derive, `un effort à 83 % a pesé dans la dérive (${JSON.stringify(f.derive)})`);
+  // Contre-épreuve : la même sortie à 78 % (156/200) compte.
+  const facile = faitsDuBilan({ ...ENTREE, seances: [{ ...marathon, avg_hr: 156 }, ...ENTREE.seances] });
+  assert.equal(facile.derive.n, faitsDuBilan(ENTREE).derive.n + 1, "une sortie à 78 % n'est plus comptée facile");
+});
+
+test("avec FC max, une sortie SANS FC moyenne n'entre pas dans la dérive (on ne sait pas si elle était facile)", () => {
+  const sansFc = sortie("2026-11-06", 12, 60, { avg_hr: null, cardiac_decoupling: 9.9 });
+  const f = faitsDuBilan({ ...ENTREE, seances: [sansFc, ...ENTREE.seances] });
+  assert.deepEqual(f.derive, faitsDuBilan(ENTREE).derive, `une sortie sans FC moyenne a pesé dans la dérive (${JSON.stringify(f.derive)})`);
 });
 
 test("ce qui est inconnu n'a pas de ligne : rien n'est mis à zéro", () => {

@@ -30,7 +30,7 @@ export type ReferencesFc = {
   repos: number | null;
   /** Seuil mesuré (LTHR). Absent chez la plupart des montres. */
   seuil: number | null;
-  source: "mesures" | "seuil" | "age" | "aucune";
+  source: "mesures" | "seuil" | "aucune";
 };
 
 export type PlageFc = { lo: number; hi: number };
@@ -61,7 +61,7 @@ const nb = (v: unknown): number | null =>
 const dans = (v: unknown, lo: number, hi: number): number | null => { const n = nb(v); return n != null && n >= lo && n <= hi ? n : null; };
 
 export function referencesFc(e: {
-  maxDeclaree?: unknown; maxObservee?: unknown; repos?: unknown; seuil?: unknown; age?: unknown;
+  maxDeclaree?: unknown; maxObservee?: unknown; repos?: unknown; seuil?: unknown;
 }): ReferencesFc {
   const seuil = dans(e.seuil, 100, 230);
   const declaree = dans(e.maxDeclaree, 100, 240);
@@ -79,9 +79,80 @@ export function referencesFc(e: {
   // Le seuil vaut ~92 % de la FC max chez un athlète entraîné : bien meilleur repli
   // que l'âge, et il reste adossé à une mesure.
   if (seuil != null && seuil > 120) return { max: Math.round(seuil / 0.92), repos, seuil, source: "seuil" };
-  const age = nb(e.age);
-  if (age != null && age > 5 && age < 100) return { max: 220 - age, repos, seuil, source: "age" };
+  // ⚠️ PLUS JAMAIS 220 − ÂGE (Cyprien, 12/11/2026 : « la refuser partout »). La formule se trompe
+  // de 10 à 12 bpm pour un individu ; le coach l'utilisait, Jour J et le bilan non, et un même
+  // coureur lisait deux projections. Sans mesure, la FC max est INCONNUE, partout.
   return { max: null, repos, seuil, source: "aucune" };
+}
+
+/**
+ * LA FC MAX CONNUE — UNE seule définition pour le coach (classement des séances, VMA estimée,
+ * zones, discipline des footings), Jour J, le bilan de la semaine, le Ghost Runner et la montre.
+ * Avant le 12/11/2026, quatre chaînes : déclarée/observée > 150/âge (coach), observée > 120
+ * (Jour J, bilan, discipline), seuil/âge (zones) — un coureur lisait des chiffres différents
+ * selon l'écran. Ordre : la plus haute entre la DÉCLARÉE (test, profil, sinon montre) et le pic
+ * RÉELLEMENT atteint (> 150), sinon le seuil mesuré ÷ 0,92, sinon `null`.
+ * Le tri des « efforts maximaux » de la VMA estimée passe aussi par elle (Cyprien, 12/11/2026 ;
+ * mesuré avant : aucune VMA affichée ne bougeait chez les 6 coureurs actifs) — voir
+ * `fcMaxPourEfforts` et `fcMaxDeLAthlete` (lib/coach/fcMaxServeur).
+ */
+export function fcMaxConnue(e: { declaree?: unknown; montre?: unknown; observee?: unknown; seuil?: unknown }): { max: number | null; source: ReferencesFc["source"] } {
+  const r = referencesFc({ maxDeclaree: maxDeReference(e.declaree, e.montre), maxObservee: e.observee, seuil: e.seuil });
+  return { max: r.max, source: r.source };
+}
+
+/**
+ * LES DEUX SEUILS D'INTENSITÉ, en part de la FC max — UNE définition pour toute l'application
+ * (directeur scientifique, 12/11/2026). Avant : « facile » valait 0,75 (analyse de séance), 0,80
+ * (relecture d'exécution, `classifyRun`) et 0,85 (pente, dérive du bilan) ; une sortie à 82 % était
+ * « dure » pour le plan et « facile » pour la pente. 0,80 = frontière endurance / allure marathon
+ * chez Daniels, au milieu du seuil aérobie (77-82 %). À 0,85, un marathon loisir (80-88 %) passait
+ * pour une sortie facile : c'est le défaut du 30/10.
+ */
+export const PART_FC_FACILE = 0.80;
+/** Au-delà, la séance est DURE (seuil, tempo, VMA, course). Entre les deux : « modérée ». */
+export const PART_FC_DURE = 0.85;
+
+/** Une sortie est FACILE si sa FC moyenne est sous {@link PART_FC_FACILE} d'une FC max CONNUE.
+ *  Sans l'une ou l'autre, elle ne l'est pas : on ne sait pas, on ne suppose pas. */
+export function estSortieFacile(fcMoyenne: unknown, fcMax: number | null | undefined): boolean {
+  const fc = Number(fcMoyenne);
+  return fcMoyenne != null && Number.isFinite(fc) && fc > 0 && fcMax != null && fcMax > 0 && fc / fcMax < PART_FC_FACILE;
+}
+
+/**
+ * LE SEUIL MESURÉ (LTHR) — une seule source, le TEST d'abord, puis la MONTRE, comme la FC max
+ * (directeur scientifique, 12/11/2026). Avant, le coach prenait la montre d'abord, les cibles de la
+ * montre le test seul et le Ghost Runner la montre seule : un même coureur avait deux FC max.
+ */
+export function seuilMesure(test: unknown, montre: unknown): number | null {
+  const v = (x: unknown) => { const n = Number(x); return x != null && x !== "" && Number.isFinite(n) && n >= 100 && n <= 230 ? n : null; };
+  return v(test) ?? v(montre);
+}
+
+/**
+ * La FC qui TRIE les « efforts maximaux » de la VMA estimée (jamais affichée comme FC max) : la FC
+ * max COMMUNE. Sans elle — inconnue (`null`) ou lecture en panne (`undefined`) —, le pic > 120 des
+ * séances lues sert encore de garde-fou : sans AUCUN tri, `meilleurEffort` prenait toute sortie
+ * pour un effort maximal, et une donnée aberrante (vélo étiqueté course, GPS qui saute, sortie à FC
+ * basse) gonflait la VMA affichée (relecture du 12/11/2026).
+ */
+export function fcMaxPourEfforts(fcMax: number | null | undefined, seances: readonly { max_hr?: unknown }[]): number | null {
+  if (fcMax != null) return fcMax;
+  const pic = Math.max(0, ...(seances ?? []).map((s) => Number(s.max_hr) || 0));
+  return pic > 120 ? pic : null;
+}
+
+/** Le pic de FC réellement atteint sur les {@link PIC_FC_JOURS} jours qui finissent le jour civil `jour`. */
+export function picFcObserve(seances: readonly { date?: string | null; max_hr?: unknown }[], jour: string): number | null {
+  const fin = Date.parse(`${jour}T12:00:00Z`);
+  let pic = 0;
+  for (const s of seances ?? []) {
+    const t = Date.parse(`${String(s.date ?? "").slice(0, 10)}T12:00:00Z`);
+    const v = Number(s.max_hr);
+    if (Number.isFinite(t) && fin - t >= 0 && fin - t <= PIC_FC_JOURS * 86400000 && Number.isFinite(v) && v > pic) pic = v;
+  }
+  return pic > 0 ? pic : null;
 }
 
 /** Milieu de zone, en fraction de réserve cardiaque. Étroit par construction. */

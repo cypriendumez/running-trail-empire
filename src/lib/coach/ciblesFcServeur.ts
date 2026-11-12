@@ -8,7 +8,7 @@
  * une séance re-poussée depuis l'admin partirait avec d'autres battements que celle du coach.
  * Serveur uniquement : client service role.
  */
-import { referencesFc, ciblesFcAthlete, maxDeReference, fcMaxSaison, airFroid, PIC_FC_JOURS, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, type CiblesFc, type ReferencesFc } from "@/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, maxDeReference, fcMaxSaison, airFroid, PIC_FC_JOURS, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, type CiblesFc, type ReferencesFc, seuilMesure } from "@/lib/coach/fcCible";
 import { isRun } from "@/lib/intervals/sport";
 import { forecastWeek } from "@/lib/weather/openMeteo";
 
@@ -70,7 +70,8 @@ export async function ciblesFcPour(sb: Lecteur, userId: string, maintenant = Dat
       maxDeclaree: maxDeReference(num(b?.max_hr) ?? num(p?.max_hr), garmin?.maxHR),
       maxObservee: num((fcMax.data as { max_hr?: unknown } | null)?.max_hr),
       repos: num(b?.resting_hr) ?? num(p?.resting_hr) ?? num(garmin?.restingHR),
-      seuil: num(b?.lt_hr),
+      // 12/11/2026 : la MÊME source de seuil que le coach (test, puis montre).
+      seuil: seuilMesure(b?.lt_hr, garmin?.lthr),
     });
     const fcs = ((footings.data ?? []) as { type?: string | null; sport?: string | null; duration_seconds?: unknown; avg_hr?: unknown }[])
       .filter((w) => isRun(w.sport ?? null) && !TYPE_DUR.test(String(w.type ?? "")) && (num(w.duration_seconds) ?? 0) >= 20 * 60)

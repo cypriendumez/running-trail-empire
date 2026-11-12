@@ -14,6 +14,7 @@ import { CoursQuiz } from "@/components/cours/CoursQuiz";
 import { CoursFlashcards } from "@/components/cours/CoursFlashcards";
 import { AskCoachButton } from "@/components/cours/AskCoachButton";
 import { CoursBarreProgression, CoursMarquerLu, CoursSommaireMobile } from "@/components/cours/CoursProgression";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Cours du coureur" };
@@ -53,6 +54,8 @@ export default async function CoursPage() {
       supabase.from("performance_baselines").select("vma_kmh,max_hr").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("workouts").select("avg_cadence_spm").eq("user_id", user.id).order("date", { ascending: false }).limit(12),
     ]);
+    // Une panne n'est pas « aucune VMA » : les allures personnalisées disparaîtraient en silence (12/11/2026).
+    await signalerLectures("cours", user.id, [["profil", profileRes], ["repere", baselineRes], ["seances", workoutsRes]]);
     lang = normLang(profileRes.data?.preferred_language ?? "fr");
     vma = Number(baselineRes.data?.vma_kmh) || null;
     maxHr = Number(baselineRes.data?.max_hr) || null;

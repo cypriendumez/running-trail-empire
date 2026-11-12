@@ -39,10 +39,10 @@ const TOURS = Number(process.env.FUZZ_TOURS) || 3000;
 
 /** Un athlète au hasard : de l'élite au débutant, données complètes ou trouées. */
 function athlete() {
-  const max = nb(170, 215), repos = nb(38, 75), seuil = peut(0.3) ? nb(150, 200) : null, age = nb(14, 80);
+  const max = nb(170, 215), repos = nb(38, 75), seuil = peut(0.3) ? nb(150, 200) : null;
   const refs = referencesFc({
     maxDeclaree: peut(0.3) ? max : null, maxObservee: peut(0.7) ? nb(140, 220) : null,
-    repos: peut(0.7) ? repos : null, seuil, age: peut(0.5) ? age : null,
+    repos: peut(0.7) ? repos : null, seuil,
   });
   const footings = Array.from({ length: entre(0, 30) }, () => nb(110, 185) as number);
   return { refs, footings };

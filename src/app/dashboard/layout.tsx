@@ -3,7 +3,8 @@ import { stripProfileSecrets } from "@/lib/profile/safe";
 import { T, normLang } from "@/lib/i18n/translations";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
-import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
+import { vmaAffichee, SEANCES_VMA } from "@/lib/dashboard/vmaAffichee";
+import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { niveauDeVma } from "@/lib/running/niveau";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import { FileAttenteCourses } from "@/components/courses/FileAttenteCourses";
@@ -22,6 +23,7 @@ import { EcranLancement } from "@/components/layout/EcranLancement";
 import { MiseAJour } from "@/components/layout/MiseAJour";
 import { DecorLancement } from "@/components/layout/DecorLancement";
 import { aConsenti } from "@/lib/auth/consentement";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -38,7 +40,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // deux machines ne sont pas le même jour.
   const fuseau = decodeURIComponent((await cookies()).get("pacevo_tz")?.value ?? "");
 
-  const [{ data: profile }, { count: unreadMessages }, { data: settingsRow }, { data: seancesVma }, { data: testVma }] = await Promise.all([
+  const [{ data: profile, error: eProfil }, { count: unreadMessages }, { data: settingsRow }, { data: seancesVma, error: eSeancesVma }, { data: testVma, error: eTestVma }, fcMaxVma] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("notifications").select("id", { count: "exact", head: true })
       // La pastille compte AUSSI les messages d'athlètes : un message qu'on ne voit pas
@@ -47,15 +49,22 @@ export default async function DashboardLayout({ children }: { children: React.Re
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle(),
     // Le NIVEAU affiché sous le nom se déduit de la VMA effective (lib/running/niveau) :
     // les mêmes séances et le même calcul que la carte VMA du tableau de bord.
-    supabase.from("workouts").select("date,type,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c")
-      .eq("user_id", user.id).order("date", { ascending: false }).limit(40),
+    // `sport` : la VMA ne lit que la course à pied (12/11/2026) — sans la colonne, tout passait pour de la course.
+    supabase.from("workouts").select("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c")
+      .eq("user_id", user.id).order("date", { ascending: false }).limit(SEANCES_VMA),
     supabase.from("performance_baselines").select("vma_kmh,tested_at").eq("user_id", user.id)
       .order("tested_at", { ascending: false }).limit(1).maybeSingle(),
+    // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
+    fcMaxDeLAthlete(supabase, user.id),
   ]);
+  // Une panne de lecture n'est pas « aucune donnée » : le niveau affiché retomberait en silence.
+  // Journalisée dans error_logs (12/11/2026) ; « aucune ligne » n'est pas une panne.
+  await signalerLectures("entete", user.id, [["profil", { error: eProfil }], ["seances", { error: eSeancesVma }], ["repere", { error: eTestVma }]]);
   const niveau = niveauDeVma(vmaAffichee({
     seances: (seancesVma ?? []) as Parameters<typeof vmaAffichee>[0]["seances"],
     baseline: testVma,
     profil: profile as Parameters<typeof vmaAffichee>[0]["profil"],
+    fcMax: fcMaxVma,
   }).vma);
   const avatarColor = String(((settingsRow?.data ?? {}) as Record<string, unknown>).avatarColor ?? "emerald");
   const brutMasquees = ((settingsRow?.data ?? {}) as Record<string, unknown>).notifsMasquees;

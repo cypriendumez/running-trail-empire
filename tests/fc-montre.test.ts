@@ -10,8 +10,11 @@
  *   npx tsx tests/fc-montre.test.ts
  */
 import assert from "node:assert/strict";
+import { T } from "../src/lib/i18n/translations";
+import { execSync } from "node:child_process";
+import { vmaAffichee, effortDesSeances, acclimatationDesSeances, SEANCES_VMA } from "../src/lib/dashboard/vmaAffichee";
 import { readFileSync } from "node:fs";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, airFroid, BAISSE_HIVER_BPM, SEUIL_FROID_C } from "../src/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, airFroid, BAISSE_HIVER_BPM, SEUIL_FROID_C, fcMaxConnue, picFcObserve, seuilMesure, fcMaxPourEfforts } from "../src/lib/coach/fcCible";
 import { avecSaison } from "../src/lib/coach/ciblesFcServeur";
 import { stepsForType, parseReps, buildWorkoutDescription } from "../src/lib/watch/intervals";
 
@@ -39,7 +42,8 @@ test("le compte de Cyprien : footing 143-153, récup 133-143, footing « dur » 
 });
 
 test("sans FC max mesurée (âge seul), aucune cible : la montre garde ses zones", () => {
-  assert.equal(ciblesFcAthlete(referencesFc({ age: 22 }), FOOTINGS), null);
+  // 12/11/2026 : l'âge n'est même plus lu — un ancien appelant qui le passerait n'obtient rien.
+  assert.equal(ciblesFcAthlete(referencesFc({ age: 22 } as Parameters<typeof referencesFc>[0]), FOOTINGS), null);
   assert.equal(ciblesFcAthlete(referencesFc({}), FOOTINGS), null);
 });
 
@@ -156,8 +160,8 @@ test("la synchro garde la FC max de la montre ; coach et envois lisent 6 mois et
   for (const f of ["src/lib/intervals/syncUser.ts", "src/app/api/intervals/sync/route.ts"])
     assert.match(code(f), /maxHR: Number\(lastRun(Act)?\?\.athlete_max_hr\) \|\| null,/, `${f} ne garde plus la FC max de la montre`);
   const c = code("src/lib/ai/coachContext.ts");
-  assert.match(c, /\.not\("max_hr", "is", null\)\.gte\("date", new Date\(Date\.now\(\) - PIC_FC_JOURS \* 86400000\)/, "le coach relit le pic de TOUT l'historique");
-  assert.match(c, /const maxHrDeclare = maxDeReference\(num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\),\s*\(\(\(p as Record<string, unknown> \| null\)\?\.garmin_metrics\) as Record<string, unknown> \| null\)\?\.maxHR\)/, "le coach ignore la FC max de la montre");
+  assert.match(c, /\.not\("max_hr", "is", null\)\.gte\("date", new Date\(Date\.now\(\) - PIC_FC_JOURS \* 86400000\)/, "le coach ne limite plus le pic aux 6 derniers mois");
+  assert.match(c, /const gmFc = \(\(p as Record<string, unknown> \| null\)\?\.garmin_metrics \?\? null\) as Record<string, unknown> \| null;\s*const maxHrDeclare = maxDeReference\(num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\), gmFc\?\.maxHR\);/, "le coach ignore la FC max de la montre");
   assert.match(c, /\.filter\(w => now - new Date\(String\(w\.date\)\.slice\(0, 10\) \+ "T12:00:00Z"\)\.getTime\(\) <= PIC_FC_JOURS \* 86400000\)/, "les 60 séances lues peuvent remonter au-delà de 6 mois");
   const srv = code("src/lib/coach/ciblesFcServeur.ts");
   assert.match(srv, /\.gte\("date", new Date\(maintenant - PIC_FC_JOURS \* 86400000\)/);
@@ -190,8 +194,8 @@ test("les cibles suivent la saison : en janvier, footing et plafond descendent d
   const hiver = ciblesFcAthlete(avecSaison(REFS, { recent: 200, anDernier: 202 }), FOOTINGS)!;
   assert.ok(hiver.plafondFooting < ete.plafondFooting, `plafond ${hiver.plafondFooting} contre ${ete.plafondFooting}`);
   assert.ok(ete.plafondFooting - hiver.plafondFooting <= 8, "la saison ne doit pas effondrer les zones");
-  // Des pics plus bas que 220 − âge : recaler une estimation d'âge sur eux la ferait passer pour une mesure.
-  assert.equal(avecSaison(referencesFc({ age: 22 }), { recent: 190, anDernier: 185 }).max, 198, "une FC max tirée de l'âge n'est pas recalée sur la saison");
+  // Sans FC max mesurée (l'âge ne compte plus, 12/11/2026), la saison n'en fabrique pas une.
+  assert.equal(avecSaison(referencesFc({ age: 22 } as Parameters<typeof referencesFc>[0]), { recent: 190, anDernier: 185 }).max, null, "la saison invente une FC max");
   assert.equal(avecSaison(REFS, null), REFS, "une lecture ratée garde la référence");
 });
 
@@ -227,7 +231,7 @@ test("−5 bpm pour qui n'a pas d'hiver enregistré, par temps froid ; son effor
   assert.equal(fcMaxSaison(212, 200, 202, true), 202, "avec un hiver enregistré, ce sont SES données qui comptent, pas la baisse");
   assert.equal(fcMaxSaison(null, 190, null, true), null);
   assert.equal(avecSaison(REFS, { recent: null, anDernier: null }, true).max, 207);
-  assert.equal(avecSaison(referencesFc({ age: 22 }), { recent: null, anDernier: null }, true).max, 198, "une FC max tirée de l'âge ne bouge pas");
+  assert.equal(avecSaison(referencesFc({ age: 22 } as Parameters<typeof referencesFc>[0]), { recent: null, anDernier: null }, true).max, null, "l'air froid invente une FC max");
 });
 
 test("le coach et les envois lisent la météo de sa position, avant les cibles de FC", () => {
@@ -260,6 +264,202 @@ test("une FC max de montre plus basse que nos cibles : on garde ses zones plutô
 test("« air froid » : une case vide n'est pas 0 °C", () => {
   assert.equal(airFroid([{ tempMin: "", tempMax: "" }, { tempMin: "", tempMax: "" }, { tempMin: "", tempMax: "" }] as never), false);
   assert.equal(airFroid([{ tempMin: "1", tempMax: "2" }, { tempMin: 1, tempMax: 2 }, { tempMin: 1, tempMax: 2 }] as never), false, "du texte n'est pas une prévision");
+});
+
+test("UNE seule FC max : coach, zones, discipline, montre, Jour J, bilan, analyse de séance et Ghost Runner (12/11/2026)", () => {
+  // Avant : quatre chaînes (déclarée/pic > 150/âge ; test/pic > 120 ; seuil/âge ; test/pic/âge).
+  // Relecture du 12/11 : vérifier la PRÉSENCE de l'appel ne suffit pas — un site appelait bien
+  // `fcMaxConnue` avec un pic de tout l'historique ou un seuil d'une autre source. On vérifie donc
+  // ce qui lui est PASSÉ : la déclarée (test, profil, montre), le pic des 6 mois, le seuil test → montre.
+  // Le test (lt_hr) d'abord, la montre (lthr) ensuite — dans cet ordre.
+  const SEUIL = /^seuil: seuilMesure\(.*\blt_hr\b.*, [^,]*\blthr\)/;
+  const sites: [string, RegExp[]][] = [
+    ["src/lib/ai/coachContext.ts", [/fcMaxConnue\(\{ declaree: maxHrDeclare, observee: obsMaxHr0, seuil: seuilMesure\(b\?\.lt_hr, gmFc\?\.lthr\) \}\)/,
+      /\.not\("max_hr", "is", null\)\.gte\("date", new Date\(Date\.now\(\) - PIC_FC_JOURS \* 86400000\)/]],
+    ["src/app/dashboard/jour-j/page.tsx", [/fcMaxConnue\(\{\s*declaree: Number\(base\?\.max_hr\) \|\| Number\(fcProfil\?\.max_hr\) \|\| null, montre: gm\?\.maxHR,\s*observee: picFcObserve\(seances, jour\), seuil: seuilMesure\(base\?\.lt_hr, gm\?\.lthr\)/]],
+    ["src/lib/ai/bilanDonnees.ts", [/fcMaxConnue\(\{\s*declaree: Number\(base\?\.max_hr\) \|\| Number\(prof\?\.max_hr\) \|\| null, montre: gm\?\.maxHR,\s*observee: picFcObserve\(seances, jour\), seuil: seuilMesure\(base\?\.lt_hr, gm\?\.lthr\)/]],
+    ["src/app/api/ai/analyse-seance/route.ts", [/fcMaxConnue\(\{\s*declaree: Number\(baseFc\?\.max_hr\) \|\| Number\(profFc\?\.max_hr\) \|\| null, montre: profFc\?\.garmin_metrics\?\.maxHR,\s*observee: \(picRes\.data [^)]*\)\?\.max_hr, seuil: seuilMesure\(baseFc\?\.lt_hr, profFc\?\.garmin_metrics\?\.lthr\)/,
+      /\.not\("max_hr", "is", null\)\s*\.gte\("date", new Date\(Date\.now\(\) - PIC_FC_JOURS \* 86400000\)/]],
+    ["src/app/dashboard/ghost-runner/page.tsx", [/\.gt\("max_hr", 150\)\s*\.gte\("date", new Date\(Date\.now\(\) - PIC_FC_JOURS \* 86400000\)/,
+      /classifyRun\(w, fcMaxCommune\)/, /fcMaxConnue\(\{\s*declaree: Number\(bGr\?\.max_hr\) \|\| Number\(pGr\?\.max_hr\) \|\| null, montre: pGr\?\.garmin_metrics\?\.maxHR,\s*observee: fcMaxObservee, seuil: seuilMesure\(bGr\?\.lt_hr, pGr\?\.garmin_metrics\?\.lthr\)/]],
+    ["src/components/ghost-runner/GhostRunner.tsx", [/maxDeclaree: maxDeReference\([^\n]*, gm\?\.maxHR\),/, /seuil: seuilMesure\(\(baseline as unknown as \{ lt_hr\?: number \} \| null\)\?\.lt_hr, gm\?\.lthr\)/]],
+    ["src/lib/coach/ciblesFcServeur.ts", [/seuil: seuilMesure\(b\?\.lt_hr, garmin\?\.lthr\)/, /\.gte\("date", new Date\(maintenant - PIC_FC_JOURS \* 86400000\)/]],
+  ];
+  for (const [f, res] of sites) for (const re of res) assert.match(code(f), re, `${f} : la FC max ne reçoit plus les entrées communes (${re.source.slice(0, 60)}…)`);
+  // Aucun site ne passe un seuil d'une autre source.
+  for (const [f] of sites) {
+    const c = code(f);
+    for (const m of c.matchAll(/\bseuil: ([^\n]+)/g)) assert.match(`seuil: ${m[1]}`, SEUIL, `${f} : seuil passé hors de seuilMesure (${m[1].slice(0, 60)})`);
+  }
+  // Les sélections lisent bien ce que la définition commune consomme.
+  assert.match(code("src/lib/ai/bilanDonnees.ts"), /select\("garmin_vo2max,pace_curve,max_hr,garmin_metrics"\)/, "le bilan ne lit plus la FC max du profil ni de la montre");
+  assert.match(code("src/lib/ai/bilanDonnees.ts"), /select\("vma_kmh,max_hr,lt_hr,tested_at"\)/, "le bilan ne lit plus le seuil mesuré");
+  assert.match(code("src/lib/ai/bilanDonnees.ts"), /if \(baseRes\.error \|\| profilRes\.error\) \{[\s\S]{0,160}return null;/, "le bilan ne lit plus l'erreur des lectures de FC");
+  assert.match(code("src/app/dashboard/jour-j/page.tsx"), /sb\.from\("profiles"\)\.select\("max_hr, garmin_metrics"\)/, "Jour J ne lit plus la FC du profil à part (elle mettrait en jeu la porte d'accès)");
+  assert.match(code("src/app/dashboard/jour-j/page.tsx"), /\["repere", baseRes\], \["fc-profil", fcProfilRes\]/, "Jour J ne lit plus l'erreur des lectures de FC");
+  assert.match(code("src/app/dashboard/jour-j/page.tsx"), /const fcMax = ePanneFc \? null : fcMaxConnue/, "Jour J calcule une FC max sur une lecture en panne");
+  assert.match(code("src/app/api/ai/analyse-seance/route.ts"), /objRes\.error \?\? picRes\.error;/, "l'analyse ne lit plus l'erreur du pic de FC");
+  assert.match(code("src/app/dashboard/ghost-runner/page.tsx"), /await signalerLectures\("ghost-runner", user!\.id, \[\["pic", \{ error: ePic \}\], \["footings", \{ error: eRecentes \}\],\s*\["profil", profileRes\], \["repere", baselineRes\]\]\);/, "le Ghost Runner ne lit plus l'erreur du pic, des footings, du profil ou du test de référence");
+  // Le coach : zones et discipline des footings lisent la MÊME valeur ; le seuil des zones aussi.
+  const c = code("src/lib/ai/coachContext.ts");
+  assert.match(c, /const maxHrEff = fcMaxEst;/, "les zones ont retrouvé leur propre FC max");
+  assert.match(c, /const fcMax = fcMaxEst;/, "la discipline des footings a retrouvé sa propre FC max");
+  assert.match(c, /const lthrMeasured = seuilMesure\(ltHr, gm\?\.lthr\);/, "le seuil des zones a retrouvé sa propre source");
+});
+
+test("seuilMesure : le test d'abord, puis la montre ; hors du domaine humain, rien", () => {
+  assert.equal(seuilMesure(175, 180), 175, "la montre passe devant le test");
+  assert.equal(seuilMesure(null, 180), 180);
+  assert.equal(seuilMesure(1e9, 180), 180, "un seuil absurde est retenu");
+  assert.equal(seuilMesure(null, 40), null);
+  // Même coureur (seuil test 175, montre 180) : coach, Jour J, bilan, montre et Ghost lisent 175 ÷ 0,92.
+  assert.equal(fcMaxConnue({ seuil: seuilMesure(175, 180) }).max, Math.round(175 / 0.92));
+});
+
+test("picFcObserve : le pic des 6 derniers mois, pas celui d'avant ni d'après", () => {
+  const s = [{ date: "2026-11-01", max_hr: 180 }, { date: "2026-03-01", max_hr: 210 }, { date: "2026-11-20", max_hr: 220 }, { date: "2026-10-01", max_hr: null }];
+  assert.equal(picFcObserve(s, "2026-11-12"), 180, "un pic de plus de 6 mois (ou futur) compte encore");
+  assert.equal(picFcObserve([], "2026-11-12"), null);
+  assert.equal(fcMaxConnue({ observee: 180 }).max, 180);
+  assert.equal(fcMaxConnue({ declaree: 175, observee: 180 }).max, 180, "jamais sous le pic réellement atteint");
+  assert.equal(fcMaxConnue({ montre: 195, observee: 180 }).max, 195, "la montre sert de FC max déclarée");
+  assert.equal(fcMaxConnue({ observee: 145 }).max, null, "un pic de 145 n'est pas une FC max");
+  assert.equal(fcMaxConnue({ seuil: 175 }).source, "seuil");
+  assert.deepEqual(fcMaxConnue({}), { max: null, source: "aucune" });
+});
+
+test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien, 12/11/2026)", () => {
+  // La FC max commune d'abord. Sans elle (inconnue OU panne), le pic > 120 des séances reste un
+  // GARDE-FOU de tri (relecture du 12/11) : sans aucun tri, toute sortie passait pour un effort maximal.
+  assert.equal(fcMaxPourEfforts(188, [{ max_hr: 205 }]), 188, "un pic des séances passe devant la FC max commune");
+  assert.equal(fcMaxPourEfforts(null, [{ max_hr: 175 }, { max_hr: 140 }]), 175, "FC max inconnue : plus aucun tri des efforts");
+  assert.equal(fcMaxPourEfforts(undefined, [{ max_hr: 175 }, { max_hr: 140 }]), 175, "en panne, plus aucun tri des efforts");
+  assert.equal(fcMaxPourEfforts(null, [{ max_hr: 110 }]), null);
+  // Le cycliste qui vient au running (profil 5) : sans FC max, un vélo rapide ne fait JAMAIS la VMA affichée.
+  const jour = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  const courses = [1, 3, 5, 8].map((n) => ({ date: jour(n), sport: "run", type: "easy", distance_km: 10, duration_seconds: 3300, avg_hr: 135, max_hr: 148 }));
+  // Vélo SANS cardio : le tri par la FC ne l'écarte pas (FC moyenne absente) — seul le filtre « course » le peut.
+  const velo = { date: jour(2), sport: "bike", type: "ride", distance_km: 40, duration_seconds: 5760, avg_hr: null, max_hr: null };
+  for (const fcMax of [null, undefined] as const) {
+    const sans = vmaAffichee({ seances: courses, baseline: null, profil: null, fcMax }).vma;
+    const avec = vmaAffichee({ seances: [velo, ...courses], baseline: null, profil: null, fcMax }).vma;
+    assert.ok(sans > 0, "précondition : les sorties de course doivent donner une VMA");
+    assert.equal(avec, sans, `FC max ${fcMax} : la sortie vélo a changé la VMA affichée (${sans} → ${avec})`);
+  }
+  const v = code("src/lib/dashboard/vmaAffichee.ts");
+  assert.match(v, /const courses = lues\.filter\(\(w\) => isRun\(w\.sport\)\);\s*return meilleurEffort\(courses, fcMaxPourEfforts\(fcMax, courses\), 120, acclimatationDesSeances\(lues, maintenant\)\);/, "effortDesSeances trie de nouveau avec son propre pic, lit d'autres sports ou oublie la chaleur");
+  assert.match(v, /const effort = effortDesSeances\(i\.seances, i\.fcMax\);/, "vmaAffichee a de nouveau son propre calcul d'effort");
+  assert.doesNotMatch(v, /obsMaxHr/, "vmaAffichee recalcule son propre pic");
+  // Chaque écran passe la FC max COMMUNE (lue par fcMaxDeLAthlete, ou déjà calculée par fcMaxConnue).
+  const sites: [string, RegExp[]][] = [
+    ["src/app/dashboard/layout.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fcMax: fcMaxVma,/]],
+    ["src/app/dashboard/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /fcMax: fcMaxVma,/, /seances: \(seancesVmaRes\.data \?\? \[\]\) as /, /\.limit\(SEANCES_VMA\),/]],
+    ["src/lib/indicateurs/donnees.ts", [/fcMaxDeLAthlete\(sb, userId\),/, /profil: p, fcMax: fcMaxVma \}/, /vmaAffichee\(\{ seances: \(seancesVma\.data \?\? \[\]\) as /, /\.limit\(SEANCES_VMA\),/, /serieRessentis, seancesVma\]\.filter\(\(r\) => estUnePanne\(r\)\)/]],
+    ["src/app/dashboard/jour-j/page.tsx", [/seances: seances as Parameters<typeof vmaAffichee>/]],
+    ["src/lib/ai/bilanDonnees.ts", [/seances: seances as Parameters<typeof vmaAffichee>/]],
+    ["src/app/dashboard/jour-j/page.tsx", [/fcMax: ePanneFc \? undefined : fcMax,/]],
+    ["src/lib/ai/bilanDonnees.ts", [/profil: profilRes\.data as [^\n]*,\s*fcMax,\s*\}\);/]],
+    ["src/lib/ai/coachContext.ts", [/const effort = effortDesSeances\(\(woRes\.data \?\? \[\]\) as never, await fcMaxDeLAthlete\(sb, userId\)\);/, /fromRuns: effort\?\.vma \?\? null,/,
+      /fromRuns: objectifSeul \? null : effortDesSeances\(workouts as never, fcMaxEst, now\)\?\.vma \?\? estimateVmaFromRuns/, /const acclimVma = acclimatationDesSeances\(workouts as never, now\);/]],
+    ["src/app/dashboard/plans/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(wks, fcMaxVma\)\?\.vma \?\? null,/, /select\("date, type, sport, distance_km, duration_seconds, avg_hr, max_hr, weather_temp_c"\)/]],
+    ["src/app/dashboard/layout.tsx", [/select\("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c"\)\s*\.eq\("user_id", user\.id\)\.order\("date", \{ ascending: false \}\)\.limit\(SEANCES_VMA\)/]],
+    ["src/app/dashboard/health/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(\(seancesRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /select\("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c"\)/]],
+    ["src/app/dashboard/shop/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(seances as never, fcMaxVma\)\?\.vma \?\? null,/, /select\("date,type,distance_km,sport,elevation_gain_m,duration_seconds,avg_hr,max_hr,weather_temp_c"\)/]],
+    ["src/app/dashboard/shop/[slug]/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(seances as never, fcMaxVma\)\?\.vma \?\? null,/, /select\("date,type,distance_km,sport,elevation_gain_m,duration_seconds,avg_hr,max_hr,weather_temp_c"\)/]],
+    ["src/app/dashboard/profile/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /fromRuns: effortDesSeances\(rw, fcMaxCommune\)\?\.vma \?\? null,/, /select\("date, distance_km, duration_seconds, type, sport, avg_hr, max_hr, weather_temp_c"\)/,
+      /const fcMaxPanne = fcMaxCommune === undefined && fcMaxZones == null;/, /fcMax: fcMaxZones, fcMaxPanne,/,
+      /const fcMaxZones = fcMaxCommune !== undefined \? fcMaxCommune : \(Number\(\(baseline as \{ max_hr\?: number \} \| null\)\?\.max_hr\) \|\| null\);/, /fcMax: fcMaxZones,/]],
+    ["src/components/profile/ProfileSettings.tsx", [/const maxHr = fitness\?\.fcMax \?\? 0;/, /\{!zones && \([\s\S]{0,300}tr\(fitness\?\.fcMaxPanne \? "perf\.zonesPanne" : "perf\.zonesInconnues"\)/]],
+    ["src/app/api/admin/analyze-session/route.ts", [/const histFcMax = \(await fcMaxDeLAthlete\(admin, user_id\)\) \?\? null;/]],
+  ];
+  for (const [f, res] of sites) for (const re of res) assert.match(code(f), re, `${f} : la VMA (ou la FC max affichée) ne reçoit plus la FC max commune (${re.source.slice(0, 50)}…)`);
+  // Plus aucun pic maison (> 120 / > 150) hors de fcCible.
+  for (const [f] of sites) assert.doesNotMatch(code(f), /(obsMax|histMax|fcObservee)\w* *> *1[25]0/, `${f} : un pic maison est de retour`);
+  // La valeur de TRI des efforts (un simple pic) ne CLASSE jamais une intensité ni ne s'affiche (directeur
+  // scientifique, 12/11/2026) : ni `classifyRun(…, fcMaxPourEfforts(…))`, ni une variable qui en vient.
+  const toutSrc = execSync("grep -rln 'fcMaxPourEfforts' src || true", { encoding: "utf8" }).trim().split("\n").filter(Boolean);
+  for (const f of toutSrc) {
+    const c = code(f);
+    assert.doesNotMatch(c, /classifyRun\([^)]*fcMaxPourEfforts/, `${f} : la valeur de tri classe une intensité`);
+    for (const m of c.matchAll(/const (\w+) = fcMaxPourEfforts\(/g)) assert.doesNotMatch(c, new RegExp(`classifyRun\\([^)]*\\b${m[1]}\\b`), `${f} : ${m[1]} (valeur de tri) classe une intensité`);
+  }
+});
+
+test("chaque écran de VMA signale ses pannes dans error_logs : séances, test de référence, profil (12/11/2026)", () => {
+  // Relecture du 12/11 : des lectures en panne passaient pour « aucune donnée », et les autres ne finissaient
+  // que dans les journaux du serveur. Une seule porte (`signalerLectures`) : error_logs, une fois par jour.
+  const attendus: [string, string, string[]][] = [
+    ["src/app/dashboard/layout.tsx", "entete", ["profil", "seances", "repere"]],
+    ["src/app/dashboard/page.tsx", "dashboard", ["profil", "seances", "vma", "repere"]],
+    ["src/lib/indicateurs/donnees.ts", "indicateurs", ["profil", "seances", "repere", "vma"]],
+    ["src/app/dashboard/jour-j/page.tsx", "jour-j", ["objectif", "seances", "repere", "fc-profil"]],
+    ["src/app/dashboard/plans/page.tsx", "plans", ["seances", "repere", "profil"]],
+    ["src/app/dashboard/profile/page.tsx", "profil", ["seances", "profil", "repere"]],
+    ["src/app/dashboard/health/page.tsx", "sante", ["seances", "repere", "profil"]],
+    ["src/app/dashboard/shop/page.tsx", "boutique", ["seances", "repere", "profil"]],
+    ["src/app/dashboard/shop/[slug]/page.tsx", "fiche-boutique", ["seances", "repere", "profil"]],
+  ];
+  for (const [f, ecran, noms] of attendus) {
+    const c = code(f);
+    // Tous les appels de l'écran (Jour J en a deux : la porte d'accès d'abord, le reste ensuite).
+    const appel = [...c.matchAll(new RegExp(`await signalerLectures\\("${ecran}",[\\s\\S]*?\\]\\);`, "g"))].map((m) => m[0]).join("\n") || null;
+    assert.ok(appel, `${f} : ses pannes ne passent plus par signalerLectures`);
+    for (const n of noms) assert.ok(appel!.includes(`["${n}",`), `${f} : la lecture « ${n} » n'est plus signalée`);
+    // Les anciens messages des lectures de la VMA, qui ne partaient que dans les journaux du serveur.
+    assert.doesNotMatch(c, /console\.error\("\[(en-tête\] VMA|plans\] lecture|profil\] lecture|boutique\] séances|fiche boutique\] séances|tableau de bord\] lectures)/, `${f} : une panne de la VMA ne part encore que dans les journaux du serveur`);
+  }
+  // Ghost Runner et Cours : les deux autres écrans qui affichent une VMA (ou des allures qui en viennent).
+  for (const [f, ecran, noms] of [["src/app/dashboard/ghost-runner/page.tsx", "ghost-runner", ["pic", "footings", "profil", "repere"]],
+    ["src/app/dashboard/cours/page.tsx", "cours", ["profil", "repere", "seances"]]] as const) {
+    const appel = code(f).match(new RegExp(`await signalerLectures\\("${ecran}",[\\s\\S]*?\\]\\);`))?.[0];
+    assert.ok(appel, `${f} : ses pannes ne passent plus par signalerLectures`);
+    for (const n of noms) assert.ok(appel!.includes(`["${n}",`), `${f} : la lecture « ${n} » n'est plus signalée`);
+  }
+  // Jour J : le profil (porte d'accès) est signalé AVANT le verrou « Premium ».
+  const jjv = code("src/app/dashboard/jour-j/page.tsx");
+  assert.ok(jjv.indexOf('await signalerLectures("jour-j", user.id, [["profil", { error: eProfil }]]);') >= 0
+    && jjv.indexOf('await signalerLectures("jour-j", user.id, [["profil"') < jjv.indexOf("return <VerrouJourJ"), "Jour J : la panne du profil n'est signalée qu'après le verrou");
+  // Le bandeau du tableau de bord nomme chaque lecture : chaque nom a son libellé dans les 5 langues.
+  const appelTdb = code("src/app/dashboard/page.tsx").match(/await signalerLectures\("dashboard",[\s\S]*?\]\);/)?.[0] ?? "";
+  for (const [, nom] of appelTdb.matchAll(/\["([\w-]+)",/g)) for (const lang of ["fr", "en", "de", "es", "pt"] as const)
+    assert.ok(T[lang][`dash.inc.${nom}`], `« ${nom} » n'a pas de libellé dash.inc en ${lang} : le bandeau dirait « tes données »`);
+  // Jour J signale ses pannes AVANT le retour « sans objectif » : une panne de l'objectif n'est pas « aucun objectif ».
+  const jj = code("src/app/dashboard/jour-j/page.tsx");
+  // L'appel qui porte l'OBJECTIF (pas le premier, celui du profil, toujours avant).
+  assert.ok(jj.indexOf('["objectif", objRes]') > 0 && jj.indexOf('["objectif", objRes]') < jj.indexOf("return <SansObjectifJourJ"), "Jour J journalise l'objectif après le retour « sans objectif »");
+  // Le bilan journalise avant de renoncer.
+  assert.match(code("src/lib/ai/bilanDonnees.ts"), /await signalerLectures\("bilan", userId, \[\["repere", baseRes\], \["profil", profilRes\]\]\);\s*return null;/);
+});
+
+test("UN seul calcul de « meilleur effort » dans tout src/ : `effortDesSeances` (12/11/2026)", () => {
+  // Avant : 40 séances au tableau de bord, 60 au coach, 120 aux Plans, 200 en Santé et en Boutique ;
+  // chaleur au coach seulement ; tous sports sans tri en Santé et en Boutique. Un coureur lisait
+  // 29,3 km/h en Santé quand le coach disait 19,1 (mesure en production, lecture seule).
+  const sites = execSync("grep -rlnE 'meilleurEffort\\(|bestVmaFromWorkouts\\(' src || true", { encoding: "utf8" }).trim().split("\n").filter(Boolean);
+  assert.deepEqual(sites.sort(), ["src/lib/dashboard/vmaAffichee.ts", "src/lib/running/fitness.ts"], `un calcul d'effort parallèle est de retour : ${sites.join(", ")}`);
+});
+
+test("effortDesSeances : 60 séances, course seulement, FC max commune, chaleur — le coach et les écrans", () => {
+  const jour = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  const run = (n: number, km: number, sec: number, x: Record<string, unknown> = {}) => ({ date: jour(n), sport: "run", type: "easy", distance_km: km, duration_seconds: sec, avg_hr: 170, max_hr: 185, ...x });
+  // 1. LES 60 PLUS RÉCENTES : un record en 61e position (tous sports compris) ne compte plus — comme au coach.
+  const recentes = Array.from({ length: 60 }, (_, k) => ({ date: jour(1 + k % 50), sport: k % 2 ? "bike" : "run", type: "x", distance_km: 10, duration_seconds: 3000, avg_hr: 170, max_hr: 185 }));
+  const record = run(55, 10, 2100);
+  const sansRecord = effortDesSeances(recentes, 190)!.vma;
+  assert.equal(effortDesSeances([...recentes, { ...record, date: jour(51) }], 190)!.vma, sansRecord, "une 61e séance plus ancienne est lue");
+  // …même quand l'appelant les passe dans le désordre : ce sont les 60 plus RÉCENTES, pas les 60 premières.
+  assert.equal(effortDesSeances([{ ...record, date: jour(51) }, ...recentes], 190)!.vma, sansRecord, "les séances ne sont plus triées par date avant d'être coupées");
+  assert.ok(effortDesSeances([{ ...record, date: jour(0) }, ...recentes], 190)!.vma > sansRecord, "précondition : le même record parmi les 60 doit compter");
+  assert.equal(SEANCES_VMA, 60, "le coach lit 60 séances (fetchWorkouts)");
+  // 2. LA CHALEUR : une course à 30 °C, chez un coureur non acclimaté, se relit plus vite qu'à 12 °C.
+  const chaud = effortDesSeances([run(2, 10, 2700, { weather_temp_c: 30 })], 190)!.vma;
+  const frais = effortDesSeances([run(2, 10, 2700, { weather_temp_c: 12 })], 190)!.vma;
+  assert.ok(chaud > frais, `la chaleur n'est plus prise en compte (${chaud} contre ${frais})`);
+  // …et l'acclimatation (≥ 12 jours chauds sur 30) en corrige moins.
+  const acclimate = Array.from({ length: 12 }, (_, k) => run(3 + k, 5, 1800, { weather_temp_c: 28, avg_hr: 120 }));
+  const chaudAcclimate = effortDesSeances([run(2, 10, 2700, { weather_temp_c: 30 }), ...acclimate], 190)!.vma;
+  assert.ok(chaudAcclimate < chaud, "l'acclimatation à la chaleur n'est plus prise en compte");
+  assert.ok(acclimatationDesSeances(acclimate) < 1 && acclimatationDesSeances([]) === 1);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

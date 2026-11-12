@@ -12,7 +12,7 @@ import {
 import { toast } from "sonner";
 import type { UserProfile, PerformanceBaseline } from "@/types";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { referencesFc, plageFc, cibleEndurance } from "@/lib/coach/fcCible";
+import { referencesFc, plageFc, cibleEndurance, maxDeReference, seuilMesure } from "@/lib/coach/fcCible";
 import { GX, GUIDE, GUIDE_TIP, SPEECH_LANG, fillG } from "./ghostI18n";
 import { messageLecture } from "@/lib/watch/intervals";
 import { jourCivil } from "@/lib/time/fuseau";
@@ -954,14 +954,15 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   // toutes les zones se calculaient donc sur un 190 générique. Sur un compte réel
   // (FC max mesurée 212, repos 63, seuil 192), les cibles étaient décalées de ~20 bpm
   // vers le bas — l'athlète courait trop facile en croyant suivre la consigne.
-  const gm = (profile as unknown as { garmin_metrics?: { lthr?: number; restingHR?: number } } | null)?.garmin_metrics;
+  const gm = (profile as unknown as { garmin_metrics?: { lthr?: number; restingHR?: number; maxHR?: number } } | null)?.garmin_metrics;
   const refsFc = referencesFc({
-    // FC max du test d'abord, sinon celle déclarée à l'inscription (ignorée ici avant le 11/10/2026).
-    maxDeclaree: baseline?.max_hr ?? (profile as unknown as { max_hr?: number } | null)?.max_hr,
+    // LA MÊME FC MAX que le coach, Jour J et le bilan (`maxDeReference`, 12/11/2026) : le test,
+    // sinon celle déclarée à l'inscription, sinon celle de la montre — et plus jamais l'âge.
+    maxDeclaree: maxDeReference(baseline?.max_hr ?? (profile as unknown as { max_hr?: number } | null)?.max_hr, gm?.maxHR),
     maxObservee: fcMaxObservee,
     repos: (profile as unknown as { resting_hr?: number } | null)?.resting_hr ?? gm?.restingHR,
-    seuil: gm?.lthr,
-    age: (profile as unknown as { age?: number } | null)?.age,
+    // 12/11/2026 : la MÊME source de seuil que le coach (test, puis montre).
+    seuil: seuilMesure((baseline as unknown as { lt_hr?: number } | null)?.lt_hr, gm?.lthr),
   });
   // ⚠️ PLUS DE 190 INVENTÉ (07/11/2026). `refsFc.max ?? 190` affichait des zones en bpm
   // calculées sur une FC max que personne n'a mesurée — exactement la valeur par défaut

@@ -14,6 +14,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext } from "../src/lib/ai/coachContext";
+import { fcMaxDeLAthlete } from "../src/lib/coach/fcMaxServeur";
+import { signalerLectures } from "../src/lib/dashboard/lecturesServeur";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
 let passed = 0; const fails: string[] = [];
@@ -118,16 +120,20 @@ async function main() {
     return ctx.text.match(/- VMA : [^\n]*/)?.[0] ?? "(ligne absente)";
   };
 
-  await test("sans âge, sans FC déclarée ni mesurée : « FC max ? », jamais un chiffre présenté comme observé", async () => {
-    const l = await ligneFc({ ...PROFIL, age: null });
-    assert.match(l, /ESTIMÉE/, `précondition : la VMA doit être estimée depuis les séances (${l})`);
-    assert.match(l, /FC max \? ·/, `une FC max est inventée : ${l}`);
-    assert.doesNotMatch(l, /\b190\b|\(obs\.\)/, `une FC max inventée passe pour observée : ${l}`);
+  // 12/11/2026 (Cyprien : « refuser 220 − âge partout ») : l'âge ne donne plus de FC max non plus.
+  await test("sans FC déclarée ni mesurée, âge connu ou non : « FC max ? », jamais un chiffre inventé", async () => {
+    for (const age of [null, 30]) {
+      const l = await ligneFc({ ...PROFIL, age });
+      assert.match(l, /ESTIMÉE/, `précondition (âge ${age}) : la VMA doit être estimée depuis les séances (${l})`);
+      assert.match(l, /FC max \? ·/, `âge ${age} : une FC max est inventée : ${l}`);
+      assert.doesNotMatch(l, /\b190\b|\(obs\.\)|formule/, `âge ${age} : une FC max inventée passe pour mesurée : ${l}`);
+    }
   });
 
-  await test("avec l'âge seul : 220 − âge, dit comme une formule et non comme une mesure", async () => {
-    const l = await ligneFc({ ...PROFIL, age: 30 });
-    assert.match(l, /FC max ~190 \(formule de l'âge, pas une mesure\)/, l);
+  await test("seuil mesuré seul : FC max = seuil ÷ 0,92, dite « déduite du seuil mesuré »", async () => {
+    // Le seuil vaut ~92 % de la FC max : un repli adossé à une MESURE (montre), pas une formule.
+    const l = await ligneFc({ ...PROFIL, age: 30, garmin_metrics: { lthr: 175 } });
+    assert.match(l, /FC max ~190 \(déduite du seuil mesuré\)/, l);
   });
 
   // Relecture du 12/11 : sans FC max, deux filtres « sorties faciles » ne filtraient plus rien.
@@ -144,8 +150,8 @@ async function main() {
     const sans = await texte({ ...PROFIL, age: null });
     assert.doesNotMatch(sans, /RELECTURE DE L'EXÉCUTION/, "la relecture tourne sans FC max : elle mêle séances dures et faciles");
     assert.doesNotMatch(sans, /PENTE RÉELLE DE L'ATHLÈTE \(mesurée/, "une pente est mesurée sans pouvoir trier les sorties faciles");
-    // Contre-épreuve : avec l'âge, les mêmes séances donnent bien une relecture et une pente.
-    const avec = await texte({ ...PROFIL, age: 30 });
+    // Contre-épreuve : avec une FC max DÉCLARÉE, les mêmes séances donnent bien une relecture et une pente.
+    const avec = await texte({ ...PROFIL, age: null, max_hr: 190 });
     assert.match(avec, /RELECTURE DE L'EXÉCUTION/, "précondition : ces séances doivent produire une relecture");
     assert.match(avec, /PENTE RÉELLE DE L'ATHLÈTE \(mesurée/, "précondition : ces séances doivent produire une pente");
   });
@@ -172,19 +178,119 @@ async function main() {
       const vmaDe = async (profil: Ligne) => {
         const t = (await buildAthleteContext(fauxClient({ profiles: [profil], performance_baselines: [], workouts: [...seances], notifications: [] }), "u")).text;
         const m = t.match(/- VMA : ([\d.]+) km\/h ⚠️ ESTIMÉE/);
-        assert.ok(m, `précondition (${nom}) : VMA estimée absente (âge ${profil.age})`);
+        assert.ok(m, `précondition (${nom}) : VMA estimée absente (FC max ${profil.max_hr ?? "inconnue"})`);
         return Number(m![1]);
       };
-      const sans = await vmaDe({ ...PROFIL, age: null }), avec = await vmaDe({ ...PROFIL, age: 30 });
-      console.log(`      (${nom} : VMA estimée ${sans} sans FC max, ${avec} avec 220 − 30)`);
+      const sans = await vmaDe({ ...PROFIL, age: 30 }), avec = await vmaDe({ ...PROFIL, age: 30, max_hr: 190 });
+      console.log(`      (${nom} : VMA estimée ${sans} sans FC max, ${avec} avec une FC max déclarée à 190)`);
       assert.ok(sans <= avec, `${nom} : sans FC max, la VMA estimée MONTE (${sans} > ${avec}) : allures plus rapides sur une donnée manquante`);
     }
   });
 
-  await test("le code : sans source, `fcMaxEst` vaut null (plus de « : 190 »)", () => {
-    const src = codeNu("src/lib/ai/coachContext.ts");
-    assert.match(src, /: fcMaxSource === "age" \? 220 - \(ageConnu as number\) : null;/, "le repli de FC max n'est plus null");
-    assert.doesNotMatch(src, /:\s*190\s*\)?;/, "un repli « : 190 » est de retour dans le coach");
+  console.log("\nUN SEUL SEUIL « FACILE » : 0,80 DE LA FC MAX (directeur scientifique, 12/11/2026)");
+
+  // Six mois de sorties régulières, FC max DÉCLARÉE à 190 : seule la FC moyenne change.
+  const sixMois = (fc: number) => Array.from({ length: 180 }, (_, k) => k + 1).filter((k) => k % 2 === 0).map((k) => ({
+    user_id: "u", date: ilYa(k), type: "easy", sport: "run", distance_km: 10, duration_seconds: 2700 + k * 3,
+    avg_hr: fc, max_hr: 175, tss: 55, hr_zone_seconds: [900, 1800, 0, 0, 0],
+  }));
+  const texteDe = async (workouts: Ligne[]) =>
+    (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL, max_hr: 190 }], performance_baselines: [], workouts, notifications: [] }), "u")).text;
+
+  await test("relecture d'exécution : des footings à 82 % ne recalent pas l'allure facile, à 76 % oui", async () => {
+    // Monter ce seuil ferait entrer des sorties à 80-85 % : l'écart partirait vers le rapide et la
+    // relecture ACCÉLÉRERAIT les footings prescrits (le défaut le plus dangereux pour un coureur).
+    assert.doesNotMatch(await texteDe(sixMois(156)), /RELECTURE DE L'EXÉCUTION/, "des sorties à 82 % de la FC max servent à recaler l'allure facile");
+    assert.match(await texteDe(sixMois(144)), /RELECTURE DE L'EXÉCUTION/, "précondition : des footings à 76 % doivent produire une relecture");
+  });
+
+  await test("facteur limitant « dérive » : jamais sur un marathon couru à 85 %, toujours sur une sortie facile", async () => {
+    // La dérive est calculée sur la plus longue sortie : la semaine d'un marathon, c'est le marathon.
+    // Le coach concluait « endurance aérobie insuffisante » sur un effort de course (défaut du 30/10).
+    const avec = (fc: number) => [{ user_id: "u", date: ilYa(1), type: "easy", sport: "run", distance_km: 42.2, duration_seconds: 15000,
+      avg_hr: fc, max_hr: 180, tss: 300, cardiac_decoupling: 9, hr_zone_seconds: [0, 3000, 6000, 6000, 0] }, ...SEANCES_CALMES];
+    const marathon = await texteDe(avec(162));
+    assert.doesNotMatch(marathon, /ENDURANCE AÉROBIE \(dérive/, "un marathon à 85 % devient le facteur limitant « endurance »");
+    assert.doesNotMatch(marathon, /DÉRIVE CARDIAQUE \(/, "la dérive d'un marathon à 85 % est présentée comme une dérive d'endurance");
+    const facile = await texteDe(avec(133));
+    assert.match(facile, /ENDURANCE AÉROBIE \(dérive cardiaque \+9 %\)/, "précondition : une sortie facile à 9 % de dérive doit être le facteur limitant");
+    assert.match(facile, /DÉRIVE CARDIAQUE \(/, "précondition : la dérive d'une sortie facile doit être dite");
+  });
+
+  await test("facteur limitant « dérive » : jamais le jour d'une course connue, même courue à 78 %", async () => {
+    // Sous le seuil facile (148/190 = 78 %), un marathon reste un effort de COURSE : le jour de la
+    // course déclarée (objectif ou course remplacée) est écarté, comme pour la répartition et le bilan.
+    const marathon = { user_id: "u", date: ilYa(1), type: "easy", sport: "run", distance_km: 42.2, duration_seconds: 15000,
+      avg_hr: 148, max_hr: 175, tss: 300, cardiac_decoupling: 9, hr_zone_seconds: [0, 9000, 6000, 0, 0] };
+    const objectif = { user_id: "u", type: "race_objective",
+      data: { race: "Semi de printemps", raceDate: ilYa(-60), distanceKm: 21.1, targetSeconds: 5400,
+        precedente: { race: "Marathon de test", raceDate: ilYa(1), distanceKm: 42.2 } } };
+    const texte = async (notifications: Ligne[]) => (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL, max_hr: 190 }],
+      performance_baselines: [], workouts: [marathon, ...SEANCES_CALMES], notifications }), "u")).text;
+    assert.doesNotMatch(await texte([objectif]), /ENDURANCE AÉROBIE \(dérive/, "le marathon du jour de course devient le facteur limitant « endurance »");
+    // Contre-épreuve : sans course déclarée ce jour-là, la même sortie (78 %, donc facile) compte.
+    assert.match(await texte([]), /ENDURANCE AÉROBIE \(dérive cardiaque \+9 %\)/, "précondition : sans course déclarée, cette sortie facile doit compter");
+  });
+
+  await test("un pic vieux de 8 mois, plus haut que les récents, ne relève pas la FC max du coach", async () => {
+    const vieux = { ...SEANCES_CALMES[0], date: ilYa(245), avg_hr: 180, max_hr: 205 };
+    const recents = SEANCES_CALMES.map((w) => ({ ...w, max_hr: 172 }));
+    const t = (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL }], performance_baselines: [], workouts: [vieux, ...recents], notifications: [] }), "u")).text;
+    assert.match(t, /FC max ~172 \(obs\.\)/, `le pic de 8 mois a relevé la FC max (ou elle a disparu) : ${t.match(/FC max [^·]*/)?.[0]}`);
+  });
+
+  await test("sans FC max, le coach trie encore ses efforts : une sortie aberrante (24 km/h à 110 bpm) ne fait pas la VMA", async () => {
+    // Relecture du 12/11 : sans aucun tri, toute sortie passait pour un effort maximal (GPS qui saute,
+    // vélo étiqueté course). Le pic des séances reste un garde-fou (`fcMaxPourEfforts`).
+    const aberrante = { ...SEANCES_CALMES[0], date: ilYa(2), distance_km: 10, duration_seconds: 1500, avg_hr: 110, max_hr: 120 };
+    const vmaDe = async (workouts: Ligne[]) => {
+      const t = (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL, age: null }], performance_baselines: [], workouts, notifications: [] }), "u")).text;
+      return Number(t.match(/- VMA : ([\d.]+) km\/h ⚠️ ESTIMÉE/)?.[1]);
+    };
+    // Précondition : le cas « sans FC max » est bien celui exercé (pics à 145, aucune déclarée, montre ni seuil).
+    const ctx = (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL, age: null }], performance_baselines: [], workouts: [aberrante, ...SEANCES_CALMES], notifications: [] }), "u")).text;
+    assert.match(ctx, /FC max \? ·/, "précondition : ce test doit tourner SANS FC max connue");
+    const sans = await vmaDe(SEANCES_CALMES), avec = await vmaDe([aberrante, ...SEANCES_CALMES]);
+    assert.ok(sans > 0, "précondition : une VMA estimée doit exister");
+    assert.equal(avec, sans, `une sortie aberrante à FC basse fait la VMA du coach (${sans} → ${avec})`);
+  });
+
+  await test("fcMaxDeLAthlete (VMA affichée, profil, plans) : déclarée, pic des 6 mois, jamais un vieux pic", async () => {
+    const vieux = { user_id: "u", date: ilYa(245), max_hr: 205 }, recent = { user_id: "u", date: ilYa(10), max_hr: 190 };
+    const lire = (profil: Ligne, base: Ligne[]) => fcMaxDeLAthlete(fauxClient({ profiles: [profil], performance_baselines: base, workouts: [vieux, recent] }), "u");
+    assert.equal(await lire({ id: "u", max_hr: null }, []), 190, "le pic de 8 mois (205) relève la FC max");
+    assert.equal(await lire({ id: "u", max_hr: 195 }, []), 195, "la FC max déclarée au profil est ignorée");
+    assert.equal(await lire({ id: "u", max_hr: 180 }, []), 190, "la déclarée passe sous le pic réellement atteint");
+    assert.equal(await lire({ id: "u", max_hr: null, garmin_metrics: { maxHR: 199 } }, []), 199, "la FC max de la montre est ignorée");
+    assert.equal(await lire({ id: "u", max_hr: null }, [{ user_id: "u", max_hr: 201, tested_at: ilYa(30) }]), 201, "la FC max du test est ignorée");
+    const sansRien = await fcMaxDeLAthlete(fauxClient({ profiles: [{ id: "u", max_hr: null, age: 30 }], performance_baselines: [], workouts: [] }), "u");
+    assert.equal(sansRien, null, "une FC max est inventée (âge ?) sans aucune mesure");
+  });
+
+  await test("signalerLectures : « aucune ligne » n'est pas une panne ; une vraie panne est nommée (12/11/2026)", async () => {
+    // Journal INJECTÉ : le test n'écrit jamais dans error_logs, même avec les clés dans l'environnement.
+    const lignes: { source: string; message: string; userId: string | null }[] = [];
+    const journal = async (e: { source: string; message: string; userId: string | null }) => { lignes.push(e); };
+    assert.deepEqual(await signalerLectures("test", null, [["repere", { error: { code: "PGRST116" } }], ["seances", { error: null }], ["profil", null]], journal), [],
+      "« aucune ligne » (ou une lecture réussie) passe pour une panne");
+    assert.equal(lignes.length, 0, "un compte neuf (aucune ligne) écrit dans le journal");
+    const erreurs = console.error; console.error = () => {};
+    try {
+      assert.deepEqual(await signalerLectures("test", "u", [["repere", { error: { code: "PGRST301", message: "timeout de 4123 ms" } }], ["seances", { error: null }]], journal), ["repere"],
+        "une vraie panne n'est pas nommée");
+    } finally { console.error = erreurs; }
+    // Une ligne, au message STABLE (aucune valeur variable : la déduplication du journal en dépend).
+    assert.deepEqual(lignes, [{ source: "test", message: "lectures illisibles : repere (PGRST301)", userId: "u" }], "la panne n'est pas journalisée, ou son message varie");
+  });
+
+  await test("le code : ni « : 190 » ni « 220 − âge » nulle part où une FC max se calcule", () => {
+    for (const f of ["src/lib/ai/coachContext.ts", "src/lib/coach/fcCible.ts", "src/app/dashboard/jour-j/page.tsx",
+      "src/lib/ai/bilanDonnees.ts", "src/app/api/ai/analyse-seance/route.ts", "src/components/ghost-runner/GhostRunner.tsx"]) {
+      const src = codeNu(f);
+      assert.doesNotMatch(src, /:\s*190\s*\)?;/, `${f} : un repli « : 190 » est de retour`);
+      assert.doesNotMatch(src, /220\s*-\s*[\w(]/, `${f} : 220 − âge est de retour`);
+    }
+    assert.doesNotMatch(codeNu("src/lib/coach/fcCible.ts"), /e\.age\b/, "referencesFc relit l'âge");
   });
 
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

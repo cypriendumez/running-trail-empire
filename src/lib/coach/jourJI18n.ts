@@ -14,6 +14,8 @@ export type TextesJourJ = {
   verrou: string; verrouCta: string; sansObjectif: string; sansObjectifCta: string;
   jRestants: (n: string) => string;
   chrono: string; vise: string; maintenant: string; auJourJ: string; allure: string; parKm: string;
+  /** La projection repose sur la pente MESURÉE, ou sur l'hypothèse générique (pourcentage par semaine). */
+  progressionMesuree: string; progressionSupposee: (pctSemaine: string) => string;
   verdict: { acquis: string; atteignable: string; ambitieux: string; irrealiste: (projete: string) => string; inconnu: string };
   marche: string; km: string; tempsPassage: string;
   strategieCourte: string; strategieLongue: string;
@@ -37,6 +39,8 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
     sansObjectif: "Fixe d'abord ton objectif — une course, un chrono ou un défi : le pack se construit dessus.",
     sansObjectifCta: "Fixer mon objectif",
     jRestants: (n) => `J-${n}`,
+    progressionMesuree: "La projection « au jour J » tient compte de ta progression mesurée ces derniers mois.",
+    progressionSupposee: (p) => `La projection « au jour J » suppose une progression de +${p} % par semaine : la tienne n'a pas pu être mesurée (il faut des sorties faciles avec cardio et une FC max connue).`,
     chrono: "Ton chrono", vise: "Visé", maintenant: "Aujourd'hui", auJourJ: "Au jour J", allure: "Allure à tenir", parKm: "/km",
     verdict: {
       acquis: "Ton objectif est déjà dans tes jambes : pars à l'allure visée, sans t'emballer.",
@@ -83,6 +87,8 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
     sansObjectif: "Set your goal first — a race, a time or a challenge: the pack is built on it.",
     sansObjectifCta: "Set my goal",
     jRestants: (n) => `${n} days to go`,
+    progressionMesuree: "The “on race day” projection takes into account your progress measured over recent months.",
+    progressionSupposee: (p) => `The “on race day” projection assumes +${p}% progress per week: yours could not be measured (it takes easy runs with heart rate and a known max HR).`,
     chrono: "Your time", vise: "Target", maintenant: "Today", auJourJ: "On race day", allure: "Pace to hold", parKm: "/km",
     verdict: {
       acquis: "Your goal is already in your legs: start at target pace, without getting carried away.",
@@ -129,6 +135,8 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
     sansObjectif: "Lege zuerst dein Ziel fest — ein Rennen, eine Zeit oder eine Herausforderung: Das Paket baut darauf auf.",
     sansObjectifCta: "Ziel festlegen",
     jRestants: (n) => `noch ${n} Tage`,
+    progressionMesuree: "Die Prognose „am Renntag“ berücksichtigt deinen in den letzten Monaten gemessenen Fortschritt.",
+    progressionSupposee: (p) => `Die Prognose „am Renntag“ nimmt +${p} % Fortschritt pro Woche an: deiner konnte nicht gemessen werden (dafür braucht es lockere Läufe mit Herzfrequenz und eine bekannte maximale HF).`,
     chrono: "Deine Zeit", vise: "Ziel", maintenant: "Heute", auJourJ: "Am Renntag", allure: "Zu haltendes Tempo", parKm: "/km",
     verdict: {
       acquis: "Dein Ziel steckt schon in deinen Beinen: Starte im Zieltempo, ohne zu überziehen.",
@@ -175,6 +183,8 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
     sansObjectif: "Fija primero tu objetivo — una carrera, una marca o un reto: el pack se construye sobre él.",
     sansObjectifCta: "Fijar mi objetivo",
     jRestants: (n) => `faltan ${n} días`,
+    progressionMesuree: "La proyección «el día de la carrera» tiene en cuenta tu progresión medida en los últimos meses.",
+    progressionSupposee: (p) => `La proyección «el día de la carrera» supone una progresión de +${p} % por semana: no se ha podido medir la tuya (hacen falta rodajes suaves con pulso y una FC máxima conocida).`,
     chrono: "Tu marca", vise: "Objetivo", maintenant: "Hoy", auJourJ: "El día de la carrera", allure: "Ritmo a mantener", parKm: "/km",
     verdict: {
       acquis: "Tu objetivo ya está en tus piernas: sal al ritmo objetivo, sin precipitarte.",
@@ -221,6 +231,8 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
     sansObjectif: "Define primeiro o teu objetivo — uma prova, uma marca ou um desafio: o pack constrói-se sobre ele.",
     sansObjectifCta: "Definir o meu objetivo",
     jRestants: (n) => `faltam ${n} dias`,
+    progressionMesuree: "A projeção «no dia da prova» tem em conta a tua progressão medida nos últimos meses.",
+    progressionSupposee: (p) => `A projeção «no dia da prova» supõe uma progressão de +${p} % por semana: não foi possível medir a tua (são precisas corridas fáceis com frequência cardíaca e uma FC máxima conhecida).`,
     chrono: "A tua marca", vise: "Objetivo", maintenant: "Hoje", auJourJ: "No dia da prova", allure: "Ritmo a manter", parKm: "/km",
     verdict: {
       acquis: "O teu objetivo já está nas tuas pernas: parte ao ritmo objetivo, sem te entusiasmares.",

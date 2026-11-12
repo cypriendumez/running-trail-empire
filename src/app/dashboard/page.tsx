@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { fuseauOuDefaut } from "@/lib/time/fuseau";
 import { createClient } from "@/lib/supabase/server";
-import { lecturesEnEchec } from "@/lib/dashboard/lectures";
 import type { AnalyseMemorisee } from "@/lib/dashboard/derniereAnalyse";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
 import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
@@ -14,7 +13,8 @@ import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
 import { objectifEnCours } from "@/lib/coach/prochaineCourse";
 import { loadRisk } from "@/lib/running/fitness";
-import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
+import { vmaAffichee, SEANCES_VMA } from "@/lib/dashboard/vmaAffichee";
+import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { validerRecordDeclare, type RecordDeclare } from "@/lib/dashboard/records";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { seancesSansRessenti } from "@/lib/dashboard/ressenti";
@@ -23,6 +23,7 @@ import { accesDe } from "@/lib/billing/access";
 import { estAdmin } from "@/lib/admin/acces";
 import { serieVfc } from "@/lib/health/vfc";
 import type { HRVData } from "@/types";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
@@ -50,7 +51,7 @@ export default async function DashboardPage() {
   // séance de demain s'affichait comme « Séance du jour ». Le même jour que la série.
   const today = streakToday;
 
-  const [profileRes, hrvRes, workoutsRes, planRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes, analysesRes] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes, analysesRes, fcMaxVma, seancesVmaRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -122,6 +123,10 @@ export default async function DashboardPage() {
     // Les analyses de séance MÉMORISÉES (`/api/ai/analyse-seance`) : la carte « Analyse IA »
     // les lit, elle n'en déclenche aucune — chaque analyse est un appel payant au modèle.
     supabase.from("notifications").select("body,data").eq("user_id", user!.id).eq("type", "seance_analyse").order("created_at", { ascending: false }).limit(20),
+    // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
+    fcMaxDeLAthlete(supabase, user!.id),
+    // Les séances de LA VMA (12/11/2026) : autant que le coach (`SEANCES_VMA`).
+    supabase.from("workouts").select("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c").eq("user_id", user!.id).order("date", { ascending: false }).limit(SEANCES_VMA),
   ]);
   if (garageRes.error) console.error("[accueil] garage illisible :", garageRes.error.message);
   if (declaresRes.error) console.error("[accueil] records déclarés illisibles :", declaresRes.error.message);
@@ -179,9 +184,10 @@ export default async function DashboardPage() {
   // VMA et sa source : le module partagé avec la page détaillée (lib/dashboard/vmaAffichee),
   // lui-même branché sur `effectiveVma` — une seule chaîne de VMA dans toute l'application.
   const { vma: currentVma, source: sourceVma } = vmaAffichee({
-    seances: wks,
+    seances: (seancesVmaRes.data ?? []) as Parameters<typeof vmaAffichee>[0]["seances"],
     baseline: baseRes.data as { vma_kmh?: number | null; tested_at?: string | null } | null,
     profil: profileRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null,
+    fcMax: fcMaxVma,
   });
   // Sur l'historique de charge d'UN AN (pas les 40 dernières séances) et au jour de
   // l'athlète (pas celui de Paris) : la même série que la carte Charge & affûtage.
@@ -232,13 +238,13 @@ export default async function DashboardPage() {
   // n'a pas de dictionnaire. C'est le composant client, qui connaît la langue, qui les
   // traduit. La distinction panne / absence vit dans `lib/dashboard/lectures`, où elle
   // est éprouvable — c'est là que le projet range ses calculs affichés.
-  const donneesIncompletes = lecturesEnEchec([
+  // 12/11/2026 : les lectures de LA VMA (ses 60 séances, le test de référence) en font partie, et la
+  // panne part dans error_logs (signalerLectures), plus seulement dans les journaux du serveur.
+  const donneesIncompletes = await signalerLectures("dashboard", user!.id, [
     ["profil", profileRes], ["seances", workoutsRes],
     ["charge", chargeRes], ["records", prRes],
+    ["vma", seancesVmaRes], ["repere", baseRes],
   ]);
-  if (donneesIncompletes.length) {
-    console.error("[tableau de bord] lectures en échec :", donneesIncompletes.join(", "));
-  }
 
   // VMA MESURÉE ? = une ligne performance_baselines avec vma_kmh > 0 (même signal que le
   // verrou du coach et effectiveVma). Tant qu'elle manque, le coach ne prescrit que le test

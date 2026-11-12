@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Flag, Timer, Thermometer, Droplets, Flame, Moon, Lock } from "lucide-react";
 import { formatDateCivile } from "@/lib/time/fuseau";
 import { temps, type PackJourJ } from "@/lib/coach/jourJ";
+import { GAIN_GENERIQUE_SEMAINE } from "@/lib/running/progression";
 import type { TextesJourJ } from "@/lib/coach/jourJI18n";
 
 /**
@@ -75,6 +76,12 @@ export function PackJourJVue({ pack, t, lang, nom, date, joursRestants, dplusM }
             <p className="mt-3 text-sm leading-relaxed text-zinc-700">
               {c.verdict === "irrealiste" && c.projeteSec != null ? t.verdict.irrealiste(temps(c.projeteSec)) : c.verdict === "irrealiste" ? t.verdict.inconnu : t.verdict[c.verdict]}
             </p>
+            {c.projeteSec != null && joursRestants >= 7 && (
+              // Sans pente mesurée, la projection repose sur une HYPOTHÈSE : on le dit (12/11/2026).
+              <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                {c.progressionMesuree ? t.progressionMesuree : t.progressionSupposee(n(GAIN_GENERIQUE_SEMAINE * 100))}
+              </p>
+            )}
             {c.allureSecKm != null && (
               <p className="mt-3 flex items-baseline gap-2">
                 <span className="text-xs font-medium text-zinc-500">{t.allure}</span>

@@ -52,7 +52,7 @@ function fauxClient(repondre: (op: Op) => Rep | "lever") {
       const op: Op = { table, action: "select" };
       const b: Record<string, unknown> = {};
       const chaine = () => b;
-      for (const m of ["eq", "gte", "lte", "in", "limit", "order", "maybeSingle", "single", "neq"]) b[m] = chaine;
+      for (const m of ["eq", "gte", "lte", "in", "limit", "order", "maybeSingle", "single", "neq", "not"]) b[m] = chaine;
       b.select = () => b;
       for (const a of ["insert", "update", "upsert", "delete"] as const) b[a] = (v?: unknown) => { op.action = a; op.valeur = v; return b; };
       b.then = (ok: (r: Rep) => unknown, ko?: (e: unknown) => unknown) => {
@@ -270,7 +270,7 @@ test("un nouveau plan refusé ne laisse pas un calendrier vide", () => {
 test("l'analyse de séance n'analyse pas à l'aveugle, et ses coûts cachés se voient", () => {
   const src = codeNu("src/app/api/ai/analyse-seance/route.ts");
   assert.match(src, /if \(eCache \|\| eAcces\) \{[\s\S]{0,400}status: 503/, "un abonné Premium reçoit l'analyse essentielle sur une panne");
-  assert.match(src, /const eRepere = profilRes\.error \?\? baseRes\.error \?\? compRes\.error \?\? prescritRes\.error \?\? objRes\.error;\s*if \(eRepere\) \{[\s\S]{0,400}status: 503/,
+  assert.match(src, /const eRepere = profilRes\.error \?\? baseRes\.error \?\? compRes\.error \?\? prescritRes\.error \?\? objRes\.error \?\? picRes\.error;\s*if \(eRepere\) \{[\s\S]{0,400}status: 503/,
     "la FC max de référence illisible devient le pic de cette seule sortie");
   assert.match(src, /if \(eIns\) \{[\s\S]{0,200}journaliserEchec\(/, "une analyse non mémorisée (quota repayé) reste invisible");
   assert.match(codeNu("src/app/api/ai/session/route.ts"), /if \(eCache\) \{[\s\S]{0,200}journaliserEchec\(/, "un cache de séance IA non écrit (quota repayé) reste invisible");

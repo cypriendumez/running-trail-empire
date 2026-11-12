@@ -91,8 +91,15 @@ test("les séances DURES sont exclues du calcul", () => {
   const fcMax = 200;
   const dures: CourseEfficacite[] = serieSimulee(6, 5, () => 12, Math.round(fcMax * PART_FC_FACILE) + 5);
   assert.equal(efficaciteParBloc(dures, fcMax, MAINTENANT).length, 0, "des séances dures sont entrées dans la mesure");
-  // …et sans FC max connue, on ne peut pas trier : on garde tout plutôt que d'inventer.
-  assert.ok(efficaciteParBloc(dures, null, MAINTENANT).length > 0);
+  // …et sans FC max connue, on ne peut pas trier : RIEN n'est mesuré (12/11/2026). Garder tout
+  // mêlait séances dures et faciles ; Jour J et le bilan affichaient une pente que le coach refusait.
+  assert.equal(efficaciteParBloc(dures, null, MAINTENANT).length, 0, "sans FC max, des séances non triées entrent dans la mesure");
+  const faciles: CourseEfficacite[] = serieSimulee(6, 5, (b) => 12 - b * 0.2, 140);
+  // 12/11/2026, frontière à 0,80 (valeurs en dur, FC max 200) : 82 % n'est plus mesuré, 79 % l'est.
+  assert.equal(efficaciteParBloc(serieSimulee(6, 5, (b) => 12 - b * 0.2, 164), 200, MAINTENANT).length, 0, "des sorties à 82 % entrent dans la pente");
+  assert.ok(efficaciteParBloc(serieSimulee(6, 5, (b) => 12 - b * 0.2, 158), 200, MAINTENANT).length > 0, "des sorties à 79 % n'entrent plus dans la pente");
+  assert.ok(efficaciteParBloc(faciles, fcMax, MAINTENANT).length > 0, "contre-épreuve : avec la FC max, des sorties faciles se mesurent");
+  assert.equal(efficaciteParBloc(faciles, null, MAINTENANT).length, 0, "sans FC max, même des sorties faciles ne doivent pas se mesurer");
 });
 
 test("marche, vélo mal étiqueté et données absurdes sont écartés", () => {

@@ -180,7 +180,7 @@ test("aucun flou d'arrière-plan posé sur une carte qui se déplace, et une seu
   const accueil = codeNu("src/app/dashboard/page.tsx");
   assert.ok(!/const \[avisRes, nbSeancesRes\] = await Promise\.all/.test(accueil) && /streakPlanRes, avisRes, nbSeancesRes(, \w+)*\] = await Promise\.all\(\[/.test(accueil), "l'accueil a retrouvé sa troisième vague (invitation à laisser un avis)");
   const rec = codeNu("src/app/dashboard/ghost-runner/page.tsx");
-  assert.match(rec, /const \[\{ data: fcRows \}, \{ data: recentes \}\] = await Promise\.all\(\[/, "« Enregistrer » relit ses deux séries de FC en deux attentes");
+  assert.match(rec, /const \[\{ data: fcRows, error: ePic \}, \{ data: recentes, error: eRecentes \}\] = await Promise\.all\(\[/, "« Enregistrer » relit ses deux séries de FC en deux attentes");
   // Le catalogue des courses reste en cache navigateur : sinon ~1 Mo à chaque ouverture.
   assert.match(codeNu("src/app/api/races/list/route.ts"), /"Cache-Control": "public, max-age=1800, s-maxage=1800, stale-while-revalidate=86400"/, "le catalogue des courses n'est plus gardé par le navigateur");
 });

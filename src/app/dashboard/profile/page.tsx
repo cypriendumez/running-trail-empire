@@ -4,8 +4,11 @@ import { ProfileSettings } from "@/components/profile/ProfileSettings";
 import { indexLeger } from "@/lib/shop/indexLeger";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { TYPE_ETAT_ABO, litEtatAbo } from "@/lib/billing/etatAbonnement";
-import { bestVmaFromWorkouts, effectiveVma } from "@/lib/running/fitness";
+import { effectiveVma } from "@/lib/running/fitness";
+import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { isRun } from "@/lib/intervals/sport";
+import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 export const metadata = { title: "Mon profil" };
 
@@ -18,14 +21,15 @@ export default async function ProfilePage() {
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
   const [
-    { data: profile },
-    { data: baseline },
+    { data: profile, error: eProfil },
+    { data: baseline, error: eBaseline },
     { data: shoes },
     { data: workoutsYear },
     { data: workoutsMonth },
     { data: goals },
-    { data: recentWk },
+    { data: recentWk, error: eRecentWk },
     { data: ligneAbo },
+    fcMaxCommune,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("performance_baselines").select("*").eq("user_id", user!.id).order("tested_at", { ascending: false }).limit(1).single(),
@@ -33,17 +37,25 @@ export default async function ProfilePage() {
     supabase.from("workouts").select("distance_km, date, type, sport").eq("user_id", user!.id).gte("date", yearStart),
     supabase.from("workouts").select("distance_km, date, type, sport").eq("user_id", user!.id).gte("date", monthStart),
     supabase.from("user_goals").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }),
-    supabase.from("workouts").select("distance_km, duration_seconds, type, sport, avg_hr, max_hr").eq("user_id", user!.id).gte("date", new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10)).order("date", { ascending: false }).limit(150),
+    supabase.from("workouts").select("date, distance_km, duration_seconds, type, sport, avg_hr, max_hr, weather_temp_c").eq("user_id", user!.id).gte("date", new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10)).order("date", { ascending: false }).limit(150),
     // État de l'abonnement écrit par le webhook Stripe : date de prélèvement, résiliation
     // en cours, échec de paiement. Sans lui, l'écran ne peut répondre à aucune des trois
     // questions que se pose un abonné (cf. `lib/billing/etatAbonnement`).
     supabase.from("notifications").select("data").eq("user_id", user!.id).eq("type", TYPE_ETAT_ABO).maybeSingle(),
+    // La FC max COMMUNE (12/11/2026) : elle trie les efforts de la VMA et cale les zones affichées.
+    fcMaxDeLAthlete(supabase, user!.id),
   ]);
 
+  // Une panne n'est pas « aucune donnée » (12/11/2026) : la VMA et les zones retomberaient en silence.
+  // « Aucun test » (PGRST116 d'un `.single()` sans ligne) n'est pas une panne.
+  await signalerLectures("profil", user!.id, [["seances", { error: eRecentWk }], ["profil", { error: eProfil }], ["repere", { error: eBaseline }]]);
   // VMA estimée depuis les meilleurs efforts SOUTENUS (FC élevée) + FC max observée.
-  const rw = (recentWk ?? []) as { distance_km?: number | null; duration_seconds?: number | null; type?: string | null; sport?: string | null; avg_hr?: number | null; max_hr?: number | null }[];
-  const obsMaxHrRaw = Math.max(0, ...rw.map(w => Number(w.max_hr ?? 0)));
-  const obsMaxHr = obsMaxHrRaw > 120 ? obsMaxHrRaw : null;
+  const rw = (recentWk ?? []) as { date?: string; weather_temp_c?: number | null; distance_km?: number | null; duration_seconds?: number | null; type?: string | null; sport?: string | null; avg_hr?: number | null; max_hr?: number | null }[];
+  // Les ZONES affichées, elles, ne prennent qu'une vraie FC max : la commune ; sans elle, pas de
+  // zones (l'écran le dit). En cas de PANNE seulement, la FC du test déjà lue, sinon rien.
+  const fcMaxZones = fcMaxCommune !== undefined ? fcMaxCommune : (Number((baseline as { max_hr?: number } | null)?.max_hr) || null);
+  // Une panne de lecture n'est pas « FC max inconnue » : l'écran le dit autrement.
+  const fcMaxPanne = fcMaxCommune === undefined && fcMaxZones == null;
   // MÊME ORDRE DE FIABILITÉ QUE LE COACH : meilleurs efforts mesurés d'abord, et
   // course à pied uniquement. Sans cela le profil affichait une VMA que le plan
   // d'entraînement contredisait — et une sortie vélo pouvait la produire.
@@ -54,7 +66,9 @@ export default async function ProfilePage() {
   const { vma: estimatedVma, source: vmaSource } = effectiveVma({
     paceCurveBest,
     garminVo2: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null,
-    fromRuns: bestVmaFromWorkouts(rw.filter(w => isRun(w.sport)), obsMaxHr),
+    // LA lecture des efforts (`effortDesSeances`, 12/11/2026) : celle du coach et de chaque écran —
+    // 60 séances, course seulement, FC max commune, acclimatation à la chaleur.
+    fromRuns: effortDesSeances(rw, fcMaxCommune)?.vma ?? null,
   });
 
   // ── STATISTIQUES PAR SPORT ────────────────────────────────────────────────────
@@ -99,7 +113,7 @@ export default async function ProfilePage() {
       shoes={shoes ?? []}
       goals={goals ?? []}
       stats={{ kmYear, kmMonth, sessionsMonth, longestRun, streak, bySport }}
-      fitness={{ estimatedVma, vmaSource, obsMaxHr, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
+      fitness={{ estimatedVma, vmaSource, fcMax: fcMaxZones, fcMaxPanne, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
       userId={user!.id}
       catalogue={indexLeger()}
       etatAbo={litEtatAbo((ligneAbo as { data?: unknown } | null)?.data ?? null)}

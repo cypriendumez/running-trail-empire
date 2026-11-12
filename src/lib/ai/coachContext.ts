@@ -1,7 +1,9 @@
 import type { createClient } from "@/lib/supabase/server";
 import { sansAllureInconnue } from "@/lib/coach/allureInconnue";
 import { picsSaison, avecSaison } from "@/lib/coach/ciblesFcServeur";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, airFroid, PIC_FC_JOURS, type CiblesFc } from "@/lib/coach/fcCible";
+import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
+import { effortDesSeances, acclimatationDesSeances } from "@/lib/dashboard/vmaAffichee";
+import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, fcMaxConnue, estSortieFacile, PART_FC_FACILE, PART_FC_DURE, fcMaxPourEfforts, airFroid, PIC_FC_JOURS, type CiblesFc, seuilMesure } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { menuSelonDenivele, preferenceDenivele } from "@/lib/coach/denivele";
@@ -16,7 +18,7 @@ import { buildWeightPlan, weightModeEligibility, type WeightPlan } from "@/lib/w
 import { weightCoachBlock, weightTrainingRules, type WeightTrainingRules } from "@/lib/weight/coaching";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { forecastWithElevation, altitudeLossPct, heatAdvice, windAdvice, archiveDailyMax, heatAcclimation, type DayWeather } from "@/lib/weather/openMeteo";
-import { bestVmaFromWorkouts, vmaFromPaceCurve, effectiveVma, easyPaceFromHeartRate, predictRaceSec } from "@/lib/running/fitness";
+import { vmaFromPaceCurve, effectiveVma, easyPaceFromHeartRate, predictRaceSec } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
 import { summarizeCross, fmtMinutes, type CrossSummary } from "@/lib/coach/crossTraining";
 import { computeQualityBudget } from "@/lib/coach/qualityBudget";
@@ -205,7 +207,7 @@ function estimateVmaFromRuns(workouts: Wk[], fcMaxEst: number | null, now: numbe
  * dure vieille de 65 jours alors qu'elle datait de 13, et il espaçait donc les qualités
  * à partir d'un passé imaginaire. Une seule constante désormais, pour les deux.
  */
-export const PART_FC_DURE = 0.85;
+export { PART_FC_DURE };
 
 export function classifyRun(w: { distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; type?: string | null }, fcMax: number | null): string {
   const km = w.distance_km ?? 0, sec = w.duration_seconds ?? 0;
@@ -215,7 +217,7 @@ export function classifyRun(w: { distance_km?: number | null; duration_seconds?:
   if (pct != null) {
     if (pct >= 0.90) return "Intense (VMA/course)";
     if (pct >= PART_FC_DURE) return "Seuil/Tempo";
-    if (pct >= 0.80) return "Allure soutenue";
+    if (pct >= PART_FC_FACILE) return "Allure soutenue";
     if (pct >= 0.70) return "Endurance";
     return "Footing facile";
   }
@@ -657,24 +659,19 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     num((fcMaxRes.data as { max_hr?: number } | null)?.max_hr) ?? 0);
   // FC max DE RÉFÉRENCE : celle du test (baseline) d'abord, sinon celle saisie à l'inscription,
   // sinon celle de la MONTRE (réglage intervals.icu porté par ses séances Garmin, 07/11/2026).
-  const maxHrDeclare = maxDeReference(num(b?.max_hr) ?? num(p?.max_hr),
-    (((p as Record<string, unknown> | null)?.garmin_metrics) as Record<string, unknown> | null)?.maxHR);
-  // ⚠️ JAMAIS SOUS UNE VALEUR RÉELLEMENT ATTEINTE. Une FC max déclarée à 190 alors que la
-  // montre a enregistré 205 est fausse par construction — on ne peut pas avoir un maximum
-  // inférieur à un battement qu'on a réellement produit. On retient donc la plus haute des
-  // deux, et on ne retombe sur l'âge que si l'athlète n'a NI déclaré NI couru.
-  // ⚠️ SANS DÉCLARATION, SANS MESURE ET SANS ÂGE : `null`, PLUS 190 (12/11/2026). Le repli à 190
-  // estimait la VMA depuis les séances, classait les efforts « durs » et partait à l'IA sous la
-  // forme « ~190 (obs.) » — un chiffre inventé présenté comme observé. Le null est GARDÉ
-  // explicitement là où il dégraderait le plan : relecture d'exécution et pente (plus bas).
-  // ⚠️ JAMAIS UNE FC MOYENNE EN GUISE DE FC MAX (relecture du 12/11/2026) : essayé comme
-  // « plancher » quand `max_hr` manque, il faisait d'un footing à 155 bpm un effort à 100 %
-  // « Intense », y compris avec l'âge connu. Sans FC max, la séance est jugée sur son TYPE.
-  const ageConnu = num(p?.age);
-  const fcMaxSource: "mesures" | "age" | null = (maxHrDeclare != null || obsMaxHr0 > 150) ? "mesures" : ageConnu != null ? "age" : null;
-  const fcMaxEst: number | null = fcMaxSource === "mesures"
-    ? Math.max(maxHrDeclare ?? 0, obsMaxHr0 > 150 ? obsMaxHr0 : 0)
-    : fcMaxSource === "age" ? 220 - (ageConnu as number) : null;
+  const gmFc = ((p as Record<string, unknown> | null)?.garmin_metrics ?? null) as Record<string, unknown> | null;
+  const maxHrDeclare = maxDeReference(num(b?.max_hr) ?? num(p?.max_hr), gmFc?.maxHR);
+  // ⚠️ LA FC MAX : UNE SEULE DÉFINITION, `fcMaxConnue` (lib/coach/fcCible, 12/11/2026), la même
+  // pour le classement des séances, la VMA estimée, les zones, la discipline des footings, Jour J,
+  // le bilan, le Ghost Runner et la montre. Jamais sous un battement réellement atteint (la plus
+  // haute entre déclarée et pic > 150), sinon le seuil mesuré ÷ 0,92, sinon `null` :
+  //  · PLUS 190 (12/11/2026) — il partait à l'IA comme « ~190 (obs.) » ;
+  //  · PLUS 220 − ÂGE (Cyprien, 12/11/2026 : « la refuser partout ») ;
+  //  · jamais une FC MOYENNE (un footing à 155 bpm devenait un effort à 100 %).
+  // Sans FC max : séances jugées sur leur TYPE, ni relecture d'exécution ni pente (plus bas).
+  const fcMaxRef = fcMaxConnue({ declaree: maxHrDeclare, observee: obsMaxHr0, seuil: seuilMesure(b?.lt_hr, gmFc?.lthr) });
+  const fcMaxSource = fcMaxRef.source;
+  const fcMaxEst: number | null = fcMaxRef.max;
   // ── LES CIBLES DE FC MESURÉES (07/11/2026) ─────────────────────────────────
   // FC max réellement atteinte ou déclarée, FC de repos déclarée sinon celle de la montre,
   // seuil mesuré. Les footings récents (≥ 20 min, 60 jours) servent à suivre l'athlète
@@ -700,7 +697,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     avecSaison(referencesFc({
       maxDeclaree: maxHrDeclare, maxObservee: obsMaxHr0,
       repos: num(b?.resting_hr) ?? num(p?.resting_hr) ?? num((((p as Record<string, unknown> | null)?.garmin_metrics) as Record<string, unknown> | null)?.restingHR),
-      seuil: num(b?.lt_hr),
+      seuil: seuilMesure(b?.lt_hr, gmFc?.lthr),
     }), picsDeSaison, airFroid(forecast)),
     workouts.filter((w) => isRun(w.sport) && !isHardType(w.type) && (num(w.duration_seconds) ?? 0) >= 20 * 60
       && now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime() <= 60 * 86400000)
@@ -851,10 +848,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // performances, et la VMA se calcule avant le bloc météo. On la déduit des séances
   // elles-mêmes, qui portent toutes leur température — aucune requête supplémentaire.
   // Un athlète acclimaté souffre moins : on corrige donc MOINS son chrono.
-  const acclimVma = heatAcclimation(
-    new Set(workouts.filter((w) => num(w.weather_temp_c) != null && (num(w.weather_temp_c) as number) >= 25
-      && now - new Date(w.date).getTime() <= 30 * 86400000).map((w) => String(w.date).slice(0, 10))).size,
-  ).factor;
+  const acclimVma = acclimatationDesSeances(workouts as never, now);
 
   // UN SEUL calcul de VMA pour toute l'application (cf. lib/running/fitness.ts) : quatre
   // chaînes divergentes coexistaient, et le tableau de bord ignorait la courbe d'allure.
@@ -862,7 +856,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     vmaStored, paceCurveBest: paceCurve?.best, garminVo2,
     // Palier gratuit : la VMA du TEST, rien d'autre. L'estimer depuis les séances, c'est
     // précisément l'analyse que ce palier ne fait pas.
-    fromRuns: objectifSeul ? null : bestVmaFromWorkouts(runs, fcMaxEst, 120, acclimVma) ?? estimateVmaFromRuns(runs, fcMaxEst, now),
+    // Même tri d'efforts que la VMA affichée (`fcMaxPourEfforts`, 12/11/2026) : sans FC max, le pic
+    // des séances reste un garde-fou au lieu d'aucun tri.
+    // LA lecture des efforts, la même que chaque écran (`effortDesSeances`, 12/11/2026) : ses 60 séances,
+    // course seulement, FC max commune, acclimatation à la chaleur.
+    fromRuns: objectifSeul ? null : effortDesSeances(workouts as never, fcMaxEst, now)?.vma ?? estimateVmaFromRuns(runs, fcMaxEst, now),
   });
   const vmaIsEst = vmaSource !== "test" && vma != null;
 
@@ -950,16 +948,13 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // l'alimentant avec la MEILLEURE FC max disponible ; et on réserve le seuil mesuré
   // à la zone qu'il définit littéralement : le seuil.
   const gm = (p as Record<string, unknown> | null)?.garmin_metrics as Record<string, unknown> | null | undefined;
-  const lthrMeasured = num(gm?.lthr) ?? ltHr;
+  // 12/11/2026 : la MÊME source que la FC max (`seuilMesure` : test, puis montre).
+  const lthrMeasured = seuilMesure(ltHr, gm?.lthr);
   // ⚠️ MÊME RÈGLE QU'EN HAUT (fcMaxEst) : la plus haute entre ce qui est DÉCLARÉ et ce qui
   // a été RÉELLEMENT enregistré. Prendre la déclaration seule faisait calculer toutes les
   // zones sous la réalité pour qui s'est sous-estimé à l'inscription.
-  const maxHrEff = (maxHr != null || obsMaxHr0 > 150)
-    ? Math.max(maxHr ?? 0, obsMaxHr0 > 150 ? obsMaxHr0 : 0)
-    // Le seuil vaut ~92 % de la FC max chez un athlète entraîné : bien meilleur repli
-    // que l'âge (ici 209 déduit contre 209 réellement observés).
-    : (lthrMeasured != null && lthrMeasured > 120 ? Math.round(lthrMeasured / 0.92) : null)
-    ?? (num(p?.age) ? 220 - num(p!.age)! : null);
+  // 12/11/2026 : la MÊME valeur que `fcMaxEst` (fcMaxConnue) — plus de repli sur l'âge.
+  const maxHrEff = fcMaxEst;
   const restHrEff = restHr ?? num(gm?.restingHR) ?? null;
   const hrZone = (lo: number, hi: number) => {
     // Zone de seuil : ancrée sur la mesure, pas sur un pourcentage d'un maximum.
@@ -1212,10 +1207,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const predictions = vma ? `5K ~${predict(5, 93)} · 10K ~${predict(10, 90)} · semi ~${predict(21.1, 85)} · marathon ~${predict(42.2, 80)}` : null;
 
   // ── BOUCLE ADAPTATIVE — prescrit (séances coach) vs réalisé (workouts) ──
-  // FC de repli si pas de baseline : FC max observée en séance, sinon estimée par l'âge.
-  const obsMaxHr = Math.max(0, ...workouts.map(w => num(w.max_hr) ?? 0));
-  const ageNum = num(p?.age);
-  const fcMax = maxHr ?? (obsMaxHr > 120 ? obsMaxHr : null) ?? (ageNum ? 220 - ageNum : null);
+  // 12/11/2026 : la MÊME FC max que partout (fcMaxConnue). C'était `maxHr ?? observée > 120 ?? âge` :
+  // une déclarée inférieure au pic réel l'emportait, et l'âge servait encore de repli.
+  const fcMax = fcMaxEst;
   // ⚠️ PLUS DE FC DE REPOS INVENTÉE (c'était `restHr ?? 55`) : sans FC de repos déclarée ni
   // mesurée par la montre, le plafond de Karvonen n'a pas de base, et on le dit (« n/c »).
   const fcRest = restHrEff;
@@ -1677,7 +1671,14 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
       action: "réduis le nombre de séances jusqu'à ce qu'il les tienne TOUTES pendant trois semaines. Un plan suivi à 60 % vaut moins qu'un plan deux fois plus léger suivi à 100 %." });
   }
   // 2. ENDURANCE AÉROBIE — la dérive cardiaque dit s'il tiendra la distance.
-  const driftW = runs.find(w => w.cardiac_decoupling != null);
+  // ⚠️ SUR UNE SORTIE FACILE SEULEMENT (directeur scientifique, 12/11/2026). La dérive est calculée
+  // sur la plus longue sortie d'une heure ou plus : la semaine d'un marathon, c'est le marathon, et
+  // le coach concluait « endurance aérobie insuffisante » sur un effort de course — le défaut du
+  // 30/10, encore vivant ici. Sans FC max, aucune sortie n'est réputée facile : pas de verdict.
+  // …et JAMAIS le jour d'une course connue (`joursDeCourse` : l'objectif et la course qu'il a remplacée),
+  // même courue sous le seuil. Le bilan exige en plus la moitié de la distance courue ce jour-là ; ici,
+  // toute date de course connue est écartée — plus prudent pour un facteur qui oriente le menu.
+  const driftW = runs.find(w => w.cardiac_decoupling != null && !joursDeCourse.has(String(w.date).slice(0, 10)) && estSortieFacile(w.avg_hr, fcMaxEst));
   const drift = driftW ? Number(driftW.cardiac_decoupling) : null;
   if (drift != null && drift >= 8) {
     limiters.push({ key: "endurance", severity: 90,
@@ -2242,7 +2243,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         const km = num(w.distance_km), sec = num(w.duration_seconds), fc = num(w.avg_hr);
         const age = now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime();
         return km != null && km >= 4 && sec != null && sec > 0 && age <= 90 * 86400000
-          && fc != null && fc / fcMaxEst < 0.80;
+          && estSortieFacile(fc, fcMaxEst);
       })
       .map((w) => ({
         allureSecKm: num(w.gap_min_km) != null ? num(w.gap_min_km)! * 60 : num(w.duration_seconds)! / num(w.distance_km)!,
@@ -2517,11 +2518,11 @@ ${elev ? `- ${elev.rule}` : ""}
 ${tempRule ? `- MÉTÉO AUJOURD'HUI : ${tempRule}` : ""}${hotDays.length ? `\n- 🔥 CHALEUR ANNONCÉE : ${hotDays.slice(0, 4).map(f => `${f.date.slice(8)}/${f.date.slice(5, 7)} ${Math.round(f.tempMax)}°C`).join(" · ")} → déplace les séances de qualité de ces jours-là tôt le matin, ou échange-les avec un jour plus frais de la semaine. Prévois-le MAINTENANT, pas la veille.` : ""}
 
 CAPACITÉS (tests)
-- VMA : ${vma ?? "?"} km/h${vmaIsEst ? ` ⚠️ ESTIMÉE depuis ses séances (aucun test VMA enregistré) → recommande-lui un test VMA pour affiner, et reste un cran prudent sur la 1re séance VMA` : ""} · FC max ${maxHr ?? (vmaIsEst && fcMaxEst ? `~${fcMaxEst} (${fcMaxSource === "age" ? "formule de l'âge, pas une mesure" : "obs."})` : "?")} · FC repos ${restHr ?? "?"} · FC seuil ${ltHr ?? "?"}
+- VMA : ${vma ?? "?"} km/h${vmaIsEst ? ` ⚠️ ESTIMÉE depuis ses séances (aucun test VMA enregistré) → recommande-lui un test VMA pour affiner, et reste un cran prudent sur la 1re séance VMA` : ""} · FC max ${maxHr ?? (vmaIsEst && fcMaxEst ? `~${fcMaxEst} (${fcMaxSource === "seuil" ? "déduite du seuil mesuré" : "obs."})` : "?")} · FC repos ${restHr ?? "?"} · FC seuil ${ltHr ?? "?"}
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
-${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${limiter ? `- 🎯 SON FACTEUR LIMITANT, à ce stade, c'est ${limiter.label}. ${limiter.action} C'est LA priorité : une séance qui ne s'adresse pas à ce point précis est une séance de perdue. ${limiters.length > 1 ? `Viennent ensuite : ${limiters.slice(1, 3).map(l => l.label).join(" ; ")}.` : ""}\n` : ""}${noHistory ? "- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne. Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n" : ""}${(() => { const d = runs.find(w => w.cardiac_decoupling != null); if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
+${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${limiter ? `- 🎯 SON FACTEUR LIMITANT, à ce stade, c'est ${limiter.label}. ${limiter.action} C'est LA priorité : une séance qui ne s'adresse pas à ce point précis est une séance de perdue. ${limiters.length > 1 ? `Viennent ensuite : ${limiters.slice(1, 3).map(l => l.label).join(" ; ")}.` : ""}\n` : ""}${noHistory ? "- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne. Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n" : ""}${(() => { const d = driftW; if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
   const lines: string[] = [];
   // Cadence : sous 170 pas/min, l'appui est long et la foulée « aérienne » — surcoût
   // d'impact et de temps de contact. On ne juge pas dans l'absolu (elle dépend de la
@@ -2764,14 +2765,14 @@ export async function getEffectiveVma(sb: SupabaseClient, userId: string): Promi
   if (ePanne) throw new Error(`VMA illisible : ${ePanne.code ?? "?"} ${ePanne.message}`);
   const prof = profRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null;
   // Course à pied uniquement : une sortie vélo produirait une VMA fantaisiste.
-  const wks = ((woRes.data ?? []) as Wk[]).filter(w => isRun(w.sport));
-  const obsMaxHr = Math.max(0, ...wks.map((w) => Number(w.max_hr ?? 0)));
+  // LA lecture des efforts (`effortDesSeances`) : celle du coach et de chaque écran, chaleur comprise.
+  const effort = effortDesSeances((woRes.data ?? []) as never, await fcMaxDeLAthlete(sb, userId));
   // EXACTEMENT le calcul du coach — c'est la même fonction, pas « la même logique »
   // recopiée. Les deux ne peuvent donc plus diverger, ce qui était le cas ici.
   return effectiveVma({
     vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
     paceCurveBest: prof?.pace_curve?.best,
     garminVo2: Number(prof?.garmin_vo2max) || null,
-    fromRuns: bestVmaFromWorkouts(wks, obsMaxHr > 120 ? obsMaxHr : null),
+    fromRuns: effort?.vma ?? null,
   }).vma;
 }

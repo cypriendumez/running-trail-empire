@@ -11,6 +11,7 @@ import { journaliserEchec } from "@/lib/journal/echecServeur";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
 import { COLONNES_VFC, precisionMetrique, serieVfc } from "@/lib/health/vfc";
 import { enteteIntervals } from "@/lib/intervals/auth";
+import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 
 const BASE = "https://intervals.icu/api/v1";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -170,8 +171,10 @@ export async function POST(req: Request) {
         `#${i + 1} ${(l.distance / 1000).toFixed(2)}km @${pace(l.average_speed)}/km (GAP ${pace(l.gap)}) FC ${l.average_heartrate ?? "?"}/${l.max_heartrate ?? "?"} cad ${l.average_cadence ? Math.round(l.average_cadence * 2) : "?"} Z${l.zone ?? "?"}`).join("\n  ");
     }
     // Historique RECLASSÉ par allure/FC (les imports arrivent tous en « easy ») → débrief juste.
-    const histMax = Math.max(0, ...(recentRes.data ?? []).map((w) => (w.max_hr as number | null) ?? 0));
-    const histFcMax = (baseline?.max_hr as number | null) ?? (histMax > 150 ? histMax : null);
+    // 12/11/2026 : la FC max COMMUNE (`fcMaxDeLAthlete` : test, profil, montre, pic des 6 mois, seuil),
+    // la même que celle que le coureur voit. Elle CLASSE l'intensité : jamais la valeur de tri des
+    // efforts (`fcMaxPourEfforts`, un simple pic) — sur une panne ou sans FC max, rien, pas un pic.
+    const histFcMax = (await fcMaxDeLAthlete(admin, user_id)) ?? null;
     const histTxt = recent.map((w) => `${w.date} ${classifyRun(w, histFcMax)} ${w.distance_km ?? "?"}km FC ${w.avg_hr ?? "?"} charge ${w.tss ?? "?"}`).join("\n  ") || "aucune";
     const sp = n(a.average_speed);
 
