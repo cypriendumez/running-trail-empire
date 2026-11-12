@@ -10,6 +10,7 @@
  *   npx tsx tests/fc-montre.test.ts
  */
 import assert from "node:assert/strict";
+import { T } from "../src/lib/i18n/translations";
 import { execSync } from "node:child_process";
 import { vmaAffichee, effortDesSeances, acclimatationDesSeances, SEANCES_VMA } from "../src/lib/dashboard/vmaAffichee";
 import { readFileSync } from "node:fs";
@@ -298,7 +299,7 @@ test("UNE seule FC max : coach, zones, discipline, montre, Jour J, bilan, analys
   assert.match(code("src/app/dashboard/jour-j/page.tsx"), /\["repere", baseRes\], \["fc-profil", fcProfilRes\]/, "Jour J ne lit plus l'erreur des lectures de FC");
   assert.match(code("src/app/dashboard/jour-j/page.tsx"), /const fcMax = ePanneFc \? null : fcMaxConnue/, "Jour J calcule une FC max sur une lecture en panne");
   assert.match(code("src/app/api/ai/analyse-seance/route.ts"), /objRes\.error \?\? picRes\.error;/, "l'analyse ne lit plus l'erreur du pic de FC");
-  assert.match(code("src/app/dashboard/ghost-runner/page.tsx"), /const eBase = baselineRes\.error && baselineRes\.error\.code !== "PGRST116" \? baselineRes\.error : null;\s*const ePanneFc = ePic \?\? eRecentes \?\? profileRes\.error \?\? eBase;\s*if \(ePanneFc\) await journaliserEchecUneFois/, "le Ghost Runner ne lit plus l'erreur du pic, des footings, du profil ou du test de référence");
+  assert.match(code("src/app/dashboard/ghost-runner/page.tsx"), /await signalerLectures\("ghost-runner", user!\.id, \[\["pic", \{ error: ePic \}\], \["footings", \{ error: eRecentes \}\],\s*\["profil", profileRes\], \["repere", baselineRes\]\]\);/, "le Ghost Runner ne lit plus l'erreur du pic, des footings, du profil ou du test de référence");
   // Le coach : zones et discipline des footings lisent la MÊME valeur ; le seuil des zones aussi.
   const c = code("src/lib/ai/coachContext.ts");
   assert.match(c, /const maxHrEff = fcMaxEst;/, "les zones ont retrouvé leur propre FC max");
@@ -353,7 +354,7 @@ test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien,
   const sites: [string, RegExp[]][] = [
     ["src/app/dashboard/layout.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fcMax: fcMaxVma,/]],
     ["src/app/dashboard/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /fcMax: fcMaxVma,/, /seances: \(seancesVmaRes\.data \?\? \[\]\) as /, /\.limit\(SEANCES_VMA\),/]],
-    ["src/lib/indicateurs/donnees.ts", [/fcMaxDeLAthlete\(sb, userId\),/, /profil: p, fcMax: fcMaxVma \}/, /vmaAffichee\(\{ seances: \(seancesVma\.data \?\? \[\]\) as /, /\.limit\(SEANCES_VMA\),/, /serieRessentis, seancesVma\]\.filter\(\(r\) => r\.error\)/]],
+    ["src/lib/indicateurs/donnees.ts", [/fcMaxDeLAthlete\(sb, userId\),/, /profil: p, fcMax: fcMaxVma \}/, /vmaAffichee\(\{ seances: \(seancesVma\.data \?\? \[\]\) as /, /\.limit\(SEANCES_VMA\),/, /serieRessentis, seancesVma\]\.filter\(\(r\) => estUnePanne\(r\)\)/]],
     ["src/app/dashboard/jour-j/page.tsx", [/seances: seances as Parameters<typeof vmaAffichee>/]],
     ["src/lib/ai/bilanDonnees.ts", [/seances: seances as Parameters<typeof vmaAffichee>/]],
     ["src/app/dashboard/jour-j/page.tsx", [/fcMax: ePanneFc \? undefined : fcMax,/]],
@@ -391,7 +392,7 @@ test("chaque écran de VMA signale ses pannes dans error_logs : séances, test d
     ["src/app/dashboard/layout.tsx", "entete", ["profil", "seances", "repere"]],
     ["src/app/dashboard/page.tsx", "dashboard", ["profil", "seances", "vma", "repere"]],
     ["src/lib/indicateurs/donnees.ts", "indicateurs", ["profil", "seances", "repere", "vma"]],
-    ["src/app/dashboard/jour-j/page.tsx", "jour-j", ["profil", "objectif", "seances", "repere", "fc-profil"]],
+    ["src/app/dashboard/jour-j/page.tsx", "jour-j", ["objectif", "seances", "repere", "fc-profil"]],
     ["src/app/dashboard/plans/page.tsx", "plans", ["seances", "repere", "profil"]],
     ["src/app/dashboard/profile/page.tsx", "profil", ["seances", "profil", "repere"]],
     ["src/app/dashboard/health/page.tsx", "sante", ["seances", "repere", "profil"]],
@@ -400,12 +401,28 @@ test("chaque écran de VMA signale ses pannes dans error_logs : séances, test d
   ];
   for (const [f, ecran, noms] of attendus) {
     const c = code(f);
-    const appel = c.match(new RegExp(`await signalerLectures\\("${ecran}",[\\s\\S]*?\\]\\);`))?.[0];
+    // Tous les appels de l'écran (Jour J en a deux : la porte d'accès d'abord, le reste ensuite).
+    const appel = [...c.matchAll(new RegExp(`await signalerLectures\\("${ecran}",[\\s\\S]*?\\]\\);`, "g"))].map((m) => m[0]).join("\n") || null;
     assert.ok(appel, `${f} : ses pannes ne passent plus par signalerLectures`);
     for (const n of noms) assert.ok(appel!.includes(`["${n}",`), `${f} : la lecture « ${n} » n'est plus signalée`);
     // Les anciens messages des lectures de la VMA, qui ne partaient que dans les journaux du serveur.
     assert.doesNotMatch(c, /console\.error\("\[(en-tête\] VMA|plans\] lecture|profil\] lecture|boutique\] séances|fiche boutique\] séances|tableau de bord\] lectures)/, `${f} : une panne de la VMA ne part encore que dans les journaux du serveur`);
   }
+  // Ghost Runner et Cours : les deux autres écrans qui affichent une VMA (ou des allures qui en viennent).
+  for (const [f, ecran, noms] of [["src/app/dashboard/ghost-runner/page.tsx", "ghost-runner", ["pic", "footings", "profil", "repere"]],
+    ["src/app/dashboard/cours/page.tsx", "cours", ["profil", "repere", "seances"]]] as const) {
+    const appel = code(f).match(new RegExp(`await signalerLectures\\("${ecran}",[\\s\\S]*?\\]\\);`))?.[0];
+    assert.ok(appel, `${f} : ses pannes ne passent plus par signalerLectures`);
+    for (const n of noms) assert.ok(appel!.includes(`["${n}",`), `${f} : la lecture « ${n} » n'est plus signalée`);
+  }
+  // Jour J : le profil (porte d'accès) est signalé AVANT le verrou « Premium ».
+  const jjv = code("src/app/dashboard/jour-j/page.tsx");
+  assert.ok(jjv.indexOf('await signalerLectures("jour-j", user.id, [["profil", { error: eProfil }]]);') >= 0
+    && jjv.indexOf('await signalerLectures("jour-j", user.id, [["profil"') < jjv.indexOf("return <VerrouJourJ"), "Jour J : la panne du profil n'est signalée qu'après le verrou");
+  // Le bandeau du tableau de bord nomme chaque lecture : chaque nom a son libellé dans les 5 langues.
+  const appelTdb = code("src/app/dashboard/page.tsx").match(/await signalerLectures\("dashboard",[\s\S]*?\]\);/)?.[0] ?? "";
+  for (const [, nom] of appelTdb.matchAll(/\["([\w-]+)",/g)) for (const lang of ["fr", "en", "de", "es", "pt"] as const)
+    assert.ok(T[lang][`dash.inc.${nom}`], `« ${nom} » n'a pas de libellé dash.inc en ${lang} : le bandeau dirait « tes données »`);
   // Jour J signale ses pannes AVANT le retour « sans objectif » : une panne de l'objectif n'est pas « aucun objectif ».
   const jj = code("src/app/dashboard/jour-j/page.tsx");
   assert.ok(jj.indexOf('await signalerLectures("jour-j"') < jj.indexOf("return <SansObjectifJourJ"), "Jour J journalise après le retour « sans objectif »");

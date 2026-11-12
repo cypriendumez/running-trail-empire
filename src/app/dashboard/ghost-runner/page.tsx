@@ -2,12 +2,12 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { classifyRun } from "@/lib/ai/coachContext";
 import { fcMaxConnue, seuilMesure, PIC_FC_JOURS } from "@/lib/coach/fcCible";
-import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { GhostRunner } from "@/components/ghost-runner/GhostRunner";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { oneSessionPerSlot } from "@/lib/coach/sessions";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
 import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 
 // « Enregistrer » dans la navigation depuis le 21/09/2026 (Cyprien), comme l'onglet du
 // téléphone : c'est l'écran qui enregistre une course. Le nom « Ghost Runner » reste sur
@@ -98,11 +98,10 @@ export default async function GhostRunnerPage() {
   ]);
   // ⚠️ Une panne n'est pas « aucun pic » (relecture du 12/11/2026) : elle est journalisée. Sans le
   // pic, la FC max retombe sur la déclarée (ou rien) — plus basse, donc prudente, mais plus muette.
-  // Le profil et le test de référence portent la FC max déclarée et le seuil : leur panne compte aussi.
-  // Aucun test enregistré (PGRST116, table vide pour l'athlète) n'est PAS une panne.
-  const eBase = baselineRes.error && baselineRes.error.code !== "PGRST116" ? baselineRes.error : null;
-  const ePanneFc = ePic ?? eRecentes ?? profileRes.error ?? eBase;
-  if (ePanneFc) await journaliserEchecUneFois(null, { source: "ghost-runner", message: `FC illisible : ${ePanneFc.message}`, userId: user!.id });
+  // Le profil et le test de référence portent la FC max déclarée, le seuil et la VMA : leur panne compte
+  // aussi. La porte commune (`signalerLectures`) écarte « aucun test » (PGRST116) et journalise une fois par jour.
+  await signalerLectures("ghost-runner", user!.id, [["pic", { error: ePic }], ["footings", { error: eRecentes }],
+    ["profil", profileRes], ["repere", baselineRes]]);
   const fcMaxObservee = (fcRows?.[0] as { max_hr?: number } | undefined)?.max_hr ?? null;
   const pGr = profileRes.data as { max_hr?: number | null; garmin_metrics?: { maxHR?: number; lthr?: number } | null } | null;
   const bGr = baselineRes.data as { max_hr?: number | null; lt_hr?: number | null } | null;

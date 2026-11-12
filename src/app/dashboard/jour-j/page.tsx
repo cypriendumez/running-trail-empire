@@ -41,6 +41,9 @@ export default async function PageJourJ() {
   const { data: profil, error: eProfil } = await sb.from("profiles")
     .select(`${COLONNES_ACCES}, preferred_language, weight_kg, garmin_vo2max, pace_curve, last_lat, last_lon`)
     .eq("id", user.id).maybeSingle();
+  // La lecture qui porte la PORTE D'ACCÈS est signalée AVANT le verrou (relecture du 12/11/2026) : en
+  // panne, un abonné verrait « Premium » sans qu'aucune trace ne parte dans error_logs.
+  await signalerLectures("jour-j", user.id, [["profil", { error: eProfil }]]);
   const p = profil as Record<string, unknown> | null;
   const lang = normLang(String(p?.preferred_language ?? "fr"));
   const t = JOURJ_T[lang];
@@ -57,7 +60,7 @@ export default async function PageJourJ() {
   ]);
   // Toutes les lectures de la page, journalisées dans error_logs (12/11/2026) — AVANT le retour « sans
   // objectif » : une panne de l'objectif n'est pas « aucun objectif ». « Aucune ligne » n'est pas une panne.
-  await signalerLectures("jour-j", user.id, [["profil", { error: eProfil }], ["objectif", objRes], ["seances", seancesRes],
+  await signalerLectures("jour-j", user.id, [["objectif", objRes], ["seances", seancesRes],
     ["repere", baseRes], ["fc-profil", fcProfilRes]]);
   type Obj = { race: string; raceDate: string; distanceKm: number; targetSeconds: number; officielle?: boolean };
   const objectif = objectifEnCours(objRes.data?.data as Obj | null, jour);

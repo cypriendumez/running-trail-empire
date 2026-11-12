@@ -18,6 +18,7 @@ import { objectifEnCours } from "@/lib/coach/prochaineCourse";
 import { computeStreak, coursesDeLObjectif, type StreakWorkout, type StreakPrescription } from "@/lib/streak/compute";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
+import { estUnePanne } from "@/lib/dashboard/lectures";
 
 const decale = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const PANNE: Record<Lang, string> = {
@@ -52,7 +53,7 @@ export async function chargerDonnees(sb: SupabaseClient, userId: string, lang: L
     // Les séances de LA VMA (12/11/2026) : autant que le coach (`SEANCES_VMA`).
     sb.from("workouts").select("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c").eq("user_id", userId).order("date", { ascending: false }).limit(SEANCES_VMA),
   ]);
-  const enPanne = [profil, seances, historique, vfc, sommeil, charge, base, obj, plan, serieSeances, seriePlan, serieRessentis, seancesVma].filter((r) => r.error);
+  const enPanne = [profil, seances, historique, vfc, sommeil, charge, base, obj, plan, serieSeances, seriePlan, serieRessentis, seancesVma].filter((r) => estUnePanne(r));
   // Journalisées dans error_logs (12/11/2026) — « aucune ligne » n'est pas une panne.
   await signalerLectures("indicateurs", userId, [["profil", profil], ["seances", seances], ["historique", historique], ["vfc", vfc],
     ["sommeil", sommeil], ["charge", charge], ["repere", base], ["objectif", obj], ["plan", plan], ["serie-seances", serieSeances],
