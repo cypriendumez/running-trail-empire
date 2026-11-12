@@ -10,7 +10,6 @@ import { isRun } from "@/lib/intervals/sport";
 import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
-import { normLang } from "@/lib/i18n/base";
 import { langueEcran } from "@/lib/i18n/serverLang";
 
 export const metadata = { title: "Mon profil" };

@@ -4,7 +4,7 @@ import { texteRelief } from "@/components/trail/relief3dI18n";
 import { ParcoursBrowser } from "@/components/parcours/ParcoursBrowser";
 import { createClient } from "@/lib/supabase/server";
 import { COLONNES_ACCES, profilPeut } from "@/lib/billing/access";
-import { getAccountLang } from "@/lib/i18n/serverLang";
+import { getAccountLang, getPublicLang } from "@/lib/i18n/serverLang";
 
 /** Le seul libellé qui n'appartient pas à la vue relief : le mode « construire ». */
 const MODE_CONSTRUIRE: Record<string, string> = {
@@ -27,7 +27,7 @@ export default async function TrailPage({ searchParams }: { searchParams: Promis
     : { data: null };
   // La langue du compte : la vue relief nomme des institutions (IGN, swisstopo, USGS) qui
   // ne se traduisent pas, mais tout ce qui les décrit, si.
-  const langue = user ? await getAccountLang(sb, user.id) : "fr";
+  const langue = user ? await getAccountLang(sb, user.id) : await getPublicLang();
 
   /**
    * OÙ OUVRIR LA CARTE.

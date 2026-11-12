@@ -16,11 +16,15 @@ export async function getAccountLang(
   sb: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>,
   userId: string,
 ): Promise<Lang> {
+  // Profil illisible ou langue absente : celle du NAVIGATEUR, jamais « fr » par défaut (12/11/2026 :
+  // un coureur anglophone recevait sa page en français dès que la lecture échouait).
   try {
-    const { data } = await sb.from("profiles").select("preferred_language").eq("id", userId).single();
-    return normLang(data?.preferred_language ?? "fr");
-  } catch {
-    return "fr";
+    const { data, error } = await sb.from("profiles").select("preferred_language").eq("id", userId).maybeSingle();
+    if (error) console.error("[langue] profil illisible :", error.message);
+    return langueEcran((data as { preferred_language?: unknown } | null)?.preferred_language);
+  } catch (e) {
+    console.error("[langue] profil illisible :", e instanceof Error ? e.message : e);
+    return getPublicLang();
   }
 }
 

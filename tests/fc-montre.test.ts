@@ -503,9 +503,9 @@ test("le coureur VOIT la panne : bandeau commun sur chaque écran de VMA, 5 lang
     ["src/app/dashboard/profile/page.tsx", /<div className="mx-auto max-w-3xl"><BandeauPanne lectures=\{pannes\} lang=\{await langueEcran\(\(profile /],
     ["src/app/dashboard/health/page.tsx", /langPage = await langueEcran\(\(profilRes\.data [\s\S]*<BandeauPanne lectures=\{pannesVma\} lang=\{langPage \?\? await langueEcran\(null\)\} \/>/],
     ["src/app/dashboard/ghost-runner/page.tsx", /<BandeauPanne lectures=\{pannes\} lang=\{await langueEcran\(\(profileRes\.data /],
-    ["src/app/dashboard/cours/page.tsx", /langBandeau = await langueEcran\(profileRes\.data\?\.preferred_language\);[\s\S]*<BandeauPanne lectures=\{pannes\} lang=\{langBandeau \?\? normLang\(lang\)\} \/>/],
+    ["src/app/dashboard/cours/page.tsx", /langBandeau = await langueEcran\(profileRes\.data\?\.preferred_language\);[\s\S]*<BandeauPanne lectures=\{pannes\} lang=\{langBandeau \?\? normLang\(lang\)\} cadre="mx-auto max-w-4xl px-4 pt-4" \/>/],
     ["src/app/dashboard/shop/page.tsx", /<BandeauPanne lectures=\{pannes\} lang=\{await langueEcran\(profilRes\.data\?\.preferred_language\)\} \/>/],
-    ["src/app/dashboard/shop/[slug]/page.tsx", /<BandeauPanne lectures=\{pannes\} lang=\{await langueEcran\(profilRes\.data\?\.preferred_language\)\} \/>/],
+    ["src/app/dashboard/shop/[slug]/page.tsx", /<BandeauPanne lectures=\{pannes\} lang=\{await langueEcran\(profilRes\.data\?\.preferred_language\)\} cadre="/],
   ] as const) assert.match(code(f), re, `${f} : le bandeau ne prend plus la langue du compte (ou du navigateur)`);
   assert.match(code("src/lib/i18n/serverLang.ts"), /export async function langueEcran\(prefCompte: unknown\): Promise<Lang> \{\s*return typeof prefCompte === "string" && prefCompte\.trim\(\) \? normLang\(prefCompte\) : getPublicLang\(\);/, "langueEcran retombe sur autre chose que la langue du navigateur");
   // Jour J : profil illisible → la panne, JAMAIS le verrou « Premium » ; objectif illisible → jamais « fixe ton objectif ».
@@ -527,8 +527,25 @@ test("le coureur VOIT la panne : bandeau commun sur chaque écran de VMA, 5 lang
   assert.match(jj, /if \(pannesProfil\.length\) return <div className="mx-auto max-w-2xl"><BandeauPanne lectures=\{pannesProfil\} lang=\{await getPublicLang\(\)\} seul \/>/, "Jour J (profil illisible) : le bandeau seul parle des chiffres « ci-dessous »");
   assert.match(jj, /if \(pannes\.includes\("objectif"\)\) return <div className="mx-auto max-w-2xl"><BandeauPanne lectures=\{pannes\} lang=\{lang\} seul \/>/, "Jour J (objectif illisible) : le bandeau seul parle des chiffres « ci-dessous »");
   // Fiche boutique : le bandeau dans la colonne de FicheModele, pas sur toute la largeur.
-  assert.match(code("src/app/dashboard/shop/[slug]/page.tsx"), /<div className="mx-auto w-full max-w-\[1180px\] sm:px-6 sm:pt-6"><BandeauPanne /, "fiche boutique : le bandeau sort de la colonne");
+  assert.match(code("src/app/dashboard/shop/[slug]/page.tsx"), /<BandeauPanne lectures=\{pannes\} lang=\{[^}]*\} cadre="mx-auto w-full max-w-\[1180px\] sm:-mb-6 sm:px-6 sm:pt-6" \/>/, "fiche boutique : le bandeau sort de la colonne, ou son espace s'ajoute à celui de la fiche");
+  // Sans panne, RIEN : pas de conteneur vide qui pousse la page (Cours : 16 px, fiche : 24 px, en ligne le 12/11).
+  assert.equal(BandeauPanne({ lectures: [], lang: "fr", cadre: "mx-auto pt-4" }), null, "sans panne, le conteneur du bandeau reste à l'écran");
+  const encadre = renderToStaticMarkup(BandeauPanne({ lectures: ["vma"], lang: "fr", cadre: "mx-auto pt-4" })!);
+  assert.ok(encadre.startsWith('<div class="mx-auto pt-4"><div role="alert"'), `le bandeau n'est pas dans son cadre (${encadre})`);
+  for (const f of ["src/app/dashboard/cours/page.tsx", "src/app/dashboard/shop/[slug]/page.tsx"])
+    assert.doesNotMatch(code(f), /<div className="[^"]*\bp[tyx]?-\d[^"]*"><BandeauPanne /, `${f} : un conteneur à marge interne reste à l'écran sans panne`);
   assert.match(code("src/components/shop/FicheModele.tsx"), /className="mx-auto w-full max-w-\[1180px\] sm:px-6/, "FicheModele a changé de colonne : réaligner le bandeau de la fiche");
+});
+
+test("getAccountLang : jamais « fr » par défaut — profil illisible ou langue absente → le navigateur (12/11/2026)", () => {
+  const src = code("src/lib/i18n/serverLang.ts");
+  const corps = src.slice(src.indexOf("export async function getAccountLang"), src.indexOf("export async function getPublicLang"));
+  assert.ok(corps.length > 50, "getAccountLang introuvable");
+  assert.doesNotMatch(corps, /"fr"/, "getAccountLang retombe encore sur « fr »");
+  assert.match(corps, /const \{ data, error \} = await sb\.from\("profiles"\)\.select\("preferred_language"\)\.eq\("id", userId\)\.maybeSingle\(\);/, "l'erreur de lecture n'est plus lue (ou « aucune ligne » redevient une erreur)");
+  assert.match(corps, /return langueEcran\(/, "la langue absente ne passe plus par langueEcran");
+  assert.match(corps, /catch \(e\) \{[\s\S]*return getPublicLang\(\);/, "une exception retombe sur autre chose que le navigateur");
+  assert.doesNotMatch(code("src/app/dashboard/trail/page.tsx"), /getAccountLang\(sb, user\.id\) : "fr"/, "Trail : « fr » sans utilisateur");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
