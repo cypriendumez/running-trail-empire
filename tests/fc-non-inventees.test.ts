@@ -162,19 +162,23 @@ async function main() {
     }
   });
 
-  // La VMA estimée sans FC max : le filtre « effort vraiment maximal » ne peut plus trier, des
-  // footings comptent comme des efforts. Décision : c'est acceptable PARCE QUE l'erreur va vers le
-  // bas (allures plus lentes) — ce test le fige : jamais plus haute qu'avec une FC max connue.
-  await test("sans FC max, la VMA estimée n'est jamais plus haute qu'avec une FC max connue (mêmes séances)", async () => {
-    const vmaDe = async (profil: Ligne) => {
-      const t = (await buildAthleteContext(fauxClient({ profiles: [profil], performance_baselines: [], workouts: SEANCES_CALMES, notifications: [] }), "u")).text;
-      const m = t.match(/- VMA : ([\d.]+) km\/h ⚠️ ESTIMÉE/);
-      assert.ok(m, `précondition : VMA estimée absente (${profil.age})`);
-      return Number(m![1]);
-    };
-    const sans = await vmaDe({ ...PROFIL, age: null }), avec = await vmaDe({ ...PROFIL, age: 30 });
-    console.log(`      (VMA estimée : ${sans} sans FC max, ${avec} avec 220 − 30)`);
-    assert.ok(sans <= avec, `sans FC max, la VMA estimée MONTE (${sans} > ${avec}) : allures plus rapides sur une donnée manquante`);
+  // La VMA estimée sans FC max : le filtre « effort vraiment maximal » ne peut plus trier, et toute
+  // séance compte comme un effort. Sur des footings, la VMA baisse (allures plus lentes) ; avec une
+  // séance dure dans la fenêtre, c'est elle qui donne la VMA, comme avec une FC max connue. Ce test
+  // fige les DEUX cas (relecture du 12/11 : la règle n'était prouvée que sur des footings).
+  await test("sans FC max, la VMA estimée n'est pas plus haute qu'avec une FC max connue (footings seuls, puis avec une séance dure)", async () => {
+    const dure = { ...SEANCES_CALMES[0], date: ilYa(3), distance_km: 8, duration_seconds: 1920, avg_hr: 175, max_hr: null };
+    for (const [nom, seances] of [["footings seuls", SEANCES_CALMES], ["avec une séance dure", [dure, ...SEANCES_CALMES]]] as const) {
+      const vmaDe = async (profil: Ligne) => {
+        const t = (await buildAthleteContext(fauxClient({ profiles: [profil], performance_baselines: [], workouts: [...seances], notifications: [] }), "u")).text;
+        const m = t.match(/- VMA : ([\d.]+) km\/h ⚠️ ESTIMÉE/);
+        assert.ok(m, `précondition (${nom}) : VMA estimée absente (âge ${profil.age})`);
+        return Number(m![1]);
+      };
+      const sans = await vmaDe({ ...PROFIL, age: null }), avec = await vmaDe({ ...PROFIL, age: 30 });
+      console.log(`      (${nom} : VMA estimée ${sans} sans FC max, ${avec} avec 220 − 30)`);
+      assert.ok(sans <= avec, `${nom} : sans FC max, la VMA estimée MONTE (${sans} > ${avec}) : allures plus rapides sur une donnée manquante`);
+    }
   });
 
   await test("le code : sans source, `fcMaxEst` vaut null (plus de « : 190 »)", () => {
