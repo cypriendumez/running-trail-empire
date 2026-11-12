@@ -364,6 +364,29 @@ async function main() {
     for (const d of plan2.filter((x) => x.type !== "Repos")) assert.notEqual(d.date, posees[0].date, "décalée sur un jour où l'athlète ne court pas");
   });
 
+  await test("décalage : jamais une marche-course en course continue ; le pourquoi le dit ; les jours dispo passent par le vrai plan", async () => {
+    const R = (n: number) => jour(n, "Repos", PLAN_T.fr.reposTitre, ["Repos"]);
+    const mc = [jour(0, "Marche/course", "Marche-course", ["Marche/course", "30 min"]), R(1), R(2), R(3), R(4), R(5), R(6)];
+    const p = appliquerConsignes(mc, { consignes: consignes({ seancesMaxSemaine: 2 }), allureFacile: "5'00", sortiesRecentes: [ilYa(1), ilYa(2)], courseC: null });
+    assert.ok(p.every((d) => d.type === "Repos"), `une marche-course est devenue de la course : ${p.map((d) => d.type).join(", ")}`);
+    const f = [jour(0, "Endurance", PLAN_T.fr.enduranceTitre, ["Endurance", "8 km"], "Footing facile"), R(1), R(2), R(3), R(4), R(5), R(6)];
+    const q = appliquerConsignes(f, { consignes: consignes({ seancesMaxSemaine: 2 }), allureFacile: "5'00", sortiesRecentes: [ilYa(1), ilYa(2)], courseC: null });
+    const decalee = q.find((d) => d.type !== "Repos");
+    assert.ok(decalee && /décalée ici/.test(decalee.why) && decalee.i18n?.en?.why.includes("moved here"), "le pourquoi ne dit pas que la sortie a été décalée");
+    assert.deepEqual(appliquerConsignes(q, { consignes: consignes({ seancesMaxSemaine: 2 }), allureFacile: "5'00", sortiesRecentes: [ilYa(1), ilYa(2)], courseC: null }), q, "réappliqué, le contrôle déplace encore");
+    // Site d'appel : consignesSurPlan passe les jours déclarés MOINS ceux que l'athlète rate.
+    assert.match(codeOf("src/lib/ai/autoPlan.ts"), /joursDispo: ctx\.availability\?\.days\?\.filter\(\(d\) => !\(ctx\.skippedWeekdays \?\? \[\]\)\.includes\(d\)\),/, "les jours disponibles ne passent plus (ou incluent les jours ratés)");
+    // Et le vrai plan : 2 jours déclarés, aucune sortie hors de ces jours.
+    const tables = { profiles: [{ ...PROFIL, days_per_week: 2, available_days: [2, 6] }], performance_baselines: BASE, workouts: SEANCES, notifications: [CONSIGNES({ seancesMaxSemaine: 2 })] };
+    const ctx = await buildAthleteContext(fauxClient(tables), "u");
+    for (let k = 0; k <= 6; k++) {
+      const d0 = new Date(`${AUJ}T08:00:00`); d0.setDate(d0.getDate() + k);
+      for (const d of buildWeekPlan(ctx, d0).filter((x) => COURSE(x.type) && x.type !== "Repos")) {
+        assert.ok([2, 6].includes(new Date(`${d.date}T12:00:00Z`).getUTCDay()), `départ J+${k} : sortie le ${d.date}, jour non déclaré`);
+      }
+    }
+  });
+
   await test("une sortie décalée ne remplace jamais un repos protecteur (après une course, lendemain de sortie longue)", () => {
     const R = (n: number) => jour(n, "Repos", PLAN_T.fr.reposTitre, ["Repos"]);
     // Cas reproduit par le directeur scientifique : course A le jour 3, 3 sorties juste avant, 4 au plus.
@@ -388,6 +411,12 @@ async function main() {
       jour(2, "Sortie longue", "Sortie longue", ["Long", "14 km"]), R(3), Rf(4), Rf(5), Rf(6)];
     const q2 = appliquerConsignes(seulLendemain, { consignes: consignes({ seancesMaxSemaine: 2 }), allureFacile: "5'00", sortiesRecentes: [ilYa(5), ilYa(6)], courseC: null });
     assert.equal(q2[3].type, "Repos", "la sortie retirée est posée le lendemain de la sortie longue");
+    // Seul repos restant : la veille d'une course. La sortie reste retirée (48 h avant une course).
+    const veilleSeule = [jour(0, "Endurance", PLAN_T.fr.enduranceTitre, ["Endurance", "8 km"], "Footing facile"), Rf(1), Rf(2), Rf(3), Rf(4), R(5),
+      jour(6, "Course", "🏁 10 km", ["Course", "Objectif"])];
+    const q3 = appliquerConsignes(veilleSeule, { consignes: consignes({ seancesMaxSemaine: 2 }), allureFacile: "5'00", sortiesRecentes: [ilYa(1), ilYa(2)], courseC: null });
+    assert.equal(q3[0].type, "Repos", "précondition : le footing du jour 0 ne tient pas");
+    assert.equal(q3[5].type, "Repos", "la sortie retirée est posée la veille de la course");
   });
 
   console.log("\nCE QUE LA DOULEUR A CHANGÉ, QUAND CONSULTER, LA CHARGE D'AVANT");

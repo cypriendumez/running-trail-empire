@@ -36,7 +36,7 @@ const TYPES_INTENSES = new Set(["VMA", "Seuil", "Spécifique", "Côtes", "Tempo"
 
 const T: Record<Lang, {
   titre: string; why: (d: string) => string; repos: (n: number, d: string) => string;
-  mc: (d: string) => string; course: (d: string) => string; renfo: string;
+  mc: (d: string) => string; course: (d: string) => string; renfo: string; decale: (n: number, d: string) => string;
 }> = {
   fr: {
     titre: "Footing encadré par ton kiné",
@@ -45,6 +45,7 @@ const T: Record<Lang, {
     mc: (d) => `Cette séance de marche-course dépasse la durée fixée par ton kinésithérapeute (jusqu'au ${d}) : demande-lui comment l'adapter.`,
     course: (d) => ` ⚠️ Cette course tombe pendant les consignes de ton kinésithérapeute (jusqu'au ${d}) : demande-lui son accord avant de la courir.`,
     renfo: " Consigne de ton kiné : aucun saut ni bondissement.",
+    decale: (n, d) => `Consignes de ton kinésithérapeute jusqu'au ${d} : ${n} sortie${n > 1 ? "s" : ""} au plus sur 7 jours. Cette sortie a été décalée ici, en footing très facile, pour tenir cette limite.`,
   },
   en: {
     titre: "Run within your physio's limits",
@@ -53,6 +54,7 @@ const T: Record<Lang, {
     mc: (d) => `This walk-run session goes beyond the duration set by your physiotherapist (until ${d}): ask them how to adapt it.`,
     course: (d) => ` ⚠️ This race falls within your physiotherapist's instructions (until ${d}): ask for their go-ahead before running it.`,
     renfo: " Your physio's instruction: no jumps or bounds.",
+    decale: (n, d) => `Your physiotherapist's instructions until ${d}: ${n} run${n > 1 ? "s" : ""} at most over 7 days. This run was moved here, as a very easy run, to stay within that limit.`,
   },
   de: {
     titre: "Lauf im Rahmen deiner Physiotherapie",
@@ -61,6 +63,7 @@ const T: Record<Lang, {
     mc: (d) => `Diese Geh-Lauf-Einheit überschreitet die von deiner Physiotherapie festgelegte Dauer (bis ${d}): Frag nach, wie sie angepasst werden soll.`,
     course: (d) => ` ⚠️ Dieser Wettkampf fällt in die Vorgaben deiner Physiotherapie (bis ${d}): Hol dir vorher ihr Einverständnis.`,
     renfo: " Vorgabe deiner Physiotherapie: keine Sprünge.",
+    decale: (n, d) => `Vorgaben deiner Physiotherapie bis ${d}: höchstens ${n} Lauf${n > 1 ? "e" : ""} in 7 Tagen. Dieser Lauf wurde hierher verschoben, als sehr lockerer Lauf, um diese Grenze einzuhalten.`,
   },
   es: {
     titre: "Rodaje dentro de las indicaciones de tu fisio",
@@ -69,6 +72,7 @@ const T: Record<Lang, {
     mc: (d) => `Esta sesión de andar-correr supera la duración fijada por tu fisioterapeuta (hasta el ${d}): pregúntale cómo adaptarla.`,
     course: (d) => ` ⚠️ Esta carrera cae dentro de las indicaciones de tu fisioterapeuta (hasta el ${d}): pídele su visto bueno antes de correrla.`,
     renfo: " Indicación de tu fisio: ningún salto ni bote.",
+    decale: (n, d) => `Indicaciones de tu fisioterapeuta hasta el ${d}: ${n} salida${n > 1 ? "s" : ""} como máximo en 7 días. Esta salida se ha movido aquí, como rodaje muy suave, para respetar ese límite.`,
   },
   pt: {
     titre: "Corrida dentro das indicações do teu fisio",
@@ -77,6 +81,7 @@ const T: Record<Lang, {
     mc: (d) => `Esta sessão de caminhada-corrida ultrapassa a duração fixada pelo teu fisioterapeuta (até ${d}): pergunta-lhe como adaptá-la.`,
     course: (d) => ` ⚠️ Esta prova cai dentro das indicações do teu fisioterapeuta (até ${d}): pede-lhe autorização antes de a correres.`,
     renfo: " Indicação do teu fisio: nenhum salto.",
+    decale: (n, d) => `Indicações do teu fisioterapeuta até ${d}: ${n} corrida${n > 1 ? "s" : ""} no máximo em 7 dias. Esta corrida foi movida para aqui, como corrida muito fácil, para respeitar esse limite.`,
   },
 };
 
@@ -246,12 +251,17 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
     && !protecteur(sortie[j].date) && tient(sortie[j].date);
   for (const i of retirees) {
     const origine = apres[i];
+    // Une marche-course ne devient jamais un footing continu : un débutant qui ne court pas encore
+    // 30 minutes recevrait de la course continue (relecture). Elle reste retirée.
+    if (origine.type === "Marche/course") continue;
     const espace = (j: number) => !court(decale(sortie[j].date, -1)) && !court(decale(sortie[j].date, 1));
     let cible = sortie.findIndex((_, j) => candidat(j, i) && espace(j));
     if (cible < 0) cible = sortie.findIndex((_, j) => candidat(j, i));
     if (cible < 0) continue;
     gardees.push(sortie[cible].date);
-    sortie[cible] = footing({ ...origine, date: sortie[cible].date, confirmed: sortie[cible].confirmed });
+    const decalee = footing({ ...origine, date: sortie[cible].date, confirmed: sortie[cible].confirmed });
+    // Son « pourquoi » dit qu'elle a été décalée pour tenir le nombre de sorties.
+    sortie[cible] = reecrire(decalee, decalee.type, (l) => ({ ...texteDe(decalee, l), why: T[l].decale(max, fin) }));
   }
   return sortie;
 }
