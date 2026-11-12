@@ -2,6 +2,7 @@ import type { createClient } from "@/lib/supabase/server";
 import { sansAllureInconnue } from "@/lib/coach/allureInconnue";
 import { picsSaison, avecSaison } from "@/lib/coach/ciblesFcServeur";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
+import { effortDesSeances, acclimatationDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, fcMaxConnue, estSortieFacile, PART_FC_FACILE, PART_FC_DURE, fcMaxPourEfforts, airFroid, PIC_FC_JOURS, type CiblesFc, seuilMesure } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
@@ -17,7 +18,7 @@ import { buildWeightPlan, weightModeEligibility, type WeightPlan } from "@/lib/w
 import { weightCoachBlock, weightTrainingRules, type WeightTrainingRules } from "@/lib/weight/coaching";
 import { terrainCoachBlock } from "@/data/terrainCatalog";
 import { forecastWithElevation, altitudeLossPct, heatAdvice, windAdvice, archiveDailyMax, heatAcclimation, type DayWeather } from "@/lib/weather/openMeteo";
-import { bestVmaFromWorkouts, vmaFromPaceCurve, effectiveVma, easyPaceFromHeartRate, predictRaceSec } from "@/lib/running/fitness";
+import { vmaFromPaceCurve, effectiveVma, easyPaceFromHeartRate, predictRaceSec } from "@/lib/running/fitness";
 import { isRun } from "@/lib/intervals/sport";
 import { summarizeCross, fmtMinutes, type CrossSummary } from "@/lib/coach/crossTraining";
 import { computeQualityBudget } from "@/lib/coach/qualityBudget";
@@ -847,10 +848,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // performances, et la VMA se calcule avant le bloc météo. On la déduit des séances
   // elles-mêmes, qui portent toutes leur température — aucune requête supplémentaire.
   // Un athlète acclimaté souffre moins : on corrige donc MOINS son chrono.
-  const acclimVma = heatAcclimation(
-    new Set(workouts.filter((w) => num(w.weather_temp_c) != null && (num(w.weather_temp_c) as number) >= 25
-      && now - new Date(w.date).getTime() <= 30 * 86400000).map((w) => String(w.date).slice(0, 10))).size,
-  ).factor;
+  const acclimVma = acclimatationDesSeances(workouts as never, now);
 
   // UN SEUL calcul de VMA pour toute l'application (cf. lib/running/fitness.ts) : quatre
   // chaînes divergentes coexistaient, et le tableau de bord ignorait la courbe d'allure.
@@ -860,7 +858,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // précisément l'analyse que ce palier ne fait pas.
     // Même tri d'efforts que la VMA affichée (`fcMaxPourEfforts`, 12/11/2026) : sans FC max, le pic
     // des séances reste un garde-fou au lieu d'aucun tri.
-    fromRuns: objectifSeul ? null : bestVmaFromWorkouts(runs, fcMaxPourEfforts(fcMaxEst, runs), 120, acclimVma) ?? estimateVmaFromRuns(runs, fcMaxEst, now),
+    // LA lecture des efforts, la même que chaque écran (`effortDesSeances`, 12/11/2026) : ses 60 séances,
+    // course seulement, FC max commune, acclimatation à la chaleur.
+    fromRuns: objectifSeul ? null : effortDesSeances(workouts as never, fcMaxEst, now)?.vma ?? estimateVmaFromRuns(runs, fcMaxEst, now),
   });
   const vmaIsEst = vmaSource !== "test" && vma != null;
 
@@ -2765,15 +2765,14 @@ export async function getEffectiveVma(sb: SupabaseClient, userId: string): Promi
   if (ePanne) throw new Error(`VMA illisible : ${ePanne.code ?? "?"} ${ePanne.message}`);
   const prof = profRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null;
   // Course à pied uniquement : une sortie vélo produirait une VMA fantaisiste.
-  const wks = ((woRes.data ?? []) as Wk[]).filter(w => isRun(w.sport));
-  // Efforts triés avec la FC max COMMUNE (12/11/2026) — c'était le pic > 120 des seules séances lues.
-  const fcMaxVma = fcMaxPourEfforts(await fcMaxDeLAthlete(sb, userId), wks);
+  // LA lecture des efforts (`effortDesSeances`) : celle du coach et de chaque écran, chaleur comprise.
+  const effort = effortDesSeances((woRes.data ?? []) as never, await fcMaxDeLAthlete(sb, userId));
   // EXACTEMENT le calcul du coach — c'est la même fonction, pas « la même logique »
   // recopiée. Les deux ne peuvent donc plus diverger, ce qui était le cas ici.
   return effectiveVma({
     vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
     paceCurveBest: prof?.pace_curve?.best,
     garminVo2: Number(prof?.garmin_vo2max) || null,
-    fromRuns: bestVmaFromWorkouts(wks, fcMaxVma),
+    fromRuns: effort?.vma ?? null,
   }).vma;
 }

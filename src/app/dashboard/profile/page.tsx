@@ -4,10 +4,10 @@ import { ProfileSettings } from "@/components/profile/ProfileSettings";
 import { indexLeger } from "@/lib/shop/indexLeger";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { TYPE_ETAT_ABO, litEtatAbo } from "@/lib/billing/etatAbonnement";
-import { bestVmaFromWorkouts, effectiveVma } from "@/lib/running/fitness";
+import { effectiveVma } from "@/lib/running/fitness";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
-import { fcMaxPourEfforts } from "@/lib/coach/fcCible";
 import { isRun } from "@/lib/intervals/sport";
+import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 
 export const metadata = { title: "Mon profil" };
 
@@ -36,7 +36,7 @@ export default async function ProfilePage() {
     supabase.from("workouts").select("distance_km, date, type, sport").eq("user_id", user!.id).gte("date", yearStart),
     supabase.from("workouts").select("distance_km, date, type, sport").eq("user_id", user!.id).gte("date", monthStart),
     supabase.from("user_goals").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }),
-    supabase.from("workouts").select("distance_km, duration_seconds, type, sport, avg_hr, max_hr").eq("user_id", user!.id).gte("date", new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10)).order("date", { ascending: false }).limit(150),
+    supabase.from("workouts").select("date, distance_km, duration_seconds, type, sport, avg_hr, max_hr, weather_temp_c").eq("user_id", user!.id).gte("date", new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10)).order("date", { ascending: false }).limit(150),
     // État de l'abonnement écrit par le webhook Stripe : date de prélèvement, résiliation
     // en cours, échec de paiement. Sans lui, l'écran ne peut répondre à aucune des trois
     // questions que se pose un abonné (cf. `lib/billing/etatAbonnement`).
@@ -46,10 +46,7 @@ export default async function ProfilePage() {
   ]);
 
   // VMA estimée depuis les meilleurs efforts SOUTENUS (FC élevée) + FC max observée.
-  const rw = (recentWk ?? []) as { distance_km?: number | null; duration_seconds?: number | null; type?: string | null; sport?: string | null; avg_hr?: number | null; max_hr?: number | null }[];
-  // 12/11/2026 : le tri des efforts de la VMA passe par la FC max COMMUNE (`fcMaxPourEfforts` : sans
-  // elle, le pic des séances reste un garde-fou).
-  const obsMaxHr = fcMaxPourEfforts(fcMaxCommune, rw.filter(w => isRun(w.sport)));
+  const rw = (recentWk ?? []) as { date?: string; weather_temp_c?: number | null; distance_km?: number | null; duration_seconds?: number | null; type?: string | null; sport?: string | null; avg_hr?: number | null; max_hr?: number | null }[];
   // Les ZONES affichées, elles, ne prennent qu'une vraie FC max : la commune ; sans elle, pas de
   // zones (l'écran le dit). En cas de PANNE seulement, la FC du test déjà lue, sinon rien.
   const fcMaxZones = fcMaxCommune !== undefined ? fcMaxCommune : (Number((baseline as { max_hr?: number } | null)?.max_hr) || null);
@@ -65,7 +62,9 @@ export default async function ProfilePage() {
   const { vma: estimatedVma, source: vmaSource } = effectiveVma({
     paceCurveBest,
     garminVo2: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null,
-    fromRuns: bestVmaFromWorkouts(rw.filter(w => isRun(w.sport)), obsMaxHr),
+    // LA lecture des efforts (`effortDesSeances`, 12/11/2026) : celle du coach et de chaque écran —
+    // 60 séances, course seulement, FC max commune, acclimatation à la chaleur.
+    fromRuns: effortDesSeances(rw, fcMaxCommune)?.vma ?? null,
   });
 
   // ── STATISTIQUES PAR SPORT ────────────────────────────────────────────────────

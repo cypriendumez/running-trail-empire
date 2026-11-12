@@ -7,6 +7,7 @@
 import { meilleurEffort, effectiveVma, type MeilleurEffort } from "@/lib/running/fitness";
 import { fcMaxPourEfforts } from "@/lib/coach/fcCible";
 import { isRun } from "@/lib/intervals/sport";
+import { heatAcclimation } from "@/lib/weather/openMeteo";
 
 /** D'où vient la VMA affichée (dates au format AAAA-MM-JJ). */
 export type SourceVma =
@@ -16,6 +17,34 @@ export type SourceVma =
   | { type: "vo2max" };
 
 type SeanceVma = Parameters<typeof meilleurEffort>[0][number] & { max_hr?: number | null; sport?: string | null };
+
+/** Combien de séances (les plus récentes, tous sports) la VMA lit : le nombre que lit le coach
+ *  (`fetchWorkouts`). Avant le 12/11/2026 : 40 au tableau de bord, 60 au coach, 120 aux Plans,
+ *  200 en Santé et en Boutique — le même coureur avait plusieurs VMA selon l'écran. */
+export const SEANCES_VMA = 60;
+
+/** Facteur d'acclimatation à la chaleur, déduit des séances elles-mêmes (jours ≥ 25 °C sur 30 jours),
+ *  exactement comme le coach : un athlète acclimaté souffre moins, son chrono se corrige moins. */
+export function acclimatationDesSeances(seances: readonly { date?: string | null; weather_temp_c?: unknown }[], maintenant = Date.now()): number {
+  const jours = new Set((seances ?? [])
+    .filter((w) => { const t = Number(w.weather_temp_c); return w.weather_temp_c != null && Number.isFinite(t) && t >= 25
+      && maintenant - new Date(String(w.date ?? "")).getTime() <= 30 * 86400000; })
+    .map((w) => String(w.date).slice(0, 10)));
+  return heatAcclimation(jours.size).factor;
+}
+
+/**
+ * LE MEILLEUR EFFORT DE L'ATHLÈTE — la SEULE lecture des séances qui fonde la VMA « séances », pour
+ * le coach comme pour chaque écran (12/11/2026) : les {@link SEANCES_VMA} séances les plus récentes,
+ * course à pied seulement, efforts triés par la FC max commune (`fcMaxPourEfforts`), relus dans leurs
+ * conditions avec l'acclimatation à la chaleur. `seances` peut en porter plus : elles sont triées et
+ * coupées ici.
+ */
+export function effortDesSeances(seances: readonly SeanceVma[], fcMax: number | null | undefined, maintenant = Date.now()): MeilleurEffort | null {
+  const lues = [...(seances ?? [])].sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? ""))).slice(0, SEANCES_VMA);
+  const courses = lues.filter((w) => isRun(w.sport));
+  return meilleurEffort(courses, fcMaxPourEfforts(fcMax, courses), 120, acclimatationDesSeances(lues, maintenant));
+}
 
 export function vmaAffichee(i: {
   /** Les séances lues par le tableau de bord (les 40 dernières). */
@@ -35,8 +64,7 @@ export function vmaAffichee(i: {
   // ⚠️ COURSE À PIED SEULEMENT (directeur scientifique, 12/11/2026) : comme le coach. Une sortie vélo
   // de 40 km à 25 km/h donnait une « VMA » de ~25 km/h, que `effectiveVma` retenait (la plus haute).
   // Le tri par la FC les écartait par hasard ; sans FC max, plus rien ne les arrêtait.
-  const courses = i.seances.filter((w) => isRun(w.sport));
-  const effort = meilleurEffort(courses, fcMaxPourEfforts(i.fcMax, courses));
+  const effort = effortDesSeances(i.seances, i.fcMax);
   const calc = effectiveVma({
     vmaStored: Number(i.baseline?.vma_kmh) || null,
     paceCurveBest: i.profil?.pace_curve?.best,

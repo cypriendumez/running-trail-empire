@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
-import { fcMaxPourEfforts } from "@/lib/coach/fcCible";
-import { isRun } from "@/lib/intervals/sport";
 import { createClient } from "@/lib/supabase/server";
-import { bestVmaFromWorkouts, effectiveVma } from "@/lib/running/fitness";
+import { effectiveVma } from "@/lib/running/fitness";
 import { robustWeeklyKm } from "@/lib/running/volume";
 import { niveauDeVma } from "@/lib/plans/catalogue";
 import { PlansView } from "./PlansView";
+import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Plans d'entraînement" };
@@ -32,7 +31,7 @@ export default async function PlansPage() {
     supabase.from("profiles").select("garmin_vo2max, pace_curve").eq("id", user.id).maybeSingle(),
     supabase.from("performance_baselines").select("vma_kmh").eq("user_id", user.id)
       .order("tested_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("workouts").select("date, sport, distance_km, duration_seconds, avg_hr, max_hr")
+    supabase.from("workouts").select("date, type, sport, distance_km, duration_seconds, avg_hr, max_hr, weather_temp_c")
       .eq("user_id", user.id).order("date", { ascending: false }).limit(120),
     // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
     fcMaxDeLAthlete(supabase, user.id),
@@ -43,8 +42,9 @@ export default async function PlansPage() {
     vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
     paceCurveBest: ((profRes.data as { pace_curve?: { best?: { m: number; sec: number }[] } | null } | null)?.pace_curve)?.best,
     garminVo2: Number((profRes.data as { garmin_vo2max?: number } | null)?.garmin_vo2max) || null,
-    // Course à pied seulement, comme le coach et la carte (12/11/2026) : un vélo rapide n'est pas une VMA.
-    fromRuns: bestVmaFromWorkouts(wks.filter((w) => isRun(w.sport)), fcMaxPourEfforts(fcMaxVma, wks.filter((w) => isRun(w.sport)))),
+    // LA lecture des efforts (`effortDesSeances`, 12/11/2026) : celle du coach et de chaque écran —
+    // 60 séances, course seulement, FC max commune, acclimatation à la chaleur.
+    fromRuns: effortDesSeances(wks, fcMaxVma)?.vma ?? null,
   }).vma;
 
   // `null` si l'historique ne permet pas de conclure : la vue le dit alors franchement,

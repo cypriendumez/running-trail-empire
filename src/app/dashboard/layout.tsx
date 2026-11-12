@@ -3,7 +3,7 @@ import { stripProfileSecrets } from "@/lib/profile/safe";
 import { T, normLang } from "@/lib/i18n/translations";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
-import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
+import { vmaAffichee, SEANCES_VMA } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { niveauDeVma } from "@/lib/running/niveau";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
@@ -50,7 +50,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     // les mêmes séances et le même calcul que la carte VMA du tableau de bord.
     // `sport` : la VMA ne lit que la course à pied (12/11/2026) — sans la colonne, tout passait pour de la course.
     supabase.from("workouts").select("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c")
-      .eq("user_id", user.id).order("date", { ascending: false }).limit(40),
+      .eq("user_id", user.id).order("date", { ascending: false }).limit(SEANCES_VMA),
     supabase.from("performance_baselines").select("vma_kmh,tested_at").eq("user_id", user.id)
       .order("tested_at", { ascending: false }).limit(1).maybeSingle(),
     // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.

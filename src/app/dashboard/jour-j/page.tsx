@@ -81,7 +81,7 @@ export default async function PageJourJ() {
   // La VMA : le MÊME calcul que la carte du tableau de bord (40 dernières séances), efforts triés
   // avec la MÊME FC max (12/11/2026) — `undefined` en cas de panne : l'ancien repli.
   const { vma } = vmaAffichee({
-    seances: seances.slice(0, 40) as Parameters<typeof vmaAffichee>[0]["seances"],
+    seances: seances as Parameters<typeof vmaAffichee>[0]["seances"],
     baseline: baseRes.data as { vma_kmh?: number | null; tested_at?: string | null } | null,
     profil: p as Parameters<typeof vmaAffichee>[0]["profil"],
     fcMax: ePanneFc ? undefined : fcMax,

@@ -68,7 +68,7 @@ export async function faitsDeLaSemaine(sb: SupabaseClient, userId: string, jour:
   // La VMA et la prédiction : le MÊME calcul que la carte du tableau de bord (40 dernières séances),
   // efforts triés avec la MÊME FC max (12/11/2026).
   const { vma } = vmaAffichee({
-    seances: seances.slice(0, 40) as Parameters<typeof vmaAffichee>[0]["seances"],
+    seances: seances as Parameters<typeof vmaAffichee>[0]["seances"],
     baseline: baseRes.data as { vma_kmh?: number | null; tested_at?: string | null } | null,
     profil: profilRes.data as Parameters<typeof vmaAffichee>[0]["profil"],
     fcMax,

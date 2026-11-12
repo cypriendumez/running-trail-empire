@@ -9,7 +9,9 @@ import { decrire } from "@/lib/shop/description";
 import { evaluer } from "@/lib/shop/pourToi";
 import { construireProfil } from "@/lib/shop/profilAthlete";
 import { offresPour, meilleure, type Offre } from "@/lib/shop/offres";
-import { effectiveVma, bestVmaFromWorkouts } from "@/lib/running/fitness";
+import { effectiveVma } from "@/lib/running/fitness";
+import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
+import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -27,13 +29,15 @@ export default async function ModelePage({ params }: { params: Promise<{ slug: s
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [seancesRes, pairesRes, objRes, profilRes, baseRes] = await Promise.all([
-    supabase.from("workouts").select("date,distance_km,sport,elevation_gain_m,duration_seconds")
+  const [seancesRes, pairesRes, objRes, profilRes, baseRes, fcMaxVma] = await Promise.all([
+    supabase.from("workouts").select("date,type,distance_km,sport,elevation_gain_m,duration_seconds,avg_hr,max_hr,weather_temp_c")
       .eq("user_id", user.id).order("date", { ascending: false }).limit(200),
     supabase.from("shoes").select("brand,model,current_km,max_km,drop_mm,terrain").eq("user_id", user.id).eq("is_active", true),
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
     supabase.from("profiles").select("pace_curve,garmin_vo2max,preferred_language").eq("id", user.id).single(),
     supabase.from("performance_baselines").select("vma_kmh").eq("user_id", user.id).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
+    // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
+    fcMaxDeLAthlete(supabase, user.id),
   ]);
 
   const seances = seancesRes.data ?? [];
@@ -42,7 +46,9 @@ export default async function ModelePage({ params }: { params: Promise<{ slug: s
     vmaStored: baseRes.data?.vma_kmh ?? null,
     paceCurveBest: (profilRes.data?.pace_curve as { best?: { m: number; sec: number }[] } | null)?.best ?? null,
     garminVo2: profilRes.data?.garmin_vo2max ?? null,
-    fromRuns: bestVmaFromWorkouts(seances as { distance_km?: number | null; duration_seconds?: number | null }[]),
+    // LA lecture des efforts (`effortDesSeances`, 12/11/2026), celle du coach : avant, 200 séances TOUS
+    // sports sans aucun tri — la VMA de la recommandation pouvait venir d'une sortie vélo.
+    fromRuns: effortDesSeances(seances as never, fcMaxVma)?.vma ?? null,
   });
   const profil = construireProfil({
     seances, paires: pairesRes.data ?? [],

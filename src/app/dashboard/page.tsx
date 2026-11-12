@@ -14,7 +14,7 @@ import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
 import { objectifEnCours } from "@/lib/coach/prochaineCourse";
 import { loadRisk } from "@/lib/running/fitness";
-import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
+import { vmaAffichee, SEANCES_VMA } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { validerRecordDeclare, type RecordDeclare } from "@/lib/dashboard/records";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
@@ -51,7 +51,7 @@ export default async function DashboardPage() {
   // séance de demain s'affichait comme « Séance du jour ». Le même jour que la série.
   const today = streakToday;
 
-  const [profileRes, hrvRes, workoutsRes, planRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes, analysesRes, fcMaxVma] = await Promise.all([
+  const [profileRes, hrvRes, workoutsRes, planRes, sleepRes, coachRes, feedbackRes, objRes, baseRes, prRes, chargeRes, streakWkRes, streakPlanRes, avisRes, nbSeancesRes, premiereRes, declaresRes, garageRes, etatCoachRes, analysesRes, fcMaxVma, seancesVmaRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase.from("hrv_data").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(14),
     supabase.from("workouts").select("*").eq("user_id", user!.id).order("date", { ascending: false }).limit(40),
@@ -125,6 +125,8 @@ export default async function DashboardPage() {
     supabase.from("notifications").select("body,data").eq("user_id", user!.id).eq("type", "seance_analyse").order("created_at", { ascending: false }).limit(20),
     // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
     fcMaxDeLAthlete(supabase, user!.id),
+    // Les séances de LA VMA (12/11/2026) : autant que le coach (`SEANCES_VMA`).
+    supabase.from("workouts").select("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c").eq("user_id", user!.id).order("date", { ascending: false }).limit(SEANCES_VMA),
   ]);
   if (garageRes.error) console.error("[accueil] garage illisible :", garageRes.error.message);
   if (declaresRes.error) console.error("[accueil] records déclarés illisibles :", declaresRes.error.message);
@@ -182,7 +184,7 @@ export default async function DashboardPage() {
   // VMA et sa source : le module partagé avec la page détaillée (lib/dashboard/vmaAffichee),
   // lui-même branché sur `effectiveVma` — une seule chaîne de VMA dans toute l'application.
   const { vma: currentVma, source: sourceVma } = vmaAffichee({
-    seances: wks,
+    seances: (seancesVmaRes.data ?? []) as Parameters<typeof vmaAffichee>[0]["seances"],
     baseline: baseRes.data as { vma_kmh?: number | null; tested_at?: string | null } | null,
     profil: profileRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null,
     fcMax: fcMaxVma,
