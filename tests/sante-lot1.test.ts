@@ -102,7 +102,10 @@ async function main() {
     for (const d of sorties) {
       const km = Number((d.tags ?? []).map((t) => /^(\d+(?:,\d+)?) km$/.exec(String(t))?.[1]).find(Boolean)?.replace(",", "."));
       if (Number.isFinite(km)) assert.ok(km <= ctx.consignes!.kmMax! + 0.5, `${d.date} ${d.type} : ${km} km pour ${ctx.consignes!.kmMax} km permis`);
-      if (d.type === "Récup") assert.match(d.detail, /Corps : 20 min/, "la récupération dépasse la durée maximale");
+      if (d.type === "Récup") {
+        const m = /Échauffement (\d+) min[\s\S]*Corps : (\d+) min[\s\S]*Retour au calme (\d+) min/.exec(d.detail);
+        assert.ok(m && Number(m[1]) + Number(m[2]) + Number(m[3]) <= 30, `la récupération dépasse la durée maximale : ${d.detail}`);
+      }
     }
   });
 
@@ -340,6 +343,25 @@ async function main() {
       }
     }
     assert.ok(plan.some((d) => COURSE(d.type) && d.type !== "Repos"), "plus aucune sortie dans le plan");
+  });
+
+  await test("une sortie qui ne tient pas dans la limite est DÉCALÉE vers un repos où elle tient, pas seulement retirée", () => {
+    // Deux sorties courues hier et avant-hier, 2 au plus sur 7 jours : celles du début de semaine ne
+    // tiennent pas ; la semaine ne doit pas finir sans course (constaté le 12/11/2026).
+    const semaine = [jour(0, "Endurance", PLAN_T.fr.enduranceTitre, ["Endurance", "8 km"], "Footing facile"), jour(1, "Repos", PLAN_T.fr.reposTitre, ["Repos"]),
+      jour(2, "Repos", PLAN_T.fr.reposTitre, ["Repos"]), jour(3, "Repos", PLAN_T.fr.reposTitre, ["Repos"]), jour(4, "Repos", PLAN_T.fr.reposTitre, ["Repos"]),
+      jour(5, "Repos", PLAN_T.fr.reposTitre, ["Repos"]), jour(6, "Repos", PLAN_T.fr.reposTitre, ["Repos"])];
+    const c = { consignes: consignes({ seancesMaxSemaine: 2 }), allureFacile: "5'00", sortiesRecentes: [ilYa(1), ilYa(2)], courseC: null };
+    const plan = appliquerConsignes(semaine, c);
+    assert.equal(plan[0].type, "Repos", "la sortie qui ne tient pas est restée");
+    const posees = plan.filter((d) => d.type !== "Repos");
+    assert.equal(posees.length, 1, `la sortie n'a pas été décalée : ${plan.map((d) => d.type).join(", ")}`);
+    const courues = [...c.sortiesRecentes, ...posees.map((d) => d.date)];
+    for (const d of posees) assert.ok(courues.filter((x) => x >= fenetre(d.date) && x <= d.date).length <= 2, `décalée sur un jour où elle ne tient pas : ${d.date}`);
+    // Jamais sur un jour où l'athlète ne court pas.
+    const dispo = [0, 1, 2, 3, 4, 5, 6].filter((w) => w !== new Date(`${posees[0].date}T12:00:00Z`).getUTCDay());
+    const plan2 = appliquerConsignes(semaine, { ...c, joursDispo: dispo });
+    for (const d of plan2.filter((x) => x.type !== "Repos")) assert.notEqual(d.date, posees[0].date, "décalée sur un jour où l'athlète ne court pas");
   });
 
   console.log("\nCE QUE LA DOULEUR A CHANGÉ, QUAND CONSULTER, LA CHARGE D'AVANT");

@@ -88,6 +88,9 @@ export type ContexteConsignes = {
   sortiesRecentes: string[];
   /** Date d'une course C de la semaine (AAAA-MM-JJ), à transformer en footing ; `null` sinon. */
   courseC: string | null;
+  /** Les jours de la semaine où l'athlète peut courir (0 = dimanche, comme `Date.getDay`) : une sortie
+   *  décalée pour tenir le nombre de sorties n'atterrit que sur l'un d'eux. Absent = tous. */
+  joursDispo?: number[];
 };
 
 
@@ -207,14 +210,32 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
   // Une sortie le jour d jouxte 7 fenêtres : celles qui finissent de d à d + 6 (jusqu'à la fin des consignes).
   const tient = (d: string) => [0, 1, 2, 3, 4, 5, 6].map((k) => decale(d, k)).filter((w) => w <= consignes.jusquAu)
     .every((w) => gardees.filter((x) => x >= decale(w, -6) && x <= w).length < max);
-  return apres.map((jour) => {
-    if (PAS_COURSE.has(jour.type) || !enVigueur(jour) || jour.type === "Course") return jour;
+  // ⚠️ UNE SORTIE QUI NE TIENT PAS EST DÉCALÉE, PAS SEULEMENT RETIRÉE (12/11/2026). Le moteur pose
+  // les sorties sans connaître celles déjà courues : avec 2 sorties au plus et deux sorties ces
+  // derniers jours, celles de la semaine tombaient toutes trop tôt et étaient toutes retirées —
+  // une semaine entière sans course alors qu'une sortie redevenait possible quelques jours plus
+  // tard. Elle va sur le premier jour de repos plus tardif où elle tient (jour où l'athlète peut
+  // courir, consignes en vigueur), en footing facile.
+  const sortie = [...apres];
+  const libre = (j: number) => sortie[j].type === "Repos" && enVigueur(sortie[j])
+    && (!c.joursDispo || c.joursDispo.includes(new Date(`${sortie[j].date}T12:00:00Z`).getUTCDay()));
+  const decalees = new Set<number>();  // déjà validées (et comptées) en arrivant : ne pas les rejuger
+  for (let i = 0; i < sortie.length; i++) {
+    const jour = sortie[i];
+    if (decalees.has(i) || PAS_COURSE.has(jour.type) || !enVigueur(jour) || jour.type === "Course") continue;
     // Déjà courue ce jour-là (le jour 0 est gelé dès qu'une séance est enregistrée) : la sortie
     // est dans `sortiesRecentes`, on ne la compte pas deux fois.
-    if (c.sortiesRecentes.includes(jour.date)) return jour;
-    if (tient(jour.date)) { gardees.push(jour.date); return jour; }
-    return repos(jour, (l) => T[l].repos(max, fin));
-  });
+    if (c.sortiesRecentes.includes(jour.date)) continue;
+    if (tient(jour.date)) { gardees.push(jour.date); continue; }
+    sortie[i] = repos(jour, (l) => T[l].repos(max, fin));
+    const cible = sortie.findIndex((x, j) => j > i && libre(j) && !sortie.some((y) => y.date === x.date && y !== x && !PAS_COURSE.has(y.type)) && tient(x.date));
+    if (cible >= 0) {
+      gardees.push(sortie[cible].date);
+      decalees.add(cible);
+      sortie[cible] = footing({ ...jour, date: sortie[cible].date, confirmed: sortie[cible].confirmed });
+    }
+  }
+  return sortie;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
