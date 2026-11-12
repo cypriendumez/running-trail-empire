@@ -131,12 +131,14 @@ export function seuilMesure(test: unknown, montre: unknown): number | null {
 }
 
 /**
- * La FC max qui trie les « efforts maximaux » de la VMA estimée : la FC max COMMUNE. `undefined`
- * (lecture en panne) n'est pas « inconnue » : on garde alors l'ancien repli (pic > 120 des séances
- * lues) plutôt que de calculer sans aucun tri.
+ * La FC qui TRIE les « efforts maximaux » de la VMA estimée (jamais affichée comme FC max) : la FC
+ * max COMMUNE. Sans elle — inconnue (`null`) ou lecture en panne (`undefined`) —, le pic > 120 des
+ * séances lues sert encore de garde-fou : sans AUCUN tri, `meilleurEffort` prenait toute sortie
+ * pour un effort maximal, et une donnée aberrante (vélo étiqueté course, GPS qui saute, sortie à FC
+ * basse) gonflait la VMA affichée (relecture du 12/11/2026).
  */
 export function fcMaxPourEfforts(fcMax: number | null | undefined, seances: readonly { max_hr?: unknown }[]): number | null {
-  if (fcMax !== undefined) return fcMax;
+  if (fcMax != null) return fcMax;
   const pic = Math.max(0, ...(seances ?? []).map((s) => Number(s.max_hr) || 0));
   return pic > 120 ? pic : null;
 }

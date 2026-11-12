@@ -48,7 +48,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "user_settings").maybeSingle(),
     // Le NIVEAU affiché sous le nom se déduit de la VMA effective (lib/running/niveau) :
     // les mêmes séances et le même calcul que la carte VMA du tableau de bord.
-    supabase.from("workouts").select("date,type,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c")
+    // `sport` : la VMA ne lit que la course à pied (12/11/2026) — sans la colonne, tout passait pour de la course.
+    supabase.from("workouts").select("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c")
       .eq("user_id", user.id).order("date", { ascending: false }).limit(40),
     supabase.from("performance_baselines").select("vma_kmh,tested_at").eq("user_id", user.id)
       .order("tested_at", { ascending: false }).limit(1).maybeSingle(),

@@ -238,6 +238,19 @@ async function main() {
     assert.match(t, /FC max ~172 \(obs\.\)/, `le pic de 8 mois a relevé la FC max (ou elle a disparu) : ${t.match(/FC max [^·]*/)?.[0]}`);
   });
 
+  await test("sans FC max, le coach trie encore ses efforts : une sortie aberrante (24 km/h à 110 bpm) ne fait pas la VMA", async () => {
+    // Relecture du 12/11 : sans aucun tri, toute sortie passait pour un effort maximal (GPS qui saute,
+    // vélo étiqueté course). Le pic des séances reste un garde-fou (`fcMaxPourEfforts`).
+    const aberrante = { ...SEANCES_CALMES[0], date: ilYa(2), distance_km: 10, duration_seconds: 1500, avg_hr: 110, max_hr: 120 };
+    const vmaDe = async (workouts: Ligne[]) => {
+      const t = (await buildAthleteContext(fauxClient({ profiles: [{ ...PROFIL, age: null }], performance_baselines: [], workouts, notifications: [] }), "u")).text;
+      return Number(t.match(/- VMA : ([\d.]+) km\/h ⚠️ ESTIMÉE/)?.[1]);
+    };
+    const sans = await vmaDe(SEANCES_CALMES), avec = await vmaDe([aberrante, ...SEANCES_CALMES]);
+    assert.ok(sans > 0, "précondition : une VMA estimée doit exister");
+    assert.equal(avec, sans, `une sortie aberrante à FC basse fait la VMA du coach (${sans} → ${avec})`);
+  });
+
   await test("fcMaxDeLAthlete (VMA affichée, profil, plans) : déclarée, pic des 6 mois, jamais un vieux pic", async () => {
     const vieux = { user_id: "u", date: ilYa(245), max_hr: 205 }, recent = { user_id: "u", date: ilYa(10), max_hr: 190 };
     const lire = (profil: Ligne, base: Ligne[]) => fcMaxDeLAthlete(fauxClient({ profiles: [profil], performance_baselines: base, workouts: [vieux, recent] }), "u");

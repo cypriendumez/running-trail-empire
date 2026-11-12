@@ -6,6 +6,7 @@
  */
 import { meilleurEffort, effectiveVma, type MeilleurEffort } from "@/lib/running/fitness";
 import { fcMaxPourEfforts } from "@/lib/coach/fcCible";
+import { isRun } from "@/lib/intervals/sport";
 
 /** D'où vient la VMA affichée (dates au format AAAA-MM-JJ). */
 export type SourceVma =
@@ -14,7 +15,7 @@ export type SourceVma =
   | { type: "courbe" }
   | { type: "vo2max" };
 
-type SeanceVma = Parameters<typeof meilleurEffort>[0][number] & { max_hr?: number | null };
+type SeanceVma = Parameters<typeof meilleurEffort>[0][number] & { max_hr?: number | null; sport?: string | null };
 
 export function vmaAffichee(i: {
   /** Les séances lues par le tableau de bord (les 40 dernières). */
@@ -31,7 +32,11 @@ export function vmaAffichee(i: {
   // 18,7 km/h pendant que le plan était calé sur 17,3, pour le même athlète.
   // 12/11/2026 : les efforts sont triés avec la FC max COMMUNE, plus avec le pic > 120 des seules
   // séances lues (sans fenêtre de date ni FC déclarée).
-  const effort = meilleurEffort([...i.seances], fcMaxPourEfforts(i.fcMax, i.seances));
+  // ⚠️ COURSE À PIED SEULEMENT (directeur scientifique, 12/11/2026) : comme le coach. Une sortie vélo
+  // de 40 km à 25 km/h donnait une « VMA » de ~25 km/h, que `effectiveVma` retenait (la plus haute).
+  // Le tri par la FC les écartait par hasard ; sans FC max, plus rien ne les arrêtait.
+  const courses = i.seances.filter((w) => isRun(w.sport));
+  const effort = meilleurEffort(courses, fcMaxPourEfforts(i.fcMax, courses));
   const calc = effectiveVma({
     vmaStored: Number(i.baseline?.vma_kmh) || null,
     paceCurveBest: i.profil?.pace_curve?.best,

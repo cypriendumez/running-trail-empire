@@ -10,6 +10,7 @@
  *   npx tsx tests/fc-montre.test.ts
  */
 import assert from "node:assert/strict";
+import { vmaAffichee } from "../src/lib/dashboard/vmaAffichee";
 import { readFileSync } from "node:fs";
 import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, airFroid, BAISSE_HIVER_BPM, SEUIL_FROID_C, fcMaxConnue, picFcObserve, seuilMesure, fcMaxPourEfforts } from "../src/lib/coach/fcCible";
 import { avecSaison } from "../src/lib/coach/ciblesFcServeur";
@@ -325,13 +326,24 @@ test("picFcObserve : le pic des 6 derniers mois, pas celui d'avant ni d'après",
 });
 
 test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien, 12/11/2026)", () => {
-  // Repli de PANNE seulement (`undefined`) : l'ancien pic > 120 des séances lues. `null` reste null.
+  // La FC max commune d'abord. Sans elle (inconnue OU panne), le pic > 120 des séances reste un
+  // GARDE-FOU de tri (relecture du 12/11) : sans aucun tri, toute sortie passait pour un effort maximal.
   assert.equal(fcMaxPourEfforts(188, [{ max_hr: 205 }]), 188, "un pic des séances passe devant la FC max commune");
-  assert.equal(fcMaxPourEfforts(null, [{ max_hr: 205 }]), null, "FC max inconnue remplacée par un pic des séances");
-  assert.equal(fcMaxPourEfforts(undefined, [{ max_hr: 175 }, { max_hr: 140 }]), 175, "en panne, l'ancien repli a disparu");
-  assert.equal(fcMaxPourEfforts(undefined, [{ max_hr: 110 }]), null);
+  assert.equal(fcMaxPourEfforts(null, [{ max_hr: 175 }, { max_hr: 140 }]), 175, "FC max inconnue : plus aucun tri des efforts");
+  assert.equal(fcMaxPourEfforts(undefined, [{ max_hr: 175 }, { max_hr: 140 }]), 175, "en panne, plus aucun tri des efforts");
+  assert.equal(fcMaxPourEfforts(null, [{ max_hr: 110 }]), null);
+  // Le cycliste qui vient au running (profil 5) : sans FC max, un vélo rapide ne fait JAMAIS la VMA affichée.
+  const jour = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  const courses = [1, 3, 5, 8].map((n) => ({ date: jour(n), sport: "run", type: "easy", distance_km: 10, duration_seconds: 3300, avg_hr: 135, max_hr: 148 }));
+  const velo = { date: jour(2), sport: "bike", type: "ride", distance_km: 40, duration_seconds: 5760, avg_hr: 115, max_hr: 140 };
+  for (const fcMax of [null, undefined] as const) {
+    const sans = vmaAffichee({ seances: courses, baseline: null, profil: null, fcMax }).vma;
+    const avec = vmaAffichee({ seances: [velo, ...courses], baseline: null, profil: null, fcMax }).vma;
+    assert.ok(sans > 0, "précondition : les sorties de course doivent donner une VMA");
+    assert.equal(avec, sans, `FC max ${fcMax} : la sortie vélo a changé la VMA affichée (${sans} → ${avec})`);
+  }
   const v = code("src/lib/dashboard/vmaAffichee.ts");
-  assert.match(v, /meilleurEffort\(\[\.\.\.i\.seances\], fcMaxPourEfforts\(i\.fcMax, i\.seances\)\)/, "vmaAffichee trie de nouveau avec son propre pic");
+  assert.match(v, /const courses = i\.seances\.filter\(\(w\) => isRun\(w\.sport\)\);\s*const effort = meilleurEffort\(courses, fcMaxPourEfforts\(i\.fcMax, courses\)\);/, "vmaAffichee trie de nouveau avec son propre pic (ou lit d'autres sports)");
   assert.doesNotMatch(v, /obsMaxHr/, "vmaAffichee recalcule son propre pic");
   // Chaque écran passe la FC max COMMUNE (lue par fcMaxDeLAthlete, ou déjà calculée par fcMaxConnue).
   const sites: [string, RegExp[]][] = [
@@ -341,9 +353,11 @@ test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien,
     ["src/app/dashboard/jour-j/page.tsx", [/fcMax: ePanneFc \? undefined : fcMax,/]],
     ["src/lib/ai/bilanDonnees.ts", [/profil: profilRes\.data as [^\n]*,\s*fcMax,\s*\}\);/]],
     ["src/lib/ai/coachContext.ts", [/const fcMaxVma = fcMaxPourEfforts\(await fcMaxDeLAthlete\(sb, userId\), wks\);/, /fromRuns: bestVmaFromWorkouts\(wks, fcMaxVma\),/]],
-    ["src/app/dashboard/plans/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /bestVmaFromWorkouts\(wks, fcMaxPourEfforts\(fcMaxVma, wks\)\)/]],
-    ["src/app/dashboard/profile/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /const obsMaxHr = fcMaxPourEfforts\(fcMaxCommune, rw\);/, /fcMax: obsMaxHr,/]],
-    ["src/components/profile/ProfileSettings.tsx", [/const maxHr = fitness\?\.fcMax \?\? 0;/]],
+    ["src/app/dashboard/plans/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /bestVmaFromWorkouts\(wks\.filter\(\(w\) => isRun\(w\.sport\)\), fcMaxPourEfforts\(fcMaxVma, wks\.filter\(\(w\) => isRun\(w\.sport\)\)\)\)/]],
+    ["src/app/dashboard/layout.tsx", [/select\("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c"\)/]],
+    ["src/app/dashboard/profile/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /const obsMaxHr = fcMaxPourEfforts\(fcMaxCommune, rw\);/,
+      /const fcMaxZones = fcMaxCommune !== undefined \? fcMaxCommune : \(Number\(\(baseline as \{ max_hr\?: number \} \| null\)\?\.max_hr\) \|\| null\);/, /fcMax: fcMaxZones,/]],
+    ["src/components/profile/ProfileSettings.tsx", [/const maxHr = fitness\?\.fcMax \?\? 0;/, /\{!zones && \([\s\S]{0,300}tr\("perf\.zonesInconnues"\)/]],
     ["src/app/api/admin/analyze-session/route.ts", [/const histFcMax = fcMaxPourEfforts\(await fcMaxDeLAthlete\(admin, user_id\), recentRes\.data \?\? \[\]\);/]],
   ];
   for (const [f, res] of sites) for (const re of res) assert.match(code(f), re, `${f} : la VMA (ou la FC max affichée) ne reçoit plus la FC max commune (${re.source.slice(0, 50)}…)`);

@@ -47,9 +47,12 @@ export default async function ProfilePage() {
 
   // VMA estimée depuis les meilleurs efforts SOUTENUS (FC élevée) + FC max observée.
   const rw = (recentWk ?? []) as { distance_km?: number | null; duration_seconds?: number | null; type?: string | null; sport?: string | null; avg_hr?: number | null; max_hr?: number | null }[];
-  // 12/11/2026 : la FC max COMMUNE (déclarée, pic des 6 mois, seuil) — c'était le pic > 120 des
-  // 120 derniers jours. En cas de panne de lecture, l'ancien repli (`fcMaxPourEfforts`).
+  // 12/11/2026 : le tri des efforts de la VMA passe par la FC max COMMUNE (`fcMaxPourEfforts` : sans
+  // elle, le pic des séances reste un garde-fou).
   const obsMaxHr = fcMaxPourEfforts(fcMaxCommune, rw);
+  // Les ZONES affichées, elles, ne prennent qu'une vraie FC max : la commune ; sans elle, pas de
+  // zones (l'écran le dit). En cas de PANNE seulement, la FC du test déjà lue, sinon rien.
+  const fcMaxZones = fcMaxCommune !== undefined ? fcMaxCommune : (Number((baseline as { max_hr?: number } | null)?.max_hr) || null);
   // MÊME ORDRE DE FIABILITÉ QUE LE COACH : meilleurs efforts mesurés d'abord, et
   // course à pied uniquement. Sans cela le profil affichait une VMA que le plan
   // d'entraînement contredisait — et une sortie vélo pouvait la produire.
@@ -105,7 +108,7 @@ export default async function ProfilePage() {
       shoes={shoes ?? []}
       goals={goals ?? []}
       stats={{ kmYear, kmMonth, sessionsMonth, longestRun, streak, bySport }}
-      fitness={{ estimatedVma, vmaSource, fcMax: obsMaxHr, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
+      fitness={{ estimatedVma, vmaSource, fcMax: fcMaxZones, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
       userId={user!.id}
       catalogue={indexLeger()}
       etatAbo={litEtatAbo((ligneAbo as { data?: unknown } | null)?.data ?? null)}

@@ -858,7 +858,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     vmaStored, paceCurveBest: paceCurve?.best, garminVo2,
     // Palier gratuit : la VMA du TEST, rien d'autre. L'estimer depuis les séances, c'est
     // précisément l'analyse que ce palier ne fait pas.
-    fromRuns: objectifSeul ? null : bestVmaFromWorkouts(runs, fcMaxEst, 120, acclimVma) ?? estimateVmaFromRuns(runs, fcMaxEst, now),
+    // Même tri d'efforts que la VMA affichée (`fcMaxPourEfforts`, 12/11/2026) : sans FC max, le pic
+    // des séances reste un garde-fou au lieu d'aucun tri.
+    fromRuns: objectifSeul ? null : bestVmaFromWorkouts(runs, fcMaxPourEfforts(fcMaxEst, runs), 120, acclimVma) ?? estimateVmaFromRuns(runs, fcMaxEst, now),
   });
   const vmaIsEst = vmaSource !== "test" && vma != null;
 

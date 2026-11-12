@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { fcMaxPourEfforts } from "@/lib/coach/fcCible";
+import { isRun } from "@/lib/intervals/sport";
 import { createClient } from "@/lib/supabase/server";
 import { bestVmaFromWorkouts, effectiveVma } from "@/lib/running/fitness";
 import { robustWeeklyKm } from "@/lib/running/volume";
@@ -42,7 +43,8 @@ export default async function PlansPage() {
     vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
     paceCurveBest: ((profRes.data as { pace_curve?: { best?: { m: number; sec: number }[] } | null } | null)?.pace_curve)?.best,
     garminVo2: Number((profRes.data as { garmin_vo2max?: number } | null)?.garmin_vo2max) || null,
-    fromRuns: bestVmaFromWorkouts(wks, fcMaxPourEfforts(fcMaxVma, wks)),
+    // Course à pied seulement, comme le coach et la carte (12/11/2026) : un vélo rapide n'est pas une VMA.
+    fromRuns: bestVmaFromWorkouts(wks.filter((w) => isRun(w.sport)), fcMaxPourEfforts(fcMaxVma, wks.filter((w) => isRun(w.sport)))),
   }).vma;
 
   // `null` si l'historique ne permet pas de conclure : la vue le dit alors franchement,
