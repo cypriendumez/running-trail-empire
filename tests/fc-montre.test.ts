@@ -425,7 +425,8 @@ test("chaque écran de VMA signale ses pannes dans error_logs : séances, test d
     assert.ok(T[lang][`dash.inc.${nom}`], `« ${nom} » n'a pas de libellé dash.inc en ${lang} : le bandeau dirait « tes données »`);
   // Jour J signale ses pannes AVANT le retour « sans objectif » : une panne de l'objectif n'est pas « aucun objectif ».
   const jj = code("src/app/dashboard/jour-j/page.tsx");
-  assert.ok(jj.indexOf('await signalerLectures("jour-j"') < jj.indexOf("return <SansObjectifJourJ"), "Jour J journalise après le retour « sans objectif »");
+  // L'appel qui porte l'OBJECTIF (pas le premier, celui du profil, toujours avant).
+  assert.ok(jj.indexOf('["objectif", objRes]') > 0 && jj.indexOf('["objectif", objRes]') < jj.indexOf("return <SansObjectifJourJ"), "Jour J journalise l'objectif après le retour « sans objectif »");
   // Le bilan journalise avant de renoncer.
   assert.match(code("src/lib/ai/bilanDonnees.ts"), /await signalerLectures\("bilan", userId, \[\["repere", baseRes\], \["profil", profilRes\]\]\);\s*return null;/);
 });

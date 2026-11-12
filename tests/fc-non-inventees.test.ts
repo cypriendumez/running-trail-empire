@@ -268,13 +268,19 @@ async function main() {
   });
 
   await test("signalerLectures : « aucune ligne » n'est pas une panne ; une vraie panne est nommée (12/11/2026)", async () => {
-    assert.deepEqual(await signalerLectures("test", null, [["repere", { error: { code: "PGRST116" } }], ["seances", { error: null }], ["profil", null]]), [],
+    // Journal INJECTÉ : le test n'écrit jamais dans error_logs, même avec les clés dans l'environnement.
+    const lignes: { source: string; message: string; userId: string | null }[] = [];
+    const journal = async (e: { source: string; message: string; userId: string | null }) => { lignes.push(e); };
+    assert.deepEqual(await signalerLectures("test", null, [["repere", { error: { code: "PGRST116" } }], ["seances", { error: null }], ["profil", null]], journal), [],
       "« aucune ligne » (ou une lecture réussie) passe pour une panne");
+    assert.equal(lignes.length, 0, "un compte neuf (aucune ligne) écrit dans le journal");
     const erreurs = console.error; console.error = () => {};
     try {
-      assert.deepEqual(await signalerLectures("test", null, [["repere", { error: { code: "PGRST301", message: "timeout" } }], ["seances", { error: null }]]), ["repere"],
+      assert.deepEqual(await signalerLectures("test", "u", [["repere", { error: { code: "PGRST301", message: "timeout de 4123 ms" } }], ["seances", { error: null }]], journal), ["repere"],
         "une vraie panne n'est pas nommée");
     } finally { console.error = erreurs; }
+    // Une ligne, au message STABLE (aucune valeur variable : la déduplication du journal en dépend).
+    assert.deepEqual(lignes, [{ source: "test", message: "lectures illisibles : repere (PGRST301)", userId: "u" }], "la panne n'est pas journalisée, ou son message varie");
   });
 
   await test("le code : ni « : 190 » ni « 220 − âge » nulle part où une FC max se calcule", () => {

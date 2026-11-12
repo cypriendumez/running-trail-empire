@@ -20,11 +20,15 @@ type LectureErreur = { error: (Lecture["error"] & { message?: string }) | null }
  * tout neuf compris). `ecran` et les noms sont des identifiants stables, sans accent : le message
  * reste le même d'une panne à l'autre, et la déduplication du journal fonctionne.
  */
-export async function signalerLectures(ecran: string, userId: string | null, entrees: [string, LectureErreur | null | undefined][]): Promise<string[]> {
+export async function signalerLectures(
+  ecran: string, userId: string | null, entrees: [string, LectureErreur | null | undefined][],
+  /** Le journal : `journaliserEchecUneFois` en vrai ; injecté par les tests, qui n'écrivent jamais en base. */
+  journal: (e: { source: string; message: string; userId: string | null }) => Promise<void> = (e) => journaliserEchecUneFois(null, e),
+): Promise<string[]> {
   const enPanne = entrees.filter(([, l]) => estUnePanne(l ?? null));
   if (!enPanne.length) return [];
   const message = `lectures illisibles : ${enPanne.map(([nom, l]) => `${nom} (${l?.error?.code ?? "?"})`).join(", ")}`;
   console.error(`[${ecran}]`, message, enPanne.map(([, l]) => l?.error?.message).join(" | "));
-  await journaliserEchecUneFois(null, { source: ecran, message, userId });
+  await journal({ source: ecran, message, userId });
   return enPanne.map(([nom]) => nom);
 }
