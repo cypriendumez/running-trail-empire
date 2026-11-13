@@ -14,7 +14,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { BandeauPanne } from "../src/components/dashboard/BandeauPanne";
 import { T, fill } from "../src/lib/i18n/translations";
 import { execSync } from "node:child_process";
-import { vmaAffichee, effortDesSeances, acclimatationDesSeances, SEANCES_VMA } from "../src/lib/dashboard/vmaAffichee";
+import { vmaAffichee, effortDesSeances, acclimatationDesSeances, JOURS_VMA, debutFenetreVma } from "../src/lib/dashboard/vmaAffichee";
 import { readFileSync } from "node:fs";
 import { referencesFc, ciblesFcAthlete, footingTropIntense, plageFc, MARGE_FOOTING_DUR, avecFcMaxMontre, plageEnPctMax, maxDeReference, PIC_FC_JOURS, fcMaxSaison, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, airFroid, BAISSE_HIVER_BPM, SEUIL_FROID_C, fcMaxConnue, picFcObserve, seuilMesure, fcMaxPourEfforts } from "../src/lib/coach/fcCible";
 import { avecSaison } from "../src/lib/coach/ciblesFcServeur";
@@ -349,26 +349,29 @@ test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien,
     assert.equal(avec, sans, `FC max ${fcMax} : la sortie vélo a changé la VMA affichée (${sans} → ${avec})`);
   }
   const v = code("src/lib/dashboard/vmaAffichee.ts");
-  assert.match(v, /const courses = lues\.filter\(\(w\) => isRun\(w\.sport\)\);\s*return meilleurEffort\(courses, fcMaxPourEfforts\(fcMax, courses\), 120, acclimatationDesSeances\(lues, maintenant\)\);/, "effortDesSeances trie de nouveau avec son propre pic, lit d'autres sports ou oublie la chaleur");
+  assert.match(v, /const courses = lues\.filter\(\(w\) => isRun\(w\.sport\)\);\s*return meilleurEffort\(courses, fcMaxPourEfforts\(fcMax, courses\), JOURS_VMA, acclimatationDesSeances\(lues, maintenant\)\);/, "effortDesSeances trie de nouveau avec son propre pic, lit d'autres sports ou oublie la chaleur");
   assert.match(v, /const effort = effortDesSeances\(i\.seances, i\.fcMax\);/, "vmaAffichee a de nouveau son propre calcul d'effort");
   assert.doesNotMatch(v, /obsMaxHr/, "vmaAffichee recalcule son propre pic");
   // Chaque écran passe la FC max COMMUNE (lue par fcMaxDeLAthlete, ou déjà calculée par fcMaxConnue).
   const sites: [string, RegExp[]][] = [
     ["src/app/dashboard/layout.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fcMax: fcMaxVma,/]],
-    ["src/app/dashboard/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /fcMax: fcMaxVma,/, /seances: \(seancesVmaRes\.data \?\? \[\]\) as /, /\.limit\(SEANCES_VMA\),/]],
-    ["src/lib/indicateurs/donnees.ts", [/fcMaxDeLAthlete\(sb, userId\),/, /profil: p, fcMax: fcMaxVma \}/, /vmaAffichee\(\{ seances: \(seancesVma\.data \?\? \[\]\) as /, /\.limit\(SEANCES_VMA\),/, /serieRessentis, seancesVma\]\.filter\(\(r\) => estUnePanne\(r\)\)/]],
+    ["src/app/dashboard/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /fcMax: fcMaxVma,/, /seances: \(seancesVmaRes\.data \?\? \[\]\) as /, /lireSeancesVma\(supabase, user!\.id\),/]],
+    ["src/lib/indicateurs/donnees.ts", [/fcMaxDeLAthlete\(sb, userId\),/, /profil: p, fcMax: fcMaxVma \}/, /vmaAffichee\(\{ seances: \(seancesVma\.data \?\? \[\]\) as /, /lireSeancesVma\(sb, userId\),/, /serieRessentis, seancesVma\]\.filter\(\(r\) => estUnePanne\(r\)\)/]],
     ["src/app/dashboard/jour-j/page.tsx", [/seances: seances as Parameters<typeof vmaAffichee>/]],
     ["src/lib/ai/bilanDonnees.ts", [/seances: seances as Parameters<typeof vmaAffichee>/]],
     ["src/app/dashboard/jour-j/page.tsx", [/fcMax: ePanneFc \? undefined : fcMax,/]],
     ["src/lib/ai/bilanDonnees.ts", [/profil: profilRes\.data as [^\n]*,\s*fcMax,\s*\}\);/]],
     ["src/lib/ai/coachContext.ts", [/const effort = effortDesSeances\(\(woRes\.data \?\? \[\]\) as never, await fcMaxDeLAthlete\(sb, userId\)\);/, /fromRuns: effort\?\.vma \?\? null,/,
-      /fromRuns: objectifSeul \? null : effortDesSeances\(workouts as never, fcMaxEst, now\)\?\.vma \?\? estimateVmaFromRuns/, /const acclimVma = acclimatationDesSeances\(workouts as never, now\);/]],
-    ["src/app/dashboard/plans/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(wks, fcMaxVma\)\?\.vma \?\? null,/, /select\("date, type, sport, distance_km, duration_seconds, avg_hr, max_hr, weather_temp_c"\)/]],
-    ["src/app/dashboard/layout.tsx", [/select\("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c"\)\s*\.eq\("user_id", user\.id\)\.order\("date", \{ ascending: false \}\)\.limit\(SEANCES_VMA\)/]],
-    ["src/app/dashboard/health/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(\(seancesRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /select\("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c"\)/]],
-    ["src/app/dashboard/shop/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(seances as never, fcMaxVma\)\?\.vma \?\? null,/, /select\("date,type,distance_km,sport,elevation_gain_m,duration_seconds,avg_hr,max_hr,weather_temp_c"\)/]],
-    ["src/app/dashboard/shop/[slug]/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(seances as never, fcMaxVma\)\?\.vma \?\? null,/, /select\("date,type,distance_km,sport,elevation_gain_m,duration_seconds,avg_hr,max_hr,weather_temp_c"\)/]],
-    ["src/app/dashboard/profile/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /fromRuns: effortDesSeances\(rw, fcMaxCommune\)\?\.vma \?\? null,/, /select\("date, distance_km, duration_seconds, type, sport, avg_hr, max_hr, weather_temp_c"\)/,
+      /fromRuns: objectifSeul \? null : effortDesSeances\(seancesVma as never, fcMaxEst, now\)\?\.vma \?\? estimateVmaFromRuns/,
+      /objectifSeul \? nonLu\(\) : lireSeancesVma\(sb, userId\),/, /lireSeancesVma\(sb, userId\),\s*sb\.from\("profiles"\)\.select\("\*"\)\.eq\("id", userId\)\.maybeSingle\(\),/,
+      /const seancesVma = seancesVmaRes\.error \? workouts : /,
+      /if \(seancesVmaRes\.error\) \{[\s\S]{0,300}await journaliserEchecUneFois\(null, \{ source: "coach-vma", userId,/, /const acclimVma = acclimatationDesSeances\(workouts as never, now\);/]],
+    ["src/app/dashboard/plans/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
+    ["src/app/dashboard/layout.tsx", [/lireSeancesVma\(supabase, user\.id\),/]],
+    ["src/app/dashboard/health/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
+    ["src/app/dashboard/shop/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
+    ["src/app/dashboard/shop/[slug]/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
+    ["src/app/dashboard/profile/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /fromRuns: effortDesSeances\(rw, fcMaxCommune\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user!\.id\),/,
       /const fcMaxPanne = fcMaxCommune === undefined && fcMaxZones == null;/, /fcMax: fcMaxZones, fcMaxPanne,/,
       /const fcMaxZones = fcMaxCommune !== undefined \? fcMaxCommune : \(Number\(\(baseline as \{ max_hr\?: number \} \| null\)\?\.max_hr\) \|\| null\);/, /fcMax: fcMaxZones,/]],
     ["src/components/profile/ProfileSettings.tsx", [/const maxHr = fitness\?\.fcMax \?\? 0;/, /\{!zones && \([\s\S]{0,300}tr\(fitness\?\.fcMaxPanne \? "perf\.zonesPanne" : "perf\.zonesInconnues"\)/]],
@@ -451,18 +454,33 @@ test("UN seul calcul de « meilleur effort » dans tout src/ : `effortDesSeances
   assert.deepEqual(sites.sort(), ["src/lib/dashboard/vmaAffichee.ts", "src/lib/running/fitness.ts"], `un calcul d'effort parallèle est de retour : ${sites.join(", ")}`);
 });
 
-test("effortDesSeances : 60 séances, course seulement, FC max commune, chaleur — le coach et les écrans", () => {
+test("effortDesSeances : les courses des 120 derniers jours, FC max commune, chaleur — le coach et les écrans", () => {
   const jour = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
   const run = (n: number, km: number, sec: number, x: Record<string, unknown> = {}) => ({ date: jour(n), sport: "run", type: "easy", distance_km: km, duration_seconds: sec, avg_hr: 170, max_hr: 185, ...x });
-  // 1. LES 60 PLUS RÉCENTES : un record en 61e position (tous sports compris) ne compte plus — comme au coach.
-  const recentes = Array.from({ length: 60 }, (_, k) => ({ date: jour(1 + k % 50), sport: k % 2 ? "bike" : "run", type: "x", distance_km: 10, duration_seconds: 3000, avg_hr: 170, max_hr: 185 }));
-  const record = run(55, 10, 2100);
+  // 1. LES 120 DERNIERS JOURS, SANS PLAFOND EN NOMBRE (13/11/2026) : un record d'il y a 100 jours compte même
+  //    derrière 200 séances plus récentes (vélo compris) ; un record d'il y a 130 jours ne compte plus.
+  const recentes = Array.from({ length: 200 }, (_, k) => ({ date: jour(1 + k % 90), sport: k % 4 ? "bike" : "run", type: "x", distance_km: 10, duration_seconds: 3000, avg_hr: 170, max_hr: 185 }));
+  const record = run(100, 10, 2100);
   const sansRecord = effortDesSeances(recentes, 190)!.vma;
-  assert.equal(effortDesSeances([...recentes, { ...record, date: jour(51) }], 190)!.vma, sansRecord, "une 61e séance plus ancienne est lue");
-  // …même quand l'appelant les passe dans le désordre : ce sont les 60 plus RÉCENTES, pas les 60 premières.
-  assert.equal(effortDesSeances([{ ...record, date: jour(51) }, ...recentes], 190)!.vma, sansRecord, "les séances ne sont plus triées par date avant d'être coupées");
-  assert.ok(effortDesSeances([{ ...record, date: jour(0) }, ...recentes], 190)!.vma > sansRecord, "précondition : le même record parmi les 60 doit compter");
-  assert.equal(SEANCES_VMA, 60, "le coach lit 60 séances (fetchWorkouts)");
+  assert.ok(effortDesSeances([...recentes, record], 190)!.vma > sansRecord, "un record d'il y a 100 jours, derrière 200 séances plus récentes, ne compte pas : la VMA est encore plafonnée en nombre");
+  assert.ok(effortDesSeances([record, ...recentes], 190)!.vma > sansRecord, "l'ordre des séances change le résultat");
+  assert.equal(effortDesSeances([...recentes, { ...record, date: jour(130) }], 190)!.vma, sansRecord, "un record d'il y a 130 jours compte encore, alors que la fenêtre de forme est dépassée");
+  // …et la fenêtre s'applique AVANT le tri des efforts : sans FC max connue, le pic des courses trie les
+  // efforts. Un vieux pic à 200 (il y a 150 jours, Jour J et le bilan lisent 182 jours) ferait passer une
+  // course récente à 165 de moyenne pour facile, et la VMA changerait selon l'écran.
+  const recenteDure = run(10, 10, 2400, { avg_hr: 165, max_hr: 175 });
+  const vieuxPic = run(150, 8, 2900, { avg_hr: 150, max_hr: 200 });
+  assert.equal(effortDesSeances([recenteDure, vieuxPic], null)?.vma ?? null, effortDesSeances([recenteDure], null)?.vma ?? null,
+    "une course de plus de 120 jours change le tri des efforts (FC max inconnue) : la fenêtre n'est plus appliquée avant le tri");
+  assert.ok(effortDesSeances([recenteDure], null) != null, "précondition : sans vieux pic, la course récente fonde la VMA");
+  assert.equal(JOURS_VMA, 120, "la fenêtre de la VMA n'est plus celle de meilleurEffort (120 jours)");
+  // Là où la lecture unique s'AJOUTE à celle de l'écran (Plans, Santé, Boutique, fiche), sa panne est signalée.
+  for (const f of ["src/app/dashboard/plans/page.tsx", "src/app/dashboard/health/page.tsx", "src/app/dashboard/shop/page.tsx", "src/app/dashboard/shop/[slug]/page.tsx"])
+    assert.match(code(f), /signalerLectures\([^;]*\["seances", seancesVmaRes\]/, `${f} : la panne de la lecture de la VMA n'est plus signalée`);
+  assert.equal(debutFenetreVma(Date.parse("2026-11-13T10:00:00Z")), "2026-07-15", "la lecture ne commence plus 121 jours avant (un jour de marge)");
+  // La lecture unique : 120 jours, tous sports, plafond de garde seulement.
+  assert.match(code("src/lib/dashboard/seancesVma.ts"), /\.gte\("date", debutFenetreVma\(maintenant\)\)\.order\("date", \{ ascending: false \}\)\.limit\(PLAFOND_SEANCES_VMA\)/, "lireSeancesVma ne lit plus les 120 derniers jours");
+  assert.doesNotMatch(code("src/lib/dashboard/seancesVma.ts"), /\.eq\("sport"/, "lireSeancesVma ne lit plus que la course : l'acclimatation à la chaleur perd le vélo");
   // 2. LA CHALEUR : une course à 30 °C, chez un coureur non acclimaté, se relit plus vite qu'à 12 °C.
   const chaud = effortDesSeances([run(2, 10, 2700, { weather_temp_c: 30 })], 190)!.vma;
   const frais = effortDesSeances([run(2, 10, 2700, { weather_temp_c: 12 })], 190)!.vma;

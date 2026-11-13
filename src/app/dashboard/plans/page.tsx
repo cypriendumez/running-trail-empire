@@ -9,6 +9,7 @@ import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
 import { langueEcran } from "@/lib/i18n/serverLang";
+import { lireSeancesVma } from "@/lib/dashboard/seancesVma";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Plans d'entraînement" };
@@ -30,7 +31,7 @@ export default async function PlansPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [profRes, baseRes, woRes, fcMaxVma] = await Promise.all([
+  const [profRes, baseRes, woRes, fcMaxVma, seancesVmaRes] = await Promise.all([
     supabase.from("profiles").select("garmin_vo2max, pace_curve, preferred_language").eq("id", user.id).maybeSingle(),
     supabase.from("performance_baselines").select("vma_kmh").eq("user_id", user.id)
       .order("tested_at", { ascending: false }).limit(1).maybeSingle(),
@@ -38,18 +39,21 @@ export default async function PlansPage() {
       .eq("user_id", user.id).order("date", { ascending: false }).limit(120),
     // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
     fcMaxDeLAthlete(supabase, user.id),
+    // Les séances de LA VMA : la lecture unique (120 jours, 13/11/2026). Les 120 séances ci-dessus
+    // (volume) n'en couvrent que 8 semaines chez un coureur qui fait aussi du vélo.
+    lireSeancesVma(supabase, user.id),
   ]);
 
   // Une panne n'est pas « aucune donnée » (12/11/2026) : le niveau et le volume affichés retomberaient en silence.
-  const pannes = await signalerLectures("plans", user.id, [["seances", woRes], ["repere", baseRes], ["profil", profRes]]);
+  const pannes = await signalerLectures("plans", user.id, [["seances", woRes], ["seances", seancesVmaRes], ["repere", baseRes], ["profil", profRes]]);
   const wks = (woRes.data ?? []) as { date: string; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null; avg_hr?: number | null; max_hr?: number | null }[];
   const vma = effectiveVma({
     vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
     paceCurveBest: ((profRes.data as { pace_curve?: { best?: { m: number; sec: number }[] } | null } | null)?.pace_curve)?.best,
     garminVo2: Number((profRes.data as { garmin_vo2max?: number } | null)?.garmin_vo2max) || null,
     // LA lecture des efforts (`effortDesSeances`, 12/11/2026) : celle du coach et de chaque écran —
-    // 60 séances, course seulement, FC max commune, acclimatation à la chaleur.
-    fromRuns: effortDesSeances(wks, fcMaxVma)?.vma ?? null,
+    // les courses des 120 derniers jours (`lireSeancesVma`, 13/11/2026), FC max commune, chaleur.
+    fromRuns: effortDesSeances((seancesVmaRes.data ?? []) as never, fcMaxVma)?.vma ?? null,
   }).vma;
 
   // `null` si l'historique ne permet pas de conclure : la vue le dit alors franchement,

@@ -13,7 +13,7 @@ import { stripProfileSecrets } from "@/lib/profile/safe";
 import type { Objective } from "@/components/dashboard/ObjectiveCard";
 import { objectifEnCours } from "@/lib/coach/prochaineCourse";
 import { loadRisk } from "@/lib/running/fitness";
-import { vmaAffichee, SEANCES_VMA } from "@/lib/dashboard/vmaAffichee";
+import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { validerRecordDeclare, type RecordDeclare } from "@/lib/dashboard/records";
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
@@ -24,6 +24,7 @@ import { estAdmin } from "@/lib/admin/acces";
 import { serieVfc } from "@/lib/health/vfc";
 import type { HRVData } from "@/types";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
+import { lireSeancesVma } from "@/lib/dashboard/seancesVma";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard" };
@@ -125,8 +126,8 @@ export default async function DashboardPage() {
     supabase.from("notifications").select("body,data").eq("user_id", user!.id).eq("type", "seance_analyse").order("created_at", { ascending: false }).limit(20),
     // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
     fcMaxDeLAthlete(supabase, user!.id),
-    // Les séances de LA VMA (12/11/2026) : autant que le coach (`SEANCES_VMA`).
-    supabase.from("workouts").select("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c").eq("user_id", user!.id).order("date", { ascending: false }).limit(SEANCES_VMA),
+    // Les séances de LA VMA : la lecture unique du coach et des écrans (120 jours, 13/11/2026).
+    lireSeancesVma(supabase, user!.id),
   ]);
   if (garageRes.error) console.error("[accueil] garage illisible :", garageRes.error.message);
   if (declaresRes.error) console.error("[accueil] records déclarés illisibles :", declaresRes.error.message);
@@ -238,7 +239,7 @@ export default async function DashboardPage() {
   // n'a pas de dictionnaire. C'est le composant client, qui connaît la langue, qui les
   // traduit. La distinction panne / absence vit dans `lib/dashboard/lectures`, où elle
   // est éprouvable — c'est là que le projet range ses calculs affichés.
-  // 12/11/2026 : les lectures de LA VMA (ses 60 séances, le test de référence) en font partie, et la
+  // 12/11/2026 : les lectures de LA VMA (ses séances des 120 derniers jours, le test de référence) en font partie, et la
   // panne part dans error_logs (signalerLectures), plus seulement dans les journaux du serveur.
   const donneesIncompletes = await signalerLectures("dashboard", user!.id, [
     ["profil", profileRes], ["seances", workoutsRes],

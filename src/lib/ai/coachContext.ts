@@ -64,6 +64,7 @@ import { estUnePanne } from "@/lib/dashboard/lectures";
 import type { PausesSeance } from "@/lib/activities/pauses";
 import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
 import { phaseDeSemaine, specifiqueEnTete, semainesAffutage, partAffutage, allegementDuBloc } from "@/lib/coach/phase";
+import { lireSeancesVma } from "@/lib/dashboard/seancesVma";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
 
@@ -467,7 +468,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Une lecture qu'on ne fait pas : la forme exacte d'une réponse vide de PostgREST.
   const nonLu = () => Promise.resolve({ data: [] as never[], error: null });
   const nonLuUne = () => Promise.resolve({ data: null, error: null });
-  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes, lactateRes, planifieesRes] = await Promise.all([
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes, lactateRes, planifieesRes, seancesVmaRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     objectifSeul || essentielle ? nonLu() : sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(30),
@@ -534,6 +535,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // Les courses notées au calendrier (lib/coach/saison) : le coach les ignorait.
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "planned_race")
       .order("created_at", { ascending: false }).limit(40),
+    // Les séances de LA VMA : la lecture unique des écrans (120 jours, 13/11/2026). `fetchWorkouts`
+    // s'arrête à 60 séances : 7 semaines de courses chez un coureur qui fait aussi du vélo.
+    objectifSeul ? nonLu() : lireSeancesVma(sb, userId),
   ]);
 
   // Palier gratuit : le profil réduit à ce qui est DÉCLARÉ, et du test de VMA, la VMA seule
@@ -550,6 +554,15 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const { metrique: metriqueVfc, lignes: hrv } = serieVfc((hrvRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
   const sleep = (sleepRes.data ?? []) as { sleep_score: number | null; total_sleep_min: number | null; deep_sleep_min: number | null; rem_sleep_min: number | null; body_battery_end: number | null; respiration_rate: number | null; date: string }[];
   const workouts = (woRes.data ?? []) as Wk[];
+  // Lecture de la VMA en panne : on retombe sur les 60 séances de `fetchWorkouts` (la lecture d'avant le
+  // 13/11/2026), en le disant au journal — pas sur une liste vide qui effacerait la VMA « séances ».
+  // Journalisée dans error_logs (relecture du 13/11/2026) : le repli change la VMA, en silence sinon.
+  if (seancesVmaRes.error) {
+    const e = seancesVmaRes.error as { code?: string; message: string };
+    console.error("[coach] séances de la VMA illisibles, repli sur les 60 dernières :", e.message);
+    await journaliserEchecUneFois(null, { source: "coach-vma", userId, message: `Séances de la VMA illisibles, repli sur les 60 dernières : ${e.code ?? "?"} ${e.message}` });
+  }
+  const seancesVma = seancesVmaRes.error ? workouts : ((seancesVmaRes.data ?? []) as unknown as Wk[]);
   // Palier gratuit : du formulaire d'après-séance, ce que l'athlète DÉCLARE et qui le protège
   // — la douleur signalée, et le RESSENTI (RPE) depuis le 30/10/2026 (Cyprien : « ressenti lu
   // par le plan gratuit »). Un « 9/10, épuisé » qui laissait le lendemain inchangé était un
@@ -858,9 +871,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // précisément l'analyse que ce palier ne fait pas.
     // Même tri d'efforts que la VMA affichée (`fcMaxPourEfforts`, 12/11/2026) : sans FC max, le pic
     // des séances reste un garde-fou au lieu d'aucun tri.
-    // LA lecture des efforts, la même que chaque écran (`effortDesSeances`, 12/11/2026) : ses 60 séances,
-    // course seulement, FC max commune, acclimatation à la chaleur.
-    fromRuns: objectifSeul ? null : effortDesSeances(workouts as never, fcMaxEst, now)?.vma ?? estimateVmaFromRuns(runs, fcMaxEst, now),
+    // LA lecture des efforts, la même que chaque écran (`effortDesSeances`, 12/11/2026) : les séances des
+    // 120 derniers jours (13/11/2026), course seulement, FC max commune, acclimatation à la chaleur.
+    fromRuns: objectifSeul ? null : effortDesSeances(seancesVma as never, fcMaxEst, now)?.vma ?? estimateVmaFromRuns(runs, fcMaxEst, now),
   });
   const vmaIsEst = vmaSource !== "test" && vma != null;
 
@@ -2754,7 +2767,8 @@ ${catalog}`;
 export async function getEffectiveVma(sb: SupabaseClient, userId: string): Promise<number | null> {
   const [baseRes, woRes, profRes] = await Promise.all([
     sb.from("performance_baselines").select("vma_kmh").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
-    fetchWorkouts(sb, userId),
+    // La lecture unique des séances de la VMA (120 jours, 13/11/2026), comme le coach et les écrans.
+    lireSeancesVma(sb, userId),
     sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
   ]);
   // ⚠️ UNE PANNE N'EST PAS « VMA INCONNUE » (08/11/2026). Aucune des trois erreurs n'était

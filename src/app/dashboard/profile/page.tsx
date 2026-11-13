@@ -11,6 +11,7 @@ import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
 import { langueEcran } from "@/lib/i18n/serverLang";
+import { lireSeancesVma } from "@/lib/dashboard/seancesVma";
 
 export const metadata = { title: "Mon profil" };
 
@@ -39,7 +40,8 @@ export default async function ProfilePage() {
     supabase.from("workouts").select("distance_km, date, type, sport").eq("user_id", user!.id).gte("date", yearStart),
     supabase.from("workouts").select("distance_km, date, type, sport").eq("user_id", user!.id).gte("date", monthStart),
     supabase.from("user_goals").select("*").eq("user_id", user!.id).order("created_at", { ascending: false }),
-    supabase.from("workouts").select("date, distance_km, duration_seconds, type, sport, avg_hr, max_hr, weather_temp_c").eq("user_id", user!.id).gte("date", new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10)).order("date", { ascending: false }).limit(150),
+    // La lecture unique des séances de la VMA (120 jours, sans plafond de 150 : 13/11/2026).
+    lireSeancesVma(supabase, user!.id),
     // État de l'abonnement écrit par le webhook Stripe : date de prélèvement, résiliation
     // en cours, échec de paiement. Sans lui, l'écran ne peut répondre à aucune des trois
     // questions que se pose un abonné (cf. `lib/billing/etatAbonnement`).
@@ -69,7 +71,7 @@ export default async function ProfilePage() {
     paceCurveBest,
     garminVo2: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null,
     // LA lecture des efforts (`effortDesSeances`, 12/11/2026) : celle du coach et de chaque écran —
-    // 60 séances, course seulement, FC max commune, acclimatation à la chaleur.
+    // les courses des 120 derniers jours (`lireSeancesVma`, 13/11/2026), FC max commune, chaleur.
     fromRuns: effortDesSeances(rw, fcMaxCommune)?.vma ?? null,
   });
 

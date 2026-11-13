@@ -362,6 +362,13 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     return slot as PlanDay[];
   }
 
+  // UN JOUR PRATICABLE : déclaré disponible ET pas systématiquement raté (13/11/2026, visa @HeadCoach).
+  // Le protocole de course est posé AVANT les étapes 1 et 1 bis (jours ratés, disponibilités) : chaque
+  // sortie qu'il pose vérifie donc elle-même ce critère. Un jour non praticable reste vide — il deviendra
+  // « Repos » plus bas, ce qui protège la course tout autant : rien de dur n'y sera posé.
+  const praticable = (i: number) => i >= 0 && i <= 6 && ctx.availability.days.includes(dates[i].getDay())
+    && !(ctx.skippedWeekdays ?? []).includes(dates[i].getDay());
+
   // ── 0. LA COURSE. Elle prime sur tout le reste : c'est l'objectif, pas une séance.
   // Sans ce bloc, le moteur pouvait poser une VMA la veille ou une sortie longue le
   // jour J — il ne consultait simplement jamais la date de course.
@@ -400,7 +407,9 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     // Les 2 jours qui précèdent : décrassage seulement. Aucune séance dure dans les 48 h.
     for (const d of [1, 2]) {
       const i = raceIdx - d;
-      if (i < 0) continue;
+      // Un jour non praticable reste vide (13/11/2026) : la veille posée un jour indisponible y comptait
+      // une sortie que le coureur a dit ne pas pouvoir faire.
+      if (i < 0 || !praticable(i)) continue;
       // Ces jours-là sont des SORTIES : ils consomment le budget hebdomadaire au même
       // titre qu'un footing. Les oublier donnait 6 séances à un athlète qui en déclare 3.
       //
@@ -422,8 +431,8 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     for (const d of [1, 2]) {
       const i = raceIdx + d;
       if (i > 6) continue;
-      // Le footing de reprise n'a lieu que si le budget de sorties le permet.
-      if (d === 2 && runBudget <= 0) continue;
+      // Le footing de reprise n'a lieu que si le budget de sorties le permet, un jour praticable.
+      if (d === 2 && (runBudget <= 0 || !praticable(i))) continue;
       const placedRest = put(i, d === 1
         ? { type: "Repos", title: (l) => PLAN_T[l].reposCourseTitre, detail: (l) => PLAN_T[l].reposCourseDetail,
             why: (l) => PLAN_T[l].reposCourseWhy, tags: tags("Repos") }
@@ -431,6 +440,23 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
             detail: (l) => PLAN_T[l].recupCourseDetail,
             why: (l) => PLAN_T[l].recupCourseWhy, tags: tags("Récup", "Z1") });
       if (placedRest && d === 2) spend();   // le footing de reprise est une sortie
+    }
+  }
+  // LA COURSE JUSTE APRÈS LA FENÊTRE (J+7, J+8) : elle n'est pas dans les sept jours affichés, mais sa
+  // veille et son avant-veille, si. Sans ce bloc, le moteur posait un seuil la veille d'un 10 km
+  // (rejeu @Sparring du profil élite, 13/11/2026) — remplacé le lendemain par la replanification,
+  // mais affiché au calendrier et poussé à la montre d'ici là. Même protocole que dans la fenêtre, jours
+  // praticables seulement (`praticable`).
+  const courseApres = raceIdx < 0 && ctx.daysToRace != null && ctx.daysToRace >= 7 && ctx.daysToRace <= 8 ? ctx.daysToRace : -1;
+  if (courseApres > 0) {
+    for (const d of [1, 2]) {
+      const i = courseApres - d;
+      if (i > 6 || runBudget <= 0 || !praticable(i)) continue;
+      if (put(i, d === 1
+        ? { type: "Récup", title: (l) => PLAN_T[l].veilleTitre, detail: (l) => PLAN_T[l].veilleDetail,
+            why: (l) => PLAN_T[l].veilleWhy, tags: tags("Récup", "Veille de course") }
+        : { type: "Récup", title: (l) => PLAN_T[l].avantVeilleTitre, detail: (l) => PLAN_T[l].avantVeilleDetail,
+            why: (l) => PLAN_T[l].avantVeilleWhy, tags: tags("Récup", "Affûtage") })) spend();
     }
   }
 

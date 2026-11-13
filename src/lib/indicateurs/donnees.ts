@@ -11,7 +11,7 @@ import type { Lang } from "@/lib/i18n/translations";
 import type { HRVData, Workout } from "@/types";
 import type { DonneesFiche } from "./fiches";
 import type { SeanceCharge } from "@/lib/dashboard/charge";
-import { vmaAffichee, SEANCES_VMA } from "@/lib/dashboard/vmaAffichee";
+import { vmaAffichee } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
 import { objectifEnCours } from "@/lib/coach/prochaineCourse";
@@ -19,6 +19,7 @@ import { computeStreak, coursesDeLObjectif, type StreakWorkout, type StreakPresc
 import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { estUnePanne } from "@/lib/dashboard/lectures";
+import { lireSeancesVma } from "@/lib/dashboard/seancesVma";
 
 const decale = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const PANNE: Record<Lang, string> = {
@@ -50,8 +51,8 @@ export async function chargerDonnees(sb: SupabaseClient, userId: string, lang: L
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "session_feedback").order("created_at", { ascending: false }).limit(60),
     // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
     fcMaxDeLAthlete(sb, userId),
-    // Les séances de LA VMA (12/11/2026) : autant que le coach (`SEANCES_VMA`).
-    sb.from("workouts").select("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c").eq("user_id", userId).order("date", { ascending: false }).limit(SEANCES_VMA),
+    // Les séances de LA VMA : la lecture unique du coach et des écrans (120 jours, 13/11/2026).
+    lireSeancesVma(sb, userId),
   ]);
   const enPanne = [profil, seances, historique, vfc, sommeil, charge, base, obj, plan, serieSeances, seriePlan, serieRessentis, seancesVma].filter((r) => estUnePanne(r));
   // Journalisées dans error_logs (12/11/2026) — « aucune ligne » n'est pas une panne.
