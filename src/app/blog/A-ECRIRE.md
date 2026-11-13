@@ -36,3 +36,4 @@ Catégories possibles pour la carte : `AI`, `TRAINING`, `NUTRITION`, `HEALTH`, `
 - [ ] Caféine avant la course : dose, délai, effets, et à qui ça ne convient pas — `NUTRITION`
 - [ ] Courir à jeun : ce que la littérature mesure vraiment (et ce qu'elle ne mesure pas) — `NUTRITION`
 - [ ] Bâtons en trail : gain d'économie mesuré, et le coût qu'on oublie — `GEAR`
+- [x] Quelle application de coaching running choisir en 2027 : six questions à poser, et nos réponses — `AI` (`quelle-application-coaching-running-2027-six-questions`) — hors carnet, demandé par Cyprien le 13/11/2026
