@@ -18,6 +18,7 @@
  */
 import assert from "node:assert/strict";
 import { buildWeekPlan, type PlanDay } from "../src/lib/ai/autoPlan";
+import { PLAN_T } from "../src/lib/ai/planI18n";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
@@ -701,6 +702,39 @@ async function profilElite10() {
       }
     }
     assert.equal(vus, 10, "précondition : tous les cas n'ont pas tourné");
+  });
+  await testA("course C trop près de la course A : écartée du plan, ET LE PLAN LE DIT (5 langues), sans veille orpheline", async () => {
+    // Décision de Cyprien (13/11/2026) : une course C dont le jour est pris par le protocole de la course A
+    // (veille, avant-veille, repos, reprise — dans la fenêtre comme à J+7/J+8) est écartée, et le coureur le
+    // lit. Avant : elle disparaissait sans un mot, et sa « veille » restait seule au calendrier.
+    const debut = new Date("2026-09-07T08:00:00Z");
+    const iso = (n: number) => new Date(debut.getTime() + n * 86400000).toISOString().slice(0, 10);
+    let ecartees = 0, gardees = 0;
+    for (const dtr of [2, 3, 4, 5, 7, 8]) for (const cIdx of [0, 1, 2, 3, 4, 5, 6]) {
+      if (cIdx === dtr) continue;
+      const ctx = mk({
+        objective: { race: "10 km A", distanceKm: 10, targetPace: "4'00/km", targetTime: "40'00", targetSeconds: 2400 },
+        daysToRace: dtr, weeksToRace: 0, cycle: { deload: false, taper: true, label: "" },
+        courseSecondaire: { idx: cIdx, nom: "Cross du village", distanceKm: 8, priorite: "C" },
+        availability: { daysPerWeek: 6, days: [0, 1, 2, 3, 4, 5, 6] },
+      });
+      const plan = buildWeekPlan(ctx, debut);
+      const courseC = plan.find((d) => d.type === "Course" && d.date === iso(cIdx));
+      if (courseC) { gardees++; continue; }
+      ecartees++;
+      const jourC = plan.filter((d) => d.date === iso(cIdx));
+      assert.ok(jourC.some((d) => d.why.includes(PLAN_T.fr.courseCEcartee("Cross du village"))),
+        `A à J+${dtr}, C au jour ${cIdx} : la course C disparaît sans que le plan le dise (${jourC.map((d) => `${d.type} : ${d.why.slice(-80)}`).join(" | ")})`);
+      for (const l of ["en", "de", "es", "pt"] as const)
+        assert.ok(jourC.some((d) => d.i18n?.[l]?.why?.includes(PLAN_T[l].courseCEcartee("Cross du village"))), `A à J+${dtr}, C au jour ${cIdx} : message absent en ${l}`);
+      // Pas de veille de la C sans la C (sauf si ce jour est la veille de la A elle-même).
+      const veilleC = plan.find((d) => d.date === iso(cIdx - 1) && d.title === PLAN_T.fr.veilleTitre);
+      assert.ok(!veilleC || cIdx - 1 === dtr - 1, `A à J+${dtr}, C au jour ${cIdx} : « ${veilleC?.title} » le ${iso(cIdx - 1)}, veille d'une course C écartée`);
+    }
+    assert.ok(ecartees >= 8 && gardees >= 8, `précondition : ${ecartees} C écartée(s), ${gardees} gardée(s)`);
+    // Le message existe vraiment dans chaque langue : il nomme la course (un texte vide « contiendrait » tout).
+    for (const l of ["fr", "en", "de", "es", "pt"] as const)
+      assert.ok(PLAN_T[l].courseCEcartee("Cross du village").includes("Cross du village") && PLAN_T[l].courseCEcartee("Cross du village").trim().length > 40, `message vide ou sans le nom de la course en ${l}`);
   });
   await testA("course de J+3 à J+8 : la veille, l'avant-veille et la reprise ne tombent jamais un jour systématiquement raté", async () => {
     // Un jour « disponible » mais jamais couru (`skippedWeekdays`) reçoit « Repos » à l'étape 1 : le protocole

@@ -464,16 +464,28 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
 
   // Course C : la course, une veille calme ; elle compte comme une séance dure (étape 4).
   if (courseCIdx >= 0) {
-    if (put(courseCIdx, {
+    const poseeC = put(courseCIdx, {
       type: "Course",
       title: (l) => PLAN_T[l].courseSecondaireTitre(cs!.nom, "C"),
       detail: (l) => PLAN_T[l].courseCDetail,
       why: (l) => PLAN_T[l].courseCWhy,
       tags: (l) => [PLAN_T[l].tags["Course"], ...(cs!.distanceKm ? [PLAN_T[l].tagKm(nRaw(cs!.distanceKm, l))] : [])],
-    })) spend();
+    });
+    if (poseeC) spend();
+    else if (slot[courseCIdx]) {
+      // ÉCARTÉE, ET ON LE DIT (décision de Cyprien, 13/11/2026). Son jour est pris par le protocole d'une
+      // course plus importante (veille, avant-veille, repos ou reprise de la A ou de la B, dans la fenêtre
+      // comme à J+7/J+8) : une course la veille d'un objectif en gâche la fraîcheur. Avant, elle
+      // disparaissait du plan sans un mot. Le message s'ajoute au « pourquoi » de ce jour, en 5 langues.
+      const pris = slot[courseCIdx]!;
+      const i18n = Object.fromEntries(Object.entries(pris.i18n ?? {}).map(([l, t]) =>
+        [l, t ? { ...t, why: `${t.why ?? ""}${PLAN_T[l as Lang].courseCEcartee(cs!.nom)}` } : t])) as Partial<Record<Lang, PlanDayText>>;
+      slot[courseCIdx] = { ...pris, why: `${pris.why ?? ""}${PLAN_T.fr.courseCEcartee(cs!.nom)}`, i18n };
+    }
     const veille = courseCIdx - 1;
-    // Un jour praticable seulement, comme tout le protocole de course (visa @HeadCoach, 2e tour).
-    if (veille >= 0 && praticable(veille) && runBudget > 0 && put(veille, {
+    // Un jour praticable seulement, comme tout le protocole de course (visa @HeadCoach, 2e tour) ; et pas
+    // de veille pour une course C écartée.
+    if (poseeC && veille >= 0 && praticable(veille) && runBudget > 0 && put(veille, {
       type: "Récup", title: (l) => PLAN_T[l].veilleTitre, detail: (l) => PLAN_T[l].veilleDetail,
       why: (l) => PLAN_T[l].veilleWhy, tags: tags("Récup", "Veille de course"),
     })) spend();
