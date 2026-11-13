@@ -141,18 +141,30 @@ export function courseCEcartee(ctx: AthleteContext): { idx: number; nom: string 
   return Math.abs(cs.idx - a) <= 2 ? { idx: cs.idx, nom: cs.nom } : null;
 }
 
-/** Ajoute au « pourquoi » du jour de la course C écartée (5 langues) le message qui le dit. */
-function avecCourseCEcartee(ctx: AthleteContext, plan: PlanDay[], today: Date): PlanDay[] {
+/**
+ * Pose au « pourquoi » du jour de la course C écartée (5 langues) le message qui le dit. À appeler EN
+ * DERNIER sur le plan publié : `buildWeekPlan` le fait, et le coach le refait après ses ajustements
+ * (« alléger », « décaler », « échanger ») et sa seconde passe de consignes, qui réécrivent ou
+ * déplacent les jours (relecture du 13/11/2026). Idempotente : le message est d'abord retiré PARTOUT,
+ * puis posé une seule fois, sur le bon jour — un « échanger » ne l'emporte pas ailleurs.
+ */
+export function avecCourseCEcartee(ctx: AthleteContext, plan: PlanDay[], today: Date): PlanDay[] {
   const c = courseCEcartee(ctx);
   if (!c) return plan;
+  const sans = (texte: string | undefined, l: Lang) => (texte ?? "").split(PLAN_T[l].courseCEcartee(c.nom)).join("");
+  const nettoye = plan.map((d) => ({
+    ...d, why: sans(d.why, "fr"),
+    i18n: Object.fromEntries(Object.entries(d.i18n ?? {}).map(([l, t]) => [l, t ? { ...t, why: sans(t.why, l as Lang) } : t])) as Partial<Record<Lang, PlanDayText>>,
+  }));
   const debut = new Date(today); debut.setHours(0, 0, 0, 0);
   const date = iso(addDays(debut, c.idx));
-  const i = plan.findIndex((d) => d.date === date);
-  if (i < 0) return plan;
-  const jour = plan[i];
+  // L'entrée principale du jour (pas le footing du soir d'un jour doublé).
+  const i = nettoye.findIndex((d) => d.date === date && d.moment !== "soir");
+  if (i < 0) return nettoye;
+  const jour = nettoye[i];
   const i18n = Object.fromEntries(Object.entries(jour.i18n ?? {}).map(([l, t]) =>
     [l, t ? { ...t, why: `${t.why ?? ""}${PLAN_T[l as Lang].courseCEcartee(c.nom)}` } : t])) as Partial<Record<Lang, PlanDayText>>;
-  return plan.map((d, k) => (k === i ? { ...jour, why: `${jour.why ?? ""}${PLAN_T.fr.courseCEcartee(c.nom)}`, i18n } : d));
+  return nettoye.map((d, k) => (k === i ? { ...jour, why: `${jour.why ?? ""}${PLAN_T.fr.courseCEcartee(c.nom)}`, i18n } : d));
 }
 
 /**

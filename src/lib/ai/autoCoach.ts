@@ -10,7 +10,7 @@
 import { lignesRetireesParDouleur } from "@/lib/coach/footings";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
-import { buildWeekPlan, consignesSurPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
+import { buildWeekPlan, consignesSurPlan, avecCourseCEcartee, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
 import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
 import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, fcMaxMontre, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
@@ -285,7 +285,10 @@ export async function autoCoachForUser(
   }
   // Les ajustements (« décaler », « échanger ») réécrivent la semaine APRÈS le moteur : les
   // consignes du kinésithérapeute sont réappliquées sur le résultat (relecture du 10/11/2026).
-  const week = consignesSurPlan(ctx, ajuste.week, maintenant);
+  // Puis le message d'une course C écartée, EN DERNIER : un ajustement peut l'avoir effacé (« alléger »)
+  // ou déplacé (« décaler », « échanger ») (relecture du 13/11/2026). La relecture Premium qui suit
+  // ajoute au « pourquoi » sans le remplacer.
+  const week = avecCourseCEcartee(ctx, consignesSurPlan(ctx, ajuste.week, maintenant), maintenant);
 
   // ── LE COACH AVANCÉ (Premium, et l'essai qui le montre) ─────────────────────
   // Le modèle relit les séances CLÉS et ajoute à leur « pourquoi » un conseil d'exécution

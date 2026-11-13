@@ -17,7 +17,8 @@
  * ne dépasse pas ce que le module lui-même a fixé comme cible.
  */
 import assert from "node:assert/strict";
-import { buildWeekPlan, type PlanDay } from "../src/lib/ai/autoPlan";
+import { buildWeekPlan, avecCourseCEcartee, type PlanDay } from "../src/lib/ai/autoPlan";
+import { readFileSync } from "node:fs";
 import { PLAN_T } from "../src/lib/ai/planI18n";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
@@ -750,6 +751,41 @@ async function profilElite10() {
     // Le message existe vraiment dans chaque langue : il nomme la course (un texte vide « contiendrait » tout).
     for (const l of ["fr", "en", "de", "es", "pt"] as const)
       assert.ok(PLAN_T[l].courseCEcartee(NOM).includes(NOM) && PLAN_T[l].courseCEcartee(NOM).trim().length > 40, `message vide ou sans le nom de la course en ${l}`);
+  });
+  await testA("course C écartée : le coach repose le message APRÈS ses ajustements — une fois, au bon jour, 5 langues", async () => {
+    // Relecture du 13/11/2026 : le coach publie le plan APRÈS « alléger » (qui réécrit le « pourquoi »),
+    // « décaler » / « échanger » (qui déplacent le jour) et une seconde passe de consignes.
+    const debut = new Date("2026-09-07T08:00:00Z");
+    const iso = (n: number) => new Date(debut.getTime() + n * 86400000).toISOString().slice(0, 10);
+    const NOM = "Cross du village";
+    const ctx = mk({
+      objective: { race: "10 km A", distanceKm: 10, targetPace: "4'00/km", targetTime: "40'00", targetSeconds: 2400 },
+      daysToRace: 3, weeksToRace: 0, cycle: { deload: false, taper: true, label: "" },
+      courseSecondaire: { idx: 2, nom: NOM, distanceKm: 8, priorite: "C" },
+      availability: { daysPerWeek: 6, days: [0, 1, 2, 3, 4, 5, 6] },
+    });
+    const plan = buildWeekPlan(ctx, debut);
+    const porte = (w: PlanDay[], l: "fr" | "en" | "de" | "es" | "pt") => w.filter((d) =>
+      (l === "fr" ? d.why : d.i18n?.[l]?.why ?? "").includes(PLAN_T[l].courseCEcartee(NOM))).map((d) => d.date);
+    assert.deepEqual(porte(plan, "fr"), [iso(2)], "précondition : le message n'est pas sur le jour de la C");
+    // « alléger » : le « pourquoi » du jour de la C est remplacé (5 langues).
+    const allegee = plan.map((d) => d.date === iso(2) ? { ...d, why: "Allégée.", i18n: Object.fromEntries(Object.entries(d.i18n ?? {}).map(([l, t]) => [l, t ? { ...t, why: "Allégée." } : t])) } : d);
+    // « échanger » : le jour qui portait le message part au jour 5, et le jour 5 vient au jour 2.
+    const echangee = plan.map((d) => d.date === iso(2) ? { ...d, date: iso(5) } : d.date === iso(5) ? { ...d, date: iso(2) } : d);
+    for (const [nom, w] of [["alléger", allegee], ["échanger", echangee], ["deux passes", avecCourseCEcartee(ctx, plan, debut)]] as const) {
+      const fin = avecCourseCEcartee(ctx, w as PlanDay[], debut);
+      for (const l of ["fr", "en", "de", "es", "pt"] as const)
+        assert.deepEqual(porte(fin, l), [iso(2)], `${nom} (${l}) : le message est sur ${porte(fin, l).join(", ") || "aucun jour"}, pas une fois le ${iso(2)}`);
+    }
+    // Un jour doublé (matin + soir) : le message va sur la séance principale, pas sur le footing du soir.
+    const jourC = plan.find((d) => d.date === iso(2))!;
+    const double = [...plan.filter((d) => d.date !== iso(2)),
+      { ...jourC, moment: "soir" as const, title: "Footing du soir" }, { ...jourC, moment: "matin" as const, title: "Séance du matin" }];
+    const surDouble = avecCourseCEcartee(ctx, double, debut).filter((d) => d.why.includes(PLAN_T.fr.courseCEcartee(NOM)));
+    assert.deepEqual(surDouble.map((d) => d.title), ["Séance du matin"], `jour doublé : message sur ${surDouble.map((d) => d.title).join(", ") || "rien"}`);
+    // Le coach l'appelle bien EN DERNIER, après ses ajustements et sa seconde passe de consignes.
+    const coach = readFileSync("src/lib/ai/autoCoach.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((x) => x.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+    assert.match(coach, /const week = avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, maintenant\), maintenant\);/, "le coach publie sans reposer le message de la course C écartée");
   });
   await testA("course de J+3 à J+8 : la veille, l'avant-veille et la reprise ne tombent jamais un jour systématiquement raté", async () => {
     // Un jour « disponible » mais jamais couru (`skippedWeekdays`) reçoit « Repos » à l'étape 1 : le protocole
