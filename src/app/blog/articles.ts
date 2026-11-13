@@ -1015,7 +1015,7 @@ export const ARTICLES: Article[] = [
         h: "Ce qu'une montre calcule, pas ce qu'elle voit",
         p: [
           "Une montre GPS ne mesure pas ta vitesse : elle enregistre une suite de positions, à intervalles réguliers, et calcule la distance puis l'allure à partir de l'écart entre deux points. L'allure instantanée affichée au poignet est donc une dérivée — une position moins une autre, divisée par un temps très court.",
-          "Cette construction est fragile par nature. Une position légèrement décalée ne fait presque rien à la distance totale d'une sortie d'une heure, mais elle peut faire bondir ou chuter l'allure instantanée calculée sur quelques secondes. Sous les arbres, c'est précisément cette position ponctuelle qui se dégrade.",
+          "Cette construction est fragile par nature. Une position légèrement décalée pèse moins sur la distance totale d'une sortie d'une heure que sur l'allure instantanée, calculée sur quelques secondes, qu'elle peut faire bondir ou chuter. Sous les arbres, c'est précisément cette position ponctuelle qui se dégrade.",
         ],
       },
       {
@@ -1045,7 +1045,7 @@ export const ARTICLES: Article[] = [
         h: "Ce que Pacevo en fait",
         p: [
           "L'app relit, via intervals.icu, les mêmes traces GPS que celles enregistrées par la montre — elle n'a pas accès à une source de position plus précise que l'appareil au poignet, et ne prétend corriger aucune erreur de ce type.",
-          "C'est pourquoi, dans l'analyse d'une séance, Pacevo classe l'intensité (facile, modérée ou dure) d'après ta fréquence cardiaque moyenne, rapportée à ta fréquence maximale, et non d'après l'allure affichée seconde par seconde. Pour l'écart à la séance prévue, l'allure est comparée à la cible en moyenne, sur une répétition, un bloc ou la séance. Sans fréquence cardiaque enregistrée, ou sans fréquence maximale connue, l'intensité n'est pas classée.",
+          "Dans l'analyse d'une séance, Pacevo classe l'intensité (facile, modérée ou dure) d'après ta fréquence cardiaque moyenne, rapportée à ta fréquence maximale, et non d'après l'allure affichée seconde par seconde. Pour l'écart à la séance prévue, l'allure est comparée à la cible en moyenne, sur une répétition, un bloc ou la séance. Sans fréquence cardiaque enregistrée, ou sans fréquence maximale connue, l'intensité n'est pas classée.",
         ],
       },
       {
