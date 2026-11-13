@@ -1007,7 +1007,7 @@ export const ARTICLES: Article[] = [
   {
     slug: "gps-en-foret-pourquoi-ta-montre-se-trompe",
     cle: "p14",
-    maj: "9 novembre 2026",
+    maj: "13 novembre 2026",
     chapo:
       "Plusieurs trails se courent en forêt ces prochains week-ends, et l'un d'eux de nuit. C'est exactement le terrain où le signal satellite se dégrade. Voici ce qu'une étude de validation a mesuré, et le repère qui reste fiable quand l'allure affichée ne l'est plus.",
     blocs: [
@@ -1021,15 +1021,15 @@ export const ARTICLES: Article[] = [
       {
         h: "Ce qu'une étude de validation a mesuré",
         p: [
-          "Une équipe suisse menée par Rahel Gilgen-Ammann a testé huit montres GPS de sport (Apple, Coros, Garmin, Polar, Suunto) sur un même parcours répété à ciel ouvert, en zone urbaine et en forêt, à la marche, en course et à vélo. L'étude a été publiée dans JMIR mHealth and uHealth en 2020.",
-          "Ses résultats : l'erreur de distance mesurée se situe entre 3,2 % et 6,1 % selon les montres, tous terrains confondus. À ciel ouvert, six des huit montres restent précises ; en forêt et en zone urbaine, la précision se dégrade nettement, et les montres sous-estiment généralement la distance parcourue.",
+          "Une équipe suisse menée par Rahel Gilgen-Ammann a testé huit montres GPS de sport (Apple, Coros, Garmin, Polar, Suunto) dans trois types de zones, en ville, en forêt et sur piste d'athlétisme, à la marche, en course et à vélo. L'étude a été publiée dans JMIR mHealth and uHealth en 2020.",
+          "Ses résultats : toutes zones confondues, l'erreur absolue moyenne sur la distance se situe entre 3,2 % et 6,1 % selon les montres. Sur la piste, six des huit montres gardent une bonne précision ; en ville et en forêt, les distances sont moins précises et généralement sous-estimées.",
           "Autre résultat qui compte pour un coureur plutôt qu'un marcheur : la course affiche des taux d'erreur plus élevés que la marche ou le vélo pour la majorité des montres testées. Le mode de déplacement lui-même joue, pas seulement le terrain.",
         ],
       },
       {
         h: "Pourquoi l'allure affichée trompe le plus là où on la regarde le plus",
         p: [
-          "Le réflexe, sous un sous-bois technique, est de regarder l'allure pour savoir si on accélère ou si on cale. C'est exactement le moment où ce chiffre est le moins fiable : moins de satellites visibles, signal réfléchi par les troncs et le relief, et une allure instantanée qui amplifie chaque erreur de position.",
+          "Ce qui suit est notre raisonnement, pas un résultat de l'étude, qui mesure des distances et non des allures. Le réflexe, sous un sous-bois technique, est de regarder l'allure pour savoir si on accélère ou si on cale. C'est exactement le moment où ce chiffre est le moins fiable : moins de satellites visibles, signal réfléchi par les troncs et le relief, et une allure instantanée qui amplifie chaque erreur de position.",
           "Un coureur qui corrige sa foulée à chaque sursaut d'allure sous les arbres ne corrige rien de réel — il réagit à du bruit de mesure. C'est fatigant, et ça casse une régularité d'effort qui, elle, est réelle.",
         ],
       },
@@ -1045,7 +1045,7 @@ export const ARTICLES: Article[] = [
         h: "Ce que Pacevo en fait",
         p: [
           "L'app relit, via intervals.icu, les mêmes traces GPS que celles enregistrées par la montre — elle n'a pas accès à une source de position plus précise que l'appareil au poignet, et ne prétend corriger aucune erreur de ce type.",
-          "C'est pourquoi l'intensité d'une séance se juge d'abord à la fréquence cardiaque, jamais à l'allure instantanée brute : sur un trail boisé, c'est la donnée qui reste interprétable.",
+          "C'est pourquoi Pacevo classe l'intensité d'une séance (facile, modérée ou dure) d'après ta fréquence cardiaque moyenne, rapportée à ta fréquence maximale, et non d'après l'allure affichée seconde par seconde. L'allure ne sert qu'à comparer ce que tu as couru à la cible prévue, en moyenne sur une répétition, un bloc ou la séance. Sans fréquence cardiaque enregistrée, l'intensité n'est pas classée.",
         ],
       },
       {
