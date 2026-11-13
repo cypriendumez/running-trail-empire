@@ -26,6 +26,8 @@ import { OffreEtudiante } from "@/components/landing/OffreEtudiante";
 import { WaitlistSection } from "@/components/WaitlistSection";
 import { PHOTOS_PROGRAMMES } from "@/lib/brand/photosProgrammes";
 import { SITE_URL, NOM_MARQUE, jsonLdMarque } from "@/lib/brand/entite";
+import { derniersArticles } from "@/app/blog/maillage";
+import { BLOG } from "@/app/blog/blogI18n";
 
 // Données visuelles (non traduisibles). Les libellés viennent de LANDING[lang].
 // ── PHOTOS DES PROGRAMMES ────────────────────────────────────────────────────
@@ -919,6 +921,32 @@ export default function LandingPage() {
           <p className="mx-auto mt-8 max-w-2xl text-center text-sm leading-relaxed text-zinc-500">
             {L.pricing.apres}
           </p>
+        </Container>
+      </Section>
+
+      {/* ── DERNIERS ARTICLES ──
+          Trois liens depuis la page la plus visitée du site : sans eux, un article n'était
+          lié que depuis /blog, et Google n'en avait exploré que 4 sur 17 (13/11/2026).
+          Des liens de texte, pas des cartes à photo : le bloc ne doit rien coûter au
+          chargement de l'accueil. */}
+      <Section>
+        <Container className="max-w-3xl">
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">{L.blog.title}</h2>
+            <Link href="/blog" className="shrink-0 text-sm font-semibold text-emerald-700 hover:text-emerald-800">
+              {L.blog.all} <ArrowRight className="inline h-4 w-4" />
+            </Link>
+          </div>
+          <ul className="mt-6 divide-y divide-zinc-200 border-y border-zinc-200">
+            {derniersArticles(3).map((a) => (
+              <li key={a.slug}>
+                <Link href={a.href} className="group flex items-start justify-between gap-4 py-4 text-lg font-medium leading-snug text-zinc-800 transition-colors hover:text-emerald-700">
+                  {(BLOG[lang] ?? BLOG.fr).posts[a.cle]?.title}
+                  <ArrowRight className="mt-1.5 h-4 w-4 shrink-0 text-zinc-300 transition-colors group-hover:text-emerald-700" />
+                </Link>
+              </li>
+            ))}
+          </ul>
         </Container>
       </Section>
 

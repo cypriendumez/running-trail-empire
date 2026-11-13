@@ -9,6 +9,8 @@ import { editionsAAfficher } from "@/lib/races/editionsResultats";
 import { lienSortantPropre } from "@/lib/races/lienPropre";
 import { nomDestination, estCalendrierTiers, organisateurReel } from "@/lib/races/destination";
 import { texteCourses } from "../coursesI18n";
+import { articlesPourCourse } from "@/app/blog/maillage";
+import { BLOG } from "@/app/blog/blogI18n";
 import { jourFrance } from "@/lib/races/jourFrance";
 import {
   estPubliable, estPubliableSansDate, aUneDate, idDepuisSlug, bornesId, slugCourse, basculeALaLecture,
@@ -129,6 +131,9 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   // ⚠️ `terrain` EST UN TABLEAU. `{c.terrain && …}` rendait donc une ligne « Terrain »
   // VIDE sur les ~15 000 courses où il vaut `[]` — un tableau vide est truthy. Et un
   // tableau plein s'affichait « single_track,forest », en anglais et sans espace.
+  // Trois articles utiles à qui prépare cette course (règles dans `blog/maillage`).
+  const aLire = articlesPourCourse({ distanceKm: km, deniveleM: dplus, type: c.type });
+  const titresBlog = (BLOG[lang as keyof typeof BLOG] ?? BLOG.fr).posts;
   const terrains = (Array.isArray(c.terrain) ? c.terrain : [])
     .map((v) => t(`terrain.${String(v)}`))
     .filter(Boolean);
@@ -262,7 +267,22 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
         {t("cta.avertissement")}
       </p>
 
-      <section className="mt-12 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6">
+      {aLire.length > 0 && (
+        <nav className="mt-12" aria-label={t("lire.titre")}>
+          <h2 className="text-lg font-semibold text-zinc-900">{t("lire.titre")}</h2>
+          <ul className="mt-3 divide-y divide-zinc-100 rounded-2xl border border-zinc-200 bg-white">
+            {aLire.map((a) => (
+              <li key={a.slug}>
+                <Link href={a.href} className="block px-5 py-3.5 text-sm font-medium text-zinc-700 transition-colors hover:text-emerald-700">
+                  {titresBlog[a.cle]?.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
+
+      <section className="mt-8 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6">
         <h2 className="text-lg font-semibold text-zinc-900">{t("prep.titre")}</h2>
         <p className="mt-1.5 text-sm text-zinc-600">
           {t("prep.texte")}

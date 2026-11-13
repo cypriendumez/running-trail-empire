@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Info } from "lucide-react";
+import { ArrowLeft, ArrowRight, ExternalLink, Info } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Container, Section } from "@/components/ui/Container";
@@ -10,6 +10,7 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { BLOG } from "../blogI18n";
 import { articleParSlug } from "../articles";
 import { traductionArticle } from "../articlesI18n";
+import { articlesVoisins } from "../maillage";
 
 /**
  * Avertissement affiché quand l'article N'EST PAS ENCORE TRADUIT dans la langue lue.
@@ -42,6 +43,14 @@ const MAJ: Record<string, string> = {
   pt: "Atualizado a",
 };
 
+const A_LIRE: Record<string, string> = {
+  fr: "À lire aussi",
+  en: "Read next",
+  de: "Auch lesenswert",
+  es: "Sigue leyendo",
+  pt: "Lê também",
+};
+
 const SOURCES: Record<string, string> = {
   fr: "Sources",
   en: "Sources",
@@ -57,7 +66,9 @@ export function VueArticle({ slug }: { slug: string }) {
 
   // Le TITRE et l'extrait restent traduits — ils existent déjà dans les cinq langues et
   // servent aussi la carte de l'index. Seul le corps est français.
-  const t = (BLOG[lang] ?? BLOG.fr).posts[a.cle];
+  const titres = (BLOG[lang] ?? BLOG.fr).posts;
+  const t = titres[a.cle];
+  const voisins = articlesVoisins(a.slug);
 
   // Le corps traduit s'il existe, le français sinon. Le bandeau « seulement en
   // français » ne s'affiche QUE dans le second cas : il est piloté par la présence
@@ -142,6 +153,29 @@ export function VueArticle({ slug }: { slug: string }) {
               ))}
             </ul>
           </div>
+
+          {/* Liens vers d'autres articles : sans eux, un article n'était lié que depuis
+              /blog, et Google n'en avait exploré que 4 sur 17 (voir `maillage.ts`). */}
+          {voisins.length > 0 && (
+            <nav className="mt-12 border-t border-zinc-200 pt-8" aria-label={A_LIRE[lang] ?? A_LIRE.fr}>
+              <h2 className="text-xs font-semibold text-zinc-400 first-letter:uppercase">
+                {A_LIRE[lang] ?? A_LIRE.fr}
+              </h2>
+              <ul className="mt-4 space-y-3">
+                {voisins.map((v) => (
+                  <li key={v.slug}>
+                    <Link
+                      href={v.href}
+                      className="group inline-flex items-start gap-2 text-[17px] font-medium leading-snug text-zinc-800 transition-colors hover:text-[#059669]"
+                    >
+                      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-zinc-300 transition-colors group-hover:text-[#059669]" />
+                      {titres[v.cle]?.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
 
           <div className="mt-14 surface-brand rounded-2xl px-8 py-12 text-center">
             <p className="mx-auto max-w-md text-xl font-semibold leading-snug tracking-tight">
