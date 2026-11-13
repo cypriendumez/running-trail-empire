@@ -10,7 +10,7 @@ import { generateContent, budget } from "@/lib/ai/gemini";
 import { lignesDuBilan, inviteBilan, empreinteBilan } from "@/lib/ai/bilanSemaine";
 import { faitsDeLaSemaine, TYPE_BILAN } from "@/lib/ai/bilanDonnees";
 import { chiffresInconnus } from "@/lib/ai/relectureSemaine";
-import { getAccountLang } from "@/lib/i18n/serverLang";
+import { langueDuCompte } from "@/lib/i18n/serverLang";
 import { aujourdhui, fuseauOuDefaut } from "@/lib/time/fuseau";
 
 /**
@@ -33,7 +33,7 @@ export async function POST() {
   if (refus) return refus.reponse;
 
   const jour = aujourdhui(fuseauOuDefaut(decodeURIComponent((await cookies()).get("pacevo_tz")?.value ?? "")));
-  const lang = await getAccountLang(supabase, user.id);
+  const { lang, profilLu } = await langueDuCompte(supabase, user.id);
 
   // ── 1. Les faits, toutes données à l'athlète (RLS) — la MÊME lecture que l'e-mail du lundi.
   const faits = await faitsDeLaSemaine(supabase as unknown as Parameters<typeof faitsDeLaSemaine>[0], user.id, jour);
@@ -75,6 +75,9 @@ export async function POST() {
   }
 
   // ── 5. Mémoriser — une écriture ratée se repaierait à chaque ouverture ─────
+  // Profil illisible : la langue est un repli (navigateur). Ce bilan est servi, pas mémorisé — il
+  // écraserait celui écrit dans la langue du compte, et le modèle serait repayé (13/11/2026).
+  if (!profilLu) return NextResponse.json({ ok: true, texte, memorise: false });
   const donnees = { empreinte, texte, semaine: faits.debut, lang, at: new Date().toISOString() };
   const { error: eMemo } = memo?.id
     ? await admin.from("notifications").update({ data: donnees }).eq("id", memo.id)

@@ -13,18 +13,41 @@ export async function getAccountLang(
   // Le client Supabase réel, pas une forme structurelle réécrite à la main : la version
   // manuscrite ne décrivait pas `PostgrestBuilder` (pas de `catch`/`finally`) et faisait
   // échouer le typage sur chaque page appelante.
-  sb: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>,
+  sb: ClientServeur,
   userId: string,
 ): Promise<Lang> {
-  // Profil illisible ou langue absente : celle du NAVIGATEUR, jamais « fr » par défaut (12/11/2026 :
-  // un coureur anglophone recevait sa page en français dès que la lecture échouait).
+  return (await langueDuCompte(sb, userId)).lang;
+}
+
+type ClientServeur = Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>;
+
+/**
+ * La langue du compte, et SI LE PROFIL A PU ÊTRE LU (13/11/2026).
+ *
+ * Profil illisible ou langue absente : celle du NAVIGATEUR (`repli`), jamais « fr » par défaut
+ * (12/11/2026 : un coureur anglophone recevait sa page en français dès que la lecture échouait).
+ * `profilLu: false` = la lecture a ÉCHOUÉ : la langue est un repli de passage. Un texte d'IA écrit
+ * dans cette langue ne se MÉMORISE pas — l'analyse de séance, dont le cache ignore la langue, l'aurait
+ * resservi à jamais ; le bilan aurait écrasé le bon et repayé le modèle. Un profil lu sans langue
+ * choisie (`profilLu: true`) est un état stable : la langue du navigateur y est la vraie réponse.
+ * `repli` est injectable pour que le test EXÉCUTE la fonction hors d'une requête Next.
+ */
+export async function langueDuCompte(
+  sb: ClientServeur,
+  userId: string,
+  repli: () => Promise<Lang> = getPublicLang,
+): Promise<{ lang: Lang; profilLu: boolean }> {
   try {
     const { data, error } = await sb.from("profiles").select("preferred_language").eq("id", userId).maybeSingle();
-    if (error) console.error("[langue] profil illisible :", error.message);
-    return langueEcran((data as { preferred_language?: unknown } | null)?.preferred_language);
+    if (error) {
+      console.error("[langue] profil illisible :", error.message);
+      return { lang: await repli(), profilLu: false };
+    }
+    const pref = (data as { preferred_language?: unknown } | null)?.preferred_language;
+    return { lang: typeof pref === "string" && pref.trim() ? normLang(pref) : await repli(), profilLu: true };
   } catch (e) {
     console.error("[langue] profil illisible :", e instanceof Error ? e.message : e);
-    return getPublicLang();
+    return { lang: await repli(), profilLu: false };
   }
 }
 
