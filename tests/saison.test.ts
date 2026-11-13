@@ -306,6 +306,47 @@ async function main() {
     assert.equal(courseCEcarteeDe({ ...base, courseSecondaire: { idx: 1, nom: "Course B", priorite: "B" } }), null, "une course B est écartée par la règle de la C");
   });
 
+  await test("course B courue il y a 3 jours : une course C dans sa récupération est écartée, et le message nomme la B", async () => {
+    // Décision de Cyprien (13/11/2026) : la récupération de TOUTE course courue écarte une C, pas seulement la A.
+    const seances = [...SEANCES.filter((w) => w.date !== ilYa(3)), { ...SEANCES[0], date: ilYa(3), type: "race", distance_km: 10, duration_seconds: 2500 }];
+    const ctx = await contexte([objectif("Marathon A", -60, 42.2), planifiee("10 km B", 3, 10, "B"), planifiee("Cross C", -1, 8, "C")], seances);
+    assert.equal(ctx.recuperation?.course, "10 km B", `précondition : la récupération n'est pas celle de la course B (${ctx.recuperation?.course})`);
+    assert.equal(ctx.courseSecondaire?.priorite, "C", "précondition : la course C n'est pas vue");
+    assert.deepEqual(ctx.courseCEcartee && { motif: ctx.courseCEcartee.motif, courseA: ctx.courseCEcartee.courseA }, { motif: "apres", courseA: "10 km B" }, "la course C n'est pas écartée pendant la récupération d'une course B");
+    const jourC = buildWeekPlan(ctx, JOUR0).filter((d) => d.date === ilYa(-1));
+    assert.ok(jourC.some((d) => d.why.includes(PLAN_T.fr.courseCEcarteeRecup("Cross C", "10 km B"))), "le message ne nomme pas la course B dont on récupère");
+  });
+
+  await test("la même course C (deux jours après un 10 km) est écartée AVANT la course comme APRÈS, sans trou", async () => {
+    // Avant : la A est dans la semaine (fenêtre `joursDeRecuperation`) ; après : la A est courue
+    // (`recuperation`). Les deux chemins doivent dire la même chose de la même C.
+    const avantCourse = await contexte([objectif("10 km A", -1, 10), planifiee("Cross C", -3, 8, "C")]);
+    assert.equal(avantCourse.courseCEcartee?.motif, "apres", "la course C deux jours après un 10 km de la semaine n'est pas écartée");
+    const seances = [...SEANCES.filter((w) => w.date !== ilYa(1)), { ...SEANCES[0], date: ilYa(1), type: "race", distance_km: 10, duration_seconds: 2400 }];
+    const apresCourse = await contexte([objectif("10 km A", 1, 10), planifiee("Cross C", -1, 8, "C")], seances);
+    assert.equal(apresCourse.courseCEcartee?.motif, "apres", "la course C deux jours après un 10 km couru n'est plus écartée");
+  });
+
+  await test("marathon couru, rejoué sur 7 départs (J+1 à J+7) : la course C du surlendemain est toujours écartée", async () => {
+    for (const k of [1, 2, 3, 4, 5, 6, 7]) {
+      const seances = [...SEANCES.filter((w) => w.date !== ilYa(k)), { ...SEANCES[0], date: ilYa(k), type: "race", distance_km: 42.2, duration_seconds: 10500 }];
+      const ctx = await contexte([objectif("Marathon A", k, 42.2), planifiee("Cross C", -2, 8, "C")], seances);
+      assert.ok(ctx.recuperation?.fin, `J+${k} : précondition, aucune récupération`);
+      assert.equal(ctx.courseCEcartee?.motif, "apres", `J+${k} après le marathon : la course C du surlendemain n'est pas écartée`);
+      assert.ok(!buildWeekPlan(ctx, JOUR0).some((d) => d.type === "Course" && d.title.includes("Cross C")), `J+${k} : la course C est au plan`);
+    }
+  });
+
+  await test("semi dans 9 jours : une course C à J-5 (semaine d'affûtage) est écartée ; avant un 10 km, gardée", async () => {
+    const semi = await contexte([objectif("Semi A", -9, 21.1), planifiee("Cross C", -4, 8, "C")]);
+    assert.equal(semi.courseCEcartee?.motif, "avant", "une course C pendant l'affûtage d'un semi n'est pas écartée");
+    assert.ok(!buildWeekPlan(semi, JOUR0).some((d) => d.type === "Course" && d.title.includes("Cross C")), "la course C de l'affûtage d'un semi est au plan");
+    assert.ok(semi.macroPlan[0]?.focus.includes("course C écartée : Cross C"), `la feuille de route annonce encore la course C écartée (${semi.macroPlan[0]?.focus})`);
+    const dix = await contexte([objectif("10 km A", -9, 10), planifiee("Cross C", -4, 8, "C")]);
+    assert.equal(dix.courseSecondaire?.priorite, "C", "précondition : la course C n'est pas vue");
+    assert.equal(dix.courseCEcartee, null, "une course C cinq jours avant un 10 km est écartée");
+  });
+
   await test("contre-épreuve : la même course C loin de toute course A reste au plan et prend une qualité", async () => {
     const C = planifiee("Cross C", -2, 8, "C");
     const avec = await contexte([objectif("Marathon A", -60, 42.2), C]);

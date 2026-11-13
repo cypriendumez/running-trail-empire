@@ -715,7 +715,8 @@ async function profilElite10() {
     const NOM = "Cross du village";
     const signature = (plan: PlanDay[]) => plan.map((d) => `${d.date} ${d.type} ${d.title}`).join(" | ");
     let ecartees = 0, gardees = 0, rouges = 0, aptitudes = 0;
-    for (const km of [10, 5]) for (const dtr of [0, 1, 2, 3, 4, 5, 7, 8]) for (const cIdx of [0, 1, 2, 3, 4, 5, 6]) {
+    // 5, 10 km et semi ; la A de J+0 à J+12 (la semaine d'affûtage d'un semi déborde sur les 7 jours du plan).
+    for (const km of [10, 5, 21.1]) for (const dtr of [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12]) for (const cIdx of [0, 1, 2, 3, 4, 5, 6]) {
       for (const variante of ["vert", "rouge", "dur aujourd'hui", "veille de la A indisponible", "aptitude en attente"] as const) {
         const veilleA = new Date(debut.getTime() + (dtr - 1) * 86400000).getUTCDay();
         const base = {
@@ -731,7 +732,9 @@ async function profilElite10() {
         const courseC = avecC.find((d) => d.type === "Course" && d.date === iso(cIdx) && d.title.includes(NOM));
         // Récupération : un jour par mile, arrondi (10 km → 6 jours, 5 km → 3 jours).
         const recup = Math.round(km / 1.609);
-        const motif = cIdx <= dtr && cIdx >= dtr - 2 ? "avant" : cIdx > dtr && cIdx - dtr <= recup ? "apres" : null;
+        // Avant la A : veille et avant-veille ; toute la semaine d'affûtage (J-6) avant un semi ou un marathon.
+        const avant = km >= 21 ? 6 : 2;
+        const motif = cIdx <= dtr && cIdx >= dtr - avant ? "avant" : cIdx > dtr && cIdx - dtr <= recup ? "apres" : null;
         const ecartee = motif != null;
         const attendu = (l: "fr" | "en" | "de" | "es" | "pt") => motif === "apres" ? PLAN_T[l].courseCEcarteeRecup(NOM, `${km} km A`) : PLAN_T[l].courseCEcartee(NOM);
         if (!ecartee) {
@@ -753,7 +756,7 @@ async function profilElite10() {
         assert.equal(avecC.filter((d) => d.why.includes(attendu("fr"))).length, 1, `A à J+${dtr}, C au jour ${cIdx} (${variante}) : le message n'est pas posé une seule fois`);
       }
     }
-    assert.ok(ecartees >= 80 && gardees >= 80 && rouges >= 2 && aptitudes >= 20, `précondition : ${ecartees} écartées, ${gardees} gardées, ${rouges} au feu rouge le jour même, ${aptitudes} sous avis médical attendu`);
+    assert.ok(ecartees >= 150 && gardees >= 150 && rouges >= 3 && aptitudes >= 30, `précondition : ${ecartees} écartées, ${gardees} gardées, ${rouges} au feu rouge le jour même, ${aptitudes} sous avis médical attendu`);
     // Le message existe vraiment dans chaque langue : il nomme la course (un texte vide « contiendrait » tout).
     for (const l of ["fr", "en", "de", "es", "pt"] as const) {
       assert.ok(PLAN_T[l].courseCEcartee(NOM).includes(NOM) && PLAN_T[l].courseCEcartee(NOM).trim().length > 40, `message vide ou sans le nom de la course en ${l}`);

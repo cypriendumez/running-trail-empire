@@ -1474,7 +1474,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Le coach ignorait les courses du calendrier : une VMA pouvait tomber le jour même.
   const dateObjectifVise = objective?.raceDate ? String(objective.raceDate).slice(0, 10) : null;
   const secondaire = courseSecondaireDeLaSemaine(saison, todayStr, dateObjectifVise);
-  // Une course C trop près de la course A, ou pendant sa récupération, est ÉCARTÉE (décisions de Cyprien,
+  // Une course C trop près de la course A (veille, avant-veille ; semaine d'affûtage d'un semi ou d'un
+  // marathon), ou pendant la récupération de toute course courue, est ÉCARTÉE (décisions de Cyprien,
   // 13/11/2026, lib/coach/courseCEcartee) : elle ne retire pas de qualité et n'est annoncée ni dans les
   // motifs ni à l'IA. Le plan la signale au jour où elle tombait.
   const cEcartee = courseCEcarteeDe({
@@ -2180,7 +2181,9 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         : wkUntil <= 1 ? "Fraîcheur — repos, rappels d'allure" : "Volume −, on garde l'intensité (fraîcheur jour J)";
       // Une course B ou C de la semaine se lit dans la feuille de route, comme dans le plan.
       const cs = courseDeLaSemaine(i);
-      out.push({ week: i + 1, phase: ph, volumeKm, quality, longRunKm, focus: cs ? `${focus} · course ${cs.priorite} : ${cs.nom}` : focus });
+      // Une course C écartée cette semaine est dite écartée, pas annoncée (13/11/2026).
+      const ecarteeIci = i === 0 && cs && cEcartee && cs.priorite === "C" && cs.nom === cEcartee.nom;
+      out.push({ week: i + 1, phase: ph, volumeKm, quality, longRunKm, focus: cs ? `${focus} · course ${cs.priorite}${ecarteeIci ? " écartée" : ""} : ${cs.nom}` : focus });
     }
     return out;
   })();
