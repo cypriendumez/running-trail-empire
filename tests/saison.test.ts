@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
 import { PLAN_T } from "../src/lib/ai/planI18n";
+import { courseCEcarteeDe } from "../src/lib/coach/courseCEcartee";
 import { prioriteDe, coursesDeSaison, prochaineCourseA, courseSecondaireDeLaSemaine, coursesPassees } from "../src/lib/coach/saison";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
@@ -279,6 +280,30 @@ async function main() {
     assert.ok(sans.weekPlan.qBudget > 0, `précondition : aucune qualité cette semaine (${sans.weekPlan.qBudget}), l'assertion ne prouverait rien`);
     assert.equal(avec.weekPlan.qBudget, sans.weekPlan.qBudget, `une course C écartée retire encore une qualité (${sans.weekPlan.qBudget} → ${avec.weekPlan.qBudget})`);
     assert.ok(!buildWeekPlan(avec, JOUR0).some((d) => d.type === "Course" && d.title.includes("Cross C")), "la course C de la veille d'un 10 km est au plan");
+  });
+
+  await test("10 km couru il y a 2 jours (6 jours de récupération) : C écartée le DERNIER jour, gardée le premier jour normal", async () => {
+    // La frontière de la décision de Cyprien (« jusqu'à la fin de sa récupération ») : `fin` = la course + 7
+    // jours (premier jour d'entraînement normal). La C du jour d'avant est écartée, celle de `fin` gardée.
+    const seances = [...SEANCES.filter((w) => w.date !== ilYa(2)), { ...SEANCES[0], date: ilYa(2), type: "race", distance_km: 10, duration_seconds: 2400 }];
+    const dix = objectif("10 km A", 2, 10);
+    const dernier = await contexte([dix, planifiee("Cross C", -4, 8, "C")], seances);
+    assert.equal(dernier.recuperation?.fin, ilYa(-5), `précondition : la récupération du 10 km ne finit pas au jour attendu (${dernier.recuperation?.fin})`);
+    assert.equal(dernier.courseCEcartee?.motif, "apres", "la course C du dernier jour de récupération n'est pas écartée");
+    assert.ok(!buildWeekPlan(dernier, JOUR0).some((d) => d.type === "Course" && d.title.includes("Cross C")), "la course C du dernier jour de récupération est au plan");
+    const premier = await contexte([dix, planifiee("Cross C", -5, 8, "C")], seances);
+    assert.equal(premier.courseSecondaire?.priorite, "C", "précondition : la course C du premier jour normal n'est pas vue");
+    assert.equal(premier.courseCEcartee, null, "la course C du premier jour d'entraînement normal est écartée");
+    assert.ok(premier.text.includes("COURSE C CETTE SEMAINE"), "la course C du premier jour normal n'est pas annoncée");
+    assert.ok(buildWeekPlan(premier, JOUR0).some((d) => d.type === "Course" && d.title.includes("Cross C") && d.date === ilYa(-5)), "la course C du premier jour normal n'est pas au plan");
+  });
+
+  await test("course A à venir de distance inconnue : la C n'est écartée que dans le protocole (2 jours), rien n'est supposé", async () => {
+    const base = { courseSecondaire: null, daysToRace: 2, distanceA: null, nomA: "Course A", recuperation: null, aujourdhui: "2026-09-07" };
+    const c = (idx: number) => courseCEcarteeDe({ ...base, courseSecondaire: { idx, nom: "Cross C", priorite: "C" } })?.motif ?? null;
+    assert.deepEqual([0, 1, 2, 3, 4, 5, 6].map(c), ["avant", "avant", "avant", "apres", "apres", null, null], "sans distance, la fenêtre d'après n'est plus le seul protocole de course (2 jours)");
+    assert.equal(courseCEcarteeDe({ ...base, distanceA: 42.2, courseSecondaire: { idx: 6, nom: "Cross C", priorite: "C" } })?.motif, "apres", "précondition : avec la distance d'un marathon, toute la semaine est en récupération");
+    assert.equal(courseCEcarteeDe({ ...base, courseSecondaire: { idx: 1, nom: "Course B", priorite: "B" } }), null, "une course B est écartée par la règle de la C");
   });
 
   await test("contre-épreuve : la même course C loin de toute course A reste au plan et prend une qualité", async () => {
