@@ -475,13 +475,14 @@ async function profilDouleur() {
     // Le renfo PRINCIPAL (un jour sans course, pas greffé le soir d'un footing) suit un autre
     // chemin : trois jours disponibles, course en début de semaine, contexte fabriqué.
     let principal = 0;
-    for (const dtr of [0, 1, 2]) {
+    // Deux jeux de jours : dimanche-mercredi-vendredi (course à J+0) et dimanche-lundi-jeudi (course à J+1).
+    for (const jours of [[0, 3, 5], [0, 1, 4]]) for (const dtr of [0, 1, 2]) {
       const ctx = mk({
         objective: { race: "Marathon", distanceKm: 42.195, targetPace: "5'40/km", targetTime: "4h", targetSeconds: 14400 },
         daysToRace: dtr, weeksToRace: 0, cycle: { deload: false, taper: true, label: "" },
-        // Dimanche, mercredi, vendredi : le footing de reprise (J+2) tombe un jour disponible. Avant le
-        // 13/11/2026, il était posé même un jour indisponible (le mercredi des jours 0, 2, 4).
-        availability: { daysPerWeek: 3, days: [0, 3, 5] },
+        // Avant le 13/11/2026, la reprise de J+2 était posée même un jour indisponible (avec les jours 0, 2, 4
+        // et une course le lundi : le mercredi). Ces jeux-ci laissent le renfo principal tomber après la course.
+        availability: { daysPerWeek: 3, days: jours },
         volume: { weekKm: 40, avg4wkKm: 40, targetKm: 20, longRunKm: 4 },
         macroPlan: [{ week: 1, phase: "Affûtage", volumeKm: 20, quality: [], longRunKm: 0, focus: "" }],
       });
@@ -492,7 +493,7 @@ async function profilDouleur() {
         assert.ok(!/bondissement/i.test(d.detail) && /RÉCUPÉRATION/.test(d.detail), `course à J+${dtr} : « ${d.detail.slice(0, 90)} » le ${d.date}, après un marathon`);
       }
     }
-    assert.ok(principal > 0, "le renfo principal n'est jamais tombé après la course : le second chemin n'est pas éprouvé");
+    assert.ok(principal >= 2, `le renfo principal n'est tombé que ${principal} fois après la course : le second chemin est à peine éprouvé`);
   });
 
   await testA("invite du coach IA : l'allure de course sans « /km/km », et aucun découpage sans chrono visé", async () => {
@@ -654,6 +655,52 @@ async function profilElite10() {
         assert.ok(!veille || /R[ée]cup|Repos/.test(veille.type), `course dans ${avant} j : la veille (${plusJours(course, -1)}) porte « ${veille?.type} »`);
       }
     }
+  });
+  await testA("course A à J+7 / J+8 AVEC une course B dans la semaine : aucune séance dure la veille ni l'avant-veille de la A", async () => {
+    // Visa @HeadCoach (2e tour, 13/11/2026) : la protection de J+7/J+8 était conditionnée par l'indice de
+    // N'IMPORTE QUELLE course de la semaine ; une B posée au jour 1 ou 2 la faisait sauter.
+    const DUR_OU_LONGUE = /VMA|Seuil|Sp[ée]cifique|Allure|C[oô]te/i;
+    let dures = 0, cas = 0;
+    for (const k of DEPARTS) for (const bIdx of [1, 2]) for (const dtr of [7, 8]) {
+      const debut = new Date(Date.parse("2026-09-07T08:00:00Z") + k * 86400000);
+      const ctx = mk({
+        objective: { race: "10 km A", distanceKm: 10, targetPace: "3'45/km", targetTime: "37'30", targetSeconds: 2250 },
+        daysToRace: dtr, weeksToRace: 1, cycle: { deload: false, taper: true, label: "" },
+        courseSecondaire: { idx: bIdx, nom: "10 km B", distanceKm: 10, priorite: "B" },
+        availability: { daysPerWeek: 5, days: [0, 1, 2, 3, 4, 5, 6] },
+        weekPlan: { qBudget: 2, quality: [{ type: "VMA", desc: "VMA : 10×400 m" }, { type: "Seuil", desc: "Seuil : 3×8 min" }], easyPace: "5'20", eased: false },
+      });
+      const plan = buildWeekPlan(ctx, debut);
+      cas++;
+      const jour = (n: number) => new Date(debut.getTime() + n * 86400000).toISOString().slice(0, 10);
+      dures += plan.filter((d) => DUR_OU_LONGUE.test(d.type)).length;
+      const proches = plan.filter((d) => (d.date === jour(dtr - 1) || d.date === jour(dtr - 2)) && DUR_OU_LONGUE.test(d.type));
+      assert.equal(proches.length, 0, `départ +${k}, B au jour ${bIdx}, A à J+${dtr} : ${proches.map((d) => `${d.type} le ${d.date}`).join(", ")}`);
+    }
+    assert.ok(cas >= 40 && dures > 0, `précondition : ${cas} cas, ${dures} séance(s) dure(s) posée(s) — rien n'éprouve la protection`);
+  });
+  await testA("course C : sa veille ne tombe jamais un jour indisponible ou systématiquement raté", async () => {
+    // Visa @HeadCoach (2e tour) : la veille de la course C était posée avant les étapes 1 et 1 bis, sans
+    // aucun contrôle de disponibilité, et consommait une sortie.
+    const debut = new Date("2026-09-07T08:00:00Z");
+    const jour = (n: number) => new Date(debut.getTime() + n * 86400000);
+    let vus = 0;
+    for (const cIdx of [2, 3, 4, 5, 6]) {
+      const veille = jour(cIdx - 1), jourSemaine = veille.getUTCDay();
+      for (const variante of ["indisponible", "raté"] as const) {
+        const ctx = mk({
+          courseSecondaire: { idx: cIdx, nom: "Cross C", distanceKm: 8, priorite: "C" },
+          availability: { daysPerWeek: 5, days: [0, 1, 2, 3, 4, 5, 6].filter((d) => variante === "raté" || d !== jourSemaine) },
+          skippedWeekdays: variante === "raté" ? [jourSemaine] : [],
+        });
+        const plan = buildWeekPlan(ctx, debut);
+        assert.ok(plan.some((d) => d.type === "Course"), `précondition : la course C du jour ${cIdx} n'est pas posée`);
+        vus++;
+        const ce = plan.filter((d) => d.date === veille.toISOString().slice(0, 10) && /R[ée]cup|Endurance|Sortie longue|VMA|Seuil|Sp[ée]cifique|Allure|C[oô]te/i.test(d.type));
+        assert.equal(ce.length, 0, `course C au jour ${cIdx}, veille ${variante} : ${ce.map((d) => d.type).join(", ")} le ${veille.toISOString().slice(0, 10)}`);
+      }
+    }
+    assert.equal(vus, 10, "précondition : tous les cas n'ont pas tourné");
   });
   await testA("course de J+3 à J+8 : la veille, l'avant-veille et la reprise ne tombent jamais un jour systématiquement raté", async () => {
     // Un jour « disponible » mais jamais couru (`skippedWeekdays`) reçoit « Repos » à l'étape 1 : le protocole

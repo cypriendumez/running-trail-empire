@@ -447,7 +447,9 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // (rejeu @Sparring du profil élite, 13/11/2026) — remplacé le lendemain par la replanification,
   // mais affiché au calendrier et poussé à la montre d'ici là. Même protocole que dans la fenêtre, jours
   // praticables seulement (`praticable`).
-  const courseApres = raceIdx < 0 && ctx.daysToRace != null && ctx.daysToRace >= 7 && ctx.daysToRace <= 8 ? ctx.daysToRace : -1;
+  // L'indice de la course A (`objectifIdx`), pas celui de « la course de la semaine » (`raceIdx`) : une
+  // course B posée au jour 1 ou 2 faisait sauter cette protection (visa @HeadCoach, 2e tour).
+  const courseApres = objectifIdx < 0 && ctx.daysToRace != null && ctx.daysToRace >= 7 && ctx.daysToRace <= 8 ? ctx.daysToRace : -1;
   if (courseApres > 0) {
     for (const d of [1, 2]) {
       const i = courseApres - d;
@@ -470,7 +472,8 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
       tags: (l) => [PLAN_T[l].tags["Course"], ...(cs!.distanceKm ? [PLAN_T[l].tagKm(nRaw(cs!.distanceKm, l))] : [])],
     })) spend();
     const veille = courseCIdx - 1;
-    if (veille >= 0 && runBudget > 0 && put(veille, {
+    // Un jour praticable seulement, comme tout le protocole de course (visa @HeadCoach, 2e tour).
+    if (veille >= 0 && praticable(veille) && runBudget > 0 && put(veille, {
       type: "Récup", title: (l) => PLAN_T[l].veilleTitre, detail: (l) => PLAN_T[l].veilleDetail,
       why: (l) => PLAN_T[l].veilleWhy, tags: tags("Récup", "Veille de course"),
     })) spend();
