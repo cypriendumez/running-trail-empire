@@ -1271,6 +1271,101 @@ export const ARTICLES: Article[] = [
       },
     ],
   },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Demandé par Cyprien le 13/11/2026 (hors carnet). ⚠️ PAS DE COMPARATIF NOMINATIF : un
+  // classement des concurrents écrit par l'un des classés ne vaut rien, et aucune de leurs
+  // fonctions n'a été vérifiée. L'article donne des questions, puis NOS réponses — chacune
+  // relue dans le code le 13/11/2026 (montres : `SYNC` de `app/page.tsx` ; VMA sans
+  // repli : `effectiveVma` ; douleur : article p13 ; sous-traitants : `legalI18n`).
+  // Si l'une de ces réponses change dans le produit, elle change ici le même jour.
+  {
+    slug: "quelle-application-coaching-running-2027-six-questions",
+    cle: "p17",
+    maj: "13 novembre 2026",
+    chapo:
+      "Un comparatif écrit par l'éditeur d'une des applications comparées ne vaut pas grand-chose. Voici plutôt six questions à poser à n'importe laquelle, la nôtre comprise, avec ce que la littérature en dit quand elle en dit quelque chose. Nos propres réponses sont à la fin, limites incluses.",
+    avertissement:
+      "Cet article parle de douleur et de données de santé, sans donner d'avis médical. Une application d'entraînement n'est pas un soignant : une douleur qui persiste se montre à un médecin ou à un kinésithérapeute.",
+    blocs: [
+      {
+        h: "1. Le plan change-t-il quand ta semaine change ?",
+        p: [
+          "Un plan figé sur douze semaines suppose que tu feras chaque séance, dans l'ordre, reposé. Une semaine réelle contient une séance manquée, une nuit courte, un déplacement.",
+          "La question à poser est simple : que devient la suite du plan après une séance sautée ? Si la réponse est « rien », tu as un document, pas un coach.",
+          "Ça se vérifie pendant la période d'essai : saute une séance, et regarde ce qui bouge.",
+        ],
+      },
+      {
+        h: "2. La séance arrive-t-elle sur ta montre ?",
+        p: [
+          "« Compatible avec ta montre » recouvre deux choses très différentes. Soit l'application LIT tes sorties après coup. Soit elle ENVOIE la séance du jour au poignet, avec ses paliers et ses cibles.",
+          "Seul le second cas t'évite de mémoriser un fractionné ou de sortir le téléphone entre deux répétitions. Demande la liste des marques qui reçoivent la séance, pas celle des marques « synchronisées ».",
+        ],
+      },
+      {
+        h: "3. Sur quoi juge-t-elle ton intensité ?",
+        p: [
+          "Une équipe suisse menée par Rahel Gilgen-Ammann a testé huit montres GPS de sport sur un même parcours, à ciel ouvert, en zone urbaine et en forêt (JMIR mHealth and uHealth, 2020). L'erreur de distance mesurée va de 3,2 % à 6,1 % selon les montres, et la précision se dégrade nettement en forêt et en zone urbaine.",
+          "L'allure instantanée affichée au poignet est calculée sur quelques secondes : c'est elle qui amplifie le plus ces erreurs de position. L'illustration est de nous, pas de l'étude : une application qui note ta séance à l'allure brute peut te reprocher, en sous-bois, un écart que tu n'as pas commis.",
+          "Demande donc si l'intensité est aussi jugée à la fréquence cardiaque, qui ne dépend d'aucun satellite.",
+        ],
+      },
+      {
+        h: "4. Que fait-elle quand la donnée manque ?",
+        p: [
+          "Sans test ni historique, aucun logiciel ne connaît ta VMA ni ta fréquence cardiaque maximale. La tentation est d'afficher quand même une valeur « par défaut », parce qu'un écran vide rassure moins qu'un chiffre.",
+          "Une valeur inventée produit des allures et des zones fausses, présentées avec la même assurance qu'une mesure. La bonne réponse est moins flatteuse : dire que la donnée manque, et proposer un test.",
+        ],
+      },
+      {
+        h: "5. Quelle règle de progression applique-t-elle, et que fait-elle d'une douleur ?",
+        p: [
+          "La règle la plus citée, ne pas augmenter son volume de plus de 10 % par semaine, a été testée. L'essai randomisé de Buist et ses collègues (2008) a réparti 532 coureurs débutants entre un programme progressif de 13 semaines bâti sur cette règle et un programme standard de 8 semaines. Blessures liées à la course : 20,8 % dans le premier groupe, 20,3 % dans le second (P = 0,90).",
+          "Une application qui présente cette règle comme une protection te vend une certitude que cet essai n'a pas trouvée. Demande plutôt comment elle évite les sauts brutaux de charge.",
+          "Et demande ce qu'elle fait d'une douleur déclarée. Elle peut alléger la semaine et t'orienter vers un professionnel de santé. Elle ne doit pas poser de diagnostic.",
+        ],
+      },
+      {
+        h: "6. Que deviennent tes données de santé ?",
+        p: [
+          "Fréquence cardiaque, sommeil, poids, douleurs : ce sont des données de santé, que le droit européen protège plus strictement que les autres.",
+          "Trois choses se lisent dans la politique de confidentialité avant de créer un compte : où la base est hébergée, quels sous-traitants reçoivent quoi (en particulier les fournisseurs d'intelligence artificielle), et comment faire supprimer tes données. Une politique qui ne nomme pas ses sous-traitants ne répond pas à la question.",
+        ],
+      },
+      {
+        h: "Nos réponses, limites comprises",
+        p: [
+          "Pacevo est édité par l'auteur de cet article : lis ce qui suit comme la réponse d'une partie intéressée.",
+          "Le plan couvre sept jours glissants et se recalcule à partir de tes séances réelles, par des règles fixes et non par un modèle de langage. Le calendrier affiche le motif de chaque décision.",
+          "La séance part vers Garmin, COROS et Suunto, par l'intermédiaire d'intervals.icu. L'intensité d'une séance se juge d'abord à la fréquence cardiaque, jamais à l'allure instantanée brute.",
+          "Aucune VMA ni fréquence cardiaque maximale par défaut n'est affichée comme une mesure : quand la donnée manque, l'application le dit.",
+          "Une zone douloureuse déclarée à 4 sur 10 ou plus retire une séance de qualité à la semaine en cours. L'application ne pose aucun diagnostic.",
+          "La base de données est hébergée dans l'Union européenne, à Francfort. Les analyses rédigées par intelligence artificielle transmettent des données d'entraînement à Google et à Anthropic ; la liste complète des sous-traitants est sur notre page de confidentialité.",
+          "Nos limites, maintenant. Il te faut un compte intervals.icu pour relier ta montre. La séance de renforcement n'est pas envoyée au poignet. Et Pacevo ne publie aucun chiffre de résultat, ni taux de réussite ni minutes gagnées : il n'en a pas encore de mesuré.",
+        ],
+      },
+      {
+        h: "Ce que cet article ne fait pas",
+        p: [
+          "Il ne classe pas les applications du marché. Un classement tenu par l'un des classés ne vaut rien, et leurs fonctions changent plus vite qu'un article.",
+          "Les six questions, elles, ne se périment pas : pose-les à chacune, pendant sa période d'essai, avant de payer.",
+        ],
+      },
+    ],
+    sources: [
+      {
+        label:
+          "Gilgen-Ammann R, Schweizer T, Wyss T. Accuracy of Distance Recordings in Eight Positioning-Enabled Sport Watches: Instrument Validation Study. JMIR Mhealth Uhealth, 2020",
+        url: "https://pubmed.ncbi.nlm.nih.gov/32396865/",
+      },
+      {
+        label:
+          "Buist I et al. No effect of a graded training program on the number of running-related injuries in novice runners: a randomized controlled trial. Am J Sports Med, 2008",
+        url: "https://pubmed.ncbi.nlm.nih.gov/17940147/",
+      },
+    ],
+  },
 ];
 
 /** Clé d'article → slug, pour que l'index sache quelles cartes sont cliquables. */

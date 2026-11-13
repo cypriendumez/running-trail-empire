@@ -774,6 +774,78 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         },
       ],
     },
+    "quelle-application-coaching-running-2027-six-questions": {
+      chapo:
+        "A comparison written by the publisher of one of the apps being compared isn't worth much. Here instead are six questions to put to any of them, ours included, with what the literature says when it says something. Our own answers come at the end, limits included.",
+      avertissement:
+        "This article discusses pain and health data without giving medical advice. A training app is not a clinician: pain that persists should be shown to a doctor or a physiotherapist.",
+      blocs: [
+        {
+          h: "1. Does the plan change when your week changes?",
+          p: [
+            "A plan fixed over twelve weeks assumes you will do every session, in order, well rested. A real week contains a missed session, a short night, a trip.",
+            "The question to ask is simple: what happens to the rest of the plan after a skipped session? If the answer is “nothing”, you have a document, not a coach.",
+            "It can be checked during the trial period: skip a session and watch what moves.",
+          ],
+        },
+        {
+          h: "2. Does the session reach your watch?",
+          p: [
+            "“Compatible with your watch” covers two very different things. Either the app READS your runs after the fact. Or it SENDS the day's session to your wrist, with its steps and targets.",
+            "Only the second spares you from memorising an interval session or pulling out your phone between two reps. Ask for the list of brands that receive the session, not the list of brands that are “synced”.",
+          ],
+        },
+        {
+          h: "3. What does it judge your intensity on?",
+          p: [
+            "A Swiss team led by Rahel Gilgen-Ammann tested eight GPS sport watches on the same course, in open terrain, in an urban area and in forest (JMIR mHealth and uHealth, 2020). The measured distance error ranges from 3.2% to 6.1% depending on the watch, and accuracy degrades markedly in forest and in urban areas.",
+            "The instantaneous pace shown on your wrist is computed over a few seconds: it is what amplifies those position errors the most. The illustration is ours, not the study's: an app that grades your session on raw pace can blame you, under tree cover, for a deviation you never made.",
+            "So ask whether intensity is also judged on heart rate, which depends on no satellite.",
+          ],
+        },
+        {
+          h: "4. What does it do when the data is missing?",
+          p: [
+            "Without a test or a history, no software knows your maximal aerobic speed or your maximum heart rate. The temptation is to display a “default” value anyway, because an empty screen is less reassuring than a number.",
+            "An invented value produces wrong paces and zones, presented with the same confidence as a measurement. The right answer is less flattering: say the data is missing, and offer a test.",
+          ],
+        },
+        {
+          h: "5. Which progression rule does it apply, and what does it do with pain?",
+          p: [
+            "The most quoted rule, not increasing your volume by more than 10% a week, has been tested. The randomised trial by Buist and colleagues (2008) allocated 532 novice runners to either a 13-week graded programme built on that rule or a standard 8-week programme. Running-related injuries: 20.8% in the first group, 20.3% in the second (P = 0.90).",
+            "An app that presents this rule as protection is selling you a certainty that this trial did not find. Ask instead how it avoids abrupt jumps in load.",
+            "And ask what it does with pain you report. It can lighten the week and point you to a health professional. It must not make a diagnosis.",
+          ],
+        },
+        {
+          h: "6. What happens to your health data?",
+          p: [
+            "Heart rate, sleep, weight, pain: these are health data, which European law protects more strictly than other data.",
+            "Three things are worth reading in the privacy policy before creating an account: where the database is hosted, which processors receive what (AI providers in particular), and how to have your data deleted. A policy that does not name its processors does not answer the question.",
+          ],
+        },
+        {
+          h: "Our answers, limits included",
+          p: [
+            "Pacevo is published by the author of this article: read what follows as the answer of an interested party.",
+            "The plan covers a rolling seven days and is recalculated from your actual sessions, by fixed rules and not by a language model. The calendar shows the reason behind each decision.",
+            "The session goes to Garmin, COROS and Suunto, through intervals.icu. A session's intensity is judged first on heart rate, never on raw instantaneous pace.",
+            "No default maximal aerobic speed or maximum heart rate is displayed as a measurement: when the data is missing, the app says so.",
+            "A painful area reported at 4 out of 10 or more removes one quality session from the current week. The app makes no diagnosis.",
+            "The database is hosted in the European Union, in Frankfurt. AI-written analyses send training data to Google and Anthropic; the full list of processors is on our privacy page.",
+            "Now our limits. You need an intervals.icu account to connect your watch. The strength session is not sent to your wrist. And Pacevo publishes no outcome figures, neither success rates nor minutes gained: it has none measured yet.",
+          ],
+        },
+        {
+          h: "What this article does not do",
+          p: [
+            "It does not rank the apps on the market. A ranking kept by one of the ranked is worth nothing, and their features change faster than an article.",
+            "The six questions, though, do not go out of date: put them to each app, during its trial period, before paying.",
+          ],
+        },
+      ],
+    },
   },
   de: {
     "deficit-energetique-relatif-reds-coureur": {
@@ -1307,6 +1379,78 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
           p: [
             "Es sagt keine Verletzung voraus. Der Belastungsanstieg ist ein Faktor unter mehreren — Biomechanik, Untergrund, Material, Verletzungsgeschichte und Schlaf zählen ebenso, und nichts davon passt in drei Kurven.",
             "Es ersetzt dein Urteil nicht. Ein Schmerz, der sich festsetzt, ein Missempfinden, das deinen Laufstil verändert, eine Müdigkeit, die trotz normaler Werte bleibt: Das sind Gründe aufzuhören, was auch immer ein Dashboard sagt. Ein Modell hat immer recht über das, was es misst, und unrecht über alles andere.",
+          ],
+        },
+      ],
+    },
+    "quelle-application-coaching-running-2027-six-questions": {
+      chapo:
+        "Ein Vergleich aus der Feder des Anbieters einer der verglichenen Apps ist wenig wert. Hier sind stattdessen sechs Fragen, die du jeder App stellen kannst, auch unserer, mit dem, was die Literatur dazu sagt, wenn sie etwas dazu sagt. Unsere eigenen Antworten stehen am Ende, Grenzen inbegriffen.",
+      avertissement:
+        "Dieser Artikel spricht über Schmerzen und Gesundheitsdaten, ohne medizinischen Rat zu geben. Eine Trainings-App ist kein Behandler: Anhaltende Schmerzen gehören zu einer Ärztin, einem Arzt oder in die Physiotherapie.",
+      blocs: [
+        {
+          h: "1. Ändert sich der Plan, wenn sich deine Woche ändert?",
+          p: [
+            "Ein auf zwölf Wochen festgelegter Plan setzt voraus, dass du jede Einheit absolvierst, in der richtigen Reihenfolge und ausgeruht. Eine echte Woche enthält eine verpasste Einheit, eine kurze Nacht, eine Reise.",
+            "Die Frage ist einfach: Was wird aus dem Rest des Plans, wenn eine Einheit ausfällt? Lautet die Antwort „nichts“, hast du ein Dokument, keinen Coach.",
+            "Das lässt sich in der Testphase prüfen: Lass eine Einheit aus und sieh nach, was sich bewegt.",
+          ],
+        },
+        {
+          h: "2. Kommt die Einheit auf deiner Uhr an?",
+          p: [
+            "„Kompatibel mit deiner Uhr“ meint zwei sehr verschiedene Dinge. Entweder LIEST die App deine Läufe im Nachhinein. Oder sie SCHICKT die Einheit des Tages ans Handgelenk, mit ihren Abschnitten und Zielwerten.",
+            "Nur das Zweite erspart dir, ein Intervalltraining auswendig zu lernen oder zwischen zwei Wiederholungen das Handy herauszuholen. Frag nach der Liste der Marken, die die Einheit empfangen, nicht nach der Liste der „synchronisierten“ Marken.",
+          ],
+        },
+        {
+          h: "3. Woran misst sie deine Intensität?",
+          p: [
+            "Ein Schweizer Team um Rahel Gilgen-Ammann hat acht GPS-Sportuhren auf derselben Strecke getestet, im offenen Gelände, im Stadtgebiet und im Wald (JMIR mHealth and uHealth, 2020). Der gemessene Distanzfehler liegt je nach Uhr zwischen 3,2 % und 6,1 %, und die Genauigkeit nimmt im Wald und im Stadtgebiet deutlich ab.",
+            "Das am Handgelenk angezeigte Momentantempo wird über wenige Sekunden berechnet: Es verstärkt diese Positionsfehler am meisten. Das Beispiel stammt von uns, nicht aus der Studie: Eine App, die deine Einheit am rohen Tempo bewertet, kann dir im Unterholz eine Abweichung vorwerfen, die du nie begangen hast.",
+            "Frag also, ob die Intensität auch an der Herzfrequenz gemessen wird, die von keinem Satelliten abhängt.",
+          ],
+        },
+        {
+          h: "4. Was macht sie, wenn die Daten fehlen?",
+          p: [
+            "Ohne Test und ohne Verlauf kennt keine Software deine maximale aerobe Geschwindigkeit oder deine maximale Herzfrequenz. Die Versuchung ist groß, trotzdem einen „Standardwert“ anzuzeigen, weil ein leerer Bildschirm weniger beruhigt als eine Zahl.",
+            "Ein erfundener Wert erzeugt falsche Tempi und Zonen, die mit derselben Sicherheit präsentiert werden wie eine Messung. Die richtige Antwort ist weniger schmeichelhaft: sagen, dass die Daten fehlen, und einen Test anbieten.",
+          ],
+        },
+        {
+          h: "5. Welche Steigerungsregel wendet sie an, und was macht sie mit Schmerzen?",
+          p: [
+            "Die meistzitierte Regel, den Umfang um nicht mehr als 10 % pro Woche zu steigern, wurde getestet. Die randomisierte Studie von Buist und Kollegen (2008) teilte 532 Laufanfänger auf ein nach dieser Regel aufgebautes, abgestuftes 13-Wochen-Programm und ein 8-wöchiges Standardprogramm auf. Laufbedingte Verletzungen: 20,8 % in der ersten Gruppe, 20,3 % in der zweiten (P = 0,90).",
+            "Eine App, die diese Regel als Schutz darstellt, verkauft dir eine Gewissheit, die diese Studie nicht gefunden hat. Frag lieber, wie sie abrupte Belastungssprünge vermeidet.",
+            "Und frag, was sie mit einem gemeldeten Schmerz macht. Sie kann die Woche entlasten und dich an eine medizinische Fachperson verweisen. Eine Diagnose darf sie nicht stellen.",
+          ],
+        },
+        {
+          h: "6. Was geschieht mit deinen Gesundheitsdaten?",
+          p: [
+            "Herzfrequenz, Schlaf, Gewicht, Schmerzen: Das sind Gesundheitsdaten, die das europäische Recht strenger schützt als andere.",
+            "Drei Dinge solltest du in der Datenschutzerklärung lesen, bevor du ein Konto anlegst: wo die Datenbank gehostet wird, welche Auftragsverarbeiter was erhalten (vor allem die KI-Anbieter) und wie du deine Daten löschen lassen kannst. Eine Erklärung, die ihre Auftragsverarbeiter nicht nennt, beantwortet die Frage nicht.",
+          ],
+        },
+        {
+          h: "Unsere Antworten, Grenzen inbegriffen",
+          p: [
+            "Pacevo wird vom Autor dieses Artikels herausgegeben: Lies das Folgende als Antwort einer interessierten Partei.",
+            "Der Plan umfasst gleitende sieben Tage und wird aus deinen tatsächlichen Einheiten neu berechnet, nach festen Regeln und nicht durch ein Sprachmodell. Der Kalender zeigt den Grund für jede Entscheidung.",
+            "Die Einheit geht über intervals.icu an Garmin, COROS und Suunto. Die Intensität einer Einheit wird zuerst an der Herzfrequenz gemessen, nie am rohen Momentantempo.",
+            "Keine maximale aerobe Geschwindigkeit und keine maximale Herzfrequenz wird als Standardwert wie eine Messung angezeigt: Fehlen die Daten, sagt die App das.",
+            "Eine schmerzende Zone, die mit 4 von 10 oder mehr gemeldet wird, streicht der laufenden Woche eine Qualitätseinheit. Die App stellt keine Diagnose.",
+            "Die Datenbank wird in der Europäischen Union gehostet, in Frankfurt. KI-verfasste Analysen übermitteln Trainingsdaten an Google und Anthropic; die vollständige Liste der Auftragsverarbeiter steht auf unserer Datenschutzseite.",
+            "Nun zu unseren Grenzen. Du brauchst ein intervals.icu-Konto, um deine Uhr zu verbinden. Die Krafteinheit wird nicht ans Handgelenk geschickt. Und Pacevo veröffentlicht keine Ergebniszahlen, weder Erfolgsquoten noch gewonnene Minuten: Es hat noch keine gemessen.",
+          ],
+        },
+        {
+          h: "Was dieser Artikel nicht tut",
+          p: [
+            "Er stellt keine Rangliste der Apps auf dem Markt auf. Eine Rangliste, die einer der Gelisteten führt, ist nichts wert, und ihre Funktionen ändern sich schneller als ein Artikel.",
+            "Die sechs Fragen dagegen veralten nicht: Stell sie jeder App, während ihrer Testphase, bevor du zahlst.",
           ],
         },
       ],
@@ -1848,6 +1992,78 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         },
       ],
     },
+    "quelle-application-coaching-running-2027-six-questions": {
+      chapo:
+        "Una comparativa escrita por el editor de una de las aplicaciones comparadas no vale gran cosa. Aquí van, en cambio, seis preguntas que hacerle a cualquiera de ellas, la nuestra incluida, con lo que dice la literatura cuando dice algo. Nuestras propias respuestas están al final, con sus límites.",
+      avertissement:
+        "Este artículo habla de dolor y de datos de salud sin dar consejo médico. Una aplicación de entrenamiento no es un profesional sanitario: un dolor que persiste se enseña a un médico o a un fisioterapeuta.",
+      blocs: [
+        {
+          h: "1. ¿Cambia el plan cuando cambia tu semana?",
+          p: [
+            "Un plan fijado a doce semanas supone que harás cada sesión, en orden y descansado. Una semana real contiene una sesión perdida, una noche corta, un viaje.",
+            "La pregunta es sencilla: ¿qué pasa con el resto del plan tras una sesión saltada? Si la respuesta es «nada», tienes un documento, no un entrenador.",
+            "Se comprueba durante el periodo de prueba: sáltate una sesión y mira qué se mueve.",
+          ],
+        },
+        {
+          h: "2. ¿Llega la sesión a tu reloj?",
+          p: [
+            "«Compatible con tu reloj» abarca dos cosas muy distintas. O la aplicación LEE tus salidas a posteriori. O ENVÍA la sesión del día a tu muñeca, con sus tramos y sus objetivos.",
+            "Solo lo segundo te evita memorizar unas series o sacar el móvil entre dos repeticiones. Pide la lista de marcas que reciben la sesión, no la de marcas «sincronizadas».",
+          ],
+        },
+        {
+          h: "3. ¿Con qué juzga tu intensidad?",
+          p: [
+            "Un equipo suizo dirigido por Rahel Gilgen-Ammann probó ocho relojes deportivos con GPS en un mismo recorrido, a cielo abierto, en zona urbana y en bosque (JMIR mHealth and uHealth, 2020). El error de distancia medido va del 3,2 % al 6,1 % según el reloj, y la precisión se degrada claramente en bosque y en zona urbana.",
+            "El ritmo instantáneo que muestra la muñeca se calcula sobre unos pocos segundos: es el que más amplifica esos errores de posición. El ejemplo es nuestro, no del estudio: una aplicación que califica tu sesión con el ritmo en bruto puede reprocharte, bajo los árboles, un desvío que no cometiste.",
+            "Pregunta, pues, si la intensidad se juzga también con la frecuencia cardíaca, que no depende de ningún satélite.",
+          ],
+        },
+        {
+          h: "4. ¿Qué hace cuando falta el dato?",
+          p: [
+            "Sin test ni historial, ningún programa conoce tu velocidad aeróbica máxima ni tu frecuencia cardíaca máxima. La tentación es mostrar igualmente un valor «por defecto», porque una pantalla vacía tranquiliza menos que una cifra.",
+            "Un valor inventado produce ritmos y zonas falsos, presentados con la misma seguridad que una medición. La respuesta correcta es menos halagadora: decir que falta el dato y proponer un test.",
+          ],
+        },
+        {
+          h: "5. ¿Qué regla de progresión aplica y qué hace con un dolor?",
+          p: [
+            "La regla más citada, no aumentar el volumen más de un 10 % por semana, se ha puesto a prueba. El ensayo aleatorizado de Buist y sus colegas (2008) repartió a 532 corredores principiantes entre un programa progresivo de 13 semanas construido sobre esa regla y un programa estándar de 8 semanas. Lesiones relacionadas con la carrera: 20,8 % en el primer grupo, 20,3 % en el segundo (P = 0,90).",
+            "Una aplicación que presenta esa regla como una protección te vende una certeza que este ensayo no encontró. Pregunta más bien cómo evita los saltos bruscos de carga.",
+            "Y pregunta qué hace con un dolor declarado. Puede aligerar la semana y orientarte hacia un profesional sanitario. No debe emitir un diagnóstico.",
+          ],
+        },
+        {
+          h: "6. ¿Qué pasa con tus datos de salud?",
+          p: [
+            "Frecuencia cardíaca, sueño, peso, dolores: son datos de salud, que el derecho europeo protege con más rigor que los demás.",
+            "Tres cosas se leen en la política de privacidad antes de crear una cuenta: dónde se aloja la base de datos, qué encargados del tratamiento reciben qué (en especial los proveedores de inteligencia artificial) y cómo hacer que se borren tus datos. Una política que no nombra a sus encargados no responde a la pregunta.",
+          ],
+        },
+        {
+          h: "Nuestras respuestas, con sus límites",
+          p: [
+            "Pacevo lo edita el autor de este artículo: lee lo que sigue como la respuesta de una parte interesada.",
+            "El plan cubre siete días móviles y se recalcula a partir de tus sesiones reales, mediante reglas fijas y no mediante un modelo de lenguaje. El calendario muestra el motivo de cada decisión.",
+            "La sesión se envía a Garmin, COROS y Suunto, a través de intervals.icu. La intensidad de una sesión se juzga primero con la frecuencia cardíaca, nunca con el ritmo instantáneo en bruto.",
+            "No se muestra ninguna velocidad aeróbica máxima ni frecuencia cardíaca máxima por defecto como si fuera una medición: cuando falta el dato, la aplicación lo dice.",
+            "Una zona dolorida declarada con 4 sobre 10 o más quita una sesión de calidad a la semana en curso. La aplicación no emite ningún diagnóstico.",
+            "La base de datos está alojada en la Unión Europea, en Fráncfort. Los análisis redactados por inteligencia artificial transmiten datos de entrenamiento a Google y a Anthropic; la lista completa de encargados está en nuestra página de privacidad.",
+            "Ahora, nuestros límites. Necesitas una cuenta de intervals.icu para conectar tu reloj. La sesión de fuerza no se envía a la muñeca. Y Pacevo no publica ninguna cifra de resultados, ni tasas de éxito ni minutos ganados: todavía no tiene ninguna medida.",
+          ],
+        },
+        {
+          h: "Lo que este artículo no hace",
+          p: [
+            "No clasifica las aplicaciones del mercado. Una clasificación llevada por uno de los clasificados no vale nada, y sus funciones cambian más rápido que un artículo.",
+            "Las seis preguntas, en cambio, no caducan: házselas a cada una, durante su periodo de prueba, antes de pagar.",
+          ],
+        },
+      ],
+    },
   },
   pt: {
     "deficit-energetique-relatif-reds-coureur": {
@@ -2381,6 +2597,78 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
           p: [
             "Não prevê uma lesão. A progressão da carga é um fator entre outros — a biomecânica, o terreno, o material, o histórico de lesões e o sono também contam, e nada disso cabe em três curvas.",
             "Não substitui o teu juízo. Uma dor que se instala, um incómodo que altera a tua passada, uma fadiga que persiste apesar de indicadores normais: são motivos para parar, diga o que disser um painel. Um modelo tem sempre razão sobre o que mede e engana-se sobre tudo o resto.",
+          ],
+        },
+      ],
+    },
+    "quelle-application-coaching-running-2027-six-questions": {
+      chapo:
+        "Um comparativo escrito pelo editor de uma das aplicações comparadas não vale grande coisa. Ficam antes seis perguntas a fazer a qualquer uma delas, a nossa incluída, com o que a literatura diz quando diz alguma coisa. As nossas próprias respostas estão no fim, com os seus limites.",
+      avertissement:
+        "Este artigo fala de dor e de dados de saúde sem dar aconselhamento médico. Uma aplicação de treino não é um profissional de saúde: uma dor que persiste mostra-se a um médico ou a um fisioterapeuta.",
+      blocs: [
+        {
+          h: "1. O plano muda quando a tua semana muda?",
+          p: [
+            "Um plano fixado para doze semanas pressupõe que farás cada treino, por ordem e descansado. Uma semana real tem um treino falhado, uma noite curta, uma viagem.",
+            "A pergunta é simples: o que acontece ao resto do plano depois de um treino saltado? Se a resposta for «nada», tens um documento, não um treinador.",
+            "Verifica-se durante o período de experiência: salta um treino e vê o que se mexe.",
+          ],
+        },
+        {
+          h: "2. O treino chega ao teu relógio?",
+          p: [
+            "«Compatível com o teu relógio» abrange duas coisas muito diferentes. Ou a aplicação LÊ as tuas saídas depois de feitas. Ou ENVIA o treino do dia para o teu pulso, com os seus blocos e alvos.",
+            "Só a segunda te poupa a decorar umas séries ou a tirar o telemóvel entre duas repetições. Pede a lista das marcas que recebem o treino, não a das marcas «sincronizadas».",
+          ],
+        },
+        {
+          h: "3. Com base em quê avalia a tua intensidade?",
+          p: [
+            "Uma equipa suíça liderada por Rahel Gilgen-Ammann testou oito relógios desportivos com GPS no mesmo percurso, a céu aberto, em zona urbana e em floresta (JMIR mHealth and uHealth, 2020). O erro de distância medido vai de 3,2 % a 6,1 % consoante o relógio, e a precisão degrada-se claramente em floresta e em zona urbana.",
+            "O ritmo instantâneo mostrado no pulso é calculado sobre poucos segundos: é ele que mais amplifica esses erros de posição. O exemplo é nosso, não do estudo: uma aplicação que avalia o teu treino pelo ritmo em bruto pode censurar-te, debaixo das árvores, um desvio que não cometeste.",
+            "Pergunta, por isso, se a intensidade é também avaliada pela frequência cardíaca, que não depende de nenhum satélite.",
+          ],
+        },
+        {
+          h: "4. O que faz quando o dado falta?",
+          p: [
+            "Sem teste nem histórico, nenhum programa conhece a tua velocidade aeróbia máxima nem a tua frequência cardíaca máxima. A tentação é mostrar mesmo assim um valor «por defeito», porque um ecrã vazio tranquiliza menos do que um número.",
+            "Um valor inventado produz ritmos e zonas errados, apresentados com a mesma segurança de uma medição. A resposta certa é menos lisonjeira: dizer que o dado falta e propor um teste.",
+          ],
+        },
+        {
+          h: "5. Que regra de progressão aplica, e o que faz com uma dor?",
+          p: [
+            "A regra mais citada, não aumentar o volume em mais de 10 % por semana, foi testada. O ensaio aleatorizado de Buist e colegas (2008) distribuiu 532 corredores principiantes por um programa progressivo de 13 semanas construído sobre essa regra e por um programa padrão de 8 semanas. Lesões relacionadas com a corrida: 20,8 % no primeiro grupo, 20,3 % no segundo (P = 0,90).",
+            "Uma aplicação que apresenta essa regra como uma proteção vende-te uma certeza que este ensaio não encontrou. Pergunta antes como evita os saltos bruscos de carga.",
+            "E pergunta o que faz com uma dor declarada. Pode aliviar a semana e encaminhar-te para um profissional de saúde. Não deve fazer um diagnóstico.",
+          ],
+        },
+        {
+          h: "6. O que acontece aos teus dados de saúde?",
+          p: [
+            "Frequência cardíaca, sono, peso, dores: são dados de saúde, que o direito europeu protege com mais rigor do que os outros.",
+            "Três coisas leem-se na política de privacidade antes de criar uma conta: onde está alojada a base de dados, que subcontratantes recebem o quê (em especial os fornecedores de inteligência artificial) e como pedir que os teus dados sejam apagados. Uma política que não nomeia os seus subcontratantes não responde à pergunta.",
+          ],
+        },
+        {
+          h: "As nossas respostas, com os seus limites",
+          p: [
+            "O Pacevo é editado pelo autor deste artigo: lê o que se segue como a resposta de uma parte interessada.",
+            "O plano cobre sete dias móveis e é recalculado a partir dos teus treinos reais, por regras fixas e não por um modelo de linguagem. O calendário mostra o motivo de cada decisão.",
+            "O treino segue para Garmin, COROS e Suunto, através do intervals.icu. A intensidade de um treino avalia-se primeiro pela frequência cardíaca, nunca pelo ritmo instantâneo em bruto.",
+            "Nenhuma velocidade aeróbia máxima nem frequência cardíaca máxima por defeito é mostrada como se fosse uma medição: quando o dado falta, a aplicação di-lo.",
+            "Uma zona dolorosa declarada com 4 em 10 ou mais retira um treino de qualidade à semana em curso. A aplicação não faz nenhum diagnóstico.",
+            "A base de dados está alojada na União Europeia, em Frankfurt. As análises redigidas por inteligência artificial transmitem dados de treino à Google e à Anthropic; a lista completa de subcontratantes está na nossa página de privacidade.",
+            "Agora, os nossos limites. Precisas de uma conta intervals.icu para ligar o teu relógio. O treino de força não é enviado para o pulso. E o Pacevo não publica nenhum número de resultados, nem taxas de sucesso nem minutos ganhos: ainda não tem nenhum medido.",
+          ],
+        },
+        {
+          h: "O que este artigo não faz",
+          p: [
+            "Não classifica as aplicações do mercado. Uma classificação feita por um dos classificados não vale nada, e as suas funções mudam mais depressa do que um artigo.",
+            "As seis perguntas, essas, não perdem validade: fá-las a cada uma, durante o seu período de experiência, antes de pagar.",
           ],
         },
       ],
