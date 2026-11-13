@@ -1036,16 +1036,16 @@ export const ARTICLES: Article[] = [
       {
         h: "Ce qui reste fiable sous le couvert",
         p: [
-          "La fréquence cardiaque et la sensation d'effort ne dépendent d'aucun satellite : elles restent le repère le plus stable quand le terrain se complique, sous-bois dense ou portion technique en dévers.",
-          "La distance totale d'une sortie bouge peu en valeur absolue, même avec une erreur de quelques pour cent — c'est l'allure seconde par seconde qui perd le plus de sens, pas le volume de la séance une fois rentré.",
-          "Une astuce simple, déjà suggérée par la littérature sur la validation des montres : étalonner son matériel sur un parcours de distance connue, en conditions dégagées, pour savoir à quel point se fier à l'allure affichée sur SA propre montre avant de s'y fier en forêt.",
+          "La fréquence cardiaque et la sensation d'effort ne dépendent d'aucun satellite. Notre conseil, qui n'est pas un résultat de l'étude : quand le terrain se complique, sous-bois dense ou portion technique en dévers, cale-toi sur elles plutôt que sur l'allure affichée.",
+          "Les auteurs concluent que les distances enregistrées peuvent être sous-estimées jusqu'à 9 %. Notre lecture, qui n'engage que nous : cet écart pèse sur le total d'une sortie, mais c'est l'allure seconde par seconde qui perd le plus de sens sous les arbres.",
+          "Une astuce simple, qui est la nôtre et non celle de l'étude : comparer sa montre à un parcours de distance connue, en conditions dégagées, pour savoir à quel point se fier à l'allure affichée sur SA propre montre avant de s'y fier en forêt.",
         ],
       },
       {
         h: "Ce que Pacevo en fait",
         p: [
           "L'app relit, via intervals.icu, les mêmes traces GPS que celles enregistrées par la montre — elle n'a pas accès à une source de position plus précise que l'appareil au poignet, et ne prétend corriger aucune erreur de ce type.",
-          "C'est pourquoi Pacevo classe l'intensité d'une séance (facile, modérée ou dure) d'après ta fréquence cardiaque moyenne, rapportée à ta fréquence maximale, et non d'après l'allure affichée seconde par seconde. L'allure ne sert qu'à comparer ce que tu as couru à la cible prévue, en moyenne sur une répétition, un bloc ou la séance. Sans fréquence cardiaque enregistrée, l'intensité n'est pas classée.",
+          "C'est pourquoi, dans l'analyse d'une séance, Pacevo classe l'intensité (facile, modérée ou dure) d'après ta fréquence cardiaque moyenne, rapportée à ta fréquence maximale, et non d'après l'allure affichée seconde par seconde. Pour l'écart à la séance prévue, l'allure est comparée à la cible en moyenne, sur une répétition, un bloc ou la séance. Sans fréquence cardiaque enregistrée, ou sans fréquence maximale connue, l'intensité n'est pas classée.",
         ],
       },
       {
@@ -1060,11 +1060,6 @@ export const ARTICLES: Article[] = [
         label:
           "Gilgen-Ammann R, Schweizer T, Wyss T. Accuracy of Distance Recordings in Eight Positioning-Enabled Sport Watches: Instrument Validation Study. JMIR Mhealth Uhealth, 2020",
         url: "https://pubmed.ncbi.nlm.nih.gov/32396865/",
-      },
-      {
-        label:
-          "Buchheit M. Monitoring training status with HR measures: do all roads lead to Rome ? Front Physiol, 2014",
-        url: "https://pubmed.ncbi.nlm.nih.gov/24578692/",
       },
     ],
   },
