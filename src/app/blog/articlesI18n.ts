@@ -798,8 +798,8 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         {
           h: "3. What does it judge your intensity on?",
           p: [
-            "A Swiss team led by Rahel Gilgen-Ammann tested eight GPS sport watches on the same course, in open terrain, in an urban area and in forest (JMIR mHealth and uHealth, 2020). The measured distance error ranges from 3.2% to 6.1% depending on the watch, and accuracy degrades markedly in forest and in urban areas.",
-            "The instantaneous pace shown on your wrist is computed over a few seconds: it is what amplifies those position errors the most. The illustration is ours, not the study's: an app that grades your session on raw pace can blame you, under tree cover, for a deviation you never made.",
+            "A Swiss team led by Rahel Gilgen-Ammann tested eight GPS sport watches in three types of area (urban, forest, athletics track), while walking, running and cycling (JMIR mHealth and uHealth, 2020). Across all areas and activities, the mean absolute error on distance ranges from 3.2% to 6.1% depending on the watch, and distances are less accurate in urban and forest areas than on the track.",
+            "What follows is our reasoning, not a finding of the study, which measures distances and not paces: the pace shown on your wrist is computed over a few seconds, so from very few positions. An app that grades your session on raw pace can blame you, under tree cover, for a deviation you never made.",
             "So ask whether intensity is also judged on heart rate, which depends on no satellite.",
           ],
         },
@@ -813,8 +813,8 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         {
           h: "5. Which progression rule does it apply, and what does it do with pain?",
           p: [
-            "The most quoted rule, not increasing your volume by more than 10% a week, has been tested. The randomised trial by Buist and colleagues (2008) allocated 532 novice runners to either a 13-week graded programme built on that rule or a standard 8-week programme. Running-related injuries: 20.8% in the first group, 20.3% in the second (P = 0.90).",
-            "An app that presents this rule as protection is selling you a certainty that this trial did not find. Ask instead how it avoids abrupt jumps in load.",
+            "The most quoted rule, not increasing your volume by more than 10% a week, has been put to the test in at least one randomised trial. Buist and colleagues (2008) allocated 532 novice runners, who were preparing for a 6.7 km event, to either a 13-week graded programme built on that rule or a standard 8-week programme. Running-related injuries: 20.8% in the first group, 20.3% in the second (P = 0.90).",
+            "In these novices, the programme built on the 10% rule therefore did not reduce injuries compared with the standard programme. An app that presents this rule as protection claims more than this trial found. Ask instead how it avoids abrupt jumps in load.",
             "And ask what it does with pain you report. It can lighten the week and point you to a health professional. It must not make a diagnosis.",
           ],
         },
@@ -829,10 +829,10 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
           h: "Our answers, limits included",
           p: [
             "Pacevo is published by the author of this article: read what follows as the answer of an interested party.",
-            "The plan covers a rolling seven days and is recalculated from your actual sessions, by fixed rules and not by a language model. The calendar shows the reason behind each decision.",
-            "The session goes to Garmin, COROS and Suunto, through intervals.icu. A session's intensity is judged first on heart rate, never on raw instantaneous pace.",
+            "The plan covers a rolling seven days and is recalculated from your actual sessions, by fixed rules and not by a language model. The calendar shows the reasoning behind the plan: target, last session, reasons for any easing.",
+            "The session goes to Garmin, COROS and Suunto, through intervals.icu. On intensity, our answer is limited: Pacevo re-reads, through intervals.icu, the GPS traces recorded by your watch and corrects none of their errors.",
             "No default maximal aerobic speed or maximum heart rate is displayed as a measurement: when the data is missing, the app says so.",
-            "A painful area reported at 4 out of 10 or more removes one quality session from the current week. The app makes no diagnosis.",
+            "A painful area reported at 4 out of 10 or more removes one quality session from the current week's budget. The app makes no diagnosis.",
             "The database is hosted in the European Union, in Frankfurt. AI-written analyses send training data to Google and Anthropic; the full list of processors is on our privacy page.",
             "Now our limits. You need an intervals.icu account to connect your watch. The strength session is not sent to your wrist. And Pacevo publishes no outcome figures, neither success rates nor minutes gained: it has none measured yet.",
           ],
@@ -1407,8 +1407,8 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         {
           h: "3. Woran misst sie deine Intensität?",
           p: [
-            "Ein Schweizer Team um Rahel Gilgen-Ammann hat acht GPS-Sportuhren auf derselben Strecke getestet, im offenen Gelände, im Stadtgebiet und im Wald (JMIR mHealth and uHealth, 2020). Der gemessene Distanzfehler liegt je nach Uhr zwischen 3,2 % und 6,1 %, und die Genauigkeit nimmt im Wald und im Stadtgebiet deutlich ab.",
-            "Das am Handgelenk angezeigte Momentantempo wird über wenige Sekunden berechnet: Es verstärkt diese Positionsfehler am meisten. Das Beispiel stammt von uns, nicht aus der Studie: Eine App, die deine Einheit am rohen Tempo bewertet, kann dir im Unterholz eine Abweichung vorwerfen, die du nie begangen hast.",
+            "Ein Schweizer Team um Rahel Gilgen-Ammann hat acht GPS-Sportuhren in drei Arten von Umgebung getestet (Stadt, Wald, Leichtathletikbahn), beim Gehen, Laufen und Radfahren (JMIR mHealth and uHealth, 2020). Über alle Umgebungen und Aktivitäten hinweg liegt der mittlere absolute Distanzfehler je nach Uhr zwischen 3,2 % und 6,1 %, und die Distanzen sind in der Stadt und im Wald ungenauer als auf der Bahn.",
+            "Was folgt, ist unsere Überlegung, kein Ergebnis der Studie, die Distanzen misst und keine Tempi: Das am Handgelenk angezeigte Tempo wird über wenige Sekunden berechnet, also aus sehr wenigen Positionen. Eine App, die deine Einheit am rohen Tempo bewertet, kann dir im Unterholz eine Abweichung vorwerfen, die du nie begangen hast.",
             "Frag also, ob die Intensität auch an der Herzfrequenz gemessen wird, die von keinem Satelliten abhängt.",
           ],
         },
@@ -1422,8 +1422,8 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         {
           h: "5. Welche Steigerungsregel wendet sie an, und was macht sie mit Schmerzen?",
           p: [
-            "Die meistzitierte Regel, den Umfang um nicht mehr als 10 % pro Woche zu steigern, wurde getestet. Die randomisierte Studie von Buist und Kollegen (2008) teilte 532 Laufanfänger auf ein nach dieser Regel aufgebautes, abgestuftes 13-Wochen-Programm und ein 8-wöchiges Standardprogramm auf. Laufbedingte Verletzungen: 20,8 % in der ersten Gruppe, 20,3 % in der zweiten (P = 0,90).",
-            "Eine App, die diese Regel als Schutz darstellt, verkauft dir eine Gewissheit, die diese Studie nicht gefunden hat. Frag lieber, wie sie abrupte Belastungssprünge vermeidet.",
+            "Die meistzitierte Regel, den Umfang um nicht mehr als 10 % pro Woche zu steigern, wurde in mindestens einer randomisierten Studie geprüft. Buist und Kollegen (2008) teilten 532 Laufanfänger, die sich auf einen 6,7-km-Lauf vorbereiteten, auf ein nach dieser Regel aufgebautes, abgestuftes 13-Wochen-Programm und ein 8-wöchiges Standardprogramm auf. Laufbedingte Verletzungen: 20,8 % in der ersten Gruppe, 20,3 % in der zweiten (P = 0,90).",
+            "Bei diesen Anfängern hat das auf der 10-%-Regel aufgebaute Programm die Verletzungen gegenüber dem Standardprogramm also nicht verringert. Eine App, die diese Regel als Schutz darstellt, behauptet mehr, als diese Studie gefunden hat. Frag lieber, wie sie abrupte Belastungssprünge vermeidet.",
             "Und frag, was sie mit einem gemeldeten Schmerz macht. Sie kann die Woche entlasten und dich an eine medizinische Fachperson verweisen. Eine Diagnose darf sie nicht stellen.",
           ],
         },
@@ -1438,10 +1438,10 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
           h: "Unsere Antworten, Grenzen inbegriffen",
           p: [
             "Pacevo wird vom Autor dieses Artikels herausgegeben: Lies das Folgende als Antwort einer interessierten Partei.",
-            "Der Plan umfasst gleitende sieben Tage und wird aus deinen tatsächlichen Einheiten neu berechnet, nach festen Regeln und nicht durch ein Sprachmodell. Der Kalender zeigt den Grund für jede Entscheidung.",
-            "Die Einheit geht über intervals.icu an Garmin, COROS und Suunto. Die Intensität einer Einheit wird zuerst an der Herzfrequenz gemessen, nie am rohen Momentantempo.",
+            "Der Plan umfasst gleitende sieben Tage und wird aus deinen tatsächlichen Einheiten neu berechnet, nach festen Regeln und nicht durch ein Sprachmodell. Der Kalender zeigt die Überlegung hinter dem Plan: Ziel, letzte Einheit, Gründe für eine Entlastung.",
+            "Die Einheit geht über intervals.icu an Garmin, COROS und Suunto. Zur Intensität ist unsere Antwort begrenzt: Pacevo liest über intervals.icu die von deiner Uhr aufgezeichneten GPS-Spuren und korrigiert keinen ihrer Fehler.",
             "Keine maximale aerobe Geschwindigkeit und keine maximale Herzfrequenz wird als Standardwert wie eine Messung angezeigt: Fehlen die Daten, sagt die App das.",
-            "Eine schmerzende Zone, die mit 4 von 10 oder mehr gemeldet wird, streicht der laufenden Woche eine Qualitätseinheit. Die App stellt keine Diagnose.",
+            "Eine schmerzende Zone, die mit 4 von 10 oder mehr gemeldet wird, streicht eine Qualitätseinheit aus dem Budget der laufenden Woche. Die App stellt keine Diagnose.",
             "Die Datenbank wird in der Europäischen Union gehostet, in Frankfurt. KI-verfasste Analysen übermitteln Trainingsdaten an Google und Anthropic; die vollständige Liste der Auftragsverarbeiter steht auf unserer Datenschutzseite.",
             "Nun zu unseren Grenzen. Du brauchst ein intervals.icu-Konto, um deine Uhr zu verbinden. Die Krafteinheit wird nicht ans Handgelenk geschickt. Und Pacevo veröffentlicht keine Ergebniszahlen, weder Erfolgsquoten noch gewonnene Minuten: Es hat noch keine gemessen.",
           ],
@@ -2016,8 +2016,8 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         {
           h: "3. ¿Con qué juzga tu intensidad?",
           p: [
-            "Un equipo suizo dirigido por Rahel Gilgen-Ammann probó ocho relojes deportivos con GPS en un mismo recorrido, a cielo abierto, en zona urbana y en bosque (JMIR mHealth and uHealth, 2020). El error de distancia medido va del 3,2 % al 6,1 % según el reloj, y la precisión se degrada claramente en bosque y en zona urbana.",
-            "El ritmo instantáneo que muestra la muñeca se calcula sobre unos pocos segundos: es el que más amplifica esos errores de posición. El ejemplo es nuestro, no del estudio: una aplicación que califica tu sesión con el ritmo en bruto puede reprocharte, bajo los árboles, un desvío que no cometiste.",
+            "Un equipo suizo dirigido por Rahel Gilgen-Ammann probó ocho relojes deportivos con GPS en tres tipos de zona (ciudad, bosque, pista de atletismo), caminando, corriendo y en bicicleta (JMIR mHealth and uHealth, 2020). Con todas las zonas y actividades juntas, el error absoluto medio de distancia va del 3,2 % al 6,1 % según el reloj, y las distancias son menos precisas en ciudad y en bosque que en la pista.",
+            "Lo que sigue es nuestro razonamiento, no un resultado del estudio, que mide distancias y no ritmos: el ritmo que muestra la muñeca se calcula sobre unos pocos segundos, es decir, a partir de muy pocas posiciones. Una aplicación que califica tu sesión con el ritmo en bruto puede reprocharte, bajo los árboles, un desvío que no cometiste.",
             "Pregunta, pues, si la intensidad se juzga también con la frecuencia cardíaca, que no depende de ningún satélite.",
           ],
         },
@@ -2031,8 +2031,8 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         {
           h: "5. ¿Qué regla de progresión aplica y qué hace con un dolor?",
           p: [
-            "La regla más citada, no aumentar el volumen más de un 10 % por semana, se ha puesto a prueba. El ensayo aleatorizado de Buist y sus colegas (2008) repartió a 532 corredores principiantes entre un programa progresivo de 13 semanas construido sobre esa regla y un programa estándar de 8 semanas. Lesiones relacionadas con la carrera: 20,8 % en el primer grupo, 20,3 % en el segundo (P = 0,90).",
-            "Una aplicación que presenta esa regla como una protección te vende una certeza que este ensayo no encontró. Pregunta más bien cómo evita los saltos bruscos de carga.",
+            "La regla más citada, no aumentar el volumen más de un 10 % por semana, se ha puesto a prueba en al menos un ensayo aleatorizado. Buist y sus colegas (2008) repartieron a 532 corredores principiantes, que preparaban una carrera de 6,7 km, entre un programa progresivo de 13 semanas construido sobre esa regla y un programa estándar de 8 semanas. Lesiones relacionadas con la carrera: 20,8 % en el primer grupo, 20,3 % en el segundo (P = 0,90).",
+            "En esos principiantes, el programa construido sobre la regla del 10 % no redujo, por tanto, las lesiones frente al programa estándar. Una aplicación que presenta esa regla como una protección afirma más de lo que este ensayo encontró. Pregunta más bien cómo evita los saltos bruscos de carga.",
             "Y pregunta qué hace con un dolor declarado. Puede aligerar la semana y orientarte hacia un profesional sanitario. No debe emitir un diagnóstico.",
           ],
         },
@@ -2047,10 +2047,10 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
           h: "Nuestras respuestas, con sus límites",
           p: [
             "Pacevo lo edita el autor de este artículo: lee lo que sigue como la respuesta de una parte interesada.",
-            "El plan cubre siete días móviles y se recalcula a partir de tus sesiones reales, mediante reglas fijas y no mediante un modelo de lenguaje. El calendario muestra el motivo de cada decisión.",
-            "La sesión se envía a Garmin, COROS y Suunto, a través de intervals.icu. La intensidad de una sesión se juzga primero con la frecuencia cardíaca, nunca con el ritmo instantáneo en bruto.",
+            "El plan cubre siete días móviles y se recalcula a partir de tus sesiones reales, mediante reglas fijas y no mediante un modelo de lenguaje. El calendario muestra el razonamiento que lleva al plan: objetivo, última sesión, motivos de la descarga.",
+            "La sesión se envía a Garmin, COROS y Suunto, a través de intervals.icu. Sobre la intensidad, nuestra respuesta es limitada: Pacevo relee, a través de intervals.icu, las trazas GPS registradas por tu reloj y no corrige ninguno de sus errores.",
             "No se muestra ninguna velocidad aeróbica máxima ni frecuencia cardíaca máxima por defecto como si fuera una medición: cuando falta el dato, la aplicación lo dice.",
-            "Una zona dolorida declarada con 4 sobre 10 o más quita una sesión de calidad a la semana en curso. La aplicación no emite ningún diagnóstico.",
+            "Una zona dolorida declarada con 4 sobre 10 o más quita una sesión de calidad del presupuesto de la semana en curso. La aplicación no emite ningún diagnóstico.",
             "La base de datos está alojada en la Unión Europea, en Fráncfort. Los análisis redactados por inteligencia artificial transmiten datos de entrenamiento a Google y a Anthropic; la lista completa de encargados está en nuestra página de privacidad.",
             "Ahora, nuestros límites. Necesitas una cuenta de intervals.icu para conectar tu reloj. La sesión de fuerza no se envía a la muñeca. Y Pacevo no publica ninguna cifra de resultados, ni tasas de éxito ni minutos ganados: todavía no tiene ninguna medida.",
           ],
@@ -2625,8 +2625,8 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         {
           h: "3. Com base em quê avalia a tua intensidade?",
           p: [
-            "Uma equipa suíça liderada por Rahel Gilgen-Ammann testou oito relógios desportivos com GPS no mesmo percurso, a céu aberto, em zona urbana e em floresta (JMIR mHealth and uHealth, 2020). O erro de distância medido vai de 3,2 % a 6,1 % consoante o relógio, e a precisão degrada-se claramente em floresta e em zona urbana.",
-            "O ritmo instantâneo mostrado no pulso é calculado sobre poucos segundos: é ele que mais amplifica esses erros de posição. O exemplo é nosso, não do estudo: uma aplicação que avalia o teu treino pelo ritmo em bruto pode censurar-te, debaixo das árvores, um desvio que não cometeste.",
+            "Uma equipa suíça liderada por Rahel Gilgen-Ammann testou oito relógios desportivos com GPS em três tipos de zona (cidade, floresta, pista de atletismo), a andar, a correr e de bicicleta (JMIR mHealth and uHealth, 2020). Com todas as zonas e atividades juntas, o erro absoluto médio de distância vai de 3,2 % a 6,1 % consoante o relógio, e as distâncias são menos precisas em cidade e em floresta do que na pista.",
+            "O que se segue é o nosso raciocínio, não um resultado do estudo, que mede distâncias e não ritmos: o ritmo mostrado no pulso é calculado sobre poucos segundos, ou seja, a partir de muito poucas posições. Uma aplicação que avalia o teu treino pelo ritmo em bruto pode censurar-te, debaixo das árvores, um desvio que não cometeste.",
             "Pergunta, por isso, se a intensidade é também avaliada pela frequência cardíaca, que não depende de nenhum satélite.",
           ],
         },
@@ -2640,8 +2640,8 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         {
           h: "5. Que regra de progressão aplica, e o que faz com uma dor?",
           p: [
-            "A regra mais citada, não aumentar o volume em mais de 10 % por semana, foi testada. O ensaio aleatorizado de Buist e colegas (2008) distribuiu 532 corredores principiantes por um programa progressivo de 13 semanas construído sobre essa regra e por um programa padrão de 8 semanas. Lesões relacionadas com a corrida: 20,8 % no primeiro grupo, 20,3 % no segundo (P = 0,90).",
-            "Uma aplicação que apresenta essa regra como uma proteção vende-te uma certeza que este ensaio não encontrou. Pergunta antes como evita os saltos bruscos de carga.",
+            "A regra mais citada, não aumentar o volume em mais de 10 % por semana, foi posta à prova em pelo menos um ensaio aleatorizado. Buist e colegas (2008) distribuíram 532 corredores principiantes, que preparavam uma prova de 6,7 km, por um programa progressivo de 13 semanas construído sobre essa regra e por um programa padrão de 8 semanas. Lesões relacionadas com a corrida: 20,8 % no primeiro grupo, 20,3 % no segundo (P = 0,90).",
+            "Nesses principiantes, o programa construído sobre a regra dos 10 % não reduziu, portanto, as lesões face ao programa padrão. Uma aplicação que apresenta essa regra como uma proteção afirma mais do que este ensaio encontrou. Pergunta antes como evita os saltos bruscos de carga.",
             "E pergunta o que faz com uma dor declarada. Pode aliviar a semana e encaminhar-te para um profissional de saúde. Não deve fazer um diagnóstico.",
           ],
         },
@@ -2656,10 +2656,10 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
           h: "As nossas respostas, com os seus limites",
           p: [
             "O Pacevo é editado pelo autor deste artigo: lê o que se segue como a resposta de uma parte interessada.",
-            "O plano cobre sete dias móveis e é recalculado a partir dos teus treinos reais, por regras fixas e não por um modelo de linguagem. O calendário mostra o motivo de cada decisão.",
-            "O treino segue para Garmin, COROS e Suunto, através do intervals.icu. A intensidade de um treino avalia-se primeiro pela frequência cardíaca, nunca pelo ritmo instantâneo em bruto.",
+            "O plano cobre sete dias móveis e é recalculado a partir dos teus treinos reais, por regras fixas e não por um modelo de linguagem. O calendário mostra o raciocínio que leva ao plano: objetivo, último treino, motivos do alívio.",
+            "O treino segue para Garmin, COROS e Suunto, através do intervals.icu. Sobre a intensidade, a nossa resposta é limitada: o Pacevo relê, através do intervals.icu, os traçados GPS registados pelo teu relógio e não corrige nenhum dos seus erros.",
             "Nenhuma velocidade aeróbia máxima nem frequência cardíaca máxima por defeito é mostrada como se fosse uma medição: quando o dado falta, a aplicação di-lo.",
-            "Uma zona dolorosa declarada com 4 em 10 ou mais retira um treino de qualidade à semana em curso. A aplicação não faz nenhum diagnóstico.",
+            "Uma zona dolorosa declarada com 4 em 10 ou mais retira um treino de qualidade ao orçamento da semana em curso. A aplicação não faz nenhum diagnóstico.",
             "A base de dados está alojada na União Europeia, em Frankfurt. As análises redigidas por inteligência artificial transmitem dados de treino à Google e à Anthropic; a lista completa de subcontratantes está na nossa página de privacidade.",
             "Agora, os nossos limites. Precisas de uma conta intervals.icu para ligar o teu relógio. O treino de força não é enviado para o pulso. E o Pacevo não publica nenhum número de resultados, nem taxas de sucesso nem minutos ganhos: ainda não tem nenhum medido.",
           ],

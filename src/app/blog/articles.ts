@@ -1277,8 +1277,19 @@ export const ARTICLES: Article[] = [
   // classement des concurrents écrit par l'un des classés ne vaut rien, et aucune de leurs
   // fonctions n'a été vérifiée. L'article donne des questions, puis NOS réponses — chacune
   // relue dans le code le 13/11/2026 (montres : `SYNC` de `app/page.tsx` ; VMA sans
-  // repli : `effectiveVma` ; douleur : article p13 ; sous-traitants : `legalI18n`).
+  // repli : `effectiveVma` ; douleur : `SEUIL_DOULEUR_DECLAREE` et `qualityBudget` ;
+  // raisonnement du calendrier : `CalendarView` ; sous-traitants : `legalI18n`).
   // Si l'une de ces réponses change dans le produit, elle change ici le même jour.
+  //
+  // ⚠️ DOUBLE RELECTURE DU 13/11/2026, deux ÉCHOUE au premier tour, corrigés :
+  //  · l'étude des montres GPS mesure des DISTANCES, dans trois types de zones (ville,
+  //    forêt, piste) : ni « un même parcours », ni rien sur l'allure instantanée. Ce
+  //    qu'on en déduit sur l'allure est signalé comme NOTRE raisonnement ;
+  //  · l'essai de Buist porte sur des DÉBUTANTS préparant un 6,7 km : on ne lui fait
+  //    pas dire plus ;
+  //  · « l'intensité se juge d'abord à la fréquence cardiaque » n'est PAS une règle du
+  //    code : retiré. Ces formulations venaient de l'article p14, déjà en ligne : une
+  //    phrase déjà publiée n'est pas une phrase vérifiée.
   {
     slug: "quelle-application-coaching-running-2027-six-questions",
     cle: "p17",
@@ -1306,8 +1317,8 @@ export const ARTICLES: Article[] = [
       {
         h: "3. Sur quoi juge-t-elle ton intensité ?",
         p: [
-          "Une équipe suisse menée par Rahel Gilgen-Ammann a testé huit montres GPS de sport sur un même parcours, à ciel ouvert, en zone urbaine et en forêt (JMIR mHealth and uHealth, 2020). L'erreur de distance mesurée va de 3,2 % à 6,1 % selon les montres, et la précision se dégrade nettement en forêt et en zone urbaine.",
-          "L'allure instantanée affichée au poignet est calculée sur quelques secondes : c'est elle qui amplifie le plus ces erreurs de position. L'illustration est de nous, pas de l'étude : une application qui note ta séance à l'allure brute peut te reprocher, en sous-bois, un écart que tu n'as pas commis.",
+          "Une équipe suisse menée par Rahel Gilgen-Ammann a testé huit montres GPS de sport dans trois types de zones (ville, forêt, piste d'athlétisme), à la marche, en course et à vélo (JMIR mHealth and uHealth, 2020). Toutes zones et activités confondues, l'erreur absolue moyenne sur la distance va de 3,2 % à 6,1 % selon les montres, et les distances sont moins précises en ville et en forêt que sur la piste.",
+          "Ce qui suit est notre raisonnement, pas un résultat de l'étude, qui mesure des distances et non des allures : l'allure affichée au poignet est calculée sur quelques secondes, donc à partir de très peu de positions. Une application qui note ta séance à l'allure brute peut te reprocher, en sous-bois, un écart que tu n'as pas commis.",
           "Demande donc si l'intensité est aussi jugée à la fréquence cardiaque, qui ne dépend d'aucun satellite.",
         ],
       },
@@ -1321,8 +1332,8 @@ export const ARTICLES: Article[] = [
       {
         h: "5. Quelle règle de progression applique-t-elle, et que fait-elle d'une douleur ?",
         p: [
-          "La règle la plus citée, ne pas augmenter son volume de plus de 10 % par semaine, a été testée. L'essai randomisé de Buist et ses collègues (2008) a réparti 532 coureurs débutants entre un programme progressif de 13 semaines bâti sur cette règle et un programme standard de 8 semaines. Blessures liées à la course : 20,8 % dans le premier groupe, 20,3 % dans le second (P = 0,90).",
-          "Une application qui présente cette règle comme une protection te vend une certitude que cet essai n'a pas trouvée. Demande plutôt comment elle évite les sauts brutaux de charge.",
+          "La règle la plus citée, ne pas augmenter son volume de plus de 10 % par semaine, a été mise à l'épreuve dans au moins un essai randomisé. Buist et ses collègues (2008) ont réparti 532 coureurs débutants, qui préparaient une course de 6,7 km, entre un programme progressif de 13 semaines bâti sur cette règle et un programme standard de 8 semaines. Blessures liées à la course : 20,8 % dans le premier groupe, 20,3 % dans le second (P = 0,90).",
+          "Chez ces débutants, le programme bâti sur la règle des 10 % n'a donc pas réduit les blessures par rapport au programme standard. Une application qui présente cette règle comme une protection avance plus que ce que cet essai a trouvé. Demande plutôt comment elle évite les sauts brutaux de charge.",
           "Et demande ce qu'elle fait d'une douleur déclarée. Elle peut alléger la semaine et t'orienter vers un professionnel de santé. Elle ne doit pas poser de diagnostic.",
         ],
       },
@@ -1337,10 +1348,10 @@ export const ARTICLES: Article[] = [
         h: "Nos réponses, limites comprises",
         p: [
           "Pacevo est édité par l'auteur de cet article : lis ce qui suit comme la réponse d'une partie intéressée.",
-          "Le plan couvre sept jours glissants et se recalcule à partir de tes séances réelles, par des règles fixes et non par un modèle de langage. Le calendrier affiche le motif de chaque décision.",
-          "La séance part vers Garmin, COROS et Suunto, par l'intermédiaire d'intervals.icu. L'intensité d'une séance se juge d'abord à la fréquence cardiaque, jamais à l'allure instantanée brute.",
+          "Le plan couvre sept jours glissants et se recalcule à partir de tes séances réelles, par des règles fixes et non par un modèle de langage. Le calendrier affiche le raisonnement qui mène au plan : objectif visé, dernière séance, motifs d'allègement.",
+          "La séance part vers Garmin, COROS et Suunto, par l'intermédiaire d'intervals.icu. Sur l'intensité, notre réponse est limitée : Pacevo relit, via intervals.icu, les traces GPS enregistrées par ta montre et ne corrige aucune de leurs erreurs.",
           "Aucune VMA ni fréquence cardiaque maximale par défaut n'est affichée comme une mesure : quand la donnée manque, l'application le dit.",
-          "Une zone douloureuse déclarée à 4 sur 10 ou plus retire une séance de qualité à la semaine en cours. L'application ne pose aucun diagnostic.",
+          "Une zone douloureuse déclarée à 4 sur 10 ou plus retire une séance de qualité du budget de la semaine en cours. L'application ne pose aucun diagnostic.",
           "La base de données est hébergée dans l'Union européenne, à Francfort. Les analyses rédigées par intelligence artificielle transmettent des données d'entraînement à Google et à Anthropic ; la liste complète des sous-traitants est sur notre page de confidentialité.",
           "Nos limites, maintenant. Il te faut un compte intervals.icu pour relier ta montre. La séance de renforcement n'est pas envoyée au poignet. Et Pacevo ne publie aucun chiffre de résultat, ni taux de réussite ni minutes gagnées : il n'en a pas encore de mesuré.",
         ],
