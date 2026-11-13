@@ -132,6 +132,9 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
  * `lib/coach/courseCEcartee` (décisions de Cyprien, 13/11/2026), lue sur le contexte du coach.
  */
 export function courseCEcartee(ctx: AthleteContext, today: Date): CourseCEcartee | null {
+  // Le résultat du coach fait foi : il a été calculé avec le jour 0 du COUREUR (son fuseau). Le calcul
+  // ci-dessous ne sert qu'aux contextes bâtis sans `buildAthleteContext` (tests).
+  if (ctx.courseCEcartee !== undefined) return ctx.courseCEcartee;
   const debut = new Date(today); debut.setHours(0, 0, 0, 0);
   return courseCEcarteeDe({
     courseSecondaire: ctx.courseSecondaire ?? null, daysToRace: ctx.daysToRace,

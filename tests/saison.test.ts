@@ -239,6 +239,8 @@ async function main() {
   });
 
   console.log("\nLA COURSE C ÉCARTÉE, DANS LE VRAI CONTEXTE (décisions de Cyprien, 13/11/2026)");
+  /** Le jour 0 du plan, celui du coureur (les dates du test sont en heure de Paris), à midi local. */
+  const JOUR0 = new Date(`${AUJOURDHUI}T12:00:00`);
 
   await test("marathon couru il y a 5 jours, course C dans 2 jours : écartée À LA SOURCE (qualité, motifs, invite) et dite au plan", async () => {
     // Le contexte du coach, bâti par `buildAthleteContext` (pas un contexte fabriqué) : la récupération
@@ -254,8 +256,13 @@ async function main() {
     const tout = JSON.stringify(avec);
     assert.ok(!tout.includes("course C cette semaine"), "une course C écartée est encore annoncée dans les motifs");
     assert.ok(!avec.text.includes("COURSE C CETTE SEMAINE") && avec.text.includes("COURSE C ÉCARTÉE"), "l'invite annonce encore la course C, ou ne dit pas qu'elle est écartée");
-    const plan = buildWeekPlan(avec);
+    const plan = buildWeekPlan(avec, JOUR0);
     assert.ok(!plan.some((d) => d.type === "Course" && d.title.includes("Cross C")), "la course C est au plan pendant la récupération du marathon");
+    assert.deepEqual(avec.courseCEcartee && { idx: avec.courseCEcartee.idx, motif: avec.courseCEcartee.motif, courseA: avec.courseCEcartee.courseA }, { idx: 2, motif: "apres", courseA: "Marathon A" },
+      "le contexte ne porte plus la course C écartée qu'il a calculée");
+    // Sans récupération ni course A, un recalcul garderait la C : le plan doit suivre le contexte.
+    const seulContexte = buildWeekPlan({ ...avec, recuperation: null, daysToRace: null }, JOUR0);
+    assert.ok(!seulContexte.some((d) => d.type === "Course" && d.title.includes("Cross C")), "le plan recalcule la règle au lieu de lire celle du coach (jour 0 du serveur)");
     const jourC = plan.filter((d) => d.date === ilYa(-2));
     for (const l of ["fr", "en", "de", "es", "pt"] as const) {
       const attendu = PLAN_T[l].courseCEcarteeRecup("Cross C", "Marathon A");
@@ -271,7 +278,7 @@ async function main() {
     assert.equal(avec.courseSecondaire?.priorite, "C", "précondition : la course C n'est pas vue");
     assert.ok(sans.weekPlan.qBudget > 0, `précondition : aucune qualité cette semaine (${sans.weekPlan.qBudget}), l'assertion ne prouverait rien`);
     assert.equal(avec.weekPlan.qBudget, sans.weekPlan.qBudget, `une course C écartée retire encore une qualité (${sans.weekPlan.qBudget} → ${avec.weekPlan.qBudget})`);
-    assert.ok(!buildWeekPlan(avec).some((d) => d.type === "Course" && d.title.includes("Cross C")), "la course C de la veille d'un 10 km est au plan");
+    assert.ok(!buildWeekPlan(avec, JOUR0).some((d) => d.type === "Course" && d.title.includes("Cross C")), "la course C de la veille d'un 10 km est au plan");
   });
 
   await test("contre-épreuve : la même course C loin de toute course A reste au plan et prend une qualité", async () => {
@@ -281,7 +288,7 @@ async function main() {
     assert.equal(avec.courseSecondaire?.priorite, "C", "précondition : la course C n'est pas vue");
     assert.ok(avec.weekPlan.qBudget === Math.max(0, sans.weekPlan.qBudget - 1) && sans.weekPlan.qBudget > 0, `une course C gardée ne prend plus sa qualité (${sans.weekPlan.qBudget} → ${avec.weekPlan.qBudget})`);
     assert.ok(avec.text.includes("COURSE C CETTE SEMAINE"), "une course C gardée n'est plus annoncée à l'IA");
-    assert.ok(buildWeekPlan(avec).some((d) => d.type === "Course" && d.title.includes("Cross C")), "une course C loin de toute course A n'est plus au plan");
+    assert.ok(buildWeekPlan(avec, JOUR0).some((d) => d.type === "Course" && d.title.includes("Cross C")), "une course C loin de toute course A n'est plus au plan");
   });
 
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
