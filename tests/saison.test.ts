@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
+import { PLAN_T } from "../src/lib/ai/planI18n";
 import { prioriteDe, coursesDeSaison, prochaineCourseA, courseSecondaireDeLaSemaine, coursesPassees } from "../src/lib/coach/saison";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
@@ -235,6 +236,52 @@ async function main() {
     assert.match(src, /distanceKm: race\.distanceKm, priorite: race\.priorite \}/, "la priorité n'est pas envoyée à l'ajout");
     assert.match(src, /fetch\("\/api\/calendar-entry", \{ method: "PATCH"/, "la priorité ne se change pas");
     assert.match(codeNu("src/app/dashboard/calendrier/page.tsx"), /priorite: prioriteDe\(d\.priorite\)/, "la priorité n'est pas lue");
+  });
+
+  console.log("\nLA COURSE C ÉCARTÉE, DANS LE VRAI CONTEXTE (décisions de Cyprien, 13/11/2026)");
+
+  await test("marathon couru il y a 5 jours, course C dans 2 jours : écartée À LA SOURCE (qualité, motifs, invite) et dite au plan", async () => {
+    // Le contexte du coach, bâti par `buildAthleteContext` (pas un contexte fabriqué) : la récupération
+    // n'existe que si le marathon a été COURU — une sortie de 42 km ce jour-là.
+    const seances = [...SEANCES.filter((w) => w.date !== ilYa(5)), { ...SEANCES[0], date: ilYa(5), type: "race", distance_km: 42.2, duration_seconds: 10500 }];
+    const marathon = objectif("Marathon A", 5, 42.2);
+    const C = planifiee("Cross C", -2, 8, "C");
+    const avec = await contexte([marathon, C], seances);
+    const sans = await contexte([marathon], seances);
+    assert.ok(avec.recuperation?.fin, "précondition : aucune récupération après le marathon couru");
+    assert.equal(avec.courseSecondaire?.priorite, "C", "précondition : la course C de la semaine n'est pas vue");
+    assert.equal(avec.weekPlan.qBudget, sans.weekPlan.qBudget, `une course C écartée retire encore une qualité (${sans.weekPlan.qBudget} → ${avec.weekPlan.qBudget})`);
+    const tout = JSON.stringify(avec);
+    assert.ok(!tout.includes("course C cette semaine"), "une course C écartée est encore annoncée dans les motifs");
+    assert.ok(!avec.text.includes("COURSE C CETTE SEMAINE") && avec.text.includes("COURSE C ÉCARTÉE"), "l'invite annonce encore la course C, ou ne dit pas qu'elle est écartée");
+    const plan = buildWeekPlan(avec);
+    assert.ok(!plan.some((d) => d.type === "Course" && d.title.includes("Cross C")), "la course C est au plan pendant la récupération du marathon");
+    const jourC = plan.filter((d) => d.date === ilYa(-2));
+    for (const l of ["fr", "en", "de", "es", "pt"] as const) {
+      const attendu = PLAN_T[l].courseCEcarteeRecup("Cross C", "Marathon A");
+      assert.ok(jourC.some((d) => (l === "fr" ? d.why : d.i18n?.[l]?.why ?? "").includes(attendu)), `${l} : le jour de la course C ne dit pas qu'elle est écartée pendant la récupération`);
+    }
+  });
+
+  await test("10 km dans 6 jours, course C la veille : écartée, elle ne retire AUCUNE qualité de la semaine", async () => {
+    // Pendant la récupération d'un marathon, la qualité est déjà à zéro : il faut une semaine où elle existe.
+    const dix = objectif("10 km A", -6, 10);
+    const avec = await contexte([dix, planifiee("Cross C", -5, 8, "C")]);
+    const sans = await contexte([dix]);
+    assert.equal(avec.courseSecondaire?.priorite, "C", "précondition : la course C n'est pas vue");
+    assert.ok(sans.weekPlan.qBudget > 0, `précondition : aucune qualité cette semaine (${sans.weekPlan.qBudget}), l'assertion ne prouverait rien`);
+    assert.equal(avec.weekPlan.qBudget, sans.weekPlan.qBudget, `une course C écartée retire encore une qualité (${sans.weekPlan.qBudget} → ${avec.weekPlan.qBudget})`);
+    assert.ok(!buildWeekPlan(avec).some((d) => d.type === "Course" && d.title.includes("Cross C")), "la course C de la veille d'un 10 km est au plan");
+  });
+
+  await test("contre-épreuve : la même course C loin de toute course A reste au plan et prend une qualité", async () => {
+    const C = planifiee("Cross C", -2, 8, "C");
+    const avec = await contexte([objectif("Marathon A", -60, 42.2), C]);
+    const sans = await contexte([objectif("Marathon A", -60, 42.2)]);
+    assert.equal(avec.courseSecondaire?.priorite, "C", "précondition : la course C n'est pas vue");
+    assert.ok(avec.weekPlan.qBudget === Math.max(0, sans.weekPlan.qBudget - 1) && sans.weekPlan.qBudget > 0, `une course C gardée ne prend plus sa qualité (${sans.weekPlan.qBudget} → ${avec.weekPlan.qBudget})`);
+    assert.ok(avec.text.includes("COURSE C CETTE SEMAINE"), "une course C gardée n'est plus annoncée à l'IA");
+    assert.ok(buildWeekPlan(avec).some((d) => d.type === "Course" && d.title.includes("Cross C")), "une course C loin de toute course A n'est plus au plan");
   });
 
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

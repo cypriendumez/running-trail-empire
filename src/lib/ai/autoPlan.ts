@@ -23,6 +23,7 @@ import { joursSansIntensite } from "@/lib/coach/apresCourse";
 import { axesRenforcement } from "@/lib/coach/renforcement";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
+import { courseCEcarteeDe, type CourseCEcartee } from "@/lib/coach/courseCEcartee";
 import { appliquerConsignes, appliquerAptitude } from "@/lib/coach/consignesPlan";
 import { BILAN_T } from "@/lib/health/bilanMatin";
 import { nRaw, type I18nText } from "@/lib/i18n/multi";
@@ -127,19 +128,20 @@ export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[
 }
 
 /**
- * LA COURSE C TROP PRÈS D'UNE COURSE PLUS IMPORTANTE (décision de Cyprien, 13/11/2026) : à deux jours
- * ou moins de la course A — le jour même, sa veille, son avant-veille, son lendemain, sa reprise —, dans
- * la semaine comme à J+7/J+8. Elle est ÉCARTÉE : la semaine est celle d'un plan sans elle (ni sortie
- * longue bloquée, ni espacement imposé), et le plan le DIT. Une course la veille d'un objectif en gâche
- * la fraîcheur ; la règle est la même que la veille de la A soit disponible ou non.
+ * La course C écartée de la semaine qui commence `today`, ou `null` — la règle de
+ * `lib/coach/courseCEcartee` (décisions de Cyprien, 13/11/2026), lue sur le contexte du coach.
  */
-export function courseCEcartee(ctx: AthleteContext): { idx: number; nom: string } | null {
-  const cs = ctx.courseSecondaire ?? null;
-  if (!cs || cs.priorite !== "C" || cs.idx < 0 || cs.idx > 6) return null;
-  const a = ctx.daysToRace;
-  if (a == null || a < 0 || a > 8) return null;
-  return Math.abs(cs.idx - a) <= 2 ? { idx: cs.idx, nom: cs.nom } : null;
+export function courseCEcartee(ctx: AthleteContext, today: Date): CourseCEcartee | null {
+  const debut = new Date(today); debut.setHours(0, 0, 0, 0);
+  return courseCEcarteeDe({
+    courseSecondaire: ctx.courseSecondaire ?? null, daysToRace: ctx.daysToRace,
+    distanceA: ctx.objective?.distanceKm ?? null, nomA: ctx.objective?.race ?? null,
+    recuperation: ctx.recuperation ?? null, aujourdhui: iso(debut),
+  });
 }
+/** Le message d'une course C écartée, dans la langue `l`, selon son motif. */
+const messageCourseCEcartee = (c: CourseCEcartee, l: Lang) =>
+  c.motif === "apres" ? PLAN_T[l].courseCEcarteeRecup(c.nom, c.courseA) : PLAN_T[l].courseCEcartee(c.nom);
 
 /**
  * Pose au « pourquoi » du jour de la course C écartée (5 langues) le message qui le dit. À appeler EN
@@ -149,9 +151,9 @@ export function courseCEcartee(ctx: AthleteContext): { idx: number; nom: string 
  * puis posé une seule fois, sur le bon jour — un « échanger » ne l'emporte pas ailleurs.
  */
 export function avecCourseCEcartee(ctx: AthleteContext, plan: PlanDay[], today: Date): PlanDay[] {
-  const c = courseCEcartee(ctx);
+  const c = courseCEcartee(ctx, today);
   if (!c) return plan;
-  const sans = (texte: string | undefined, l: Lang) => (texte ?? "").split(PLAN_T[l].courseCEcartee(c.nom)).join("");
+  const sans = (texte: string | undefined, l: Lang) => (texte ?? "").split(messageCourseCEcartee(c, l)).join("");
   const nettoye = plan.map((d) => ({
     ...d, why: sans(d.why, "fr"),
     i18n: Object.fromEntries(Object.entries(d.i18n ?? {}).map(([l, t]) => [l, t ? { ...t, why: sans(t.why, l as Lang) } : t])) as Partial<Record<Lang, PlanDayText>>,
@@ -163,8 +165,8 @@ export function avecCourseCEcartee(ctx: AthleteContext, plan: PlanDay[], today: 
   if (i < 0) return nettoye;
   const jour = nettoye[i];
   const i18n = Object.fromEntries(Object.entries(jour.i18n ?? {}).map(([l, t]) =>
-    [l, t ? { ...t, why: `${t.why ?? ""}${PLAN_T[l as Lang].courseCEcartee(c.nom)}` } : t])) as Partial<Record<Lang, PlanDayText>>;
-  return nettoye.map((d, k) => (k === i ? { ...jour, why: `${jour.why ?? ""}${PLAN_T.fr.courseCEcartee(c.nom)}`, i18n } : d));
+    [l, t ? { ...t, why: `${t.why ?? ""}${messageCourseCEcartee(c, l as Lang)}` } : t])) as Partial<Record<Lang, PlanDayText>>;
+  return nettoye.map((d, k) => (k === i ? { ...jour, why: `${jour.why ?? ""}${messageCourseCEcartee(c, "fr")}`, i18n } : d));
 }
 
 /**
@@ -424,7 +426,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   const raceIdx = objectifIdx >= 0 ? objectifIdx : courseB ? cs!.idx : -1;
   // Une C écartée (`courseCEcartee`) n'existe plus pour la semaine : ni posée, ni sortie longue du
   // lendemain bloquée, ni espacement imposé aux séances de qualité.
-  const courseCIdx = cs?.priorite === "C" && cs.idx !== raceIdx && !courseCEcartee(ctx) ? cs.idx : -1;
+  const courseCIdx = cs?.priorite === "C" && cs.idx !== raceIdx && !courseCEcartee(ctx, today) ? cs.idx : -1;
 
   // Budget de SORTIES de la semaine. Déclaré avant tout placement : la semaine de course
   // pose elle aussi des footings (déblocage, avant-veille, reprise) qui doivent le

@@ -704,7 +704,9 @@ async function profilElite10() {
     }
     assert.equal(vus, 10, "précondition : tous les cas n'ont pas tourné");
   });
-  await testA("course C à 2 jours ou moins de la course A : écartée, la semaine est celle d'un plan sans elle, ET LE PLAN LE DIT (5 langues)", async () => {
+  await testA("course C trop près de la course A (2 jours avant, ou pendant sa récupération) : écartée, semaine sans elle, ET LE PLAN LE DIT (5 langues)", async () => {
+    // Décisions de Cyprien (13/11/2026) : avant la A, sa veille et son avant-veille ; après, jusqu'à la FIN
+    // de sa récupération (un jour par mile : 6 jours après un 10 km, 3 après un 5 km — lib/coach/apresCourse).
     // Décision de Cyprien (13/11/2026). Relectures du 13/11 : une C écartée bloquait encore la sortie longue
     // du lendemain et l'espacement des qualités ; posée un jour indisponible, la veille de la A n'arrêtait
     // rien ; et au feu rouge, la réécriture du jour 0 effaçait le message.
@@ -713,11 +715,11 @@ async function profilElite10() {
     const NOM = "Cross du village";
     const signature = (plan: PlanDay[]) => plan.map((d) => `${d.date} ${d.type} ${d.title}`).join(" | ");
     let ecartees = 0, gardees = 0, rouges = 0, aptitudes = 0;
-    for (const dtr of [0, 1, 2, 3, 4, 5, 7, 8]) for (const cIdx of [0, 1, 2, 3, 4, 5, 6]) {
+    for (const km of [10, 5]) for (const dtr of [0, 1, 2, 3, 4, 5, 7, 8]) for (const cIdx of [0, 1, 2, 3, 4, 5, 6]) {
       for (const variante of ["vert", "rouge", "dur aujourd'hui", "veille de la A indisponible", "aptitude en attente"] as const) {
         const veilleA = new Date(debut.getTime() + (dtr - 1) * 86400000).getUTCDay();
         const base = {
-          objective: { race: "10 km A", distanceKm: 10, targetPace: "4'00/km", targetTime: "40'00", targetSeconds: 2400 },
+          objective: { race: `${km} km A`, distanceKm: km, targetPace: "4'00/km", targetTime: "40'00", targetSeconds: 2400 },
           daysToRace: dtr, weeksToRace: 0, cycle: { deload: false, taper: true, label: "" },
           availability: { daysPerWeek: 6, days: [0, 1, 2, 3, 4, 5, 6].filter((d) => variante !== "veille de la A indisponible" || d !== veilleA) },
           readiness: variante === "rouge" ? { level: "rouge", reasons: ["test"], advice: "" } : { level: "vert", reasons: [], advice: "" },
@@ -727,30 +729,38 @@ async function profilElite10() {
         };
         const avecC = buildWeekPlan(mk({ ...base, courseSecondaire: { idx: cIdx, nom: NOM, distanceKm: 8, priorite: "C" } }), debut);
         const courseC = avecC.find((d) => d.type === "Course" && d.date === iso(cIdx) && d.title.includes(NOM));
-        const ecartee = Math.abs(cIdx - dtr) <= 2;
+        // Récupération : un jour par mile, arrondi (10 km → 6 jours, 5 km → 3 jours).
+        const recup = Math.round(km / 1.609);
+        const motif = cIdx <= dtr && cIdx >= dtr - 2 ? "avant" : cIdx > dtr && cIdx - dtr <= recup ? "apres" : null;
+        const ecartee = motif != null;
+        const attendu = (l: "fr" | "en" | "de" | "es" | "pt") => motif === "apres" ? PLAN_T[l].courseCEcarteeRecup(NOM, `${km} km A`) : PLAN_T[l].courseCEcartee(NOM);
         if (!ecartee) {
           if (variante === "aptitude en attente") continue;   // sans avis médical, aucune course n'est courue
-          assert.ok(courseC, `A à J+${dtr}, C au jour ${cIdx} (${variante}) : course C à plus de 2 jours, elle doit rester au plan`);
+          assert.ok(courseC, `${km} km A à J+${dtr}, C au jour ${cIdx} (${variante}) : course C hors de la fenêtre, elle doit rester au plan`);
           gardees++;
           continue;
         }
         ecartees++; if (variante === "rouge" && cIdx === 0) rouges++; if (variante === "aptitude en attente") aptitudes++;
-        assert.ok(!courseC, `A à J+${dtr}, C au jour ${cIdx} (${variante}) : course C à ${Math.abs(cIdx - dtr)} jour(s) de la A, encore au plan`);
+        assert.ok(!courseC, `${km} km A à J+${dtr}, C au jour ${cIdx} (${variante}) : course C ${motif === "apres" ? "pendant la récupération" : "juste avant la A"}, encore au plan`);
         // La semaine est EXACTEMENT celle d'un plan sans C (types et titres, jour par jour).
         const sansC = buildWeekPlan(mk(base), debut);
         assert.equal(signature(avecC), signature(sansC), `A à J+${dtr}, C au jour ${cIdx} (${variante}) : la C écartée pèse encore sur la semaine`);
         // …et le jour de la C le dit, dans les 5 langues, après toutes les réécritures (feu rouge compris).
         const jourC = avecC.filter((d) => d.date === iso(cIdx));
-        assert.ok(jourC.some((d) => d.why.includes(PLAN_T.fr.courseCEcartee(NOM))), `A à J+${dtr}, C au jour ${cIdx} (${variante}) : la C est écartée sans que le plan le dise (${jourC.map((d) => d.why.slice(-70)).join(" | ")})`);
+        assert.ok(jourC.some((d) => d.why.includes(attendu("fr"))), `A à J+${dtr}, C au jour ${cIdx} (${variante}) : la C est écartée sans que le plan le dise (${jourC.map((d) => d.why.slice(-70)).join(" | ")})`);
         for (const l of ["en", "de", "es", "pt"] as const)
-          assert.ok(jourC.some((d) => d.i18n?.[l]?.why?.includes(PLAN_T[l].courseCEcartee(NOM))), `A à J+${dtr}, C au jour ${cIdx} (${variante}) : message absent en ${l}`);
-        assert.equal(avecC.filter((d) => d.why.includes(PLAN_T.fr.courseCEcartee(NOM))).length, 1, `A à J+${dtr}, C au jour ${cIdx} (${variante}) : le message n'est pas posé une seule fois`);
+          assert.ok(jourC.some((d) => d.i18n?.[l]?.why?.includes(attendu(l))), `A à J+${dtr}, C au jour ${cIdx} (${variante}) : message absent en ${l}`);
+        assert.equal(avecC.filter((d) => d.why.includes(attendu("fr"))).length, 1, `A à J+${dtr}, C au jour ${cIdx} (${variante}) : le message n'est pas posé une seule fois`);
       }
     }
-    assert.ok(ecartees >= 40 && gardees >= 40 && rouges >= 2 && aptitudes >= 10, `précondition : ${ecartees} écartées, ${gardees} gardées, ${rouges} au feu rouge le jour même, ${aptitudes} sous avis médical attendu`);
+    assert.ok(ecartees >= 80 && gardees >= 80 && rouges >= 2 && aptitudes >= 20, `précondition : ${ecartees} écartées, ${gardees} gardées, ${rouges} au feu rouge le jour même, ${aptitudes} sous avis médical attendu`);
     // Le message existe vraiment dans chaque langue : il nomme la course (un texte vide « contiendrait » tout).
-    for (const l of ["fr", "en", "de", "es", "pt"] as const)
+    for (const l of ["fr", "en", "de", "es", "pt"] as const) {
       assert.ok(PLAN_T[l].courseCEcartee(NOM).includes(NOM) && PLAN_T[l].courseCEcartee(NOM).trim().length > 40, `message vide ou sans le nom de la course en ${l}`);
+      const recup = PLAN_T[l].courseCEcarteeRecup(NOM, "Marathon A");
+      assert.ok(recup.includes(NOM) && recup.includes("Marathon A") && recup !== PLAN_T[l].courseCEcartee(NOM), `message de récupération vide, sans les noms ou identique en ${l}`);
+      assert.ok(PLAN_T[l].courseCEcarteeRecup(NOM, null).includes(NOM) && !PLAN_T[l].courseCEcarteeRecup(NOM, null).includes("null"), `message de récupération sans nom de course A cassé en ${l}`);
+    }
   });
   await testA("course C écartée : le coach repose le message APRÈS ses ajustements — une fois, au bon jour, 5 langues", async () => {
     // Relecture du 13/11/2026 : le coach publie le plan APRÈS « alléger » (qui réécrit le « pourquoi »),
