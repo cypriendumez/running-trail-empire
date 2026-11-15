@@ -846,6 +846,69 @@ export const ARTICLES_I18N: Partial<Record<Lang, Record<string, TraductionArticl
         },
       ],
     },
+    "sommeil-et-performance-du-coureur": {
+      chapo:
+        "It is the one session of the week nobody writes on their calendar, and the literature puts a fairly firm number on what losing it costs. It is far thinner than you would think on what you actually care about: sleeping more, and what your watch knows about it.",
+      avertissement:
+        "This article is about training, not medicine. Sleepiness that persists despite long nights, snoring with breathing pauses, settled insomnia or fatigue that rest does not relieve are reasons to see a doctor: they are a physician's business, not a dashboard's or a blog article's.",
+      blocs: [
+        {
+          h: "What a lost night costs, and why long efforts pay the most",
+          p: [
+            "The meta-analysis by Lopes and colleagues (2023) pools 31 studies and 478 participants, and produces 38 effect sizes on endurance alone. Its verdict: a moderate negative effect, a standardised mean difference of -0.52 (95% CI: -0.67 to -0.38). Clear, but not the collapse one imagines.",
+            "A single factor comes out significant: exercise lasting more than 30 minutes is more degraded than shorter efforts (p = 0.035). Training status changes nothing, and one sleepless night or several shortened ones count the same.",
+            "The review by Fullagar and colleagues (2015) qualifies this: some maximal efforts and gross motor performances can be MAINTAINED despite sleep loss, while cognitive performance becomes slower and less accurate. It calls these findings equivocal, in fact. The only numerical marker left is Lopes': the longer the effort, the more it is degraded.",
+          ],
+        },
+        {
+          h: "What the literature does NOT settle — and it is your case",
+          p: [
+            "The scenario studied is not yours. The expert consensus by Walsh and colleagues (2020), in the British Journal of Sports Medicine, holds that performance is reduced by a night or more WITHOUT sleep, but that the influence of PARTIAL restriction over one to three nights — \"a more real-world scenario\" — remains unclear.",
+            "Lopes adds that the effect in well-trained and professional athletes is unknown, and recalls the quality of what is being pooled: risk of bias is low in only 8% of the studies, unclear in 74%, high in 18%. Walsh draws up the same list for this literature: inadequate experimental control, a lack of females, questions about the validity of the assessment tools.",
+          ],
+        },
+        {
+          h: "Sleeping more: the most-touted lead, the least supported",
+          p: [
+            "The systematic review by Silva and colleagues (2021) looked for what is known about sleep extension: of 74 articles, 5 were eligible, TWO were included.",
+            "They extended time in bed or total sleep time by 26 to 106 minutes. Across fifteen measures, six show a large effect size; the rest range from trivial to medium. The quality of evidence ranges from very low to moderate across ten outcomes.",
+            "The authors conclude that extension MAY be beneficial and themselves call that conclusion tentative; Walsh lists it among the topics to research.",
+          ],
+        },
+        {
+          h: "Napping: the frankest figure, and its caveats",
+          p: [
+            "The meta-analysis by Zheng and colleagues (2026) pools 12 randomised trials and 179 athletes, and measures the effect of a nap between 13:00 and 15:30, following a presumed normal night.",
+            "The effect on endurance is large: 0.96 (95% CI: 0.62 to 1.29; p < 0.001). Agility improves moderately, 0.55 (0.01 to 1.09; p = 0.048). Power and strength give 0.50, with an interval crossing zero (-0.09 to 1.09): effect not demonstrated. Beyond 60 minutes of napping, endurance goes from 0.96 to 1.38.",
+            "The caveat is in the title: these athletes play team ball sports. Transferring this to a runner is plausible, not measured.",
+          ],
+        },
+        {
+          h: "What your watch knows about your nights, and what it misses",
+          p: [
+            "The study by Chinoy and colleagues (2021) compared seven consumer devices with polysomnography, the laboratory reference: 34 healthy young adults (22 women), three consecutive nights including one deliberately disrupted.",
+            "At detecting that you are asleep, they are excellent: epoch-by-epoch sensitivity is at least 0.93 for all of them. At detecting that you are AWAKE, specificity falls to between 0.18 and 0.54 — a watch readily counts as sleep moments when you are not sleeping.",
+            "The Garmin devices tested performed worse than standard actigraphy, where most of the others did as well or better; assessment of sleep STAGES is judged inconsistent; and the devices tend to perform worse on disrupted nights, the ones you care about. What the study validates is the detection of sleep, not the breakdown by stage. Our reading, not the study's: a displayed duration is worth an order of magnitude and a trend, and, given the specificity, rather overestimated.",
+          ],
+        },
+        {
+          h: "There is no eight-hour norm",
+          p: [
+            "Walsh and colleagues are explicit: a one-size-fits-all recommendation — 7 to 9 hours a night — is unlikely to be ideal for health and performance. They advocate an individualised approach taking the athlete's PERCEIVED sleep needs into account.",
+            "They do set a health marker: in the wider population, habitually sleeping less than 7 hours a night increases susceptibility to respiratory infection. Fullagar, for his part, suggests that a reduction in sleep quality and quantity COULD result in an autonomic nervous system imbalance simulating the symptoms of overtraining syndrome. Walsh finally sorts the risk factors into two families: sport-specific ones (training, travel, competition) and non-sport ones — female gender, stress, anxiety.",
+          ],
+        },
+        {
+          h: "What Pacevo does with your nights",
+          p: [
+            "The app reads what your watch sends through intervals.icu — duration, the night's score, respiration rate — and draws two signals from it, not one.",
+            "The first is last night: a score below 60 out of 100, OR less than 6 hours of sleep, counts as a \"degraded night\" — provided the measurement is at most two days old. The second is debt, over the three preceding nights: each one is compared with YOUR habitual duration — the median of your measured nights, if you have at least seven — and the signal only lights up at 2 h 30 of cumulative shortfall. No eight-hour norm hard-coded: someone living on 6 h 30 would otherwise be in debt every day, and a signal that is always on signals nothing.",
+            "In the plan, a degraded night takes one notch off the week's budget of hard sessions, with the reason written out in plain words. A single signal leaves the session in place; two have it lightened — about a third less of the main set, or an easy run. On the sleep side, two combinations turn the light red, with no intensity that day: a degraded night AND falling heart rate variability, or an acute drop in variability confirmed by the night or the debt.",
+            "Two silences are deliberate. Watch not worn: the data is absent, not bad, nothing lights up. And the stages are not served back to you: the intervals.icu API does not provide them, and the column is written empty rather than zero, so as not to manufacture a \"0% deep sleep\". Given what Chinoy measures about stages, little is lost.",
+          ],
+        },
+      ],
+    },
   },
   de: {
     "deficit-energetique-relatif-reds-coureur": {

@@ -93,6 +93,17 @@ export const POSTS = [
   // déjà dans AUDITEES : chaînes de montagnes dans la brume, soleil voilé. Retéléchargée
   // au format servi (600×450) et regardée le 13/11/2026 : ni personne ni marque.
   { id: 17, key: "p17", cat: "AI", img: "https://images.unsplash.com/photo-1762858741992-a254724623bd?w=600&h=450&fit=crop&q=80", featured: false },
+  // Ajouté le 15/11/2026 par la routine bimensuelle (sujet « sommeil »). Photo prise
+  // dans la RÉSERVE (`src/app/blog/reservePhotos.ts`) : c'était sa DERNIÈRE entrée libre,
+  // et ses thèmes (chaleur, soleil, ultra) ne collent PAS au sujet — l'entrée « sommeil,
+  // nuit » de la réserve sert déjà p16. L'API de recherche d'Unsplash reste injoignable
+  // depuis le conteneur (`unsplash.com` ne résout pas ; seul `images.unsplash.com`
+  // répond), impossible donc d'y DÉCOUVRIR puis d'auditer un identifiant inédit à ce
+  // thème. Celle-ci — piste de sable dans un désert — a été retéléchargée au format
+  // servi (600×450) et regardée le 15/11/2026 : ni personne ni marque. Elle figure déjà
+  // dans AUDITEES. ⚠️ La réserve est désormais VIDE : le prochain passage n'aura plus
+  // rien à prendre.
+  { id: 18, key: "p18", cat: "HEALTH", img: "https://images.unsplash.com/photo-1544034287-c9c09e0341a1?w=600&h=450&fit=crop&q=80", featured: false },
 ];
 
 /** Largeur servie aux moteurs et aux réseaux ; 1200 px est le minimum conseillé par Google. */
