@@ -93,13 +93,13 @@ export function VueArticle({ slug }: { slug: string }) {
             {t.title}
           </h1>
 
-          <p className="mt-3 text-xs font-medium text-zinc-400 first-letter:uppercase">
+          <p className="mt-3 text-xs font-medium text-zinc-500 first-letter:uppercase">
             {MAJ[lang] ?? MAJ.fr} {a.maj}
           </p>
 
           {avertLangue && (
             <p className="mt-6 flex items-start gap-2 rounded-xl bg-zinc-50 px-4 py-3 text-sm leading-relaxed text-zinc-500 ring-1 ring-inset ring-zinc-200">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
               {avertLangue}
             </p>
           )}
@@ -134,7 +134,7 @@ export function VueArticle({ slug }: { slug: string }) {
           {/* Les sources sont en BAS et cliquables, pas en note de bas de page décorative :
               chaque chiffre du texte doit pouvoir être remonté à sa publication. */}
           <div className="mt-4 border-t border-zinc-200 pt-8">
-            <h2 className="text-xs font-semibold text-zinc-400 first-letter:uppercase">
+            <h2 className="text-xs font-semibold text-zinc-500 first-letter:uppercase">
               {SOURCES[lang] ?? SOURCES.fr}
             </h2>
             <ul className="mt-4 space-y-3">
@@ -158,7 +158,9 @@ export function VueArticle({ slug }: { slug: string }) {
               /blog, et Google n'en avait exploré que 4 sur 17 (voir `maillage.ts`). */}
           {voisins.length > 0 && (
             <nav className="mt-12 border-t border-zinc-200 pt-8" aria-label={A_LIRE[lang] ?? A_LIRE.fr}>
-              <h2 className="text-xs font-semibold text-zinc-400 first-letter:uppercase">
+              {/* zinc-500, pas zinc-400 : sur blanc, ce dernier ne donne que 2,56:1 pour un
+                  petit texte (`tests/contraste.test.ts`). */}
+              <h2 className="text-xs font-semibold text-zinc-500 first-letter:uppercase">
                 {A_LIRE[lang] ?? A_LIRE.fr}
               </h2>
               <ul className="mt-4 space-y-3">
