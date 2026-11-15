@@ -163,20 +163,24 @@ export function avecCourseCEcartee(ctx: AthleteContext, plan: PlanDay[], today: 
   const i = nettoye.findIndex((d) => d.date === date && d.moment !== "soir");
   if (i < 0) return nettoye;
   const jour = nettoye[i];
+  // EN TÊTE du « pourquoi » (16/11/2026) : la relecture Premium (`composerPourquoi`) garde le DÉBUT et
+  // coupe la fin pour loger son conseil, et l'écriture en base coupe à 640 caractères. Posé en fin, le
+  // message disparaissait à l'enregistrement ; en tête, il passe les deux, et le coureur le lit d'abord.
+  const enTete = (m: string, texte: string | undefined) => (texte ? `${m} ${texte}` : m);
   const i18n = Object.fromEntries(Object.entries(jour.i18n ?? {}).map(([l, t]) =>
-    [l, t ? { ...t, why: `${t.why ?? ""}${messageCourseCEcartee(c, l as Lang)}` } : t])) as Partial<Record<Lang, PlanDayText>>;
-  return nettoye.map((d, k) => (k === i ? { ...jour, why: `${jour.why ?? ""}${messageCourseCEcartee(c, "fr")}`, i18n } : d));
+    [l, t ? { ...t, why: enTete(messageCourseCEcartee(c, l as Lang), t.why) } : t])) as Partial<Record<Lang, PlanDayText>>;
+  return nettoye.map((d, k) => (k === i ? { ...jour, why: enTete(messageCourseCEcartee(c, "fr"), jour.why), i18n } : d));
 }
 
-/**
- * Le plan SANS le message de la course C écartée (5 langues). Le coach l'appelle avant la relecture
- * Premium : `composerPourquoi` coupe la FIN du « pourquoi » pour loger son conseil, et coupait le message
- * en plein milieu (relecture du 16/11/2026) ; `avecCourseCEcartee` le repose ensuite, entier.
- */
+/** Le plan SANS le message de la course C écartée (5 langues) : la première étape d'`avecCourseCEcartee`. */
 export function sansCourseCEcartee<T extends { why: string; i18n?: Partial<Record<Lang, { why: string }>> }>(ctx: AthleteContext, plan: readonly T[], today: Date): T[] {
   const c = courseCEcartee(ctx, today);
   if (!c) return [...plan];
-  const sans = (texte: string | undefined, l: Lang) => (texte ?? "").split(messageCourseCEcartee(c, l)).join("");
+  // Le message en tête (suivi d'une espace), seul, ou à l'ancienne place (en fin, précédé d'une espace).
+  const sans = (texte: string | undefined, l: Lang) => {
+    const m = messageCourseCEcartee(c, l);
+    return (texte ?? "").split(`${m} `).join("").split(` ${m}`).join("").split(m).join("");
+  };
   return plan.map((d) => ({
     ...d, why: sans(d.why, "fr"),
     i18n: Object.fromEntries(Object.entries(d.i18n ?? {}).map(([l, t]) => [l, t ? { ...t, why: sans(t.why, l as Lang) } : t])),

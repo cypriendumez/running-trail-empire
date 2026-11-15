@@ -17,7 +17,7 @@
  * ne dépasse pas ce que le module lui-même a fixé comme cible.
  */
 import assert from "node:assert/strict";
-import { buildWeekPlan, avecCourseCEcartee, sansCourseCEcartee, type PlanDay } from "../src/lib/ai/autoPlan";
+import { buildWeekPlan, avecCourseCEcartee, type PlanDay } from "../src/lib/ai/autoPlan";
 import { appliquerConseils } from "../src/lib/ai/relectureSemaine";
 import { readFileSync } from "node:fs";
 import { PLAN_T } from "../src/lib/ai/planI18n";
@@ -797,24 +797,33 @@ async function profilElite10() {
       { ...jourC, moment: "soir" as const, title: "Footing du soir" }, { ...jourC, moment: "matin" as const, title: "Séance du matin" }];
     const surDouble = avecCourseCEcartee(ctx, double, debut).filter((d) => d.why.includes(PLAN_T.fr.courseCEcartee(NOM)));
     assert.deepEqual(surDouble.map((d) => d.title), ["Séance du matin"], `jour doublé : message sur ${surDouble.map((d) => d.title).join(", ") || "rien"}`);
-    // La relecture Premium (`composerPourquoi`) coupe la FIN du « pourquoi » pour loger son conseil : le
-    // message est retiré avant, puis reposé entier (relecture du 16/11/2026). Un « pourquoi » long et un
-    // conseil de 240 caractères, dans chaque langue : le message entier, une fois, sans morceau coupé.
-    const long = plan.map((d) => d.date === iso(2) ? { ...d, why: `${"Raison du moteur. ".repeat(25)}${d.why}`,
-      i18n: Object.fromEntries(Object.entries(d.i18n ?? {}).map(([l, t]) => [l, t ? { ...t, why: `${"Engine reason. ".repeat(25)}${t.why}` } : t])) } : d) as PlanDay[];
-    for (const l of ["fr", "en", "de", "es", "pt"] as const) {
-      const conseils = [{ date: iso(2), lang: l, texte: "Conseil d'exécution personnalisé. ".repeat(7).slice(0, 240) }];
-      const relue = avecCourseCEcartee(ctx, appliquerConseils(sansCourseCEcartee(ctx, long, debut), conseils), debut);
-      const why = (relue.find((d) => d.date === iso(2) && d.moment !== "soir") as PlanDay | undefined)?.[l === "fr" ? "why" : "i18n"];
-      const texte = l === "fr" ? String(why ?? "") : String((why as PlanDay["i18n"])?.[l]?.why ?? "");
-      assert.ok(texte.includes(PLAN_T[l].courseCEcartee(NOM)), `relecture Premium (${l}) : le message de la course C écartée a disparu`);
-      assert.equal(texte.split(`${NOM}`).length - 1, 1, `relecture Premium (${l}) : le nom de la course apparaît ${texte.split(NOM).length - 1} fois (morceau de message coupé)`);
-      assert.ok(texte.includes("Conseil d'exécution"), `relecture Premium (${l}) : précondition, le conseil n'est pas posé`);
+    // CE QUI EST ÉCRIT, pas la valeur en mémoire (visa @HeadCoach du 16/11/2026). La relecture Premium
+    // (`composerPourquoi`) remplit le « pourquoi » jusqu'à 640 caractères en coupant la FIN, puis l'écriture en
+    // base coupe à 640. Le message est donc posé EN TÊTE. Trois longueurs de motif — dont ~300, où un message
+    // posé en fin tombait coupé en plein milieu —, un conseil de 240 caractères exactement, 5 langues.
+    const CONSEIL = "Conseil d'exécution personnalisé : ".repeat(8).slice(0, 240);
+    assert.equal(CONSEIL.trim().length, 240, "précondition : le conseil ne fait pas 240 caractères");
+    for (const nb of [6, 17, 25]) {
+      const motif = (base: string) => "Raison du moteur. ".repeat(nb) + base;
+      const long = plan.map((d) => d.date === iso(2) ? { ...d, why: motif(d.why),
+        i18n: Object.fromEntries(Object.entries(d.i18n ?? {}).map(([l, t]) => [l, t ? { ...t, why: motif(t.why) } : t])) } : d) as PlanDay[];
+      // Le chemin du coach : le plan (message en tête), puis les conseils, puis le message reposé.
+      for (const l of ["fr", "en", "de", "es", "pt"] as const) {
+        const relue = avecCourseCEcartee(ctx, appliquerConseils(avecCourseCEcartee(ctx, long, debut), [{ date: iso(2), lang: l, texte: CONSEIL }]), debut);
+        const jour = relue.find((d) => d.date === iso(2) && d.moment !== "soir") as PlanDay | undefined;
+        const ecrit = (l === "fr" ? jour?.why ?? "" : jour?.i18n?.[l]?.why ?? "").slice(0, 640);   // la coupe de l'écriture (autoCoach)
+        const m = PLAN_T[l].courseCEcartee(NOM);
+        assert.ok(ecrit.startsWith(m), `motif ×${nb} (${l}) : le texte écrit ne commence pas par le message (« ${ecrit.slice(0, 60)}… »)`);
+        assert.equal(ecrit.split(NOM).length - 1, 1, `motif ×${nb} (${l}) : le nom de la course apparaît ${ecrit.split(NOM).length - 1} fois dans le texte écrit`);
+        assert.ok(ecrit.includes(CONSEIL.trim()), `motif ×${nb} (${l}) : le conseil Premium n'est plus entier dans le texte écrit`);
+      }
     }
     // Le coach l'appelle bien EN DERNIER, après ses ajustements et sa seconde passe de consignes.
     const coach = readFileSync("src/lib/ai/autoCoach.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((x) => x.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
     assert.match(coach, /const week = avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, maintenant\), maintenant\);/, "le coach publie sans reposer le message de la course C écartée");
-    assert.match(coach, /avecCourseCEcartee\(ctx, appliquerConseils\(sansCourseCEcartee\(ctx, week, maintenant\), relecture\.conseils\), maintenant\)/, "la relecture Premium compose ses conseils sur un « pourquoi » qui porte encore le message (il serait coupé)");
+    assert.match(coach, /avecCourseCEcartee\(ctx, appliquerConseils\(week, relecture\.conseils\), maintenant\)/, "le message n'est plus reposé après la relecture Premium");
+    // La coupe simulée ci-dessus est celle de l'écriture : 640 caractères, en français et dans les 4 autres langues.
+    assert.equal((coach.match(/why: (?:d|t)\.why\.slice\(0, 640\),/g) ?? []).length, 2, "l'écriture du « pourquoi » ne coupe plus à 640 : le test ne simule plus la vraie coupe");
   });
   await testA("course de J+3 à J+8 : la veille, l'avant-veille et la reprise ne tombent jamais un jour systématiquement raté", async () => {
     // Un jour « disponible » mais jamais couru (`skippedWeekdays`) reçoit « Repos » à l'étape 1 : le protocole

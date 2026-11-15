@@ -128,7 +128,7 @@ export type TextesPlan = {
   courseBWhy: string;
   courseCDetail: string;
   courseCWhy: string;
-  /** Ajouté au « pourquoi » du jour où une course C est écartée (13/11/2026) : commence par une espace. */
+  /** Posé EN TÊTE du « pourquoi » du jour où une course C est écartée (13/11/2026, 16/11/2026). */
   courseCEcartee: (nom: string) => string;
   /** Course C écartée parce qu'elle tombe pendant la récupération de la course A (`a`, son nom s'il est connu). */
   courseCEcarteeRecup: (nom: string, a: string | null) => string;
@@ -280,8 +280,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseBWhy: "Une course B se prépare légèrement — deux jours calmes avant, une semaine allégée — et se récupère ensuite : elle sert ton objectif sans le compromettre.",
     courseCDetail: "Course d'entraînement : échauffe-toi 15 min, puis cours-la à l'effort d'une séance au seuil, pas à fond. Retour au calme 10 min.",
     courseCWhy: "Une course C remplace une séance de qualité de la semaine : pas d'affûtage, on s'en sert pour s'entraîner en conditions de course.",
-    courseCEcartee: (n) => ` Ta course « ${n} » (C) est écartée du plan : elle tombe trop près d'une course plus importante.`,
-    courseCEcarteeRecup: (n, a) => ` Ta course « ${n} » (C) est écartée du plan : elle tombe pendant ta récupération${a ? ` de « ${a} »` : ""}.`,
+    courseCEcartee: (n) => `Ta course « ${n} » (C) est écartée du plan : elle tombe trop près d'une course plus importante.`,
+    courseCEcarteeRecup: (n, a) => `Ta course « ${n} » (C) est écartée du plan : elle tombe pendant ta récupération${a ? ` de « ${a} »` : ""}.`,
     dsTitreMatin: "Double seuil · matin",
     dsTitreSoir: "Double seuil · soir",
     dsWhy: "Méthode norvégienne : deux séances au seuil le même jour, toutes deux SOUS le seuil — c'est le cumul qui construit le seuil, pas l'intensité. Elle se pilote normalement au lactate ; sans lactatemètre, l'erreur classique est de courir trop vite et d'en faire deux séances dures. Tiens l'allure écrite, même si tu te sens bien.",
@@ -409,8 +409,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseBWhy: "A B race gets a light taper — two easy days before, a lighter week — and a recovery afterwards: it serves your goal without compromising it.",
     courseCDetail: "Training race: warm up 15 min, then run it at threshold-session effort, not all out. Cool down 10 min.",
     courseCWhy: "A C race replaces one quality session of the week: no taper, you use it to train in race conditions.",
-    courseCEcartee: (n) => ` Your race “${n}” (C) is left out of the plan: it falls too close to a more important race.`,
-    courseCEcarteeRecup: (n, a) => ` Your race “${n}” (C) is left out of the plan: it falls during your recovery${a ? ` from “${a}”` : ""}.`,
+    courseCEcartee: (n) => `Your race “${n}” (C) is left out of the plan: it falls too close to a more important race.`,
+    courseCEcarteeRecup: (n, a) => `Your race “${n}” (C) is left out of the plan: it falls during your recovery${a ? ` from “${a}”` : ""}.`,
     dsTitreMatin: "Double threshold · morning",
     dsTitreSoir: "Double threshold · evening",
     dsWhy: "Norwegian method: two threshold sessions on the same day, both BELOW threshold — the total builds the threshold, not the intensity. It is normally steered by blood lactate; without a lactate meter, the classic mistake is running too fast and turning it into two hard sessions. Hold the written pace, even if you feel good.",
@@ -538,8 +538,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseBWhy: "Ein B-Rennen bekommt ein leichtes Tapering — zwei ruhige Tage davor, eine leichtere Woche — und danach Erholung: Es dient deinem Ziel, ohne es zu gefährden.",
     courseCDetail: "Trainingsrennen: 15 Min einlaufen, dann im Tempo einer Schwelleneinheit laufen, nicht voll. 10 Min auslaufen.",
     courseCWhy: "Ein C-Rennen ersetzt eine Qualitätseinheit der Woche: kein Tapering, du trainierst damit unter Wettkampfbedingungen.",
-    courseCEcartee: (n) => ` Dein Rennen „${n}“ (C) ist nicht im Plan: Es liegt zu nah an einem wichtigeren Rennen.`,
-    courseCEcarteeRecup: (n, a) => ` Dein Rennen „${n}“ (C) ist nicht im Plan: Es fällt in deine Erholung${a ? ` nach „${a}“` : ""}.`,
+    courseCEcartee: (n) => `Dein Rennen „${n}“ (C) ist nicht im Plan: Es liegt zu nah an einem wichtigeren Rennen.`,
+    courseCEcarteeRecup: (n, a) => `Dein Rennen „${n}“ (C) ist nicht im Plan: Es fällt in deine Erholung${a ? ` nach „${a}“` : ""}.`,
     dsTitreMatin: "Doppelte Schwelle · Morgen",
     dsTitreSoir: "Doppelte Schwelle · Abend",
     dsWhy: "Norwegische Methode: zwei Schwelleneinheiten am selben Tag, beide UNTER der Schwelle — die Summe baut die Schwelle auf, nicht die Intensität. Normalerweise wird sie per Laktat gesteuert; ohne Laktatmessgerät ist der klassische Fehler, zu schnell zu laufen und daraus zwei harte Einheiten zu machen. Halte das angegebene Tempo, auch wenn du dich gut fühlst.",
@@ -667,8 +667,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseBWhy: "Una carrera B se prepara ligeramente (dos días tranquilos antes, una semana más suave) y se recupera después: sirve a tu objetivo sin comprometerlo.",
     courseCDetail: "Carrera de entrenamiento: calienta 15 min y córrela al esfuerzo de una sesión de umbral, no a tope. Vuelta a la calma 10 min.",
     courseCWhy: "Una carrera C sustituye una sesión de calidad de la semana: sin puesta a punto, te sirve para entrenar en condiciones de carrera.",
-    courseCEcartee: (n) => ` Tu carrera «${n}» (C) queda fuera del plan: cae demasiado cerca de una carrera más importante.`,
-    courseCEcarteeRecup: (n, a) => ` Tu carrera «${n}» (C) queda fuera del plan: cae durante tu recuperación${a ? ` de «${a}»` : ""}.`,
+    courseCEcartee: (n) => `Tu carrera «${n}» (C) queda fuera del plan: cae demasiado cerca de una carrera más importante.`,
+    courseCEcarteeRecup: (n, a) => `Tu carrera «${n}» (C) queda fuera del plan: cae durante tu recuperación${a ? ` de «${a}»` : ""}.`,
     dsTitreMatin: "Doble umbral · mañana",
     dsTitreSoir: "Doble umbral · tarde",
     dsWhy: "Método noruego: dos sesiones de umbral el mismo día, ambas POR DEBAJO del umbral; es la suma la que construye el umbral, no la intensidad. Normalmente se controla con lactato; sin lactatómetro, el error clásico es correr demasiado rápido y convertirlo en dos sesiones duras. Mantén el ritmo indicado, aunque te sientas bien.",
@@ -796,8 +796,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseBWhy: "Uma prova B prepara-se de forma ligeira (dois dias calmos antes, uma semana mais leve) e recupera-se depois: serve o teu objetivo sem o comprometer.",
     courseCDetail: "Prova de treino: aquece 15 min e corre-a ao esforço de uma sessão de limiar, não no máximo. Retorno à calma 10 min.",
     courseCWhy: "Uma prova C substitui uma sessão de qualidade da semana: sem afinamento, serve para treinar em condições de prova.",
-    courseCEcartee: (n) => ` A tua prova «${n}» (C) fica fora do plano: está demasiado perto de uma prova mais importante.`,
-    courseCEcarteeRecup: (n, a) => ` A tua prova «${n}» (C) fica fora do plano: cai durante a tua recuperação${a ? ` de «${a}»` : ""}.`,
+    courseCEcartee: (n) => `A tua prova «${n}» (C) fica fora do plano: está demasiado perto de uma prova mais importante.`,
+    courseCEcarteeRecup: (n, a) => `A tua prova «${n}» (C) fica fora do plano: cai durante a tua recuperação${a ? ` de «${a}»` : ""}.`,
     dsTitreMatin: "Duplo limiar · manhã",
     dsTitreSoir: "Duplo limiar · tarde",
     dsWhy: "Método norueguês: duas sessões de limiar no mesmo dia, ambas ABAIXO do limiar; é a soma que constrói o limiar, não a intensidade. Normalmente controla-se com lactato; sem lactatómetro, o erro clássico é correr depressa demais e transformá-la em duas sessões duras. Mantém o ritmo indicado, mesmo que te sintas bem.",
