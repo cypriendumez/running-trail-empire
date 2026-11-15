@@ -3,7 +3,10 @@
 La routine Claude « Blog Pacevo — un article sourcé » (claude.ai/code/routines) tourne
 le 1er et le 15 de chaque mois. À chaque passage elle prend **le premier sujet non coché**,
 l'écrit selon les règles de `articles.ts` (aucun chiffre sans source citée et vérifiée
-via l'API NCBI), et le coche ici dans le même commit.
+via l'API NCBI), et le coche ici dans le même commit. Elle ajoute aussi la ligne de l'article
+dans `slugs.ts` (clé → adresse) et ses cinq titres dans `titres.ts` (copie exacte de ceux de
+`blogI18n.ts`) : c'est ce qui le relie à l'accueil, aux autres articles et
+aux pages de course ; `tests/blog-maillage.test.ts` rougit tant qu'elle manque.
 
 ## Le critère d'ordre : la pertinence pour les clients de Pacevo (Cyprien, 21/09/2026)
 
