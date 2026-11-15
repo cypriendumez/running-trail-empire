@@ -72,6 +72,8 @@ export type LandingDict = {
     plans: { cle: "gratuit" | "starter" | "premium"; name: string; pitch: string; badge?: string; cta: string; features: string[] }[];
     apres: string;
   };
+  /** Bloc « derniers articles » : trois liens vers le blog (voir `app/blog/maillage`). */
+  blog: { title: string; all: string };
   cta: { title: string; subtitle: string; primary: string; secondary: string; note: string };
 };
 
@@ -140,6 +142,7 @@ const fr: LandingDict = {
     ],
     apres: "À la fin de l'essai, rien n'est effacé : ton compte passe au palier gratuit. Tes activités continuent d'être synchronisées et ton plan continue, bâti sur ton objectif. Ce qui s'arrête : l'adaptation à tes données, l'analyse de tes séances, l'envoi sur la montre et les échanges avec l'IA.",
   },
+  blog: { title: "Derniers articles du blog", all: "Tous les articles" },
   cta: { title: "Prêt à performer ?", subtitle: "Rejoins les coureurs qui s'entraînent plus intelligemment avec Pacevo.", primary: "Créer un compte gratuit", secondary: "Se connecter", note: "Gratuit · Sans carte bancaire · Annulable à tout moment" },
 };
 
@@ -205,6 +208,7 @@ const en: LandingDict = {
     ],
     apres: "When the trial ends nothing is deleted: your account moves to the free tier. Your activities keep syncing and your plan carries on, built on your goal. What stops: adapting to your data, analysing your sessions, sending to your watch and the AI exchanges.",
   },
+  blog: { title: "Latest from the blog", all: "All articles" },
   cta: { title: "Ready to perform?", subtitle: "Join the runners training smarter with Pacevo.", primary: "Create a free account", secondary: "Log in", note: "Free · No credit card · Cancel anytime" },
 };
 
@@ -270,6 +274,7 @@ const de: LandingDict = {
     ],
     apres: "Am Ende des Tests wird nichts gelöscht: dein Konto wechselt auf die Gratis-Stufe. Deine Aktivitäten werden weiter synchronisiert und dein Plan läuft weiter, gebaut auf dein Ziel. Es enden: die Anpassung an deine Daten, die Analyse deiner Einheiten, das Senden auf die Uhr und die KI-Dialoge.",
   },
+  blog: { title: "Neu im Blog", all: "Alle Artikel" },
   cta: { title: "Bereit für Leistung?", subtitle: "Schließe dich den Läufern an, die mit Pacevo smarter trainieren.", primary: "Kostenloses Konto erstellen", secondary: "Anmelden", note: "Gratis · Keine Kreditkarte · Jederzeit kündbar" },
 };
 
@@ -335,6 +340,7 @@ const es: LandingDict = {
     ],
     apres: "Al terminar la prueba no se borra nada: tu cuenta pasa al nivel gratuito. Tus actividades se siguen sincronizando y tu plan continúa, construido sobre tu objetivo. Lo que se detiene: la adaptación a tus datos, el análisis de tus sesiones, el envío al reloj y los intercambios con la IA.",
   },
+  blog: { title: "Lo último del blog", all: "Todos los artículos" },
   cta: { title: "¿Listo para rendir?", subtitle: "Únete a los corredores que entrenan de forma más inteligente con Pacevo.", primary: "Crear cuenta gratis", secondary: "Iniciar sesión", note: "Gratis · Sin tarjeta · Cancela cuando quieras" },
 };
 
@@ -400,6 +406,7 @@ const pt: LandingDict = {
     ],
     apres: "No fim do teste nada é apagado: a tua conta passa ao nível gratuito. As tuas atividades continuam a sincronizar e o teu plano continua, construído sobre o teu objetivo. O que para: a adaptação aos teus dados, a análise dos teus treinos, o envio para o relógio e as trocas com a IA.",
   },
+  blog: { title: "Últimos artigos do blog", all: "Todos os artigos" },
   cta: { title: "Pronto para performar?", subtitle: "Junta-te aos corredores que treinam de forma mais inteligente com a Pacevo.", primary: "Criar conta grátis", secondary: "Entrar", note: "Grátis · Sem cartão · Cancela quando quiseres" },
 };
 

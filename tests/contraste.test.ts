@@ -158,5 +158,49 @@ test("le petit texte des écrans denses reste lisible", () => {
     `petit texte sous le seuil (2,56:1) :\n    ${coupables.join("\n    ")}`);
 });
 
+test("les blocs de liens vers le blog n'ajoutent aucun petit texte gris illisible", () => {
+  /**
+   * ⚠️ RELEVÉ PAR @Maestro LE 16/11/2026. Le titre « À lire aussi », ajouté en bas des
+   * articles, recopiait le style de son voisin « Sources » : `text-xs text-zinc-400` sur
+   * le fond blanc de la page, soit 2,56:1. Un élément neuf qui imite un élément existant
+   * hérite de son défaut sans que personne ne le mesure.
+   *
+   * « Sources », la date de mise à jour et l'icône du bandeau de langue portaient ce même
+   * gris depuis l'origine : corrigés le même jour à la demande de Cyprien. La page
+   * d'article entière n'emploie donc plus zinc-400, et c'est ce que ce test garde.
+   */
+  const sansCommentaires = (f: string) => readFileSync(f, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+
+  const article = sansCommentaires("src/app/blog/[slug]/VueArticle.tsx");
+  const titre = article.match(/<h2 className="([^"]*)">\s*\{A_LIRE\[lang\] \?\? A_LIRE\.fr\}/);
+  assert.ok(titre, "le titre « À lire aussi » n'est plus trouvé : le test ne garde plus rien");
+  assert.ok(!/(?<!hover:)text-zinc-400\b/.test(titre![1]), `« À lire aussi » est en zinc-400 sur blanc (2,56:1) : ${titre![1]}`);
+  assert.ok(/\btext-zinc-(500|600|700|800|900)\b/.test(titre![1]), `« À lire aussi » n'a plus de couleur lisible : ${titre![1]}`);
+
+  // Toute la page d'article, posée sur fond blanc : plus aucun zinc-400, texte ou icône.
+  assert.ok(/bg-white/.test(article), "la page d'article n'est plus sur fond blanc : la règle est à revoir");
+  const grisFaibles = [...article.matchAll(/(?<!hover:)text-zinc-400\b/g)].length;
+  assert.equal(grisFaibles, 0, `la page d'article porte ${grisFaibles} usage(s) de zinc-400 sur blanc, soit 2,56:1`);
+  for (const [nom, motif] of [
+    ["le titre « Sources »", /<h2 className="([^"]*)">\s*\{SOURCES\[lang\] \?\? SOURCES\.fr\}/],
+    ["la date de mise à jour", /<p className="([^"]*)">\s*\{MAJ\[lang\] \?\? MAJ\.fr\}/],
+  ] as [string, RegExp][]) {
+    const m = article.match(motif);
+    assert.ok(m, `${nom} n'est plus trouvé dans la page d'article`);
+    assert.ok(/\btext-zinc-(500|600|700|800|900)\b/.test(m![1]), `${nom} n'a plus de couleur lisible : ${m![1]}`);
+  }
+
+  // Le bloc de la page de course : aucun gris faible entre son ouverture et sa fermeture.
+  const course = sansCommentaires("src/app/courses/[slug]/page.tsx");
+  const bloc = course.match(/\{aLire\.length > 0 && \([\s\S]*?<\/nav>/);
+  assert.ok(bloc, "le bloc d'articles de la page de course n'est plus trouvé");
+  assert.ok(!/(?<!hover:)text-zinc-(300|400)\b/.test(bloc![0]), "le bloc d'articles de la page de course porte un gris sous le seuil");
+
+  // Et la couleur retenue passe bien le seuil, sinon on a déplacé le problème.
+  assert.ok(contraste("#71717a", BLANC) >= 4.5, "zinc-500 sur blanc ne passe plus");
+});
+
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
 if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
