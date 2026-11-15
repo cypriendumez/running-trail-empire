@@ -9,8 +9,9 @@
  * ici. Si tu ajoutes un sujet à `blogI18n` sans l'écrire ici, il portera son badge tout
  * seul, et c'est voulu.
  *
- * ⚠️ UN ARTICLE AJOUTÉ ICI A AUSSI SA LIGNE DANS `slugs.ts` (clé → adresse). C'est cette
- * table légère qui pose les liens vers l'article depuis l'accueil, les autres articles et
+ * ⚠️ UN ARTICLE AJOUTÉ ICI A AUSSI SA LIGNE DANS `slugs.ts` (clé → adresse) ET SES CINQ
+ * TITRES DANS `titres.ts` (copie exacte de ceux de `blogI18n.ts`). Ce sont ces deux
+ * tables légères qui posent les liens vers l'article depuis l'accueil, les autres articles et
  * les pages de course (`maillage.ts`) : sans elle, l'article n'est lié que depuis /blog,
  * et Google ne le trouve pas (constat du 13/11/2026 : 4 articles indexés sur 17).
  * `tests/blog-maillage.test.ts` rougit tant que la ligne manque.

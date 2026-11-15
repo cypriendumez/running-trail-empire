@@ -14,6 +14,7 @@ import { SLUG_PAR_CLE, ARTICLES } from "../src/app/blog/articles";
 import { SLUGS_BLOG } from "../src/app/blog/slugs";
 import { POSTS } from "../src/app/blog/posts";
 import { BLOG } from "../src/app/blog/blogI18n";
+import { TITRES_BLOG } from "../src/app/blog/titres";
 import { derniersArticles, articlesVoisins, articlesPourCourse } from "../src/app/blog/maillage";
 import type { RaceType } from "../src/types";
 
@@ -89,7 +90,7 @@ test("chaque article reçoit au moins un lien depuis un autre article", () => {
 /** Les NEUF valeurs réelles de `races.type` : le test balaie l'énumération, pas des types inventés. */
 const TYPES: RaceType[] = ["road_5k", "road_10k", "semi", "marathon", "trail_s", "trail_m", "trail_l", "trail_xl", "ultra"];
 const cles = (c: Parameters<typeof articlesPourCourse>[0]) => articlesPourCourse(c).map((x) => x.cle);
-const ULTRA = ["p5", "p8", "p14"], TRAIL = ["p8", "p14", "p15"], MARATHON = ["p7", "p10", "p2"], SEMI = ["p3", "p10", "p2"], GENERAL = ["p10", "p2", "p17"];
+const ULTRA = ["p5", "p8", "p14"], TRAIL = ["p8", "p14", "p15"], MARATHON = ["p7", "p10", "p2"], SEMI = ["p3", "p10", "p2"], GENERAL = ["p10", "p2", "p4"];
 
 test("page de course : chaque type réel de course reçoit trois articles réels", () => {
   // Défaut relevé par @Maestro le 13/11/2026 : la règle cherchait « trail » dans le type, donc
@@ -141,6 +142,18 @@ test("page de course : semi et marathon ne valent que si la distance le confirme
   assert.deepEqual(cles({ distanceKm: 33, type: "marathon" }), GENERAL, "33 km typé marathon");
 });
 
+test("page de course : l'article sur le choix d'une application n'est proposé sur aucune course", () => {
+  // Décision de Cyprien du 16/11/2026 : sous « À lire pour préparer cette course », cet
+  // article tenait de la promotion. Aucune combinaison de type et de distance ne le rend.
+  for (const type of [...TYPES, null, "inconnu"]) {
+    for (const km of [null, 5, 10, 21.1, 42.195, 60, 160]) {
+      for (const d of [null, 0, 800]) {
+        assert.ok(!cles({ type, distanceKm: km, deniveleM: d }).includes("p17"), `p17 proposé pour ${type}, ${km} km, ${d} m`);
+      }
+    }
+  }
+});
+
 test("page de course : type absent ou inconnu, on ne suppose rien", () => {
   assert.deepEqual(cles({ distanceKm: null, deniveleM: null, type: null }), GENERAL, "sans donnée");
   assert.deepEqual(cles({}), GENERAL, "objet vide");
@@ -164,10 +177,38 @@ test("les trois pages appellent bien le module et rendent un lien par article", 
   assert.match(course, /aLire\.map\(/, "la page de course n'affiche plus les articles");
 });
 
+test("la table légère des titres est strictement égale aux titres du blog, dans les cinq langues", () => {
+  const langues = ["fr", "en", "de", "es", "pt"] as const;
+  assert.deepEqual(Object.keys(TITRES_BLOG).sort(), [...langues].sort(), "titres.ts ne porte pas exactement les cinq langues");
+  for (const lg of langues) {
+    // Exactement les articles ÉCRITS : ni un de plus, ni un de moins que slugs.ts.
+    assert.deepEqual(Object.keys(TITRES_BLOG[lg]).sort(), Object.keys(SLUGS_BLOG).sort(),
+      `titres.ts (${lg}) ne couvre pas les mêmes articles que slugs.ts : un lien de l'accueil s'afficherait vide`);
+    for (const cle of Object.keys(SLUGS_BLOG)) {
+      assert.equal(TITRES_BLOG[lg][cle], BLOG[lg].posts[cle].title,
+        `titre de ${cle} en ${lg} : titres.ts et blogI18n.ts ne disent plus la même chose`);
+      assert.ok(TITRES_BLOG[lg][cle].trim().length > 0, `titre vide pour ${cle} en ${lg}`);
+    }
+  }
+});
+
+test("l'accueil n'importe aucun fichier lourd du blog", () => {
+  // Défaut relevé par @Maestro le 16/11/2026 : l'accueil (composant client) importait tout
+  // `blogI18n.ts`, 26 Ko, pour afficher trois titres. Seuls `maillage` et `titres` sont permis.
+  const accueil = code("src/app/page.tsx");
+  const imports = [...accueil.matchAll(/from\s+["']@\/app\/blog\/([\w\/\[\]-]+)["']/g)].map((m) => m[1]).sort();
+  assert.deepEqual(imports, ["maillage", "titres"], `l'accueil importe du blog : ${imports.join(", ")}`);
+  assert.match(accueil, /\(TITRES_BLOG\[lang\] \?\? TITRES_BLOG\.fr\)\[a\.cle\]/, "l'accueil ne lit plus les titres dans la table légère");
+  // Et la table légère elle-même n'importe rien d'autre qu'un type.
+  const titres = code("src/app/blog/titres.ts");
+  assert.deepEqual([...titres.matchAll(/^import\s+(?!type\b)/gm)].length, 0, "titres.ts importe du code : il n'est plus léger");
+});
+
 test("le module de liens ne tire pas le corps des articles dans le bundle de l'accueil", () => {
   const m = code("src/app/blog/maillage.ts");
   assert.ok(!/from\s+["']\.\/articles["']/.test(m), "maillage.ts importe articles.ts : 100 Ko de texte partiraient dans l'accueil");
   assert.ok(!/from\s+["']\.\/articlesI18n["']/.test(m), "maillage.ts importe articlesI18n.ts");
+  assert.ok(!/from\s+["']\.\/blogI18n["']/.test(m), "maillage.ts importe blogI18n.ts : 26 Ko de titres et d'extraits partiraient dans l'accueil");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

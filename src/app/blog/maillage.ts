@@ -11,7 +11,7 @@
  * chaque page de course.
  *
  * Il ne dépend que de `slugs.ts`, de `posts.ts` et de `lib/raceType` (légers), jamais de
- * `articles.ts` :
+ * `articles.ts` ni de `blogI18n.ts` (les titres seuls sont dans `titres.ts`) :
  * la page d'accueil est un composant client.
  */
 import type { RaceType } from "@/types";
@@ -69,12 +69,17 @@ const estTypeCourse = (t: unknown): t is RaceType => TYPES_COURSE.includes(t as 
  * Les articles utiles à qui prépare CETTE course. Choix par règles lisibles, pas par
  * score : un lien hors sujet sur 15 000 pages vaudrait pire que pas de lien.
  *
- *  · trail long (50 km et plus, ou 42 km et plus) → choisir son premier ultra, chaussure
- *    de trail, GPS en forêt ;
+ *  · trail long (type `trail_l`, `trail_xl` ou `ultra`, ou distance de 42 km et plus)
+ *    → choisir son premier ultra, chaussure de trail, GPS en forêt ;
  *  · trail plus court   → chaussure de trail, GPS en forêt, plaque carbone en trail ;
  *  · marathon sur route → ravitaillement marathon, renforcement, VFC et charge ;
  *  · semi-marathon      → semi en moins d'1 h 45, renforcement, VFC et charge ;
- *  · tout le reste      → renforcement, VFC et charge, choisir une application.
+ *  · tout le reste      → renforcement, VFC et charge, Body Battery.
+ *
+ * ⚠️ PAS L'ARTICLE « QUELLE APPLICATION CHOISIR » DANS LE CAS GÉNÉRAL (Cyprien, 16/11/2026).
+ * Sous le titre « À lire pour préparer cette course », il tenait de la promotion sur les
+ * pages de 5 km et de 10 km. « Body Battery à 20 % : faut-il courir ? » sert n'importe
+ * quel coureur qui porte une montre.
  *
  * ⚠️ LE TYPE SE LIT SUR LES VRAIES VALEURS (relecture @Maestro, 13/11/2026). Un premier jet
  * cherchait « trail » dans le type : une course `ultra` sans dénivelé renseigné recevait
@@ -109,6 +114,6 @@ export function articlesPourCourse(c: {
     ? long ? ["p5", "p8", "p14"] : ["p8", "p14", "p15"]
     : marathon ? ["p7", "p10", "p2"]
     : semi ? ["p3", "p10", "p2"]
-    : ["p10", "p2", "p17"];
+    : ["p10", "p2", "p4"];
   return sansDoublon(cles);
 }
