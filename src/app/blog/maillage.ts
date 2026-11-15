@@ -10,9 +10,12 @@
  * reçoit des liens : ce module en pose depuis l'accueil, depuis chaque article et depuis
  * chaque page de course.
  *
- * Il ne dépend que de `slugs.ts` et de `posts.ts` (légers), jamais de `articles.ts` :
+ * Il ne dépend que de `slugs.ts`, de `posts.ts` et de `lib/raceType` (légers), jamais de
+ * `articles.ts` :
  * la page d'accueil est un composant client.
  */
+import type { RaceType } from "@/types";
+import { correctedRaceType } from "@/lib/raceType";
 import { SLUGS_BLOG } from "./slugs";
 import { POSTS } from "./posts";
 
@@ -58,32 +61,54 @@ export function articlesVoisins(slug: string, n = 3): LienArticle[] {
   return sansDoublon([...memeRubrique, ...suivantsEnBoucle(tous, i)].map((p) => p.cle)).slice(0, n);
 }
 
+/** Les valeurs RÉELLES de `races.type` (`RaceType`, `src/types`). */
+const TYPES_COURSE: readonly RaceType[] = ["road_5k", "road_10k", "semi", "marathon", "trail_s", "trail_m", "trail_l", "trail_xl", "ultra"];
+const estTypeCourse = (t: unknown): t is RaceType => TYPES_COURSE.includes(t as RaceType);
+
 /**
  * Les articles utiles à qui prépare CETTE course. Choix par règles lisibles, pas par
  * score : un lien hors sujet sur 15 000 pages vaudrait pire que pas de lien.
  *
- *  · trail de 42 km et plus → choisir son premier ultra, chaussure de trail, GPS en forêt ;
- *  · trail plus court       → chaussure de trail, GPS en forêt, plaque carbone en trail ;
- *  · marathon sur route     → ravitaillement marathon, renforcement, VFC et charge ;
- *  · semi-marathon          → semi en moins d'1 h 45, renforcement, VFC et charge ;
- *  · tout le reste          → renforcement, VFC et charge, choisir une application.
+ *  · trail long (50 km et plus, ou 42 km et plus) → choisir son premier ultra, chaussure
+ *    de trail, GPS en forêt ;
+ *  · trail plus court   → chaussure de trail, GPS en forêt, plaque carbone en trail ;
+ *  · marathon sur route → ravitaillement marathon, renforcement, VFC et charge ;
+ *  · semi-marathon      → semi en moins d'1 h 45, renforcement, VFC et charge ;
+ *  · tout le reste      → renforcement, VFC et charge, choisir une application.
  *
- * « Trail » se lit sur le type de la course, ou à défaut sur son dénivelé (500 m et plus).
- * Distance inconnue : on retombe sur le cas général, sans rien supposer.
+ * ⚠️ LE TYPE SE LIT SUR LES VRAIES VALEURS (relecture @Maestro, 13/11/2026). Un premier jet
+ * cherchait « trail » dans le type : une course `ultra` sans dénivelé renseigné recevait
+ * donc les trois articles génériques au lieu de « choisir son premier ultra ». Le test
+ * passait, parce qu'il employait des types INVENTÉS (« trail », « route »). On passe donc
+ * par `correctedRaceType`, la même correction que le catalogue (elle reclasse par la
+ * distance, et par le nom quand l'organisateur a écrit « Trail »), et le test balaie les
+ * neuf valeurs de `RaceType`.
+ *
+ * ⚠️ `semi` ET `marathon` COUVRENT LARGE EN BASE : `semi` va de 16 à 30 km, `marathon`
+ * commence à 30 km. L'article sur le semi ou sur le ravitaillement du marathon n'est donc
+ * proposé que si la DISTANCE le confirme, ou si elle est inconnue.
+ *
+ * Type absent ou inconnu : on se rabat sur le dénivelé (500 m et plus = trail), puis sur
+ * la distance, puis sur le cas général, sans rien supposer.
  */
 export function articlesPourCourse(c: {
   distanceKm?: number | null;
   deniveleM?: number | null;
   type?: string | null;
+  nom?: string | null;
 }): LienArticle[] {
   const km = Number(c.distanceKm);
   const dplus = Number(c.deniveleM);
-  const trail = /trail/i.test(String(c.type ?? "")) || (Number.isFinite(dplus) && dplus >= 500);
   const connu = Number.isFinite(km) && km > 0;
+  const type = estTypeCourse(c.type) ? correctedRaceType(connu ? km : null, c.type, c.nom) : null;
+  const trail = type ? /trail|ultra/.test(type) : Number.isFinite(dplus) && dplus >= 500;
+  const long = type === "trail_l" || type === "trail_xl" || type === "ultra" || (connu && km >= 42);
+  const marathon = connu ? km >= 40 && km <= 45 : type === "marathon";
+  const semi = connu ? km >= 20 && km <= 22.5 : type === "semi";
   const cles = trail
-    ? connu && km >= 42 ? ["p5", "p8", "p14"] : ["p8", "p14", "p15"]
-    : connu && km >= 40 && km <= 45 ? ["p7", "p10", "p2"]
-    : connu && km >= 20 && km <= 22.5 ? ["p3", "p10", "p2"]
+    ? long ? ["p5", "p8", "p14"] : ["p8", "p14", "p15"]
+    : marathon ? ["p7", "p10", "p2"]
+    : semi ? ["p3", "p10", "p2"]
     : ["p10", "p2", "p17"];
   return sansDoublon(cles);
 }

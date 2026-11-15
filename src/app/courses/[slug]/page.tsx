@@ -128,12 +128,12 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const parcours = lienSortantPropre((c as { parcours_url?: unknown }).parcours_url);
   // Le champ « organisation » ne vaut que s'il ne désigne pas la source du lien.
   const organisateur = organisateurReel(c.organization, c.registration_url);
+  // Trois articles utiles à qui prépare cette course (règles dans `blog/maillage`).
+  const aLire = articlesPourCourse({ distanceKm: km, deniveleM: dplus, type: c.type, nom: c.name });
+  const titresBlog = (BLOG[lang as keyof typeof BLOG] ?? BLOG.fr).posts;
   // ⚠️ `terrain` EST UN TABLEAU. `{c.terrain && …}` rendait donc une ligne « Terrain »
   // VIDE sur les ~15 000 courses où il vaut `[]` — un tableau vide est truthy. Et un
   // tableau plein s'affichait « single_track,forest », en anglais et sans espace.
-  // Trois articles utiles à qui prépare cette course (règles dans `blog/maillage`).
-  const aLire = articlesPourCourse({ distanceKm: km, deniveleM: dplus, type: c.type });
-  const titresBlog = (BLOG[lang as keyof typeof BLOG] ?? BLOG.fr).posts;
   const terrains = (Array.isArray(c.terrain) ? c.terrain : [])
     .map((v) => t(`terrain.${String(v)}`))
     .filter(Boolean);

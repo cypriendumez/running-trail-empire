@@ -9,6 +9,12 @@
  * ici. Si tu ajoutes un sujet à `blogI18n` sans l'écrire ici, il portera son badge tout
  * seul, et c'est voulu.
  *
+ * ⚠️ UN ARTICLE AJOUTÉ ICI A AUSSI SA LIGNE DANS `slugs.ts` (clé → adresse). C'est cette
+ * table légère qui pose les liens vers l'article depuis l'accueil, les autres articles et
+ * les pages de course (`maillage.ts`) : sans elle, l'article n'est lié que depuis /blog,
+ * et Google ne le trouve pas (constat du 13/11/2026 : 4 articles indexés sur 17).
+ * `tests/blog-maillage.test.ts` rougit tant que la ligne manque.
+ *
  * ⚠️ DEUX TITRES ONT ÉTÉ RECADRÉS parce qu'ils promettaient l'impossible :
  *  · « UTMB 2026 : les 20 trails à ne pas manquer » annonçait une liste datée que
  *    personne n'avait dressée, et qui serait fausse en six mois → critères de choix ;

@@ -15,6 +15,7 @@ import { SLUGS_BLOG } from "../src/app/blog/slugs";
 import { POSTS } from "../src/app/blog/posts";
 import { BLOG } from "../src/app/blog/blogI18n";
 import { derniersArticles, articlesVoisins, articlesPourCourse } from "../src/app/blog/maillage";
+import type { RaceType } from "../src/types";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -85,20 +86,70 @@ test("chaque article reçoit au moins un lien depuis un autre article", () => {
   assert.deepEqual(orphelins, [], `article(s) qu'aucun autre article ne lie : ${orphelins.join(", ")}`);
 });
 
-test("page de course : les règles renvoient trois articles réels, adaptés à l'épreuve", () => {
-  const cles = (c: Parameters<typeof articlesPourCourse>[0]) => articlesPourCourse(c).map((x) => x.cle);
-  assert.deepEqual(cles({ distanceKm: 80, deniveleM: 4000, type: "trail" }), ["p5", "p8", "p14"], "ultra-trail");
-  assert.deepEqual(cles({ distanceKm: 15, deniveleM: 700, type: "trail" }), ["p8", "p14", "p15"], "trail court");
-  assert.deepEqual(cles({ distanceKm: 25, deniveleM: 900, type: null }), ["p8", "p14", "p15"], "dénivelé sans type");
-  assert.deepEqual(cles({ distanceKm: 42.195, deniveleM: 100, type: "route" }), ["p7", "p10", "p2"], "marathon");
-  assert.deepEqual(cles({ distanceKm: 21.1, deniveleM: 50, type: "route" }), ["p3", "p10", "p2"], "semi");
-  assert.deepEqual(cles({ distanceKm: 10, deniveleM: 20, type: "route" }), ["p10", "p2", "p17"], "10 km");
-  // Donnée absente : le cas général, sans rien supposer de l'épreuve.
-  assert.deepEqual(cles({ distanceKm: null, deniveleM: null, type: null }), ["p10", "p2", "p17"], "sans donnée");
-  assert.deepEqual(cles({}), ["p10", "p2", "p17"], "objet vide");
-  for (const c of [{ distanceKm: 80, type: "trail" }, { distanceKm: 42.2 }, { distanceKm: 21 }, {}]) {
-    for (const x of articlesPourCourse(c)) assert.ok(slugsReels.has(x.slug), `${x.slug} n'existe pas`);
+/** Les NEUF valeurs réelles de `races.type` : le test balaie l'énumération, pas des types inventés. */
+const TYPES: RaceType[] = ["road_5k", "road_10k", "semi", "marathon", "trail_s", "trail_m", "trail_l", "trail_xl", "ultra"];
+const cles = (c: Parameters<typeof articlesPourCourse>[0]) => articlesPourCourse(c).map((x) => x.cle);
+const ULTRA = ["p5", "p8", "p14"], TRAIL = ["p8", "p14", "p15"], MARATHON = ["p7", "p10", "p2"], SEMI = ["p3", "p10", "p2"], GENERAL = ["p10", "p2", "p17"];
+
+test("page de course : chaque type réel de course reçoit trois articles réels", () => {
+  // Défaut relevé par @Maestro le 13/11/2026 : la règle cherchait « trail » dans le type, donc
+  // `ultra` tombait dans le cas général ; le test employait « trail » et « route », deux
+  // valeurs qui n'existent pas en base, et ne voyait rien.
+  const sansDistance: Record<RaceType, string[]> = {
+    road_5k: GENERAL, road_10k: GENERAL, semi: SEMI, marathon: MARATHON,
+    trail_s: TRAIL, trail_m: TRAIL, trail_l: ULTRA, trail_xl: ULTRA, ultra: ULTRA,
+  };
+  for (const type of TYPES) {
+    assert.deepEqual(cles({ type }), sansDistance[type], `type ${type}, sans distance ni dénivelé`);
+    for (const km of [null, 5, 10, 21.1, 42.195, 60, 160]) {
+      const l = articlesPourCourse({ type, distanceKm: km, deniveleM: null });
+      assert.equal(l.length, 3, `type ${type}, ${km} km : ${l.length} lien(s)`);
+      for (const x of l) assert.ok(slugsReels.has(x.slug), `type ${type}, ${km} km → ${x.slug} n'existe pas`);
+    }
   }
+});
+
+test("page de course : un ultra sans dénivelé renseigné reçoit bien l'article sur le premier ultra", () => {
+  assert.deepEqual(cles({ distanceKm: 160, deniveleM: null, type: "ultra" }), ULTRA);
+  assert.deepEqual(cles({ distanceKm: 100, deniveleM: 0, type: "ultra" }), ULTRA);
+  assert.deepEqual(cles({ distanceKm: 85, deniveleM: null, type: "trail_xl" }), ULTRA);
+  assert.deepEqual(cles({ distanceKm: 55, deniveleM: null, type: "trail_l" }), ULTRA);
+});
+
+test("page de course : la distance et le nom corrigent le type, comme dans le catalogue", () => {
+  // « L'Ardéchoise · 51 km » étiquetée ultra : c'est un trail long, il garde l'article ultra.
+  assert.deepEqual(cles({ distanceKm: 51, type: "ultra" }), ULTRA);
+  // Un « ultra » de 15 km est un trail court.
+  assert.deepEqual(cles({ distanceKm: 15, type: "ultra" }), TRAIL);
+  assert.deepEqual(cles({ distanceKm: 15, deniveleM: 700, type: "trail_s" }), TRAIL);
+  assert.deepEqual(cles({ distanceKm: 45, type: "trail_m" }), ULTRA, "trail de 42 km et plus");
+  assert.deepEqual(cles({ distanceKm: 35, type: "trail_m" }), TRAIL);
+  // Typée route mais nommée « Trail … » par l'organisateur : c'est un trail.
+  assert.deepEqual(cles({ distanceKm: 15, deniveleM: 500, type: "road_10k", nom: "Trail des 7 Monts" }), TRAIL);
+  // Le trail URBAIN reste une course sur route.
+  assert.deepEqual(cles({ distanceKm: 10, type: "road_10k", nom: "Trail urbain de Lyon" }), GENERAL);
+  // Une course sur route vallonnée n'est PAS un trail : le type réel prime sur le dénivelé.
+  assert.deepEqual(cles({ distanceKm: 42.195, deniveleM: 800, type: "marathon" }), MARATHON);
+});
+
+test("page de course : semi et marathon ne valent que si la distance le confirme", () => {
+  assert.deepEqual(cles({ distanceKm: 42.195, deniveleM: 100, type: "marathon" }), MARATHON);
+  assert.deepEqual(cles({ distanceKm: 21.1, deniveleM: 50, type: "semi" }), SEMI);
+  assert.deepEqual(cles({ distanceKm: 10, deniveleM: 20, type: "road_10k" }), GENERAL);
+  // En base, `semi` va de 16 à 30 km et `marathon` commence à 30 km.
+  assert.deepEqual(cles({ distanceKm: 27, type: "semi" }), GENERAL, "27 km typé semi");
+  assert.deepEqual(cles({ distanceKm: 33, type: "marathon" }), GENERAL, "33 km typé marathon");
+});
+
+test("page de course : type absent ou inconnu, on ne suppose rien", () => {
+  assert.deepEqual(cles({ distanceKm: null, deniveleM: null, type: null }), GENERAL, "sans donnée");
+  assert.deepEqual(cles({}), GENERAL, "objet vide");
+  assert.deepEqual(cles({ distanceKm: 10, type: "route" }), GENERAL, "type inconnu");
+  // Sans type, le dénivelé (500 m et plus) puis la distance tranchent.
+  assert.deepEqual(cles({ distanceKm: 25, deniveleM: 900, type: null }), TRAIL);
+  assert.deepEqual(cles({ distanceKm: 80, deniveleM: 4000 }), ULTRA);
+  assert.deepEqual(cles({ distanceKm: 42.195 }), MARATHON);
+  assert.deepEqual(cles({ distanceKm: 21.1 }), SEMI);
 });
 
 test("les trois pages appellent bien le module et rendent un lien par article", () => {
@@ -109,7 +160,7 @@ test("les trois pages appellent bien le module et rendent un lien par article", 
   assert.match(article, /articlesVoisins\(a\.slug\)/, "l'article n'appelle plus articlesVoisins");
   assert.match(article, /voisins\.map\(/, "l'article n'affiche plus « À lire aussi »");
   const course = code("src/app/courses/[slug]/page.tsx");
-  assert.match(course, /articlesPourCourse\(\{ distanceKm: km, deniveleM: dplus, type: c\.type \}\)/, "la page de course n'appelle plus articlesPourCourse");
+  assert.match(course, /articlesPourCourse\(\{ distanceKm: km, deniveleM: dplus, type: c\.type, nom: c\.name \}\)/, "la page de course n'appelle plus articlesPourCourse avec le type et le nom");
   assert.match(course, /aLire\.map\(/, "la page de course n'affiche plus les articles");
 });
 
