@@ -10,7 +10,7 @@
 import { lignesRetireesParDouleur } from "@/lib/coach/footings";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
-import { buildWeekPlan, consignesSurPlan, avecCourseCEcartee, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
+import { buildWeekPlan, consignesSurPlan, avecCourseCEcartee, sansCourseCEcartee, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
 import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
 import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, fcMaxMontre, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
@@ -300,7 +300,11 @@ export async function autoCoachForUser(
   const relecture = coachAvance
     ? await relireSemaine(admin as unknown as SupabaseClient, { userId, ctx, week, from, lang: langue })
     : null;
-  const semaineCoach = relecture?.conseils.length ? appliquerConseils(week, relecture.conseils) : week;
+  // Le message d'une course C écartée est RETIRÉ avant les conseils, puis reposé entier : `composerPourquoi`
+  // coupe la fin du « pourquoi » pour loger un conseil, et le coupait en plein milieu (relecture du 16/11/2026).
+  const semaineCoach = relecture?.conseils.length
+    ? avecCourseCEcartee(ctx, appliquerConseils(sansCourseCEcartee(ctx, week, maintenant), relecture.conseils), maintenant)
+    : week;
 
   // 2) Remplace le plan à venir. On n'efface QUE le futur : l'historique des séances
   //    déjà passées reste intact pour le suivi d'adhérence.

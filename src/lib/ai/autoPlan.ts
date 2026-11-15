@@ -156,11 +156,7 @@ const messageCourseCEcartee = (c: CourseCEcartee, l: Lang) =>
 export function avecCourseCEcartee(ctx: AthleteContext, plan: PlanDay[], today: Date): PlanDay[] {
   const c = courseCEcartee(ctx, today);
   if (!c) return plan;
-  const sans = (texte: string | undefined, l: Lang) => (texte ?? "").split(messageCourseCEcartee(c, l)).join("");
-  const nettoye = plan.map((d) => ({
-    ...d, why: sans(d.why, "fr"),
-    i18n: Object.fromEntries(Object.entries(d.i18n ?? {}).map(([l, t]) => [l, t ? { ...t, why: sans(t.why, l as Lang) } : t])) as Partial<Record<Lang, PlanDayText>>,
-  }));
+  const nettoye = sansCourseCEcartee(ctx, plan, today);
   const debut = new Date(today); debut.setHours(0, 0, 0, 0);
   const date = iso(addDays(debut, c.idx));
   // L'entrée principale du jour (pas le footing du soir d'un jour doublé).
@@ -170,6 +166,21 @@ export function avecCourseCEcartee(ctx: AthleteContext, plan: PlanDay[], today: 
   const i18n = Object.fromEntries(Object.entries(jour.i18n ?? {}).map(([l, t]) =>
     [l, t ? { ...t, why: `${t.why ?? ""}${messageCourseCEcartee(c, l as Lang)}` } : t])) as Partial<Record<Lang, PlanDayText>>;
   return nettoye.map((d, k) => (k === i ? { ...jour, why: `${jour.why ?? ""}${messageCourseCEcartee(c, "fr")}`, i18n } : d));
+}
+
+/**
+ * Le plan SANS le message de la course C écartée (5 langues). Le coach l'appelle avant la relecture
+ * Premium : `composerPourquoi` coupe la FIN du « pourquoi » pour loger son conseil, et coupait le message
+ * en plein milieu (relecture du 16/11/2026) ; `avecCourseCEcartee` le repose ensuite, entier.
+ */
+export function sansCourseCEcartee<T extends { why: string; i18n?: Partial<Record<Lang, { why: string }>> }>(ctx: AthleteContext, plan: readonly T[], today: Date): T[] {
+  const c = courseCEcartee(ctx, today);
+  if (!c) return [...plan];
+  const sans = (texte: string | undefined, l: Lang) => (texte ?? "").split(messageCourseCEcartee(c, l)).join("");
+  return plan.map((d) => ({
+    ...d, why: sans(d.why, "fr"),
+    i18n: Object.fromEntries(Object.entries(d.i18n ?? {}).map(([l, t]) => [l, t ? { ...t, why: sans(t.why, l as Lang) } : t])),
+  }));
 }
 
 /**
