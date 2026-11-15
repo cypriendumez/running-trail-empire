@@ -298,6 +298,22 @@ async function main() {
     assert.ok(buildWeekPlan(premier, JOUR0).some((d) => d.type === "Course" && d.title.includes("Cross C") && d.date === ilYa(-5)), "la course C du premier jour normal n'est pas au plan");
   });
 
+  await test("les bornes de la semaine d'affûtage : 21 km pile est une course longue, 20,9 km et une distance inconnue non", async () => {
+    // Relecture du 16/11/2026 : seuls 21,1, 10 et 5 km étaient éprouvés. A dans 5 jours, C de J-5 à J-3
+    // (idx 0 à 2) : hors des 2 jours d'une course courte, dans la semaine d'affûtage d'une course longue.
+    const motif = (distanceA: number | null | undefined, daysToRace: number, idx: number) => courseCEcarteeDe({
+      courseSecondaire: { idx, nom: "Cross C", priorite: "C" }, daysToRace, distanceA, nomA: "Course A", recuperation: null, aujourdhui: "2026-09-07",
+    })?.motif ?? null;
+    for (const idx of [0, 1, 2]) {
+      for (const km of [null, undefined, 0, 20.9]) assert.equal(motif(km, 5, idx), null, `distance ${km}, C à J-${5 - idx} : traitée comme une course longue`);
+      for (const km of [21, 21.1, 42.2]) assert.equal(motif(km, 5, idx), "avant", `distance ${km}, C à J-${5 - idx} : pas écartée pendant l'affûtage`);
+    }
+    // J-6, la borne de la semaine d'affûtage : écartée à 21 km, gardée à 20,9 ; J-7 jamais.
+    assert.equal(motif(21, 6, 0), "avant", "21 km, C à J-6 : pas écartée");
+    assert.equal(motif(20.9, 6, 0), null, "20,9 km, C à J-6 : écartée");
+    assert.equal(motif(42.2, 7, 0), null, "marathon, C à J-7 : écartée hors de la semaine d'affûtage");
+  });
+
   await test("course A à venir de distance inconnue : la C n'est écartée que dans le protocole (2 jours), rien n'est supposé", async () => {
     const base = { courseSecondaire: null, daysToRace: 2, distanceA: null, nomA: "Course A", recuperation: null, aujourdhui: "2026-09-07" };
     const c = (idx: number) => courseCEcarteeDe({ ...base, courseSecondaire: { idx, nom: "Cross C", priorite: "C" } })?.motif ?? null;
