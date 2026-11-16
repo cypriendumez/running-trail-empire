@@ -1,6 +1,6 @@
 # État de l'équipe d'agents Pacevo
 
-*Tenu par `@Nexus`. Mis à jour le 13/11/2026 à 7 h (routine Direction) ; retouché en session le 16/11/2026 (production, PR #47 et #51). Chaque ligne dit ce qui TOURNE VRAIMENT,
+*Tenu par `@Nexus`. Mis à jour le 13/11/2026 à 7 h (routine Direction) ; retouché en session le 16/11/2026 (production, PR #47, #51, #54, #55 et #56). Chaque ligne dit ce qui TOURNE VRAIMENT,
 pas ce qui est prévu : un agent écrit dans la constitution mais sans routine planifiée n'existe pas.*
 
 > ⚠️ **Dépôt PUBLIC** (`cypriendumez/running-trail-empire`). Rien de personnel, de comptable ni
@@ -51,16 +51,17 @@ https://pacevo.fr (HTTP 200) et https://pacevo.fr/version.json (alerte si « com
 
 **Production** (13/11) : pacevo.fr sert 96f288c1 (fusion de #45), `main` est à ff51926 (fusion de
 #46). Une fusion de retard, déploiement sur GO de Cyprien (`/deployer`).
-**Production au 16/11** (relevé en session) : pacevo.fr sert `ef3d2c6b`, la tête de `main` avant la
-fusion de cette PR de documentation (#48, #49, #50, #52 et #53 en ligne). Plus de retard.
+**Production au 16/11** (relevé en session, 15 h 40) : pacevo.fr sert `8476e160`, la tête de `main` avant
+la fusion de la PR #54 (#48, #49, #50, #52, #53, #55 et #56 en ligne ; #47 et #54 ne changent que `ops/` et
+des tests). Plus de retard de code.
 
 ## Vague 1 : 12 agents sur 12 en place
 
 | # | Agent | État | Preuve / remarque |
 |---|---|---|---|
 | 1 | `@Nexus` | **EXÉCUTÉ** | 13/11 (Direction, 1er passage) : ce fichier et le point de 2 minutes, à partir de `ops/ATLAS_SYNC.md`. |
-| 3 | `@Sparring` | **EXÉCUTÉ** | 09/11 (5 h) : profil marathonien sub-3 h ajouté ; 2 défauts du plan trouvés (« /km/km », seuil 3 jours après un marathon), PR #4 fusionnée et en ligne (1e2173c). 3 profils de la matrice manquent encore (`ops/sparring/PROFILS.md`). Prochain passage le 16/11. |
-| 7 | `@SafeRun` | PLANIFIÉ | Coach, lundi 16/11. |
+| 3 | `@Sparring` | **EXÉCUTÉ** | 09/11 (5 h) : profil marathonien sub-3 h ajouté ; 2 défauts du plan trouvés (« /km/km », seuil 3 jours après un marathon), PR #4 fusionnée et en ligne (1e2173c). 16/11 (5 h) : profil 7 (emploi du temps chaotique) éprouvé, PR #54 (tests et matrice seuls) ; les 8 profils de la matrice ont un test (`ops/sparring/PROFILS.md`) ; un défaut de reprise trouvé, non corrigé (voir « BLOQUÉES », point 8). |
+| 7 | `@SafeRun` | **EXÉCUTÉ** | 16/11 (Coach) : `kine.crash`, `douleurs-course` et `sante` verts ; Kiné IA toujours retiré ; aucun diagnostic dans les textes servis après une douleur ; rien à corriger (PR #54). |
 | 8 | `@Sweeper` | **EXÉCUTÉ** | 08/11 : pacevo.fr joignable depuis le cloud (version lue), aucun défaut sur 24 h. Filtre `localhost` en place à la source depuis le 06/11. Depuis le 09/11 à 23 h : aucune PR « Bugs », journal non lu (RAS ou refus, non tranché). |
 | 9 | `@Bunker` | **EXÉCUTÉ** | 08/11 : 23 → 9 failles de dépendances, Next.js 16.4.5, déployé. Restent `zod` (importé nulle part) et la chaîne ESLint (non utilisée). |
 | 10 | `@Vault` | PLANIFIÉ | Sécurité, le 5/12. Lecture seule ; une faille non corrigée ne va jamais dans le dépôt. |
@@ -91,7 +92,7 @@ toutes les autres viennent de sessions de Cyprien, qui ne sont pas tenues au vis
 | 71 | `@Atlas` | directeur adjoint des opérations, bras gauche | DÉFINI, branché le 09/11 ; appelé le 13/11 (synthèse rendue, RENVOYÉ) | Direction (vendredi) ; ACTIF après lecture du journal du 13/11 |
 | 72 | `@Strategos` | pôle A, stratégie et qualité des agents | DÉFINI, branché le 09/11 ; appelé le 13/11 (RENVOYÉ sur les leçons) | Direction ; ACTIF après lecture du journal du 13/11 |
 | 73 | `@Chancelier` | pôle B, secrétaire général | DÉFINI, branché le 09/11 | Courrier (Mac, 8 h), après `@Concierge` ; non visible depuis le cloud |
-| 74 | `@HeadCoach` | pôle C, directeur scientifique | DÉFINI, branché le 09/11 | Coach (lundi 16/11, 5 h), avant la PR |
+| 74 | `@HeadCoach` | pôle C, directeur scientifique | DÉFINI, branché le 09/11 ; appelé le 16/11 (deux visas RENVOYÉ recopiés dans la PR #54 de la routine, puis VISA ACCORDÉ en session le 16/11) | Coach (lundi 5 h), avant la PR ; ACTIF après lecture du journal du 16/11 |
 | 75 | `@Architect` | pôle D, technique et sécurité | DÉFINI, branché le 09/11 | Bugs (6 h, 23 h) et Sécurité et veille (le 5) ; aucun visa prouvé |
 | 76 | `@Maestro` | pôle E, produit et design | DÉFINI | Gazette (15/11) ; à la demande sur toute PR d'interface |
 | 77 | `@Mercator` | pôle F, marketing | DÉFINI, branché le 09/11 | Blog (15/11 à 3 h, lundi) et Sécurité et veille (rapport de `@Radar`) |
@@ -150,11 +151,18 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    par tranche de trente minutes pour les candidats et pour le fil lu par la lettre, contrôle de fraîcheur dans
    le skill `edition-lettre`. Prouvé en ligne le 16/11 : collecte faite avant de répondre au premier appel d'une
    tranche, non refaite dans la tranche. Reste à constater au passage de `@Gazette` du dimanche 22/11.
-   Suite écrite le 16/11 sur la branche `fix/rubrique-en-panne` : une collecte en échec ne sort plus une
+   Suite en ligne le 16/11 (#56, `8476e160`) : une collecte en échec ne sort plus une
    rubrique vide en silence. Une panne = une erreur du fil ou une collecte dont aucun flux n'a répondu, jamais
    une liste vide. Elle se dit dans les candidats (`pannes`, rien n'est écrit en base depuis ce point public),
    dans chaque réponse de la lettre et dans `error_logs` (source `lettre-collecte`, écrit par la lettre du lundi).
-   À fusionner et à déployer sur GO de Cyprien.
+   Contrôlé en ligne : `pannes` vide avec les vrais flux. Aucune panne réelle n'a été provoquée en production,
+   et une panne partielle (un flux sur plusieurs répond) reste sans signal.
+8. **Reprise après un arrêt : une qualité dès le premier jour** (défaut EN PRODUCTION, trouvé par `@Sparring` le
+   16/11, confirmé et rejoué par `@HeadCoach`, PR #54). Après 6 à 25 jours sans courir, sans qualité manquée, le
+   plan pose une séance au seuil le jour même sur 8 départs sur 10, et une « sortie longue » de 4 km : la reprise
+   (`repriseArret`) ne borne que le volume, jamais l'intensité. Avis de `@HeadCoach` : aucune qualité tant que le
+   coureur n'a pas couru au moins une sortie facile depuis l'arrêt ; ne pas appeler « sortie longue » une sortie
+   plus courte qu'une sortie habituelle. Non corrigé. Décision de Cyprien (Niveau 2).
 
 ## Résolues le 13/11/2026
 
