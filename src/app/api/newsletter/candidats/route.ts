@@ -39,6 +39,7 @@ const candidats = unstable_cache(async (base: string, _tranche: number) => {
     pour: lundiDEnvoi(jour),
     // Les collectes en échec, en clair (vide = aucune) : une rubrique vide n'est plus muette.
     // La réponse reste gardée pour sa tranche : un appelant ne relance pas la collecte à volonté.
+    // Rien n'est écrit en base ici (point public) : c'est la lettre du lundi qui journalise.
     pannes: sel.pannes,
     rubriques: RUBRIQUES_LETTRE.map((r, n) => ({
       cle: r.cle,
@@ -52,7 +53,7 @@ const candidats = unstable_cache(async (base: string, _tranche: number) => {
         : sel.parRubrique[n].filter(publiable).slice(0, PAR_RUBRIQUE).map(fiche),
     })),
   };
-}, ["newsletter-candidats-v1"], { revalidate: 1800 });
+}, ["newsletter-candidats-v2"], { revalidate: 1800 });
 
 export async function GET() {
   const BASE = process.env.NEXT_PUBLIC_APP_URL;

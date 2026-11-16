@@ -28,7 +28,9 @@ la route a servi la collecte du 09/11 et l'édition choisie dessus a dû être j
 depuis (une collecte par tranche de 30 minutes), ce contrôle reste : il ne coûte qu'une ligne.
 
 **Pannes de collecte.** `pannes` liste les collectes qui ont échoué (« fil « trail » : sources injoignables »).
-Vide : rien à signaler. Non vide : la rubrique concernée peut être vide ou appauvrie. Ne la comble avec
+Une panne, c'est une erreur du fil ou une collecte dont aucun flux n'a répondu, jamais une simple liste vide.
+Vide : rien à signaler, et une rubrique sans candidat est alors une semaine calme. Non vide : la rubrique
+concernée peut être vide ou appauvrie. Ne la comble avec
 aucun article venu d'ailleurs, laisse-la à l'ordre automatique (la lettre refait sa propre collecte le
 lundi), et recopie la liste dans la PR sous « Pannes de collecte ». Si la une elle-même est touchée
 (« collecte de la semaine »), c'est `État : BLOQUÉ — Cause exacte : collecte de la semaine en panne`.

@@ -37,7 +37,8 @@ export type Selection = {
    * ⚠️ Une rubrique dont la collecte échouait sortait VIDE, sans un mot : rien ne la
    * distinguait d'une semaine sans article (relecture du 16/11/2026). Depuis que la lettre
    * lit une collecte du moment (`trancheDe`), l'ancienne collecte ne masque plus ce cas.
-   * Vide = aucune panne constatée ; une rubrique sans article n'est pas une panne.
+   * Vide = aucune panne constatée. Une rubrique sans article n'est PAS une panne : la panne,
+   * c'est une erreur du fil ou une collecte dont aucun flux n'a répondu, jamais une liste vide.
    */
   pannes: string[];
 };
@@ -54,7 +55,7 @@ export async function preparerSelection({ base, edition }: { base: string; editi
     try {
       const r = await fetch(`${base}/api/community/news?cat=${cat}&avecTexte=1`, { signal: AbortSignal.timeout(25000) });
       if (!r.ok) { pannes.push(`fil « ${cat} » : HTTP ${r.status}`); return []; }
-      // Le fil répond 200 même quand aucun flux n'a répondu : il le dit dans `erreur`.
+      // Le fil répond 200 même en panne : quand aucun de ses flux n'a répondu, il le dit dans `erreur`.
       const corps = (await r.json()) as { items?: Item[]; erreur?: string };
       if (corps.erreur) pannes.push(`fil « ${cat} » : ${String(corps.erreur).slice(0, 120)}`);
       return (corps.items ?? []).filter((it) => {
@@ -78,10 +79,9 @@ export async function preparerSelection({ base, edition }: { base: string; editi
     collecterMaterielSemaine().catch((e: unknown) => { pannes.push(`matériel de la semaine : ${cause(e)}`); return [] as Item[]; }),
     collecterConseilsSemaine().catch((e: unknown) => { pannes.push(`conseils de la semaine : ${cause(e)}`); return [] as Item[]; }),
   ]);
-  // Ces collectes avalent la panne de CHAQUE flux (`fusionner`) : elles ne lèvent presque
-  // jamais. Une semaine entière sans un seul article de course à pied, en revanche, n'existe
-  // pas : c'est que tous les flux ont échoué ou dépassé le délai.
-  if (!semaineBrute.length && !echecSemaine) pannes.push("collecte de la semaine : aucun article reçu (tous les flux ont échoué ou dépassé le délai)");
+  // ⚠️ Une panne n'est JAMAIS déduite d'une liste vide : ces collectes lèvent quand aucun de
+  // leurs flux n'a répondu (`AUCUN_FLUX`), et rendent une liste vide, sans alerte, quand les
+  // flux ont répondu sans article de la semaine.
   const tempsDe = (it: Item) => new Date(it.date).getTime() || 0;
   // ⚠️ Un article dont on peut lire le texte (fourni par le flux, ou lien direct vers une
   // page que l'éditeur autorise) passe devant un lien Google News, qui partira en titre

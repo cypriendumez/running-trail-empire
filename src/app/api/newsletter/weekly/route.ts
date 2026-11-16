@@ -12,7 +12,7 @@ import { lireEdition } from "@/lib/newsletter/edition";
 import { aujourdhui } from "@/lib/time/fuseau";
 import { EDITEUR } from "@/lib/brand/editeur";
 import { envoyerEmail } from "@/lib/email/envoyer";
-import { journaliserEchec } from "@/lib/journal/echecServeur";
+import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 
 /**
  * LE RÉSUMÉ DU LUNDI MATIN.
@@ -84,9 +84,10 @@ export async function GET(req: Request) {
     await preparerSelection({ base: BASE, edition: lecture.edition });
   // ⚠️ Une collecte en échec ne coûte que sa rubrique (elle retombe sur le fil), mais elle ne
   // se voyait NULLE PART : la rubrique sortait vide ou appauvrie, comme une semaine calme.
-  // Elle va dans `error_logs` (/admin › Bugs) et dans chaque réponse de cette route.
+  // Elle va dans `error_logs` (/admin › Bugs, une ligne par jour même si l'action est relancée)
+  // et dans chaque réponse de cette route.
   if (pannes.length && !apercu) {
-    await journaliserEchec(null, { source: "lettre-collecte", url: "/api/newsletter/weekly", message: `Collecte de la lettre incomplète : ${pannes.join(" ; ")}` });
+    await journaliserEchecUneFois(null, { source: "lettre-collecte", url: "/api/newsletter/weekly", message: `Collecte de la lettre incomplète : ${pannes.join(" ; ")}` });
   }
 
 

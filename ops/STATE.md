@@ -151,8 +151,10 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    le skill `edition-lettre`. Prouvé en ligne le 16/11 : collecte faite avant de répondre au premier appel d'une
    tranche, non refaite dans la tranche. Reste à constater au passage de `@Gazette` du dimanche 22/11.
    Suite écrite le 16/11 sur la branche `fix/rubrique-en-panne` : une collecte en échec ne sort plus une
-   rubrique vide en silence, elle se dit dans les candidats (`pannes`), dans chaque réponse de la lettre et dans
-   `error_logs` (source `lettre-collecte`). À fusionner et à déployer sur GO de Cyprien.
+   rubrique vide en silence. Une panne = une erreur du fil ou une collecte dont aucun flux n'a répondu, jamais
+   une liste vide. Elle se dit dans les candidats (`pannes`, rien n'est écrit en base depuis ce point public),
+   dans chaque réponse de la lettre et dans `error_logs` (source `lettre-collecte`, écrit par la lettre du lundi).
+   À fusionner et à déployer sur GO de Cyprien.
 
 ## Résolues le 13/11/2026
 
