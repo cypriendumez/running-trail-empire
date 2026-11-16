@@ -97,7 +97,13 @@ const AUDITEES: Record<string, string> = {
   "photo-1700745286959-8658de43a15c": "réserve blog : sentier de montagne en forêt de mélèzes — ni personne ni marque",
   "photo-1519681393784-d120267933ba": "réserve blog : voie lactée au-dessus de sommets enneigés, nuit — ni personne ni marque",
   "photo-1761660227670-28922e2a69dc": "réserve blog : crête au lever du soleil au-dessus d'une mer de nuages — ni personne ni marque",
-  "photo-1762858741992-a254724623bd": "réserve blog : chaînes de montagnes dans la brume, soleil voilé — ni personne ni marque",
+  "photo-1762858741992-a254724623bd": "réserve blog : chaînes de montagnes dans la brume, soleil voilé — ni personne ni marque",  // Regardées le 16/11/2026, format servi (600×450), depuis le Mac.
+  "photo-1521510535750-13af4de027e4": "blog, sommeil : draps blancs froissés sur un lit, fenêtre au-dessus, pénombre bleutée — ni personne ni marque",
+  "photo-1632168704789-8d4c9443efc0": "réserve blog : pleine lune au-dessus d'un lac entre des collines, reflet doré sur l'eau — ni personne ni marque",
+  "photo-1639162147469-a02dee15e1d9": "réserve blog : croissant de lune au-dessus d'une forêt de sapins enneigée, brume au sol — ni personne ni marque",
+  "photo-1548342700-0824df116ec3": "réserve blog : lune sous des nuages sombres, crête en silhouette — ni personne ni marque",
+  "photo-1550955676-be18abcc851c": "réserve blog : pleine lune qui se lève derrière des montagnes arides, ciel rose — ni personne ni marque",
+  "photo-1429117237875-aa29229d99f0": "réserve blog : lit défait, deux oreillers gris, store vénitien, pénombre — ni personne ni marque",
 };
 
 // ── 3. Les Pexels validées du fil Communauté ─────────────────────────────────

@@ -1,7 +1,7 @@
 import type { Lang } from "@/lib/i18n/translations";
 
 export const BLOG_CATS = ["ALL", "AI", "TRAINING", "NUTRITION", "HEALTH", "RACES", "GEAR"] as const;
-export const POST_KEYS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12", "p13", "p14", "p15", "p16", "p17"] as const;
+export const POST_KEYS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12", "p13", "p14", "p15", "p16", "p17", "p18"] as const;
 
 export type BlogDict = {
   heroEyebrow: string; heroTitleA: string; heroAccent: string; heroSubtitle: string;
@@ -34,6 +34,7 @@ const fr: BlogDict = {
     p15: { title: "Plaque carbone en trail : ce qu'elle doit à la route, ce qu'elle ne prouve pas encore", excerpt: "2026 a vu une vague de chaussures de trail à plaque carbone. Le mécanisme qu'elles invoquent est bien documenté sur route ; son effet sur terrain technique ne l'est pas encore. Voici la différence." },
     p16: { title: "Courir dans le froid et la nuit : voies respiratoires et visibilité", excerpt: "Ce que l'hiver met en jeu, côté littérature : tes voies respiratoires, et, la nuit, le fait d'être reconnu par un conducteur. Ce que six publications mesurent — et ce qu'elles ne disent pas." },
     p17: { title: "Quelle application de coaching running choisir en 2027 ? Six questions à poser", excerpt: "Un comparatif écrit par un éditeur ne vaut pas grand-chose. Six questions à poser à n'importe quelle application, la nôtre comprise, et nos réponses, limites incluses." },
+    p18: { title: "Le sommeil, la séance que personne ne planifie", excerpt: "La méta-analyse de Lopes (2023) chiffre à -0,52 l'effet du manque de sommeil sur l'endurance, et d'autant plus que l'effort dure. Ce que la littérature mesure vraiment, ce qu'elle ne tranche pas, et ce que ta montre rate de tes nuits." },
   },
 };
 
@@ -60,6 +61,7 @@ const en: BlogDict = {
     p15: { title: "Carbon plates in trail shoes: what they owe to the road, what they haven't yet proven", excerpt: "2026 saw a wave of carbon-plated trail shoes. The mechanism they invoke is well documented on the road; its effect on technical terrain isn't yet. Here's the difference." },
     p16: { title: "Running in the cold and the dark: airways and being seen", excerpt: "What winter puts at stake, as far as the literature goes: your airways, and, after dark, being recognised by a driver. What six publications measure — and what they do not say." },
     p17: { title: "Which running coaching app to choose in 2027? Six questions to ask", excerpt: "A comparison written by one of the publishers isn't worth much. Six questions to put to any app, ours included, and our own answers, limits and all." },
+    p18: { title: "Sleep: the session nobody puts on the calendar", excerpt: "Lopes' meta-analysis (2023) puts the effect of sleep deprivation on endurance at -0.52, and the longer the effort, the worse it gets. What the literature actually measures, what it leaves open, and what your watch misses about your nights." },
   },
 };
 
@@ -86,6 +88,7 @@ const de: BlogDict = {
     p15: { title: "Carbonplatte im Trailschuh: was sie der Straße verdankt, was sie noch nicht beweist", excerpt: "2026 brachte eine Welle von Trailschuhen mit Carbonplatte. Der Mechanismus, den sie anführen, ist auf der Straße gut belegt; seine Wirkung auf technischem Gelände ist es noch nicht. Der Unterschied." },
     p16: { title: "Laufen bei Kälte und Dunkelheit: Atemwege und Sichtbarkeit", excerpt: "Was im Winter laut Literatur auf dem Spiel steht: deine Atemwege — und nachts, von Fahrenden erkannt zu werden. Was sechs Publikationen messen — und was sie nicht sagen." },
     p17: { title: "Welche Lauf-Coaching-App 2027 wählen? Sechs Fragen, die du stellen solltest", excerpt: "Ein Vergleich aus der Feder eines Anbieters ist wenig wert. Sechs Fragen an jede App, auch an unsere, und unsere eigenen Antworten samt Grenzen." },
+    p18: { title: "Schlaf: die Einheit, die niemand einplant", excerpt: "Die Metaanalyse von Lopes (2023) beziffert den Effekt von Schlafmangel auf die Ausdauer mit -0,52 — und je länger die Belastung, desto stärker. Was die Literatur wirklich misst, was sie offenlässt und was deine Uhr an deinen Nächten verpasst." },
   },
 };
 
@@ -112,6 +115,7 @@ const es: BlogDict = {
     p15: { title: "Placa de carbono en trail: lo que debe a la carretera, lo que aún no demuestra", excerpt: "2026 trajo una ola de zapatillas de trail con placa de carbono. El mecanismo que invocan está bien documentado en carretera; su efecto en terreno técnico todavía no. Aquí está la diferencia." },
     p16: { title: "Correr con frío y de noche: vías respiratorias y visibilidad", excerpt: "Lo que el invierno pone en juego, según la literatura: tus vías respiratorias y, de noche, que un conductor te reconozca. Lo que miden seis publicaciones — y lo que no dicen." },
     p17: { title: "¿Qué aplicación de entrenamiento de running elegir en 2027? Seis preguntas que hacer", excerpt: "Una comparativa escrita por uno de los editores no vale gran cosa. Seis preguntas para cualquier aplicación, la nuestra incluida, y nuestras respuestas, con sus límites." },
+    p18: { title: "El sueño, la sesión que nadie planifica", excerpt: "El metaanálisis de Lopes (2023) cifra en -0,52 el efecto de la falta de sueño sobre la resistencia, y tanto más cuanto más dura el esfuerzo. Lo que la literatura mide de verdad, lo que no zanja y lo que tu reloj no ve de tus noches." },
   },
 };
 
@@ -138,6 +142,7 @@ const pt: BlogDict = {
     p15: { title: "Placa de carbono em trail: o que deve à estrada, o que ainda não prova", excerpt: "2026 trouxe uma vaga de sapatilhas de trail com placa de carbono. O mecanismo que invocam está bem documentado na estrada; o seu efeito em terreno técnico ainda não. Eis a diferença." },
     p16: { title: "Correr com frio e à noite: vias respiratórias e visibilidade", excerpt: "O que o inverno põe em jogo, segundo a literatura: as tuas vias respiratórias e, à noite, seres reconhecido por um condutor. O que seis publicações medem — e o que não dizem." },
     p17: { title: "Que aplicação de treino de corrida escolher em 2027? Seis perguntas a fazer", excerpt: "Um comparativo escrito por um dos editores não vale grande coisa. Seis perguntas para qualquer aplicação, a nossa incluída, e as nossas respostas, com os seus limites." },
+    p18: { title: "O sono, a sessão que ninguém planeia", excerpt: "A meta-análise de Lopes (2023) cifra em -0,52 o efeito da falta de sono sobre a resistência, e tanto mais quanto mais longo for o esforço. O que a literatura mede realmente, o que não decide e o que o teu relógio não vê das tuas noites." },
   },
 };
 

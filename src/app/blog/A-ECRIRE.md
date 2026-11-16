@@ -28,7 +28,7 @@ Catégories possibles pour la carte : `AI`, `TRAINING`, `NUTRITION`, `HEALTH`, `
 
 - [x] Courir par forte chaleur : ce que dit la littérature (acclimatation, hydratation, allure) — `HEALTH` (`courir-par-forte-chaleur-acclimatation-hydratation-allure`)
 - [x] Reprendre après une blessure : les principes de progression qui tiennent la route — `HEALTH` (`reprendre-apres-une-blessure-progression`)
-- [ ] Le sommeil, la séance que personne ne planifie : dette de sommeil et performance — `HEALTH`
+- [x] Le sommeil, la séance que personne ne planifie : dette de sommeil et performance — `HEALTH` (`sommeil-et-performance-du-coureur`)
 - [ ] Le seuil lactique expliqué sans jargon : pourquoi le coach le vise autant — `AI`
 - [ ] Marche-course : pourquoi alterner n'est pas « tricher » (reprise, débutants, ultra) — `TRAINING`
 - [ ] Récupération active ou repos complet : ce que montrent les études contrôlées — `TRAINING`

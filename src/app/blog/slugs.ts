@@ -27,4 +27,5 @@ export const SLUGS_BLOG: Record<string, string> = {
   p15: "plaque-carbone-en-trail-ce-qui-manque-encore",
   p16: "courir-dans-le-froid-et-la-nuit",
   p17: "quelle-application-coaching-running-2027-six-questions",
+  p18: "sommeil-et-performance-du-coureur",
 };

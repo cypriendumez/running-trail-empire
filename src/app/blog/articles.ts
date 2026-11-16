@@ -1379,6 +1379,105 @@ export const ARTICLES: Article[] = [
       },
     ],
   },
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    slug: "sommeil-et-performance-du-coureur",
+    cle: "p18",
+    maj: "16 novembre 2026",
+    chapo:
+      "C'est la seule séance de la semaine que personne n'écrit sur son calendrier, et la littérature la chiffre plutôt bien quand on manque de sommeil. Elle est en revanche beaucoup plus pauvre qu'on ne le croit sur ce qui t'intéresse vraiment : dormir plus, et ce que ta montre en sait.",
+    avertissement:
+      "Cet article parle d'entraînement, pas de médecine. Une somnolence qui persiste malgré des nuits longues, des ronflements avec pauses respiratoires, une insomnie installée ou une fatigue qui ne cède pas au repos sont des motifs de consultation : ils relèvent d'un médecin, pas d'un tableau de bord ni d'un article de blog.",
+    blocs: [
+      {
+        h: "Ce qu'une nuit perdue coûte, et pourquoi l'effort long paie le plus",
+        p: [
+          "La méta-analyse de Lopes et ses collègues (2023) rassemble 31 études et 478 participants, et produit 38 tailles d'effet sur la seule endurance. Son verdict : un effet négatif modéré, différence moyenne standardisée de -0,52 (IC 95 % : -0,67 à -0,38). Net, mais pas l'effondrement qu'on imagine.",
+          "Un seul facteur s'y révèle significatif : les exercices de plus de 30 minutes sont davantage dégradés que les plus courts (p = 0,035). Le niveau d'entraînement ne change rien, et une nuit blanche ou plusieurs nuits amputées comptent pareil.",
+          "La revue de Fullagar et ses collègues (2015) nuance : certains efforts maximaux et performances motrices grossières peuvent être MAINTENUS malgré le manque de sommeil, quand le cognitif devient plus lent et moins précis. Elle qualifie d'ailleurs ces résultats de contradictoires. Le seul repère chiffré reste celui de Lopes : plus l'effort dure, plus il est dégradé.",
+        ],
+      },
+      {
+        h: "Ce que la littérature ne tranche PAS — et c'est ton cas",
+        p: [
+          "Le scénario étudié n'est pas le tien. Le consensus d'experts de Walsh et ses collègues (2020), dans le British Journal of Sports Medicine, pose que la performance est réduite par une nuit ou plus SANS sommeil, mais que l'influence d'une restriction PARTIELLE sur une à trois nuits — « un scénario plus proche du monde réel » — reste incertaine.",
+          "Lopes ajoute que l'effet chez les athlètes très entraînés et professionnels est inconnu, et rappelle la qualité de ce qu'il agrège : risque de biais faible pour 8 % des études seulement, incertain pour 74 %, élevé pour 18 %. Walsh dresse la même liste pour cette littérature : contrôle expérimental insuffisant, manque de femmes, doutes sur la validité des outils d'évaluation.",
+        ],
+      },
+      {
+        h: "Dormir plus : la piste la plus vantée, la moins étayée",
+        p: [
+          "La revue systématique de Silva et ses collègues (2021) a cherché ce qu'on sait de l'allongement du sommeil : sur 74 articles, 5 étaient éligibles, DEUX ont été inclus.",
+          "Elles allongeaient le temps au lit ou de sommeil total de 26 à 106 minutes. Sur quinze mesures, six montrent une taille d'effet grande ; les autres vont de triviale à moyenne. La qualité de la preuve va de très faible à modérée sur dix résultats.",
+          "Les auteurs concluent que l'allongement PEUT être bénéfique et qualifient eux-mêmes cette conclusion de provisoire ; Walsh le classe parmi les sujets à rechercher.",
+        ],
+      },
+      {
+        h: "La sieste : le chiffre le plus franc, et ses réserves",
+        p: [
+          "La méta-analyse de Zheng et ses collègues (2026) rassemble 12 essais randomisés et 179 athlètes, et mesure l'effet d'une sieste entre 13 h et 15 h 30, après une nuit supposée normale.",
+          "L'effet sur l'endurance y est grand : 0,96 (IC 95 % : 0,62 à 1,29 ; p < 0,001). L'agilité progresse modérément : 0,55 (0,01 à 1,09 ; p = 0,048). La puissance et la force donnent 0,50, intervalle traversant zéro (-0,09 à 1,09) : effet non démontré. Au-delà de 60 minutes de sieste, l'endurance passe de 0,96 à 1,38.",
+          "La réserve est dans le titre : ces athlètes pratiquent des sports collectifs de ballon. Le transfert à un coureur est plausible, pas mesuré.",
+        ],
+      },
+      {
+        h: "Ce que ta montre sait de tes nuits, et ce qu'elle rate",
+        p: [
+          "L'étude de Chinoy et ses collègues (2021) a comparé sept appareils grand public à la polysomnographie, référence en laboratoire : 34 adultes jeunes et sains (22 femmes), trois nuits consécutives dont une volontairement perturbée.",
+          "Pour détecter que tu dors, ils sont excellents : la sensibilité époque par époque est d'au moins 0,93 pour tous. Pour détecter que tu es ÉVEILLÉ, la spécificité tombe entre 0,18 et 0,54 — une montre compte volontiers comme du sommeil des moments où tu ne dors pas.",
+          "Les montres Garmin testées s'en sortaient moins bien que l'actimétrie classique, là où la plupart des autres faisaient aussi bien ou mieux ; l'évaluation des STADES est jugée inconstante ; et les appareils tendent à se dégrader les nuits perturbées, celles qui t'intéressent. Ce que l'étude valide, c'est la détection du sommeil, pas le détail des stades. Notre lecture, et non la sienne : une durée affichée vaut comme ordre de grandeur et comme tendance, et, vu la spécificité, plutôt surestimée.",
+        ],
+      },
+      {
+        h: "Il n'existe pas de norme de huit heures",
+        p: [
+          "Walsh et ses collègues sont explicites : une recommandation uniforme — 7 à 9 heures par nuit — n'est probablement pas idéale pour la santé et la performance. Ils préconisent une approche individualisée, tenant compte du besoin de sommeil PERÇU par l'athlète.",
+          "Ils posent un repère de santé : dans la population générale, dormir habituellement moins de 7 h par nuit augmente la susceptibilité aux infections respiratoires. Fullagar avance, lui, qu'une baisse de la qualité et de la quantité de sommeil POURRAIT entraîner un déséquilibre du système nerveux autonome simulant les symptômes du surentraînement. Walsh range enfin les facteurs de risque en deux familles : liés au sport (entraînement, voyages, compétition) et non liés au sport — genre féminin, stress, anxiété.",
+        ],
+      },
+      {
+        h: "Ce que Pacevo fait de tes nuits",
+        p: [
+          "L'application lit ce que ta montre remonte via intervals.icu — durée, score de la nuit, fréquence respiratoire — et en tire deux signaux, pas un.",
+          "Le premier est la nuit dernière : un score sous 60 sur 100, OU moins de 6 heures de sommeil, vaut une « nuit dégradée » — si la mesure a au plus deux jours. Le second est la dette, sur les trois nuits précédentes : chaque nuit est comparée à TA durée habituelle — la médiane de tes nuits mesurées, si tu en as au moins sept — et le signal ne s'allume qu'à 2 h 30 de retard cumulé. Aucune norme de huit heures codée en dur : qui vit à 6 h 30 serait sinon en dette tous les jours, et un signal permanent ne signale plus rien.",
+          "Sur le plan, une nuit dégradée retire une marche au budget de séances dures de la semaine, motif écrit en clair. Un seul signal laisse la séance en place ; deux la font alléger — environ un tiers du corps de séance en moins, ou un footing. Côté sommeil, deux combinaisons font passer le feu au rouge, sans intensité du jour : nuit dégradée ET variabilité cardiaque en baisse, ou chute aiguë de variabilité confirmée par la nuit ou la dette.",
+          "Deux silences sont volontaires. Montre non portée : la donnée est absente, pas mauvaise, rien ne s'allume. Et les phases ne te sont pas resservies : l'API d'intervals.icu ne les fournit pas, et la colonne est écrite vide plutôt qu'à zéro, pour ne pas fabriquer un « 0 % de sommeil profond ». Au vu de ce que Chinoy mesure sur les stades, on n'y perd pas grand-chose.",
+        ],
+      },
+    ],
+    sources: [
+      {
+        label:
+          "Lopes TR et al. How much does sleep deprivation impair endurance performance? A systematic review and meta-analysis. Eur J Sport Sci, 2023",
+        url: "https://pubmed.ncbi.nlm.nih.gov/36472094/",
+      },
+      {
+        label:
+          "Walsh NP et al. Sleep and the athlete: narrative review and 2021 expert consensus recommendations. Br J Sports Med, 2020",
+        url: "https://pubmed.ncbi.nlm.nih.gov/33144349/",
+      },
+      {
+        label:
+          "Silva AC et al. Sleep extension in athletes: what we know so far - A systematic review. Sleep Med, 2021",
+        url: "https://pubmed.ncbi.nlm.nih.gov/33352457/",
+      },
+      {
+        label:
+          "Chinoy ED et al. Performance of seven consumer sleep-tracking devices compared with polysomnography. Sleep, 2021",
+        url: "https://pubmed.ncbi.nlm.nih.gov/33378539/",
+      },
+      {
+        label:
+          "Zheng J et al. The effect of daytime napping on the athletic performance of team ball sports athletes: systematic review and meta-analysis. Front Physiol, 2026",
+        url: "https://pubmed.ncbi.nlm.nih.gov/42558951/",
+      },
+      {
+        label:
+          "Fullagar HH et al. Sleep and athletic performance: the effects of sleep loss on exercise performance, and physiological and cognitive responses to exercise. Sports Med, 2015",
+        url: "https://pubmed.ncbi.nlm.nih.gov/25315456/",
+      },
+    ],
+  },
 ];
 
 /** Clé d'article → slug, pour que l'index sache quelles cartes sont cliquables. */
