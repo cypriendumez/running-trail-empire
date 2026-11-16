@@ -12,6 +12,7 @@ import { lireEdition } from "@/lib/newsletter/edition";
 import { aujourdhui } from "@/lib/time/fuseau";
 import { EDITEUR } from "@/lib/brand/editeur";
 import { envoyerEmail } from "@/lib/email/envoyer";
+import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 
 /**
  * LE RÉSUMÉ DU LUNDI MATIN.
@@ -79,14 +80,22 @@ export async function GET(req: Request) {
   // Une édition absente ou refusée ne bloque rien : la lettre part avec son propre ordre,
   // et la réponse (journal de l'action GitHub) dit pourquoi.
   const lecture = await lireEdition(aujourdhui("Europe/Paris"));
-  const { parRubrique, une, sujetsUne, dejaALaUne, texteUne, mediasUne, recents, echecSemaine } =
+  const { parRubrique, une, sujetsUne, dejaALaUne, texteUne, mediasUne, recents, echecSemaine, pannes } =
     await preparerSelection({ base: BASE, edition: lecture.edition });
+  // ⚠️ Une collecte en échec ne coûte que sa rubrique (elle retombe sur le fil), mais elle ne
+  // se voyait NULLE PART : la rubrique sortait vide ou appauvrie, comme une semaine calme.
+  // Elle va dans `error_logs` (/admin › Bugs, une ligne par jour même si l'action est relancée)
+  // et dans chaque réponse de cette route.
+  if (pannes.length && !apercu) {
+    await journaliserEchecUneFois(null, { source: "lettre-collecte", url: "/api/newsletter/weekly", message: `Collecte de la lettre incomplète : ${pannes.join(" ; ")}` });
+  }
 
 
   if (recents.length < MINIMUM_ARTICLES) {
     return NextResponse.json({
       ok: true, envoye: 0,
       raison: `seulement ${recents.length} article(s) de la semaine — on n'envoie pas un e-mail creux`,
+      pannes,
     });
   }
 
@@ -255,6 +264,7 @@ export async function GET(req: Request) {
         edition: lecture.edition ? { pour: lecture.edition.pour, appliquee: true } : { appliquee: false, raison: lecture.raison },
         rubriques: plan.map((p) => ({ cle: p.cle, articles: p.liens.length })),
         resumes: articles.filter((x) => x.resume).length, articles: articles.length, diagnostic, lisibles,
+        pannes,
       });
     }
     {
@@ -287,6 +297,8 @@ export async function GET(req: Request) {
       : { repli: "fil le plus récent", articlesDeLaSemaine: recents.length, erreur: echecSemaine },
     // L'édition de @Gazette : appliquée, ou pourquoi pas (absente, d'une autre semaine…).
     edition: lecture.edition ? { pour: lecture.edition.pour, appliquee: true } : { appliquee: false, raison: lecture.raison },
+    // Les collectes en échec (vide = aucune) : une rubrique maigre n'est plus un mystère.
+    pannes,
     resumes: base.filter((a) => a.resume).length,
     // ⚠️ Sans ce champ, « resumes: 0 » ne dit pas s'il faut s'inquiéter. C'est ce
     // silence qui a laissé passer un budget de sortie trop bas pendant deux essais.

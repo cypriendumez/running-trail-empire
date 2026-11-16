@@ -21,6 +21,20 @@ figure pas. Ne cherche pas d'article ailleurs, n'invente aucun lien.
 Si l'appel échoue ou rend une erreur : `État : BLOQUÉ — Cause exacte : …`, rien n'est publié, la lettre
 partira avec son ordre automatique. C'est un repli sûr, pas une panne.
 
+**Contrôle de fraîcheur, avant de choisir.** Lis `genere` (date de la collecte, en UTC) et compare-le à
+`date -u`. Plus de 2 heures d'écart : rappelle la route une fois, 90 secondes plus tard. Toujours plus de
+2 heures : `État : BLOQUÉ — Cause exacte : candidats périmés (genere = …)`, aucune édition. Le 15/11/2026,
+la route a servi la collecte du 09/11 et l'édition choisie dessus a dû être jetée. La route est corrigée
+depuis (une collecte par tranche de 30 minutes), ce contrôle reste : il ne coûte qu'une ligne.
+
+**Pannes de collecte.** `pannes` liste les collectes qui ont échoué (« fil « trail » : sources injoignables »).
+Une panne, c'est une erreur du fil ou une collecte dont aucun flux n'a répondu, jamais une simple liste vide.
+Vide : rien à signaler, et une rubrique sans candidat est alors une semaine calme. Non vide : la rubrique
+concernée peut être vide ou appauvrie. Ne la comble avec
+aucun article venu d'ailleurs, laisse-la à l'ordre automatique (la lettre refait sa propre collecte le
+lundi), et recopie la liste dans la PR sous « Pannes de collecte ». Si la une elle-même est touchée
+(« collecte de la semaine »), c'est `État : BLOQUÉ — Cause exacte : collecte de la semaine en panne`.
+
 ## 2. Le lecteur
 
 Un utilisateur de Pacevo : il court de 3 à 6 fois par semaine, prépare un 10 km, un semi, un marathon

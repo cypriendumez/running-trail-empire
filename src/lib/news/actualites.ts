@@ -119,10 +119,26 @@ const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,
  * à temps sont servis, les autres le seront au prochain rafraîchissement du cache.
  */
 export async function collecterActualites(cat: Cat): Promise<Item[]> {
-  const merged = await fusionner([QUERIES[cat]], FEEDS.filter((f) => f.cats.includes(cat)), DELAI_TOTAL_MS);
-  const filtre = FILTRES[cat];
-  return (filtre ? merged.filter((it) => filtre.test(it.title)) : merged).slice(0, 48);
+  return (await collecterActualitesDetail(cat)).items;
 }
+
+/**
+ * La même collecte, avec le nombre de flux qui ont RÉPONDU à temps.
+ *
+ * ⚠️ POURQUOI (16/11/2026, double relecture). « Aucun article » a deux causes que rien ne
+ * distinguait : aucun flux n'a répondu (une PANNE), ou les flux ont répondu et le filtre
+ * de la rubrique n'a rien gardé (une semaine CALME). Signaler une panne sur une liste vide
+ * criait au loup les semaines calmes ; ne rien signaler laissait une vraie panne muette.
+ * `repondus` tranche : 0 = panne, sinon la liste dit vrai, même vide.
+ */
+export async function collecterActualitesDetail(cat: Cat): Promise<{ items: Item[]; repondus: number }> {
+  const { items: merged, repondus } = await fusionnerCompte([QUERIES[cat]], FEEDS.filter((f) => f.cats.includes(cat)), DELAI_TOTAL_MS);
+  const filtre = FILTRES[cat];
+  return { items: (filtre ? merged.filter((it) => filtre.test(it.title)) : merged).slice(0, 48), repondus };
+}
+
+/** Le message d'une collecte dont AUCUN flux n'a répondu : une panne, pas une semaine calme. */
+export const AUCUN_FLUX = "aucun flux n'a répondu";
 
 const urlGoogleNews = (q: string) => `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=fr&gl=FR&ceid=FR:fr`;
 
@@ -152,7 +168,9 @@ export const REQUETES_SEMAINE = [
 export async function collecterSemaine(maintenant = Date.now()): Promise<Item[]> {
   const depuis = maintenant - 7 * 24 * 3600 * 1000;
   // Une fois par semaine, on peut attendre les flux plus longtemps que pour le fil.
-  const tout = await fusionner(REQUETES_SEMAINE, FEEDS.filter((f) => f.cats.includes("all")), DELAI_FLUX_MS + 2000);
+  const { items: tout, repondus } = await fusionnerCompte(REQUETES_SEMAINE, FEEDS.filter((f) => f.cats.includes("all")), DELAI_FLUX_MS + 2000);
+  // Aucun flux n'a répondu : c'est une panne, et elle LÈVE, pour que l'appelant la dise.
+  if (!repondus) throw new Error(AUCUN_FLUX);
   return tout.filter((it) => {
     const t = new Date(it.date).getTime();
     return Number.isFinite(t) && t >= depuis;
@@ -208,7 +226,10 @@ export const lienGoogleNews = (lien: string) => /^https?:\/\/news\.google\.com\/
 async function collecterRubriqueSemaine(requetes: string[], cat: Cat | null, maintenant: number): Promise<Item[]> {
   const depuis = maintenant - 7 * 24 * 3600 * 1000;
   const feeds = cat ? FEEDS.filter((f) => f.cats.includes(cat)) : [];
-  const tout = await fusionner(requetes, feeds, DELAI_FLUX_MS + 2000);
+  const { items: tout, repondus } = await fusionnerCompte(requetes, feeds, DELAI_FLUX_MS + 2000);
+  // Même règle que la semaine : aucun flux n'a répondu = une panne qui lève. Des flux qui
+  // répondent sans article de la semaine rendent une liste vide, et ce n'est pas une panne.
+  if (!repondus) throw new Error(AUCUN_FLUX);
   return tout.filter((it) => {
     const t = new Date(it.date).getTime();
     return Number.isFinite(t) && t >= depuis;
@@ -246,7 +267,7 @@ export function fusionnerListes(arrives: Item[][]): Item[] {
 }
 
 /** Interroge Google Actualités et les flux, fusionne, dédoublonne, trie du plus récent au plus ancien. */
-async function fusionner(requetes: string[], feeds: Feed[], delaiTotal: number): Promise<Item[]> {
+async function fusionnerCompte(requetes: string[], feeds: Feed[], delaiTotal: number): Promise<{ items: Item[]; repondus: number }> {
   const arrives: Item[][] = [];
   // Google News + flux spécialisés pertinents, en parallèle (tolérant aux pannes).
   const jobs: Promise<void>[] = [
@@ -255,7 +276,9 @@ async function fusionner(requetes: string[], feeds: Feed[], delaiTotal: number):
   ].map((p) => p.then((items) => { arrives.push(items); }, () => undefined));
   await Promise.race([Promise.all(jobs), new Promise((r) => setTimeout(r, delaiTotal))]);
 
-  return fusionnerListes(arrives);
+  // `repondus` : les flux arrivés à temps, qu'ils portent des articles ou non. Un flux en
+  // erreur ou trop lent n'y est pas. Zéro = personne n'a répondu.
+  return { items: fusionnerListes(arrives), repondus: arrives.length };
 }
 
 /**
@@ -268,6 +291,42 @@ export const actualitesEnCache = unstable_cache(async (cat: Cat) => {
   if (!items.length) throw new Error("aucun flux n'a répondu");
   return items;
 }, ["actualites-v1"], { revalidate: 1800 });
+
+/** Durée de garde d'une collecte : trente minutes. */
+export const GARDE_COLLECTE_MS = 30 * 60 * 1000;
+
+/**
+ * LE NUMÉRO DE LA TRANCHE DE TRENTE MINUTES où tombe un instant.
+ *
+ * ⚠️ POURQUOI (16/11/2026). `unstable_cache` ne JETTE PAS une valeur périmée : passé son
+ * délai, il la sert encore au premier appel et ne relance la collecte qu'en arrière-plan.
+ * Pour le fil du site, visité souvent, c'est le but (une page instantanée). Pour ce qui
+ * n'est lu qu'UNE FOIS PAR SEMAINE, c'est un piège : le dimanche 15/11/2026, @Gazette a
+ * reçu de `/api/newsletter/candidats` la collecte du 09/11 (`genere` vieux de six jours),
+ * a choisi son édition dessus, et @Maestro a bloqué la PR. Constaté en ligne le 16/11 : un
+ * appel non servi par le CDN rendait une collecte de 12 heures pour un délai de 30 minutes.
+ * Passer ce numéro en ARGUMENT d'une fonction mise en cache en fait une partie de sa clé :
+ * une tranche neuve n'a encore aucune valeur, donc la collecte se fait AVANT de répondre.
+ */
+export const trancheDe = (maintenant: number, duree = GARDE_COLLECTE_MS): number => Math.floor(maintenant / duree);
+
+/** La collecte d'une rubrique, gardée pour SA tranche de trente minutes seulement. */
+const actualitesParTranche = unstable_cache(async (cat: Cat, _tranche: number) => {
+  const { items, repondus } = await collecterActualitesDetail(cat);
+  // ⚠️ La panne, c'est « aucun flux n'a répondu », PAS « aucun article » : des flux qui
+  // répondent quand le filtre de la rubrique ne garde rien, c'est une semaine calme, et la
+  // lettre ne doit pas la lire comme « sources injoignables ».
+  if (!repondus) throw new Error(AUCUN_FLUX);
+  return items;
+}, ["actualites-tranche-v2"], { revalidate: 1800 });
+
+/**
+ * Le fil d'une rubrique, JAMAIS plus vieux que sa tranche de trente minutes : pour la lettre
+ * du lundi et les candidats de @Gazette, qui ne passent qu'une fois par semaine. Le fil du
+ * site garde `actualitesEnCache` (instantané, rafraîchi en arrière-plan).
+ */
+export const actualitesDeLaTranche = (cat: Cat, maintenant = Date.now()): Promise<Item[]> =>
+  actualitesParTranche(cat, trancheDe(maintenant));
 
 /** Ce que voit le fil : sans le texte intégral (2 600 caractères par article, pour la lettre seulement). */
 export const sansTexte = (items: Item[]) => items.map(({ texte: _t, ...r }) => r);

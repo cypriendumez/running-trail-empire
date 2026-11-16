@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { QUERIES, estCat, type Cat } from "@/lib/news/rubriques";
-import { actualitesEnCache, sansTexte } from "@/lib/news/actualites";
+import { actualitesEnCache, actualitesDeLaTranche, sansTexte } from "@/lib/news/actualites";
 
 export const runtime = "nodejs";
 
@@ -20,8 +20,16 @@ export async function GET(req: Request) {
   // Le texte intégral du flux n'intéresse que la lettre du lundi, qui doit le résumer.
   const avecTexte = new URL(req.url).searchParams.get("avecTexte") === "1";
   try {
-    const items = await actualitesEnCache(cat);
-    return NextResponse.json({ items: avecTexte ? items : sansTexte(items), cat }, {
+    // ⚠️ La lettre (`avecTexte=1`) ne passe qu'une fois par semaine : le fil « instantané,
+    // rafraîchi en arrière-plan » lui servait la collecte du passage PRÉCÉDENT, ici comme
+    // sur le CDN (voir `trancheDe`). Elle lit donc une collecte de sa tranche de trente
+    // minutes, et sa réponse n'est jamais resservie périmée.
+    if (avecTexte) {
+      return NextResponse.json({ items: await actualitesDeLaTranche(cat), cat }, {
+        headers: { "Cache-Control": "public, max-age=300, s-maxage=900" },
+      });
+    }
+    return NextResponse.json({ items: sansTexte(await actualitesEnCache(cat)), cat }, {
       // Le même fil pour tous : le CDN le garde 15 min et le ressert pendant qu'il se
       // rafraîchit. Changer de rubrique devient instantané après la première visite.
       headers: { "Cache-Control": "public, max-age=300, s-maxage=900, stale-while-revalidate=86400" },
