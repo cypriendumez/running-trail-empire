@@ -872,12 +872,144 @@ async function profilElite10() {
   });
 }
 
+// ── PROFIL 7 — EMPLOI DU TEMPS CHAOTIQUE — ajouté le 16/11/2026 ─────────────────────────────────────
+// Ce qu'un plan sensé fait : il suit les jours déclarés CETTE semaine-ci, une séance manquée ne se
+// « rattrape » pas en doublant, un jour raté à l'occasion n'est pas retiré du plan. Absurde : deux
+// qualités juste après deux qualités manquées, une sortie un jour que le coureur vient de retirer.
+// Ce que le coach lit vraiment pour ce profil (vérifié dans le code le 16/11/2026) : les jours déclarés
+// (`available_days`, `days_per_week`), les prescriptions passées (`notifications` de type `coach_session`,
+// d'où `qualiteRecente` et `skippedWeekdays`) et les séances courues (`workouts`). L'irrégularité passée,
+// elle, ne se lit qu'à travers ces deux mécanismes : aucun champ « chaotique » n'existe.
+// Preuves par mutation (16/11/2026, code de sortie 1 à chaque fois, vert une fois le code remis) :
+// test 1 ← `qualiteRecente` qui ne rend plus les manquées dans `jours`, ou `fenetreRespectee` sans
+// `qualitePassee` (autoPlan) ; test 2 ← km manqués ajoutés à `targetKm`, ou `plafondArretKm` qui rend
+// toujours Infinity ; test 3 ← `available_days` ignoré (coachContext) ; test 4 ← seuil `s.d === 0`
+// passé à `s.d <= 1`, à `s.p >= 99` ou à `s.p >= 1`, ou jour raté non mis au repos (autoPlan, étape 1).
+const CHAOS = { id: "u", preferred_language: "fr", full_name: "Test", age: 36, gender: "female", weight_kg: 58, max_hr: 188,
+  days_per_week: 5, available_days: [0, 1, 2, 3, 4, 5, 6], health_conditions: [], injury_zones: [], health_declared: true };
+/** Les jours courus changent d'une semaine à l'autre (0 = dimanche) : 3 ou 4 sorties de 9 km, jamais deux semaines pareilles de suite. */
+const SEMAINES_CHAOS = [[1, 3, 6], [2, 4, 0], [1, 5, 6, 0], [3, 4, 0]];
+const jourSem = (j: string) => new Date(`${j}T12:00:00Z`).getUTCDay();
+/** Dix semaines de footings faciles (aucune séance dure courue) ; rien les `trou` derniers jours ; `sauf` : jours jamais courus. */
+function historiqueChaos(jour: string, trou = 0, sauf: number[] = []) {
+  const out: Ligne[] = [];
+  for (let n = trou + 1; n <= 70; n++) {
+    const d = plusJours(jour, -n);
+    if (!SEMAINES_CHAOS[Math.floor(n / 7) % 4].includes(jourSem(d)) || sauf.includes(jourSem(d))) continue;
+    out.push({ user_id: "u", date: d, type: "easy", sport: "run", distance_km: 9, duration_seconds: 9 * 330,
+      elevation_gain_m: 30, avg_hr: 140, max_hr: 155, tss: 45 });
+  }
+  return out;
+}
+/** Une prescription du coach il y a `n` jours, stockée comme l'écrit le plan automatique. */
+const prescrit = (jour: string, n: number, sessionType: string, tags: string[] = ["Qualité"]) =>
+  ({ user_id: "u", type: "coach_session", created_at: plusJours(jour, -n - 1), data: { date: plusJours(jour, -n), sessionType, tags } });
+const tablesChaos = (jour: string, o: { profil?: Ligne; workouts?: Ligne[]; prescriptions?: Ligne[] } = {}) => ({
+  profiles: [o.profil ?? CHAOS],
+  performance_baselines: [{ user_id: "u", vma_kmh: 15, max_hr: 188, tested_at: plusJours(jour, -30) }],
+  workouts: o.workouts ?? historiqueChaos(jour),
+  notifications: [{ user_id: "u", type: "race_objective", data: { race: "10 km test", raceDate: plusJours(jour, 60), distanceKm: 10, targetTime: "45'00", targetSeconds: 2700, targetPace: "4'30/km" } },
+    ...(o.prescriptions ?? [])],
+});
+const COURSE_A_PIED = /R[ée]cup|Endurance|Sortie longue|VMA|Seuil|Sp[ée]cifique|Allure|C[oô]te|Course|Footing|Marche/i;
+async function profilChaotique() {
+  console.log("\nPROFIL 7 — EMPLOI DU TEMPS CHAOTIQUE (VMA 15, ~30 km/sem, jours qui changent, séances manquées)");
+  const AUJ = aujourdhui(FUSEAU_DEFAUT);
+  const HORLOGES = DEPARTS.map((k) => plusJours(AUJ, k));
+  await testA("deux qualités manquées ne se rattrapent pas : elles comptent dans les sept jours glissants", async () => {
+    // Un seuil manqué avant-hier, une VMA il y a 5 jours (variante : un trou de 5 jours sans courir).
+    // Précondition : sur au moins un départ, le plan SANS ces prescriptions pose une qualité que le
+    // plan AVEC elles doit retirer — sinon le test passerait sur un plan qui n'en pose jamais.
+    let retiree = 0, vus = 0;
+    for (const jour of HORLOGES) for (const trou of [0, 5]) {
+      const workouts = historiqueChaos(jour, trou);
+      const sans = await contexte(jour, tablesChaos(jour, { workouts }));
+      const avec = await contexte(jour, tablesChaos(jour, { workouts, prescriptions: [prescrit(jour, 2, "Seuil"), prescrit(jour, 5, "VMA")] }));
+      const ctxt = `${jour}${trou ? `, ${trou} j sans courir` : ""}`;
+      assert.deepEqual(avec.ctx.qualiteRecente?.manquees, [plusJours(jour, -5), plusJours(jour, -2)], `${ctxt} : précondition, les deux qualités manquées ne sont pas reconnues`);
+      const durs = (plan: PlanDay[]) => [...new Set(plan.filter((d) => DURS.test(d.type)).map((d) => d.date))].sort();
+      const dAvec = durs(avec.plan), dSans = durs(sans.plan);
+      assert.ok(dAvec.length <= dSans.length, `${ctxt} : ${dAvec.length} qualités après deux manquées (${dAvec.join(", ")}), ${dSans.length} sans (${dSans.join(", ")})`);
+      if (dAvec.length < dSans.length) retiree++;
+      // Sur N'IMPORTE QUELS sept jours consécutifs, manquées + posées ≤ budget de la semaine.
+      const tous = [...(avec.ctx.qualiteRecente?.jours ?? []), ...dAvec].sort();
+      for (const debut of tous) {
+        const dedans = tous.filter((d) => d >= debut && d <= plusJours(debut, 6));
+        assert.ok(dedans.length <= avec.ctx.weekPlan.qBudget, `${ctxt} : ${dedans.length} qualités du ${debut} au ${plusJours(debut, 6)} (${dedans.join(", ")}) pour un budget de ${avec.ctx.weekPlan.qBudget}`);
+      }
+      // Ni rattrapage le lendemain du trou : rien de dur aujourd'hui ni demain.
+      const tot = dAvec.filter((d) => d <= plusJours(jour, 1));
+      assert.equal(tot.length, 0, `${ctxt} : qualité le ${tot.join(", ")}, juste après deux qualités manquées`);
+      vus++;
+    }
+    assert.equal(vus, 20, "précondition : tous les départs n'ont pas tourné");
+    assert.ok(retiree >= 1, "précondition : les qualités manquées ne retirent rien sur aucun départ, le rattrapage n'est pas éprouvé");
+  });
+  await testA("après 6 jours ou plus sans courir, le volume manqué ne s'ajoute pas à la semaine suivante", async () => {
+    let qualiteDesLaReprise = 0; const sortiesLongues: number[] = [];
+    // ⚠️ CE TEST NE FIGE PAS LA RÈGLE DE DANIELS (50 % puis 75 %, `plan-reprise.test.ts`) : sans elle, le
+    // plafond « 1,4 × la semaine écoulée » tient encore la cible. Il fige l'absence de RATTRAPAGE.
+    // ⚠️ NON COUVERT (16/11/2026, décision de Cyprien) : après le trou, le plan pose UNE séance dure, au seuil
+    // dès le premier jour sur 8 départs sur 10. Pas d'assertion ici tant que la règle n'est pas tranchée.
+    // Rien les 5 derniers jours : avec ses jours irréguliers, sa dernière sortie remonte à 6 jours ou plus.
+    for (const jour of HORLOGES) {
+      const derniere = historiqueChaos(jour, 5).map((w) => String(w.date)).sort().at(-1)!;
+      assert.ok(derniere <= plusJours(jour, -6), `${jour} : précondition, dernière sortie le ${derniere}`);
+      const regulier = await contexte(jour, tablesChaos(jour));
+      const trou = await contexte(jour, tablesChaos(jour, { workouts: historiqueChaos(jour, 5) }));
+      assert.ok(regulier.ctx.volume.targetKm > 0, `${jour} : précondition, cible nulle`);
+      assert.ok(trou.ctx.volume.targetKm <= regulier.ctx.volume.targetKm, `${jour} : cible de ${trou.ctx.volume.targetKm} km après un trou, ${regulier.ctx.volume.targetKm} km sans`);
+      if (trou.plan.some((d) => DURS.test(d.type) && d.date <= plusJours(jour, 1))) qualiteDesLaReprise++;
+      sortiesLongues.push(trou.ctx.volume.longRunKm);
+      assert.ok(trou.ctx.volume.longRunKm <= regulier.ctx.volume.longRunKm, `${jour} : sortie longue de ${trou.ctx.volume.longRunKm} km après un trou, ${regulier.ctx.volume.longRunKm} km sans`);
+    }
+    // OBSERVATION, sans assertion (défaut ouvert, décision de Cyprien) : qualité le jour même ou le lendemain.
+    console.log(`      observation : qualité au jour 0 ou 1 de la reprise sur ${qualiteDesLaReprise}/${HORLOGES.length} départs ; sortie longue visée ${[...new Set(sortiesLongues)].join("/")} km`);
+  });
+  await testA("les jours déclarés changent d'une semaine à l'autre : le plan suit ceux de CETTE semaine", async () => {
+    // Semaine A : lundi, mercredi, samedi, dimanche. Semaine B : mardi, jeudi, vendredi. Même historique.
+    let sorties = 0;
+    for (const jour of HORLOGES) for (const jours of [[1, 3, 6, 0], [2, 4, 5]]) {
+      const { plan } = await contexte(jour, tablesChaos(jour, { profil: { ...CHAOS, days_per_week: jours.length, available_days: jours } }));
+      const courues = plan.filter((d) => COURSE_A_PIED.test(d.type));
+      sorties += courues.length;
+      const hors = courues.filter((d) => !jours.includes(jourSem(d.date)));
+      assert.equal(hors.length, 0, `${jour}, jours ${jours.join(",")} : sortie un jour non déclaré (${hors.map((d) => `${d.type} le ${d.date}`).join(", ")})`);
+      assert.ok(new Set(courues.map((d) => d.date)).size <= jours.length, `${jour}, jours ${jours.join(",")} : plus de jours de course que de jours déclarés`);
+    }
+    assert.ok(sorties >= 40, `précondition : ${sorties} sorties seulement sur 20 semaines`);
+  });
+  await testA("un jour raté à chaque fois est laissé libre ; un jour raté de temps en temps reste au plan", async () => {
+    // Quatre mercredis prescrits, jamais courus (le coureur courait autour) ; quatre mardis prescrits,
+    // un seul couru. Le premier est systématique, le second est le chaos ordinaire. Et deux jeudis
+    // prescrits, jamais courus : deux fois ne font pas une habitude (le coach exige trois prescriptions).
+    let mardisPoses = 0;
+    for (const jour of HORLOGES) {
+      const mercredi = [1, 2, 3, 4, 5, 6, 7].find((n) => jourSem(plusJours(jour, -n)) === 3)!;
+      const mardi = [1, 2, 3, 4, 5, 6, 7].find((n) => jourSem(plusJours(jour, -n)) === 2)!;
+      const jeudi = [1, 2, 3, 4, 5, 6, 7].find((n) => jourSem(plusJours(jour, -n)) === 4)!;
+      const prescriptions = [...[0, 7, 14, 21].flatMap((s) => [prescrit(jour, mercredi + s, "Endurance", []), prescrit(jour, mardi + s, "Endurance", [])]),
+        prescrit(jour, jeudi, "Endurance", []), prescrit(jour, jeudi + 7, "Endurance", [])];
+      // Mardis jamais courus sauf celui de la semaine d'avant (dans les 28 jours que lit le coach) ; mercredis et jeudis jamais.
+      const workouts = [...historiqueChaos(jour, 0, [2, 3, 4]),
+        { user_id: "u", date: plusJours(jour, -(mardi + 7)), type: "easy", sport: "run", distance_km: 9, duration_seconds: 9 * 330, elevation_gain_m: 30, avg_hr: 140, max_hr: 155, tss: 45 }];
+      const { ctx, plan } = await contexte(jour, tablesChaos(jour, { workouts, prescriptions }));
+      assert.deepEqual(ctx.skippedWeekdays, [3], `${jour} : jours retirés ${JSON.stringify(ctx.skippedWeekdays)}, attendu le seul mercredi (ni le mardi couru une fois, ni le jeudi prescrit deux fois)`);
+      const mercredis = plan.filter((d) => jourSem(d.date) === 3 && COURSE_A_PIED.test(d.type));
+      assert.equal(mercredis.length, 0, `${jour} : ${mercredis.map((d) => `${d.type} le ${d.date}`).join(", ")} — un mercredi jamais couru`);
+      if (plan.some((d) => jourSem(d.date) === 2 && COURSE_A_PIED.test(d.type))) mardisPoses++;
+    }
+    assert.ok(mardisPoses >= 1, "précondition : aucun mardi n'est jamais posé, le « reste au plan » n'est pas éprouvé");
+  });
+}
+
 (async () => {
   await profilMarathonienSub3();
   await profilDouleur();
   await profilCycliste();
   await profilSenior();
   await profilElite10();
+  await profilChaotique();
   console.log(`\n${passed} test(s) d'archétypes passé(s), ${fails.length} échec(s)`);
   if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
 })().catch((e) => { console.log("  ✗ plantage : " + (e as Error).stack); process.exit(1); });
