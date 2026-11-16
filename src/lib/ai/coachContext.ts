@@ -230,6 +230,9 @@ export type AthleteContext = {
   text: string;
   objective: CoachObjective | null;
   daysToRace: number | null;
+  /** Le jour 0 du coureur, AAAA-MM-JJ (`aujourdhui(FUSEAU_DEFAUT)`) : le plan se construit sur CE jour,
+   *  pas sur l'horloge du serveur (UTC sur Vercel), qui est encore la veille entre minuit et 1 h (16/11/2026). */
+  jour0?: string;
   weeksToRace: number | null;
   athleteName: string;
   vma: number | null; // VMA km/h (test enregistré ou estimée) — pour les cibles d'allure montre.
@@ -617,12 +620,27 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const coachSessions = ((csRes.data ?? []) as { data: Prescription & { date?: string; sessionType?: string } }[]).map(r => r.data).filter((d): d is Prescription & { date?: string; sessionType?: string } => !!d?.date);
 
   const now = Date.now();
+  // Le jour du COUREUR (son fuseau), pas celui du serveur (UTC sur Vercel) : c'est le jour 0 du
+  // plan (`jour0`). Les comptes de jours et de semaines qui décident du plan se font depuis lui :
+  // J- de la course, semaine du bloc, âge de la dernière séance dure, fraîcheur de la dernière nuit,
+  // prescriptions des 14 et 28 derniers jours. Comptés à l'heure du serveur, ils contredisaient le
+  // plan entre minuit et 1 h (2 h l'été) à Paris (16/11/2026). En journée, rien ne change.
+  // ⚠️ PAS ENCORE les fenêtres de MESURE en millisecondes, défaut antérieur à traiter à part :
+  //   - à minuit UTC : km des 7 à 42 jours, charge CTL/ATL, monotonie, `runsPerWeekNow`. La nuit, le
+  //     volume visé peut différer, et le ratio aigu:chronique changer le niveau de forme ;
+  //   - à midi UTC (ancrées sur `T12:00:00Z`) : `dansLesJours`, `seancesRecentes`, `qeAgeDays`. Elles
+  //     changent entre 9 h et 14 h, pas la nuit.
+  const todayStr = aujourdhui(FUSEAU_DEFAUT);
   /** Borne basse de l'historique long — la MÊME que celle des requêtes ci-dessus. */
   const iso190 = () => new Date(now - 190 * 86400000).toISOString().slice(0, 10);
-  // Semaine ISO : ancre STABLE d'un jour à l'autre. Sert à faire varier le stimulus des
-  // séances de qualité d'une semaine sur l'autre ET à placer la semaine allégée (1 sur 4).
+  // Semaine ISO du jour du coureur : ancre STABLE d'un jour à l'autre. Sert à faire varier le
+  // stimulus des séances de qualité d'une semaine sur l'autre ET à placer la semaine allégée (1 sur 4).
+  // ⚠️ Prise à l'heure du serveur, la nuit du dimanche au lundi, elle restait celle de la semaine
+  // d'avant alors que le plan part du lundi : la semaine allégée sautait (volume visé +37 %), et le
+  // renfo (`blockWeekRenfo`, calculé sur le début du plan) n'était plus dans la même semaine du bloc.
   const isoWeek = (() => {
-    const d = new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
+    const [an, mois, jour] = todayStr.split("-").map(Number);
+    const d = new Date(Date.UTC(an, mois - 1, jour));
     const dayNum = d.getUTCDay() || 7;
     d.setUTCDate(d.getUTCDate() + 4 - dayNum);
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -793,8 +811,12 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // renseignent pas ce champ.)
   const scoresSommeil = sleep.filter(d => dansLesJours(d.date, 7)).map(d => d.sleep_score).filter((v): v is number => v != null);
   const sleepAvg = scoresSommeil.length ? Math.round(scoresSommeil.reduce((a, b) => a + b, 0) / scoresSommeil.length) : null;
-  // Sommeil de cette nuit pris en compte SEULEMENT s'il est récent (montre portée).
-  const freshSleep = sleep[0]?.date && now - new Date(sleep[0].date + "T00:00:00").getTime() <= 2 * 86400000 ? sleep[0] : null;
+  // Sommeil de cette nuit pris en compte SEULEMENT s'il est récent (montre portée) : la nuit datée
+  // d'aujourd'hui ou d'hier, EN JOURS DU COUREUR. C'est exactement ce que l'ancien calcul (`now` à
+  // moins de 48 h de minuit UTC) retenait en journée ; la nuit, il retenait aussi celle d'avant-hier,
+  // et une vieille mauvaise nuit abaissait le niveau de forme du jour 0 (relecture du 16/11/2026).
+  // Date illisible : pas de nuit retenue, comme avant.
+  const freshSleep = sleep[0]?.date && (ecartJours(todayStr, String(sleep[0].date)) ?? Infinity) <= 1 ? sleep[0] : null;
   const lastSleepMin = freshSleep?.total_sleep_min ?? null;
 
   // Douleurs = formulaire post-séance ET espace Santé. Une déclaration se périme au
@@ -997,7 +1019,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   let daysToRace: number | null = null, weeksToRace: number | null = null;
   const objLines: string[] = [];
   if (objective?.raceDate) {
-    daysToRace = Math.ceil((new Date(objective.raceDate + "T00:00:00").getTime() - now) / 86400000);
+    // Compté depuis le jour du coureur (`todayStr`, 16/11/2026) : l'horloge du serveur (UTC) affichait
+    // un jour de trop (J-4 au lieu de J-3) entre minuit et 1 h, heure de Paris. La course, elle, était
+    // posée à sa date : c'est le jour 0 du plan qui était la veille du coureur.
+    // Date illisible : NaN, exactement comme le calcul d'avant (aucun nombre de jours inventé).
+    daysToRace = ecartJours(String(objective.raceDate), todayStr) ?? Number.NaN;
     weeksToRace = Math.floor(daysToRace / 7);
     objLines.push(estOfficielle(objective)
       ? `• Course : ${objective.race} — ${objective.distanceKm} km, le ${objective.raceDate} (J-${daysToRace}, ~${weeksToRace} sem.)`
@@ -1242,7 +1268,6 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const easyDiscipline = easyRuns.length && easyCeiling != null
     ? `${tooFastEasy}/${easyRuns.length} footings au-dessus du plafond facile (~${easyCeiling} bpm)${tooFastEasy / easyRuns.length >= 0.34 ? " ⚠️ tendance à courir TROP VITE en facile → fais-le RALENTIR (frein n°1 à la progression)" : tooFastEasy === 0 ? " ✅ excellente discipline" : " ✅ discipline correcte"}`
     : "n/c (FC ou séances manquantes)";
-  const todayStr = aujourdhui(FUSEAU_DEFAUT);
   // Jours où il a COURU. Compter toutes les activités faisait passer une journée de
   // randonnée pour une séance de course honorée : l'adhérence était surestimée et les
   // jours réellement ratés — ceux que la boucle doit justement détecter — invisibles.
@@ -1256,7 +1281,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     const e = ecartJours(String(w.date).slice(0, 10), d);
     return e != null && Math.abs(e) <= 3;
   });
-  const pastPrescribed = coachSessions.filter(c => c.date && c.date <= todayStr && now - new Date(c.date).getTime() <= 14 * 86400000 && actifAutour(c.date));
+  // Fenêtres en JOURS DU COUREUR (14 et 28 jours, aujourd'hui compris) : exactement ce que l'ancien
+  // calcul en millisecondes retenait en journée. La nuit, il gardait un jour de plus, et une seule
+  // prescription manquée de plus suffit à retirer un jour de la semaine du plan (16/11/2026).
+  const dansLaFenetre = (d: string, jours: number) => (ecartJours(todayStr, d) ?? Infinity) < jours;
+  const pastPrescribed = coachSessions.filter(c => c.date && c.date <= todayStr && dansLaFenetre(c.date, 14) && actifAutour(c.date));
   // ── JOURS SYSTÉMATIQUEMENT RATÉS (boucle d'adhérence) ──
   // Un plan qu'on ne suit pas ne sert à rien. Si un jour de la semaine est prescrit
   // encore et encore sans jamais être couru, ce n'est pas de la paresse : c'est que
@@ -1266,7 +1295,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const runnable = (t?: string) => !/repos|rest|renfo|muscu|gainage|ppg/i.test(t || "");
   const wdStat = new Map<number, { p: number; d: number }>();
   for (const c of coachSessions) {
-    if (!c.date || c.date > todayStr || now - new Date(c.date).getTime() > 28 * 86400000) continue;
+    if (!c.date || c.date > todayStr || !dansLaFenetre(c.date, 28)) continue;
     if (!runnable(c.sessionType) || !actifAutour(c.date)) continue;
     const wd = new Date(c.date + "T00:00:00").getDay();
     const s = wdStat.get(wd) ?? { p: 0, d: 0 };
@@ -1279,8 +1308,13 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // `workouts` est trié du plus récent au plus ancien : le premier match est le bon.
   // Sert à espacer la prochaine qualité par rapport au PASSÉ, pas seulement aux jours à venir.
   const lastHardWk = workouts.find(w => isHardWk(w));
+  // ⚠️ EN JOURS DU COUREUR, comme le plan qui le lit (`placed`, `hardToday` : 0 = son jour 0). À
+  // l'heure du serveur, une séance dure de la veille comptait « aujourd'hui » entre minuit et 1 h
+  // (2 h l'été) à Paris : le jour 0 devenait « Récupération — séance exigeante déjà faite
+  // aujourd'hui », et la qualité suivante reculait d'un jour (@HeadCoach, 16/11/2026).
+  // Date illisible : NaN, comme le calcul d'avant.
   const lastHardDaysAgo = lastHardWk
-    ? Math.max(0, Math.floor((now - new Date(String(lastHardWk.date) + "T00:00:00").getTime()) / 86400000))
+    ? Math.max(0, ecartJours(todayStr, String(lastHardWk.date)) ?? Number.NaN)
     : null;
   // ── LA QUALITÉ DES SEPT DERNIERS JOURS, FAITE OU MANQUÉE ──
   // La dernière séance dure ne suffit pas : une séance PRESCRITE et non faite ne laissait
@@ -1386,6 +1420,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     return arretsLus.get(id)!;
   };
   const qeRaw = (p?.last_quality_exec ?? null) as { date?: string; repsSec?: number[]; avgHr?: number | null; fadeSec?: number | null } | null;
+  // ⚠️ ANCRÉ À MIDI, et laissé tel quel (choix de Cyprien, 16/11/2026) : la nuit, entre 0 h et 1 h
+  // (2 h l'été) à Paris, il donne déjà le même âge qu'à 9 h. Il bascule en revanche à midi UTC : une
+  // série de 13 jours est citée jusqu'à 13 h à Paris (14 h l'été), plus ensuite. Cela se traite avec
+  // les autres fenêtres ancrées à midi (`dansLesJours`, `seancesRecentes`), pas avec le jour 0.
   const qeAgeDays = qeRaw?.date ? Math.floor((Date.now() - new Date(`${qeRaw.date}T12:00:00`).getTime()) / 86400_000) : null;
   const qe = qeAgeDays != null && qeAgeDays <= 12 ? qeRaw : null;
   // ⚠️ DES RÉPÉTITIONS TENUES APRÈS DES RÉCUPÉRATIONS RALLONGÉES NE PROUVENT RIEN (choix de
@@ -2736,7 +2774,7 @@ ${catalog}`;
   })();
 
   return {
-    text, objective, daysToRace, weeksToRace, athleteName: String(p?.full_name ?? "Athlète"), vma,
+    text, objective, daysToRace, weeksToRace, jour0: todayStr, athleteName: String(p?.full_name ?? "Athlète"), vma,
     // ⚠️ Allure CORRIGÉE par la relecture : c'est elle qui doit partir dans le plan,
     // sinon la boucle mesure sans jamais rien changer.
     weekPlan: {

@@ -21,7 +21,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext, type AthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, type PlanDay } from "@/lib/ai/autoPlan";
 import { COLONNES_VFC, serieVfc } from "@/lib/health/vfc";
-import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { aujourdhui, FUSEAU_DEFAUT, instantDuJour } from "@/lib/time/fuseau";
 import { ecartPremium, textesRappel, TYPE_RAPPEL_PREMIUM, VERSION_RAPPEL, type DonneesRappel } from "@/lib/coach/rappelPremium";
 import { sansAdresse } from "@/lib/journal/sansAdresse";
 
@@ -63,7 +63,12 @@ export async function actualiserRappelPremium(admin: SupabaseClient, o: {
   /** La semaine publiée, celle que le calendrier affiche. */
   affichee: readonly PlanDay[];
   depuis: string;
-  /** L'instant du plan Starter : le plan complet est bâti pour le MÊME jour. */
+  /**
+   * L'instant du plan Starter. Le plan complet est bâti sur le jour 0 de SON contexte (`jour0`), relu
+   * quelques secondes plus tard (après la publication, l'envoi à la montre et le mail) : le même jour
+   * du coureur, sauf si minuit (heure de Paris) tombe entre les deux lectures. On garde quand même le jour du contexte complet : un plan posé sur un
+   * autre jour que son contexte se contredirait (J- de la course, dernière séance dure).
+   */
   maintenant: Date;
 }): Promise<IssueRappel> {
   try {
@@ -107,7 +112,8 @@ export async function actualiserRappelPremium(admin: SupabaseClient, o: {
 
     const ecart = ecartPremium({
       starter: { ctx: o.ctx, semaine: o.semaine },
-      premium: { ctx: complet, semaine: buildWeekPlan(complet, o.maintenant) },
+      // Le jour du coureur, comme le coach (16/11/2026) : l'heure du serveur commencerait la veille la nuit.
+      premium: { ctx: complet, semaine: buildWeekPlan(complet, instantDuJour(complet.jour0 ?? jour)) },
       depuis: o.depuis,
       affichee: o.affichee,
     });

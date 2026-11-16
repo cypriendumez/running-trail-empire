@@ -820,8 +820,8 @@ async function profilElite10() {
     }
     // Le coach l'appelle bien EN DERNIER, après ses ajustements et sa seconde passe de consignes.
     const coach = readFileSync("src/lib/ai/autoCoach.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((x) => x.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
-    assert.match(coach, /const week = avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, maintenant\), maintenant\);/, "le coach publie sans reposer le message de la course C écartée");
-    assert.match(coach, /avecCourseCEcartee\(ctx, appliquerConseils\(week, relecture\.conseils\), maintenant\)/, "le message n'est plus reposé après la relecture Premium");
+    assert.match(coach, /const week = avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, jourPlan\), jourPlan\);/, "le coach publie sans reposer le message de la course C écartée");
+    assert.match(coach, /avecCourseCEcartee\(ctx, appliquerConseils\(week, relecture\.conseils\), jourPlan\)/, "le message n'est plus reposé après la relecture Premium");
     // La coupe simulée ci-dessus est celle de l'écriture : 640 caractères, en français et dans les 4 autres langues.
     assert.equal((coach.match(/why: (?:d|t)\.why\.slice\(0, 640\),/g) ?? []).length, 2, "l'écriture du « pourquoi » ne coupe plus à 640 : le test ne simule plus la vraie coupe");
   });

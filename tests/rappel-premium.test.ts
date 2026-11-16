@@ -427,7 +427,9 @@ async function main() {
   await test("le coach le calcule pour le plan essentiel, APRÈS avoir publié, pour le même jour", () => {
     const src = codeNu("src/lib/ai/autoCoach.ts");
     assert.match(src, /rappelPremiumPour\(acces\)\s*\?\s*await actualiserRappelPremium\(/, "le rappel n'est plus réservé au plan essentiel");
-    assert.match(src, /const semaineMoteur = buildWeekPlan\(ctx, maintenant\)/, "le plan Starter n'est plus daté par l'instant partagé");
+    // Daté par le jour du COUREUR (16/11/2026) — celui de son contexte, à défaut celui de l'instant partagé.
+    assert.match(src, /const jourPlan = instantDuJour\(ctx\.jour0 \?\? aujourdhui\(FUSEAU_DEFAUT, maintenant\)\);/, "le plan Starter n'est plus daté par le jour du coureur");
+    assert.match(src, /const semaineMoteur = buildWeekPlan\(ctx, jourPlan\)/, "le plan Starter n'est plus daté par le jour du coureur");
     assert.match(src, /actualiserRappelPremium\([^;]*semaine: semaineMoteur[^;]*depuis: from[^;]*maintenant/, "le rappel ne compare plus la semaine du moteur, depuis le premier jour modifiable, au même instant");
     const iPlan = src.indexOf(".insert(rows)"), iRappel = src.indexOf("await actualiserRappelPremium(");
     assert.ok(iPlan > 0 && iRappel > iPlan, "le plan de l'athlète attend le calcul d'un rappel commercial");

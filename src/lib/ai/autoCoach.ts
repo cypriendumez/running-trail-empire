@@ -19,7 +19,7 @@ import { avecFcMaxMontre } from "@/lib/coach/fcCible";
 import { profilPeut, lectureDuCoach, rappelPremiumPour, COLONNES_ACCES } from "@/lib/billing/access";
 import { actualiserRappelPremium, type IssueRappel } from "@/lib/ai/rappelPremiumServeur";
 import { identifiantsDePaire } from "@/lib/intervals/identifiants";
-import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { aujourdhui, FUSEAU_DEFAUT, instantDuJour } from "@/lib/time/fuseau";
 import { estAdmin } from "@/lib/admin/acces";
 import { normLang } from "@/lib/i18n/base";
 import { relireSemaine } from "@/lib/ai/relectureServeur";
@@ -244,7 +244,10 @@ export async function autoCoachForUser(
 
   // L'instant est retenu : le rappel Premium bâtit le plan complet pour le MÊME jour.
   const maintenant = new Date();
-  const semaineMoteur = buildWeekPlan(ctx, maintenant);
+  // Le JOUR du plan est celui du coureur (son fuseau), pas celui du serveur : en UTC, entre minuit et
+  // 1 h heure de Paris, le serveur est encore la veille, et le plan commençait la veille (16/11/2026).
+  const jourPlan = instantDuJour(ctx.jour0 ?? aujourdhui(FUSEAU_DEFAUT, maintenant));
+  const semaineMoteur = buildWeekPlan(ctx, jourPlan);
   const today = semaineMoteur[0].date;
 
   // ── LA SÉANCE DÉJÀ COURUE NE SE RÉÉCRIT PAS ─────────────────────────────────
@@ -289,7 +292,7 @@ export async function autoCoachForUser(
   // Puis le message d'une course C écartée, EN DERNIER : un ajustement peut l'avoir effacé (« alléger »)
   // ou déplacé (« décaler », « échanger ») (relecture du 13/11/2026). La relecture Premium qui suit
   // ajoute au « pourquoi » sans le remplacer.
-  const week = avecCourseCEcartee(ctx, consignesSurPlan(ctx, ajuste.week, maintenant), maintenant);
+  const week = avecCourseCEcartee(ctx, consignesSurPlan(ctx, ajuste.week, jourPlan), jourPlan);
 
   // ── LE COACH AVANCÉ (Premium, et l'essai qui le montre) ─────────────────────
   // Le modèle relit les séances CLÉS et ajoute à leur « pourquoi » un conseil d'exécution
@@ -305,7 +308,7 @@ export async function autoCoachForUser(
   // coupe la fin du motif pour loger un conseil, puis l'écriture coupe à 640 (relectures du 16/11/2026).
   // Il est reposé après les conseils par précaution (`avecCourseCEcartee` est idempotente).
   const semaineCoach = relecture?.conseils.length
-    ? avecCourseCEcartee(ctx, appliquerConseils(week, relecture.conseils), maintenant)
+    ? avecCourseCEcartee(ctx, appliquerConseils(week, relecture.conseils), jourPlan)
     : week;
 
   // 2) Remplace le plan à venir. On n'efface QUE le futur : l'historique des séances
