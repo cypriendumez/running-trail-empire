@@ -146,8 +146,10 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    le 16/11 (visa `@Maestro` BLOQUÉ : l'édition était choisie sur les candidats du 09/11). Sans édition
    fusionnée, la lettre du 16/11 suit son ordre automatique (envoi non contrôlé dans cette session). Cause probable, relue dans `src/app/api/newsletter/candidats/route.ts`
    et constatée en ligne le 16/11 : `unstable_cache` sert l'ancienne collecte au premier appel après une longue
-   pause et ne la refait qu'en arrière-plan. Non corrigé. À décider par Cyprien : la route refait la collecte
-   quand `genere` a plus de 30 minutes, ou la routine refuse des candidats de plus de 24 heures.
+   pause et ne la refait qu'en arrière-plan. Correction écrite le 16/11 sur la branche `fix/candidats-frais`
+   (une collecte par tranche de trente minutes pour les candidats et pour le fil lu par la lettre, contrôle de
+   fraîcheur ajouté au skill `edition-lettre`) : à fusionner et à déployer sur GO de Cyprien, puis à prouver en
+   ligne (`genere` de moins de 30 minutes au premier appel après une longue pause).
 
 ## Résolues le 13/11/2026
 

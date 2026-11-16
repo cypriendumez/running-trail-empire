@@ -269,5 +269,38 @@ export const actualitesEnCache = unstable_cache(async (cat: Cat) => {
   return items;
 }, ["actualites-v1"], { revalidate: 1800 });
 
+/** Durée de garde d'une collecte : trente minutes. */
+export const GARDE_COLLECTE_MS = 30 * 60 * 1000;
+
+/**
+ * LE NUMÉRO DE LA TRANCHE DE TRENTE MINUTES où tombe un instant.
+ *
+ * ⚠️ POURQUOI (16/11/2026). `unstable_cache` ne JETTE PAS une valeur périmée : passé son
+ * délai, il la sert encore au premier appel et ne relance la collecte qu'en arrière-plan.
+ * Pour le fil du site, visité souvent, c'est le but (une page instantanée). Pour ce qui
+ * n'est lu qu'UNE FOIS PAR SEMAINE, c'est un piège : le dimanche 15/11/2026, @Gazette a
+ * reçu de `/api/newsletter/candidats` la collecte du 09/11 (`genere` vieux de six jours),
+ * a choisi son édition dessus, et @Maestro a bloqué la PR. Constaté en ligne le 16/11 : un
+ * appel non servi par le CDN rendait une collecte de 12 heures pour un délai de 30 minutes.
+ * Passer ce numéro en ARGUMENT d'une fonction mise en cache en fait une partie de sa clé :
+ * une tranche neuve n'a encore aucune valeur, donc la collecte se fait AVANT de répondre.
+ */
+export const trancheDe = (maintenant: number, duree = GARDE_COLLECTE_MS): number => Math.floor(maintenant / duree);
+
+/** La collecte d'une rubrique, gardée pour SA tranche de trente minutes seulement. */
+const actualitesParTranche = unstable_cache(async (cat: Cat, _tranche: number) => {
+  const items = await collecterActualites(cat);
+  if (!items.length) throw new Error("aucun flux n'a répondu");
+  return items;
+}, ["actualites-tranche-v1"], { revalidate: 1800 });
+
+/**
+ * Le fil d'une rubrique, JAMAIS plus vieux que sa tranche de trente minutes : pour la lettre
+ * du lundi et les candidats de @Gazette, qui ne passent qu'une fois par semaine. Le fil du
+ * site garde `actualitesEnCache` (instantané, rafraîchi en arrière-plan).
+ */
+export const actualitesDeLaTranche = (cat: Cat, maintenant = Date.now()): Promise<Item[]> =>
+  actualitesParTranche(cat, trancheDe(maintenant));
+
 /** Ce que voit le fil : sans le texte intégral (2 600 caractères par article, pour la lettre seulement). */
 export const sansTexte = (items: Item[]) => items.map(({ texte: _t, ...r }) => r);

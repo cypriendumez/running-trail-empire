@@ -21,6 +21,12 @@ figure pas. Ne cherche pas d'article ailleurs, n'invente aucun lien.
 Si l'appel échoue ou rend une erreur : `État : BLOQUÉ — Cause exacte : …`, rien n'est publié, la lettre
 partira avec son ordre automatique. C'est un repli sûr, pas une panne.
 
+**Contrôle de fraîcheur, avant de choisir.** Lis `genere` (date de la collecte, en UTC) et compare-le à
+`date -u`. Plus de 2 heures d'écart : rappelle la route une fois, 90 secondes plus tard. Toujours plus de
+2 heures : `État : BLOQUÉ — Cause exacte : candidats périmés (genere = …)`, aucune édition. Le 15/11/2026,
+la route a servi la collecte du 09/11 et l'édition choisie dessus a dû être jetée. La route est corrigée
+depuis (une collecte par tranche de 30 minutes), ce contrôle reste : il ne coûte qu'une ligne.
+
 ## 2. Le lecteur
 
 Un utilisateur de Pacevo : il court de 3 à 6 fois par semaine, prépare un 10 km, un semi, un marathon

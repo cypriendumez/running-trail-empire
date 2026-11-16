@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { classerALaUne, motsDuTitre, texteDuSujet, POLITIQUE, type ArticleSemaine } from "../src/lib/news/alaune";
 import { FILTRES, PAS_ELITE, PAS_CONSEIL, CONTEXTE_COURSE, COURSE_A_PIED, PROMO, TEST_MATERIEL, HORS_COURSE, RUBRIQUES_LETTRE } from "../src/lib/news/rubriques";
-import { fusionnerListes, lienGoogleNews } from "../src/lib/news/actualites";
+import { fusionnerListes, lienGoogleNews, trancheDe, GARDE_COLLECTE_MS } from "../src/lib/news/actualites";
 import { validerEdition, ordonnerSelon, lundiDEnvoi, URL_EDITION } from "../src/lib/newsletter/edition";
 import { chiffresVerifies, chiffresIntrus } from "../src/lib/newsletter/resume";
 import { construireEmail, LANGS, libellesSections } from "../src/lib/newsletter/email";
@@ -503,6 +503,38 @@ test("les candidats de @Gazette sont publics, sans texte d'article ni donnée d'
   assert.match(src, /preparerSelection\(\{ base, edition: null \}\)/, "@Gazette doit voir l'ordre AUTOMATIQUE, pas sa propre édition");
   assert.match(src, /unstable_cache\([\s\S]*revalidate: 1800/, "la collecte est relancée à chaque appel public");
   assert.match(src, /pour: lundiDEnvoi\(jour\)/);
+});
+
+// ⚠️ 15/11/2026 : @Gazette a reçu la collecte du 09/11 (`genere` vieux de six jours) et son
+// édition a dû être jetée. `unstable_cache` sert la valeur périmée au premier appel après une
+// longue pause ; la tranche de trente minutes, passée en argument, fait partie de la clé.
+test("une collecte ne survit pas à sa tranche de trente minutes", () => {
+  assert.equal(GARDE_COLLECTE_MS, 30 * 60 * 1000);
+  const lundi = Date.parse("2026-11-16T07:30:00Z");
+  // Dans la même demi-heure : la même tranche, donc une seule collecte.
+  assert.equal(trancheDe(lundi), trancheDe(lundi + GARDE_COLLECTE_MS - 1));
+  // À la demi-heure suivante, et a fortiori une semaine plus tard : une tranche neuve.
+  assert.equal(trancheDe(lundi + GARDE_COLLECTE_MS), trancheDe(lundi) + 1);
+  assert.notEqual(trancheDe(Date.parse("2026-11-09T23:07:38Z")), trancheDe(Date.parse("2026-11-15T21:31:34Z")), "le dimanche relit la collecte du lundi précédent");
+});
+
+test("les candidats et le fil lu par la lettre sont collectés pour LEUR tranche", () => {
+  const candidats = sansCommentaires("src/app/api/newsletter/candidats/route.ts");
+  // La tranche est un ARGUMENT de la fonction en cache (donc dans sa clé), calculée à l'appel.
+  assert.match(candidats, /const candidats = unstable_cache\(async \(base: string, _tranche: number\) =>/, "la collecte des candidats n'est plus gardée par tranche");
+  assert.match(candidats, /await candidats\(BASE, trancheDe\(Date\.now\(\)\)\)/, "la route ne passe plus la tranche du moment : @Gazette relira la collecte de la semaine d'avant");
+  const lib = sansCommentaires("src/lib/news/actualites.ts");
+  assert.match(lib, /const actualitesParTranche = unstable_cache\(async \(cat: Cat, _tranche: number\) =>/);
+  assert.match(lib, /actualitesParTranche\(cat, trancheDe\(maintenant\)\)/, "le fil de la lettre n'est plus collecté pour sa tranche");
+  // La lettre (`avecTexte=1`) lit le fil par tranche, et sa réponse n'est jamais resservie
+  // périmée par le CDN ; le fil du site, lui, reste instantané.
+  const fil = sansCommentaires("src/app/api/community/news/route.ts");
+  const brancheLettre = fil.match(/if \(avecTexte\) \{([\s\S]*?)\n    \}/)?.[1] ?? "";
+  assert.match(brancheLettre, /await actualitesDeLaTranche\(cat\)/, "la lettre relit le fil instantané, donc la collecte du passage précédent");
+  assert.doesNotMatch(brancheLettre, /actualitesEnCache|stale-while-revalidate/, "la réponse lue par la lettre peut être resservie périmée");
+  assert.match(fil.slice(fil.indexOf(brancheLettre) + brancheLettre.length), /sansTexte\(await actualitesEnCache\(cat\)\)[\s\S]*stale-while-revalidate=86400/, "le fil du site n'est plus instantané");
+  // Et la sélection de la lettre passe bien par ce chemin.
+  assert.match(sansCommentaires("src/lib/newsletter/selection.ts"), /\/api\/community\/news\?cat=\$\{cat\}&avecTexte=1/);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
