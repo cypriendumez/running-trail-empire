@@ -17,6 +17,7 @@ import { classerALaUne, motsDuTitre, texteDuSujet, POLITIQUE, type ArticleSemain
 import { FILTRES, PAS_ELITE, PAS_CONSEIL, CONTEXTE_COURSE, COURSE_A_PIED, PROMO, TEST_MATERIEL, HORS_COURSE, RUBRIQUES_LETTRE } from "../src/lib/news/rubriques";
 import { fusionnerListes, lienGoogleNews, trancheDe, GARDE_COLLECTE_MS } from "../src/lib/news/actualites";
 import { validerEdition, ordonnerSelon, lundiDEnvoi, URL_EDITION } from "../src/lib/newsletter/edition";
+import { preparerSelection } from "../src/lib/newsletter/selection";
 import { chiffresVerifies, chiffresIntrus } from "../src/lib/newsletter/resume";
 import { construireEmail, LANGS, libellesSections } from "../src/lib/newsletter/email";
 
@@ -537,5 +538,65 @@ test("les candidats et le fil lu par la lettre sont collectés pour LEUR tranche
   assert.match(sansCommentaires("src/lib/newsletter/selection.ts"), /\/api\/community\/news\?cat=\$\{cat\}&avecTexte=1/);
 });
 
-console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
-if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
+test("une collecte en échec va au journal des erreurs et dans chaque réponse", () => {
+  const lettre = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  // Journalisée par la porte unique, sauf en aperçu (rien n'est envoyé, la réponse la montre).
+  assert.match(lettre, /if \(pannes\.length && !apercu\) \{\s*await journaliserEchec\(null, \{ source: "lettre-collecte", url: "\/api\/newsletter\/weekly", message: `Collecte de la lettre incomplète : \$\{pannes\.join\(" ; "\)\}` \}\);/, "une collecte en échec ne laisse aucune trace dans error_logs");
+  // Les trois réponses qui décrivent la lettre la portent : lettre creuse, aperçu, envoi.
+  assert.equal((lettre.match(/^\s*pannes,$/gm) ?? []).length, 3, "une réponse de la lettre ne dit plus quelles collectes ont échoué");
+  // Les candidats de @Gazette aussi, et une collecte incomplète quitte le CDN plus vite.
+  const candidats = sansCommentaires("src/app/api/newsletter/candidats/route.ts");
+  assert.match(candidats, /pannes: sel\.pannes,/, "@Gazette ne voit plus les collectes en échec");
+  assert.match(candidats, /reponse\.pannes\.length \? "public, max-age=60, s-maxage=300" : "public, max-age=300, s-maxage=1800"/);
+});
+
+// ── Tests ASYNCHRONES (la sélection est rejouée avec un réseau simulé), puis le résumé ──
+async function testAsync(nom: string, fn: () => Promise<void>) {
+  try { await fn(); passed++; console.log(`  ✓ ${nom}`); }
+  catch (e) { fails.push(`${nom} — ${(e as Error).message}`); console.log(`  ✗ ${nom}\n      ${(e as Error).message}`); }
+}
+
+/** Rejoue `preparerSelection` avec un réseau simulé : `fil(cat)` répond pour le fil du site, `flux()` pour les flux RSS. */
+async function selectionAvec(fil: (cat: string) => Response, flux: () => Response) {
+  const vraiFetch = globalThis.fetch;
+  globalThis.fetch = (async (entree: unknown) => {
+    const url = String(entree instanceof Request ? entree.url : entree);
+    if (!url.startsWith("https://lettre.test/api/community/news")) return flux();
+    return fil(new URL(url).searchParams.get("cat") ?? "");
+  }) as typeof fetch;
+  try { return await preparerSelection({ base: "https://lettre.test", edition: null }); }
+  finally { globalThis.fetch = vraiFetch; }
+}
+const articleDuJour = (n: number) => ({ title: `Semi de Lille : le récit de la course numéro ${n}`, source: `Média ${n}`, link: `https://media${n}.test/article`, date: new Date().toUTCString(), domain: `media${n}.test`, favicon: "", langue: "fr" });
+const rssDuJour = () => new Response(`<rss><channel>${[1, 2, 3, 4, 5, 6].map((n) => `<item><title>Semi de Lille : le récit de la course numéro ${n}</title><link>https://media${n}.test/article</link><pubDate>${new Date().toUTCString()}</pubDate><source url="https://media${n}.test">Média ${n}</source></item>`).join("")}</channel></rss>`);
+
+(async () => {
+  // ⚠️ 16/11/2026 (réserve des deux relecteurs de la PR 55) : depuis que la lettre lit une
+  // collecte du moment, un fil en échec ne retombe plus sur l'ancienne collecte. La rubrique
+  // sortait VIDE, sans un mot, comme une semaine sans article.
+  await testAsync("un fil en échec est NOMMÉ : erreur HTTP, « sources injoignables », délai dépassé", async () => {
+    const sel = await selectionAvec((cat) => {
+      if (cat === "trail") return new Response("{}", { status: 500 });
+      if (cat === "elite") return Response.json({ items: [], cat, erreur: "sources injoignables" });
+      if (cat === "gear") throw new Error("délai dépassé (test)");
+      return Response.json({ items: [articleDuJour(1)], cat });
+    }, () => { throw new Error("flux coupé (test)"); });
+    const duFil = sel.pannes.filter((p) => p.startsWith("fil «")).sort();
+    assert.deepEqual(duFil, ["fil « elite » : sources injoignables", "fil « gear » : délai dépassé (test)", "fil « trail » : HTTP 500"]);
+    // Tous les flux de la semaine coupés : la une retombe sur le fil, et cela se dit aussi.
+    assert.ok(sel.pannes.some((p) => p.startsWith("collecte de la semaine : aucun article reçu")), `la semaine vide n'est pas signalée : ${sel.pannes.join(" | ")}`);
+    // La rubrique en panne sort bien vide : c'est ce vide qui était muet.
+    const iTrail = RUBRIQUES_LETTRE.findIndex((r) => r.cle === "trail");
+    assert.ok(iTrail > 0, "précondition : la rubrique trail existe");
+    assert.equal(sel.parRubrique[iTrail].length, 0, "la rubrique en panne n'est pas vide : le test ne simule plus la panne");
+  });
+
+  // Le contre-poids : une semaine où tout répond ne signale RIEN, même si une rubrique est vide.
+  await testAsync("quand tout répond, aucune panne n'est signalée (une rubrique vide n'est pas une panne)", async () => {
+    const sel = await selectionAvec((cat) => Response.json({ items: cat === "nutrition" ? [] : [articleDuJour(1)], cat }), rssDuJour);
+    assert.deepEqual(sel.pannes, []);
+  });
+
+  console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
+  if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
+})().catch((e) => { console.error(e); process.exit(1); });

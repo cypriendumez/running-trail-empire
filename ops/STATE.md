@@ -146,10 +146,13 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    le 16/11 (visa `@Maestro` BLOQUÉ : l'édition était choisie sur les candidats du 09/11). Sans édition
    fusionnée, la lettre du 16/11 suit son ordre automatique (envoi non contrôlé dans cette session). Cause probable, relue dans `src/app/api/newsletter/candidats/route.ts`
    et constatée en ligne le 16/11 : `unstable_cache` sert l'ancienne collecte au premier appel après une longue
-   pause et ne la refait qu'en arrière-plan. Correction écrite le 16/11 sur la branche `fix/candidats-frais`
-   (une collecte par tranche de trente minutes pour les candidats et pour le fil lu par la lettre, contrôle de
-   fraîcheur ajouté au skill `edition-lettre`) : à fusionner et à déployer sur GO de Cyprien, puis à prouver en
-   ligne (`genere` de moins de 30 minutes au premier appel après une longue pause).
+   pause et ne la refait qu'en arrière-plan. Corrigé et en ligne le 16/11 (#55, `f252dddd`) : une collecte
+   par tranche de trente minutes pour les candidats et pour le fil lu par la lettre, contrôle de fraîcheur dans
+   le skill `edition-lettre`. Prouvé en ligne le 16/11 : collecte faite avant de répondre au premier appel d'une
+   tranche, non refaite dans la tranche. Reste à constater au passage de `@Gazette` du dimanche 22/11.
+   Suite écrite le 16/11 sur la branche `fix/rubrique-en-panne` : une collecte en échec ne sort plus une
+   rubrique vide en silence, elle se dit dans les candidats (`pannes`), dans chaque réponse de la lettre et dans
+   `error_logs` (source `lettre-collecte`). À fusionner et à déployer sur GO de Cyprien.
 
 ## Résolues le 13/11/2026
 

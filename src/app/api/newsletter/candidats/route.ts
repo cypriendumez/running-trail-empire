@@ -37,6 +37,9 @@ const candidats = unstable_cache(async (base: string, _tranche: number) => {
   return {
     genere: new Date().toISOString(),
     pour: lundiDEnvoi(jour),
+    // Les collectes en échec, en clair (vide = aucune) : une rubrique vide n'est plus muette.
+    // La réponse reste gardée pour sa tranche : un appelant ne relance pas la collecte à volonté.
+    pannes: sel.pannes,
     rubriques: RUBRIQUES_LETTRE.map((r, n) => ({
       cle: r.cle,
       places: r.max,
@@ -55,7 +58,10 @@ export async function GET() {
   const BASE = process.env.NEXT_PUBLIC_APP_URL;
   if (!BASE) return NextResponse.json({ error: "NEXT_PUBLIC_APP_URL manquant" }, { status: 500 });
   try {
-    return NextResponse.json(await candidats(BASE, trancheDe(Date.now())), { headers: { "Cache-Control": "public, max-age=300, s-maxage=1800" } });
+    const reponse = await candidats(BASE, trancheDe(Date.now()));
+    // Une collecte incomplète ne reste pas 30 minutes de plus sur le CDN : la tranche suivante la refait.
+    const garde = reponse.pannes.length ? "public, max-age=60, s-maxage=300" : "public, max-age=300, s-maxage=1800";
+    return NextResponse.json(reponse, { headers: { "Cache-Control": garde } });
   } catch (e) {
     return NextResponse.json({ error: "collecte impossible", detail: e instanceof Error ? e.message : String(e) }, { status: 503 });
   }
