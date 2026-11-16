@@ -15,8 +15,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { classerALaUne, motsDuTitre, texteDuSujet, POLITIQUE, type ArticleSemaine } from "../src/lib/news/alaune";
 import { FILTRES, PAS_ELITE, PAS_CONSEIL, CONTEXTE_COURSE, COURSE_A_PIED, PROMO, TEST_MATERIEL, HORS_COURSE, RUBRIQUES_LETTRE } from "../src/lib/news/rubriques";
-import { fusionnerListes, lienGoogleNews, trancheDe, GARDE_COLLECTE_MS } from "../src/lib/news/actualites";
+import { fusionnerListes, lienGoogleNews, trancheDe, GARDE_COLLECTE_MS, collecterActualitesDetail, collecterNutritionSemaine, AUCUN_FLUX } from "../src/lib/news/actualites";
 import { validerEdition, ordonnerSelon, lundiDEnvoi, URL_EDITION } from "../src/lib/newsletter/edition";
+import { preparerSelection } from "../src/lib/newsletter/selection";
 import { chiffresVerifies, chiffresIntrus } from "../src/lib/newsletter/resume";
 import { construireEmail, LANGS, libellesSections } from "../src/lib/newsletter/email";
 
@@ -537,5 +538,110 @@ test("les candidats et le fil lu par la lettre sont collectés pour LEUR tranche
   assert.match(sansCommentaires("src/lib/newsletter/selection.ts"), /\/api\/community\/news\?cat=\$\{cat\}&avecTexte=1/);
 });
 
-console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
-if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
+test("une collecte en échec va au journal des erreurs et dans chaque réponse", () => {
+  const lettre = sansCommentaires("src/app/api/newsletter/weekly/route.ts");
+  // Journalisée par la porte unique, sauf en aperçu (rien n'est envoyé, la réponse la montre).
+  assert.match(lettre, /if \(pannes\.length && !apercu\) \{\s*await journaliserEchecUneFois\(null, \{ source: "lettre-collecte", url: "\/api\/newsletter\/weekly", message: `Collecte de la lettre incomplète : \$\{pannes\.join\(" ; "\)\}` \}\);/, "une collecte en échec ne laisse aucune trace dans error_logs");
+  // Les trois réponses qui décrivent la lettre la portent : lettre creuse, aperçu, envoi.
+  assert.equal((lettre.match(/^\s*pannes,$/gm) ?? []).length, 3, "une réponse de la lettre ne dit plus quelles collectes ont échoué");
+  // Les candidats de @Gazette aussi, et une collecte incomplète quitte le CDN plus vite.
+  const candidats = sansCommentaires("src/app/api/newsletter/candidats/route.ts");
+  assert.match(candidats, /pannes: sel\.pannes,/, "@Gazette ne voit plus les collectes en échec");
+  assert.match(candidats, /reponse\.pannes\.length \? "public, max-age=60, s-maxage=300" : "public, max-age=300, s-maxage=1800"/);
+  // Le fil de la lettre ne lève que si AUCUN flux n'a répondu : une liste vide n'est pas « sources injoignables ».
+  const lib = sansCommentaires("src/lib/news/actualites.ts");
+  const filLettre = lib.match(/const actualitesParTranche = unstable_cache\(async \(cat: Cat, _tranche: number\) => \{([\s\S]*?)\n\}, \[/)?.[1] ?? "";
+  assert.match(filLettre, /if \(!repondus\) throw new Error\(AUCUN_FLUX\);\s*return items;/, "le fil de la lettre ne distingue plus la panne de la semaine calme");
+  assert.doesNotMatch(filLettre, /items\.length/, "une rubrique vide redevient « sources injoignables » pour la lettre");
+});
+
+// ── Tests ASYNCHRONES (la sélection est rejouée avec un réseau simulé), puis le résumé ──
+async function testAsync(nom: string, fn: () => Promise<void>) {
+  try { await fn(); passed++; console.log(`  ✓ ${nom}`); }
+  catch (e) { fails.push(`${nom} — ${(e as Error).message}`); console.log(`  ✗ ${nom}\n      ${(e as Error).message}`); }
+}
+
+/** Rejoue `preparerSelection` avec un réseau simulé : `fil(cat)` répond pour le fil du site, `flux()` pour les flux RSS. */
+async function selectionAvec(fil: (cat: string) => Response, flux: () => Response) {
+  const vraiFetch = globalThis.fetch;
+  globalThis.fetch = (async (entree: unknown) => {
+    const url = String(entree instanceof Request ? entree.url : entree);
+    if (!url.startsWith("https://lettre.test/api/community/news")) return flux();
+    return fil(new URL(url).searchParams.get("cat") ?? "");
+  }) as typeof fetch;
+  try { return await preparerSelection({ base: "https://lettre.test", edition: null }); }
+  finally { globalThis.fetch = vraiFetch; }
+}
+const articleDuJour = (n: number) => ({ title: `Semi de Lille : le récit de la course numéro ${n}`, source: `Média ${n}`, link: `https://media${n}.test/article`, date: new Date().toUTCString(), domain: `media${n}.test`, favicon: "", langue: "fr" });
+const rssDuJour = () => new Response(`<rss><channel>${[1, 2, 3, 4, 5, 6].map((n) => `<item><title>Semi de Lille : le récit de la course numéro ${n}</title><link>https://media${n}.test/article</link><pubDate>${new Date().toUTCString()}</pubDate><source url="https://media${n}.test">Média ${n}</source></item>`).join("")}</channel></rss>`);
+
+const rss = (titres: string[], date = new Date()) => new Response(`<rss><channel>${titres.map((t, n) => `<item><title>${t}</title><link>https://media${n}.test/article-${n}</link><pubDate>${date.toUTCString()}</pubDate><source url="https://media${n}.test">Média ${n}</source></item>`).join("")}</channel></rss>`);
+const fluxCoupe = (): Response => { throw new Error("flux coupé (test)"); };
+/** Remplace le réseau le temps d'un appel direct à une collecte. */
+async function avecReseau<T>(flux: () => Response, fn: () => Promise<T>): Promise<T> {
+  const vraiFetch = globalThis.fetch;
+  globalThis.fetch = (async () => flux()) as typeof fetch;
+  try { return await fn(); } finally { globalThis.fetch = vraiFetch; }
+}
+
+(async () => {
+  // ⚠️ 16/11/2026 (réserve des deux relecteurs de la PR 55, puis double relecture de ce
+  // changement). Depuis que la lettre lit une collecte du moment, une collecte en échec ne
+  // retombe plus sur l'ancienne : la rubrique sortait VIDE, sans un mot. Et « vide » ne suffit
+  // pas à dire « panne » : des flux qui répondent sans article, c'est une semaine calme.
+  await testAsync("aucun flux n'a répondu : la collecte le DIT ; des flux qui répondent sans article : liste vide, sans alerte", async () => {
+    // Le fil d'une rubrique : tous les flux coupés → 0 répondu.
+    const coupe = await avecReseau(fluxCoupe, () => collecterActualitesDetail("elite"));
+    assert.deepEqual(coupe, { items: [], repondus: 0 });
+    // Les flux répondent, mais aucun titre ne passe le filtre « résultats » : semaine calme.
+    assert.ok(FILTRES.elite && !FILTRES.elite.test("Une recette de crêpes pour le dimanche"), "précondition : ce titre ne passe pas le filtre élite");
+    const calme = await avecReseau(() => rss(["Une recette de crêpes pour le dimanche"]), () => collecterActualitesDetail("elite"));
+    assert.deepEqual(calme.items, []);
+    assert.ok(calme.repondus > 0, "des flux ont répondu, mais la collecte dit que personne n'a répondu");
+    // Une collecte de la semaine : aucun flux → elle LÈVE ; des flux sans article récent → [] sans lever.
+    await assert.rejects(avecReseau(fluxCoupe, () => collecterNutritionSemaine()), new RegExp(AUCUN_FLUX));
+    const ilYaUnMois = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+    assert.deepEqual(await avecReseau(() => rss(["Nutrition du coureur : un article du mois dernier"], ilYaUnMois), () => collecterNutritionSemaine()), []);
+    // Des flux qui répondent VIDES ont répondu : on compte les flux, pas les articles.
+    assert.deepEqual(await avecReseau(() => rss([]), () => collecterNutritionSemaine()), []);
+    assert.ok((await avecReseau(() => rss([]), () => collecterActualitesDetail("elite"))).repondus > 0);
+  });
+
+  await testAsync("chaque collecte en échec est NOMMÉE dans la sélection : fil (HTTP, « sources injoignables », délai) et collectes de la semaine", async () => {
+    const sel = await selectionAvec((cat) => {
+      if (cat === "trail") return new Response("{}", { status: 500 });
+      if (cat === "elite") return Response.json({ items: [], cat, erreur: "sources injoignables" });
+      if (cat === "gear") throw new Error("délai dépassé (test)");
+      return Response.json({ items: [articleDuJour(1)], cat });
+    }, fluxCoupe);
+    assert.deepEqual([...sel.pannes].sort(), [
+      `collecte de la semaine : ${AUCUN_FLUX}`,
+      `conseils de la semaine : ${AUCUN_FLUX}`,
+      "fil « elite » : sources injoignables",
+      "fil « gear » : délai dépassé (test)",
+      "fil « trail » : HTTP 500",
+      `matériel de la semaine : ${AUCUN_FLUX}`,
+      `nutrition de la semaine : ${AUCUN_FLUX}`,
+    ]);
+    // La une dit pourquoi elle retombe sur le fil, comme avant.
+    assert.equal(sel.echecSemaine, AUCUN_FLUX);
+    // La rubrique en panne sort bien vide : c'est ce vide qui était muet.
+    const iTrail = RUBRIQUES_LETTRE.findIndex((r) => r.cle === "trail");
+    assert.ok(iTrail > 0, "précondition : la rubrique trail existe");
+    assert.equal(sel.parRubrique[iTrail].length, 0, "la rubrique en panne n'est pas vide : le test ne simule plus la panne");
+  });
+
+  // Le contre-poids : quand tout répond, RIEN n'est signalé, même si une rubrique est vide
+  // et même si les flux n'ont aucun article de la semaine.
+  await testAsync("quand tout répond, aucune panne n'est signalée (rubrique vide, semaine sans article)", async () => {
+    const filSain = (cat: string) => Response.json({ items: cat === "nutrition" ? [] : [articleDuJour(1)], cat });
+    assert.deepEqual((await selectionAvec(filSain, rssDuJour)).pannes, []);
+    const ilYaUnMois = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+    const calme = await selectionAvec(filSain, () => rss(["Un article du mois dernier"], ilYaUnMois));
+    assert.deepEqual(calme.pannes, []);
+    assert.equal(calme.echecSemaine, null);
+  });
+
+  console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
+  if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
+})().catch((e) => { console.error(e); process.exit(1); });

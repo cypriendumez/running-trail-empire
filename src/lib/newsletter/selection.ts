@@ -32,6 +32,15 @@ export type Selection = {
   mediasUne: Map<string, number>;
   recents: Item[];
   echecSemaine: string | null;
+  /**
+   * Les collectes qui ont ÉCHOUÉ, en clair (« fil « trail » : sources injoignables »).
+   * ⚠️ Une rubrique dont la collecte échouait sortait VIDE, sans un mot : rien ne la
+   * distinguait d'une semaine sans article (relecture du 16/11/2026). Depuis que la lettre
+   * lit une collecte du moment (`trancheDe`), l'ancienne collecte ne masque plus ce cas.
+   * Vide = aucune panne constatée. Une rubrique sans article n'est PAS une panne : la panne,
+   * c'est une erreur du fil ou une collecte dont aucun flux n'a répondu, jamais une liste vide.
+   */
+  pannes: string[];
 };
 
 export async function preparerSelection({ base, edition }: { base: string; edition: Edition | null }): Promise<Selection> {
@@ -40,16 +49,20 @@ export async function preparerSelection({ base, edition }: { base: string; editi
   // rubriques existent déjà dans l'agrégateur du fil Communauté : on les réutilise plutôt
   // que d'inventer un classement, qui serait forcément approximatif.
   const ilYaUneSemaine = Date.now() - 7 * 24 * 3600 * 1000;
+  const pannes: string[] = [];
+  const cause = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 120);
   const recentsDe = async (cat: string): Promise<Item[]> => {
     try {
       const r = await fetch(`${base}/api/community/news?cat=${cat}&avecTexte=1`, { signal: AbortSignal.timeout(25000) });
-      if (!r.ok) return [];
-      const items = ((await r.json()) as { items?: Item[] }).items ?? [];
-      return items.filter((it) => {
+      if (!r.ok) { pannes.push(`fil « ${cat} » : HTTP ${r.status}`); return []; }
+      // Le fil répond 200 même en panne : quand aucun de ses flux n'a répondu, il le dit dans `erreur`.
+      const corps = (await r.json()) as { items?: Item[]; erreur?: string };
+      if (corps.erreur) pannes.push(`fil « ${cat} » : ${String(corps.erreur).slice(0, 120)}`);
+      return (corps.items ?? []).filter((it) => {
         const t = new Date(it.date).getTime();
         return Number.isFinite(t) && t >= ilYaUneSemaine;
       });
-    } catch { return []; }
+    } catch (e) { pannes.push(`fil « ${cat} » : ${cause(e)}`); return []; }
   };
 
   // Le sommaire vit dans `lib/news/rubriques` : la lettre ne nomme plus ses rubriques
@@ -60,12 +73,15 @@ export async function preparerSelection({ base, edition }: { base: string; editi
     Promise.all(RUBRIQUES_LETTRE.map((r) => recentsDe(r.cat))),
     // Une panne ici ne doit pas annuler la lettre : la une retombe sur le fil, et la
     // réponse (lue dans le journal de l'action GitHub) dit pourquoi.
-    collecterSemaine().catch((e: unknown) => { echecSemaine = e instanceof Error ? e.message : String(e); return [] as Item[]; }),
-    // Même règle : une panne ne coûte que la rubrique, qui retombe sur le fil.
-    collecterNutritionSemaine().catch(() => [] as Item[]),
-    collecterMaterielSemaine().catch(() => [] as Item[]),
-    collecterConseilsSemaine().catch(() => [] as Item[]),
+    collecterSemaine().catch((e: unknown) => { echecSemaine = e instanceof Error ? e.message : String(e); pannes.push(`collecte de la semaine : ${cause(e)}`); return [] as Item[]; }),
+    // Même règle : une panne ne coûte que la rubrique, qui retombe sur le fil. Mais elle se DIT.
+    collecterNutritionSemaine().catch((e: unknown) => { pannes.push(`nutrition de la semaine : ${cause(e)}`); return [] as Item[]; }),
+    collecterMaterielSemaine().catch((e: unknown) => { pannes.push(`matériel de la semaine : ${cause(e)}`); return [] as Item[]; }),
+    collecterConseilsSemaine().catch((e: unknown) => { pannes.push(`conseils de la semaine : ${cause(e)}`); return [] as Item[]; }),
   ]);
+  // ⚠️ Une panne n'est JAMAIS déduite d'une liste vide : ces collectes lèvent quand aucun de
+  // leurs flux n'a répondu (`AUCUN_FLUX`), et rendent une liste vide, sans alerte, quand les
+  // flux ont répondu sans article de la semaine.
   const tempsDe = (it: Item) => new Date(it.date).getTime() || 0;
   // ⚠️ Un article dont on peut lire le texte (fourni par le flux, ou lien direct vers une
   // page que l'éditeur autorise) passe devant un lien Google News, qui partira en titre
@@ -183,5 +199,5 @@ export async function preparerSelection({ base, edition }: { base: string; editi
     if (t) texteUne.set(s.article.link, t);
   }
 
-  return { parRubrique, une, candidatsUne, sujetsUne, dejaALaUne, texteUne, mediasUne, recents, echecSemaine };
+  return { parRubrique, une, candidatsUne, sujetsUne, dejaALaUne, texteUne, mediasUne, recents, echecSemaine, pannes };
 }
