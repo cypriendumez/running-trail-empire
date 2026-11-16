@@ -25,6 +25,7 @@ import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
 import { langueEcran } from "@/lib/i18n/serverLang";
+import { lireSeancesVma } from "@/lib/dashboard/seancesVma";
 
 export const metadata = { title: "Santé" };
 
@@ -63,7 +64,7 @@ export default async function HealthPage() {
     // Pour la nutrition, les courses à venir et de quoi PRÉDIRE leur durée — la même VMA effective que le coach
     // (`effectiveVma`, seule définition de l'app) : lus ensemble, en une vague.
     // La consultation du « kiné IA » n'est plus lue : elle est retirée (lib/health/kineIa).
-    const [objRes, planRes, profilRes, baseRes, seancesRes, fcMaxVma] = await Promise.all([
+    const [objRes, planRes, profilRes, baseRes, seancesRes, fcMaxVma, seancesVmaRes] = await Promise.all([
       supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "race_objective").maybeSingle(),
       supabase.from("notifications").select("data").eq("user_id", user.id).eq("type", "planned_race").order("created_at", { ascending: false }).limit(50),
       supabase.from("profiles").select("pace_curve,garmin_vo2max,weight_kg,preferred_language").eq("id", user.id).single(),
@@ -71,9 +72,11 @@ export default async function HealthPage() {
       supabase.from("workouts").select("date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c").eq("user_id", user.id).order("date", { ascending: false }).limit(200),
       // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
       fcMaxDeLAthlete(supabase, user.id),
+      // Les séances de LA VMA : la lecture unique (120 jours, 13/11/2026).
+      lireSeancesVma(supabase, user.id),
     ]);
     // Journalisées dans error_logs (12/11/2026), le test de référence compris (`vma_kmh`, première source de la VMA).
-    pannesVma = await signalerLectures("sante", user.id, [["objectif", objRes], ["courses", planRes], ["profil", profilRes], ["seances", seancesRes], ["repere", baseRes]]);
+    pannesVma = await signalerLectures("sante", user.id, [["objectif", objRes], ["courses", planRes], ["profil", profilRes], ["seances", seancesRes], ["seances", seancesVmaRes], ["repere", baseRes]]);
     langPage = await langueEcran((profilRes.data as { preferred_language?: string } | null)?.preferred_language);
     const { vma } = effectiveVma({
       vmaStored: baseRes.data?.vma_kmh ?? null,
@@ -81,7 +84,7 @@ export default async function HealthPage() {
       garminVo2: profilRes.data?.garmin_vo2max ?? null,
       // LA lecture des efforts (`effortDesSeances`, 12/11/2026), celle du coach : avant, 200 séances TOUS
       // sports sans aucun tri — un coureur lisait ici 29,3 km/h (un vélo) quand le coach disait 19,1.
-      fromRuns: effortDesSeances((seancesRes.data ?? []) as never, fcMaxVma)?.vma ?? null,
+      fromRuns: effortDesSeances((seancesVmaRes.data ?? []) as never, fcMaxVma)?.vma ?? null,
     });
     coursesNutrition = coursesPourNutrition(
       objRes.data?.data as Parameters<typeof coursesPourNutrition>[0],

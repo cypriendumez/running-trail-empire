@@ -297,7 +297,8 @@ async function main() {
     }
     // Idempotent : réappliquer ne double ni l'avertissement de course ni la consigne de renfo.
     assert.deepEqual(appliquerConsignes(plan, c), plan, "le contrôle n'est pas idempotent");
-    assert.match(codeOf("src/lib/ai/autoCoach.ts"), /const week = consignesSurPlan\(ctx, ajuste\.week, maintenant\);/, "le coach ne réapplique plus les consignes après les ajustements");
+    // (enveloppé, depuis le 13/11/2026, par le message d'une course C écartée, reposé en dernier)
+    assert.match(codeOf("src/lib/ai/autoCoach.ts"), /const week = avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, maintenant\), maintenant\);/, "le coach ne réapplique plus les consignes après les ajustements");
   });
 
   await test("une sortie courue aujourd'hui compte, même si le plan du jour n'en prévoyait pas", () => {

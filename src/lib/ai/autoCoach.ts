@@ -10,7 +10,7 @@
 import { lignesRetireesParDouleur } from "@/lib/coach/footings";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
-import { buildWeekPlan, consignesSurPlan, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
+import { buildWeekPlan, consignesSurPlan, avecCourseCEcartee, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
 import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
 import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, fcMaxMontre, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
@@ -285,7 +285,10 @@ export async function autoCoachForUser(
   }
   // Les ajustements (« décaler », « échanger ») réécrivent la semaine APRÈS le moteur : les
   // consignes du kinésithérapeute sont réappliquées sur le résultat (relecture du 10/11/2026).
-  const week = consignesSurPlan(ctx, ajuste.week, maintenant);
+  // Puis le message d'une course C écartée, EN DERNIER : un ajustement peut l'avoir effacé (« alléger »)
+  // ou déplacé (« décaler », « échanger ») (relecture du 13/11/2026). La relecture Premium qui suit
+  // ajoute au « pourquoi » sans le remplacer.
+  const week = avecCourseCEcartee(ctx, consignesSurPlan(ctx, ajuste.week, maintenant), maintenant);
 
   // ── LE COACH AVANCÉ (Premium, et l'essai qui le montre) ─────────────────────
   // Le modèle relit les séances CLÉS et ajoute à leur « pourquoi » un conseil d'exécution
@@ -297,7 +300,12 @@ export async function autoCoachForUser(
   const relecture = coachAvance
     ? await relireSemaine(admin as unknown as SupabaseClient, { userId, ctx, week, from, lang: langue })
     : null;
-  const semaineCoach = relecture?.conseils.length ? appliquerConseils(week, relecture.conseils) : week;
+  // Le message d'une course C écartée est EN TÊTE du « pourquoi » : `composerPourquoi` garde le début et
+  // coupe la fin du motif pour loger un conseil, puis l'écriture coupe à 640 (relectures du 16/11/2026).
+  // Il est reposé après les conseils par précaution (`avecCourseCEcartee` est idempotente).
+  const semaineCoach = relecture?.conseils.length
+    ? avecCourseCEcartee(ctx, appliquerConseils(week, relecture.conseils), maintenant)
+    : week;
 
   // 2) Remplace le plan à venir. On n'efface QUE le futur : l'historique des séances
   //    déjà passées reste intact pour le suivi d'adhérence.

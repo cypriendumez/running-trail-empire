@@ -23,6 +23,7 @@ import { joursSansIntensite } from "@/lib/coach/apresCourse";
 import { axesRenforcement } from "@/lib/coach/renforcement";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
+import { courseCEcarteeDe, type CourseCEcartee } from "@/lib/coach/courseCEcartee";
 import { appliquerConsignes, appliquerAptitude } from "@/lib/coach/consignesPlan";
 import { BILAN_T } from "@/lib/health/bilanMatin";
 import { nRaw, type I18nText } from "@/lib/i18n/multi";
@@ -121,7 +122,69 @@ function kmAndTime(km: number, pace: string | null, lang: Lang): string {
 export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[] {
   // LES CONSIGNES DU KINÉSITHÉRAPEUTE : un contrôle unique sur le plan FINI, quel que soit le
   // chemin qui a produit chaque séance (lib/coach/consignesPlan).
-  return consignesSurPlan(ctx, construireSemaine(ctx, today), today);
+  // Puis le message d'une course C écartée, posé EN DERNIER : le feu rouge, le bilan du matin ou les
+  // consignes réécrivent le « pourquoi » du jour 0, et l'effaçaient (relecture du 13/11/2026).
+  return avecCourseCEcartee(ctx, consignesSurPlan(ctx, construireSemaine(ctx, today), today), today);
+}
+
+/**
+ * La course C écartée de la semaine qui commence `today`, ou `null` — la règle de
+ * `lib/coach/courseCEcartee` (décisions de Cyprien, 13/11/2026), lue sur le contexte du coach.
+ */
+export function courseCEcartee(ctx: AthleteContext, today: Date): CourseCEcartee | null {
+  // Le résultat du coach fait foi : il a été calculé avec le jour 0 du COUREUR (son fuseau). Le calcul
+  // ci-dessous ne sert qu'aux contextes bâtis sans `buildAthleteContext` (tests).
+  if (ctx.courseCEcartee !== undefined) return ctx.courseCEcartee;
+  const debut = new Date(today); debut.setHours(0, 0, 0, 0);
+  return courseCEcarteeDe({
+    courseSecondaire: ctx.courseSecondaire ?? null, daysToRace: ctx.daysToRace,
+    distanceA: ctx.objective?.distanceKm ?? null, nomA: ctx.objective?.race ?? null,
+    recuperation: ctx.recuperation ?? null, aujourdhui: iso(debut),
+  });
+}
+/** Le message d'une course C écartée, dans la langue `l`, selon son motif. */
+const messageCourseCEcartee = (c: CourseCEcartee, l: Lang) =>
+  c.motif === "apres" ? PLAN_T[l].courseCEcarteeRecup(c.nom, c.courseA) : PLAN_T[l].courseCEcartee(c.nom);
+
+/**
+ * Pose au « pourquoi » du jour de la course C écartée (5 langues) le message qui le dit. À appeler EN
+ * DERNIER sur le plan publié : `buildWeekPlan` le fait, et le coach le refait après ses ajustements
+ * (« alléger », « décaler », « échanger ») et sa seconde passe de consignes, qui réécrivent ou
+ * déplacent les jours (relecture du 13/11/2026). Idempotente : le message est d'abord retiré PARTOUT,
+ * puis posé une seule fois, sur le bon jour — un « échanger » ne l'emporte pas ailleurs.
+ */
+export function avecCourseCEcartee(ctx: AthleteContext, plan: PlanDay[], today: Date): PlanDay[] {
+  const c = courseCEcartee(ctx, today);
+  if (!c) return plan;
+  const nettoye = sansCourseCEcartee(ctx, plan, today);
+  const debut = new Date(today); debut.setHours(0, 0, 0, 0);
+  const date = iso(addDays(debut, c.idx));
+  // L'entrée principale du jour (pas le footing du soir d'un jour doublé).
+  const i = nettoye.findIndex((d) => d.date === date && d.moment !== "soir");
+  if (i < 0) return nettoye;
+  const jour = nettoye[i];
+  // EN TÊTE du « pourquoi » (16/11/2026) : la relecture Premium (`composerPourquoi`) garde le DÉBUT et
+  // coupe la fin pour loger son conseil, et l'écriture en base coupe à 640 caractères. Posé en fin, le
+  // message disparaissait à l'enregistrement ; en tête, il passe les deux, et le coureur le lit d'abord.
+  const enTete = (m: string, texte: string | undefined) => (texte ? `${m} ${texte}` : m);
+  const i18n = Object.fromEntries(Object.entries(jour.i18n ?? {}).map(([l, t]) =>
+    [l, t ? { ...t, why: enTete(messageCourseCEcartee(c, l as Lang), t.why) } : t])) as Partial<Record<Lang, PlanDayText>>;
+  return nettoye.map((d, k) => (k === i ? { ...jour, why: enTete(messageCourseCEcartee(c, "fr"), jour.why), i18n } : d));
+}
+
+/** Le plan SANS le message de la course C écartée (5 langues) : la première étape d'`avecCourseCEcartee`. */
+export function sansCourseCEcartee<T extends { why: string; i18n?: Partial<Record<Lang, { why: string }>> }>(ctx: AthleteContext, plan: readonly T[], today: Date): T[] {
+  const c = courseCEcartee(ctx, today);
+  if (!c) return [...plan];
+  // Le message en tête (suivi d'une espace), seul, ou à l'ancienne place (en fin, précédé d'une espace).
+  const sans = (texte: string | undefined, l: Lang) => {
+    const m = messageCourseCEcartee(c, l);
+    return (texte ?? "").split(`${m} `).join("").split(` ${m}`).join("").split(m).join("");
+  };
+  return plan.map((d) => ({
+    ...d, why: sans(d.why, "fr"),
+    i18n: Object.fromEntries(Object.entries(d.i18n ?? {}).map(([l, t]) => [l, t ? { ...t, why: sans(t.why, l as Lang) } : t])),
+  }));
 }
 
 /**
@@ -362,6 +425,13 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     return slot as PlanDay[];
   }
 
+  // UN JOUR PRATICABLE : déclaré disponible ET pas systématiquement raté (13/11/2026, visa @HeadCoach).
+  // Le protocole de course est posé AVANT les étapes 1 et 1 bis (jours ratés, disponibilités) : chaque
+  // sortie qu'il pose vérifie donc elle-même ce critère. Un jour non praticable reste vide — il deviendra
+  // « Repos » plus bas, ce qui protège la course tout autant : rien de dur n'y sera posé.
+  const praticable = (i: number) => i >= 0 && i <= 6 && ctx.availability.days.includes(dates[i].getDay())
+    && !(ctx.skippedWeekdays ?? []).includes(dates[i].getDay());
+
   // ── 0. LA COURSE. Elle prime sur tout le reste : c'est l'objectif, pas une séance.
   // Sans ce bloc, le moteur pouvait poser une VMA la veille ou une sortie longue le
   // jour J — il ne consultait simplement jamais la date de course.
@@ -372,7 +442,9 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   const cs = ctx.courseSecondaire ?? null;
   const courseB = objectifIdx < 0 && cs?.priorite === "B";
   const raceIdx = objectifIdx >= 0 ? objectifIdx : courseB ? cs!.idx : -1;
-  const courseCIdx = cs?.priorite === "C" && cs.idx !== raceIdx ? cs.idx : -1;
+  // Une C écartée (`courseCEcartee`) n'existe plus pour la semaine : ni posée, ni sortie longue du
+  // lendemain bloquée, ni espacement imposé aux séances de qualité.
+  const courseCIdx = cs?.priorite === "C" && cs.idx !== raceIdx && !courseCEcartee(ctx, today) ? cs.idx : -1;
 
   // Budget de SORTIES de la semaine. Déclaré avant tout placement : la semaine de course
   // pose elle aussi des footings (déblocage, avant-veille, reprise) qui doivent le
@@ -400,7 +472,9 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     // Les 2 jours qui précèdent : décrassage seulement. Aucune séance dure dans les 48 h.
     for (const d of [1, 2]) {
       const i = raceIdx - d;
-      if (i < 0) continue;
+      // Un jour non praticable reste vide (13/11/2026) : la veille posée un jour indisponible y comptait
+      // une sortie que le coureur a dit ne pas pouvoir faire.
+      if (i < 0 || !praticable(i)) continue;
       // Ces jours-là sont des SORTIES : ils consomment le budget hebdomadaire au même
       // titre qu'un footing. Les oublier donnait 6 séances à un athlète qui en déclare 3.
       //
@@ -422,8 +496,8 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     for (const d of [1, 2]) {
       const i = raceIdx + d;
       if (i > 6) continue;
-      // Le footing de reprise n'a lieu que si le budget de sorties le permet.
-      if (d === 2 && runBudget <= 0) continue;
+      // Le footing de reprise n'a lieu que si le budget de sorties le permet, un jour praticable.
+      if (d === 2 && (runBudget <= 0 || !praticable(i))) continue;
       const placedRest = put(i, d === 1
         ? { type: "Repos", title: (l) => PLAN_T[l].reposCourseTitre, detail: (l) => PLAN_T[l].reposCourseDetail,
             why: (l) => PLAN_T[l].reposCourseWhy, tags: tags("Repos") }
@@ -433,18 +507,40 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
       if (placedRest && d === 2) spend();   // le footing de reprise est une sortie
     }
   }
+  // LA COURSE JUSTE APRÈS LA FENÊTRE (J+7, J+8) : elle n'est pas dans les sept jours affichés, mais sa
+  // veille et son avant-veille, si. Sans ce bloc, le moteur posait un seuil la veille d'un 10 km
+  // (rejeu @Sparring du profil élite, 13/11/2026) — remplacé le lendemain par la replanification,
+  // mais affiché au calendrier et poussé à la montre d'ici là. Même protocole que dans la fenêtre, jours
+  // praticables seulement (`praticable`).
+  // L'indice de la course A (`objectifIdx`), pas celui de « la course de la semaine » (`raceIdx`) : une
+  // course B posée au jour 1 ou 2 faisait sauter cette protection (visa @HeadCoach, 2e tour).
+  const courseApres = objectifIdx < 0 && ctx.daysToRace != null && ctx.daysToRace >= 7 && ctx.daysToRace <= 8 ? ctx.daysToRace : -1;
+  if (courseApres > 0) {
+    for (const d of [1, 2]) {
+      const i = courseApres - d;
+      if (i > 6 || runBudget <= 0 || !praticable(i)) continue;
+      if (put(i, d === 1
+        ? { type: "Récup", title: (l) => PLAN_T[l].veilleTitre, detail: (l) => PLAN_T[l].veilleDetail,
+            why: (l) => PLAN_T[l].veilleWhy, tags: tags("Récup", "Veille de course") }
+        : { type: "Récup", title: (l) => PLAN_T[l].avantVeilleTitre, detail: (l) => PLAN_T[l].avantVeilleDetail,
+            why: (l) => PLAN_T[l].avantVeilleWhy, tags: tags("Récup", "Affûtage") })) spend();
+    }
+  }
 
   // Course C : la course, une veille calme ; elle compte comme une séance dure (étape 4).
   if (courseCIdx >= 0) {
-    if (put(courseCIdx, {
+    const poseeC = put(courseCIdx, {
       type: "Course",
       title: (l) => PLAN_T[l].courseSecondaireTitre(cs!.nom, "C"),
       detail: (l) => PLAN_T[l].courseCDetail,
       why: (l) => PLAN_T[l].courseCWhy,
       tags: (l) => [PLAN_T[l].tags["Course"], ...(cs!.distanceKm ? [PLAN_T[l].tagKm(nRaw(cs!.distanceKm, l))] : [])],
-    })) spend();
+    });
+    if (poseeC) spend();
     const veille = courseCIdx - 1;
-    if (veille >= 0 && runBudget > 0 && put(veille, {
+    // Un jour praticable seulement, comme tout le protocole de course (visa @HeadCoach, 2e tour) ; et pas
+    // de veille pour une course C écartée.
+    if (poseeC && veille >= 0 && praticable(veille) && runBudget > 0 && put(veille, {
       type: "Récup", title: (l) => PLAN_T[l].veilleTitre, detail: (l) => PLAN_T[l].veilleDetail,
       why: (l) => PLAN_T[l].veilleWhy, tags: tags("Récup", "Veille de course"),
     })) spend();

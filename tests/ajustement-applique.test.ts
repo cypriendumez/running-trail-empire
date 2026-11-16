@@ -155,7 +155,8 @@ test("le coach réapplique les ajustements AVANT de publier le plan et de l'envo
   const iPurge = src.indexOf(`.eq("type", "coach_session").gte("data->>date", from)`);
   assert.ok(iApplique > 0 && iPurge > iApplique, "les ajustements ne sont plus appliqués avant la publication");
   // Le plan ajusté, puis les consignes du kinésithérapeute réappliquées dessus (Santé, lot 1).
-  assert.match(src, /const week = consignesSurPlan\(ctx, ajuste\.week, maintenant\);/, "le plan publié n'est plus le plan ajusté");
+  // …et le message d'une course C écartée reposé en dernier (13/11/2026) : il enveloppe, sans le changer.
+  assert.match(src, /const week = avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, maintenant\), maintenant\);/, "le plan publié n'est plus le plan ajusté");
   assert.match(src, /joursCourables: ctx\.availability\.days\.filter\(\(d\) => !ctx\.skippedWeekdays\.includes\(d\)\)/);
 });
 

@@ -47,6 +47,7 @@ import { apresCourse, facteurVolumeApresCourse, type PhaseApresCourse } from "@/
 import { repriseApresArret, partApresArret } from "@/lib/coach/repriseArret";
 import { programmeMarcheCourse, dureesMarcheCourse, type SeanceMarcheCourse } from "@/lib/coach/marcheCourse";
 import { testEnVigueur, allureFacileMaxSec, fmtAllure, TYPE_TEST_LACTATE, type TestLactate } from "@/lib/coach/lactate";
+import { courseCEcarteeDe, type CourseCEcartee } from "@/lib/coach/courseCEcartee";
 import { coursesDeSaison, prochaineCourseA, courseSecondaireDeLaSemaine, coursesPassees, PART_VOLUME_COURSE_B, type Priorite } from "@/lib/coach/saison";
 import { objectifEnCours, estOfficielle } from "@/lib/coach/prochaineCourse";
 import { decaleJour } from "@/lib/streak/compute";
@@ -64,6 +65,7 @@ import { estUnePanne } from "@/lib/dashboard/lectures";
 import type { PausesSeance } from "@/lib/activities/pauses";
 import { qualiteRecente as qualiteDesSeptJours, type QualiteRecente, type Prescription } from "@/lib/coach/qualiteRecente";
 import { phaseDeSemaine, specifiqueEnTete, semainesAffutage, partAffutage, allegementDuBloc } from "@/lib/coach/phase";
+import { lireSeancesVma } from "@/lib/dashboard/seancesVma";
 
 type SB = Awaited<ReturnType<typeof createClient>>;
 
@@ -351,6 +353,10 @@ export type AthleteContext = {
   marcheCourse?: { etape: number; total: number; seance: SeanceMarcheCourse } | null;
   /** Course B ou C dans les sept jours du plan (`lib/coach/saison`), hors objectif visé. */
   courseSecondaire?: { idx: number; nom: string; distanceKm: number | null; priorite: Priorite } | null;
+  /** La course C écartée de la semaine (lib/coach/courseCEcartee), calculée UNE fois ici, avec le jour 0
+   *  du coureur (son fuseau) : le plan la lit telle quelle. Recalculée dans le plan avec l'horloge du
+   *  serveur (UTC), elle pouvait le contredire entre 23 h et minuit (relecture du 13/11/2026). */
+  courseCEcartee?: CourseCEcartee | null;
   /** Construit pour le palier gratuit (`LectureContexte.objectifSeul`) : l'objectif et le
    *  déclaré, aucune mesure. Optionnel : un contexte sérialisé avant cette version ne l'a pas. */
   objectifSeul?: boolean;
@@ -467,7 +473,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Une lecture qu'on ne fait pas : la forme exacte d'une réponse vide de PostgREST.
   const nonLu = () => Promise.resolve({ data: [] as never[], error: null });
   const nonLuUne = () => Promise.resolve({ data: null, error: null });
-  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes, lactateRes, planifieesRes] = await Promise.all([
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes, lactateRes, planifieesRes, seancesVmaRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     objectifSeul || essentielle ? nonLu() : sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(30),
@@ -534,6 +540,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // Les courses notées au calendrier (lib/coach/saison) : le coach les ignorait.
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "planned_race")
       .order("created_at", { ascending: false }).limit(40),
+    // Les séances de LA VMA : la lecture unique des écrans (120 jours, 13/11/2026). `fetchWorkouts`
+    // s'arrête à 60 séances : 7 semaines de courses chez un coureur qui fait aussi du vélo.
+    objectifSeul ? nonLu() : lireSeancesVma(sb, userId),
   ]);
 
   // Palier gratuit : le profil réduit à ce qui est DÉCLARÉ, et du test de VMA, la VMA seule
@@ -550,6 +559,15 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const { metrique: metriqueVfc, lignes: hrv } = serieVfc((hrvRes.data ?? []) as { date: string; rmssd: number | null; sdnn: number | null }[]);
   const sleep = (sleepRes.data ?? []) as { sleep_score: number | null; total_sleep_min: number | null; deep_sleep_min: number | null; rem_sleep_min: number | null; body_battery_end: number | null; respiration_rate: number | null; date: string }[];
   const workouts = (woRes.data ?? []) as Wk[];
+  // Lecture de la VMA en panne : on retombe sur les 60 séances de `fetchWorkouts` (la lecture d'avant le
+  // 13/11/2026), en le disant au journal — pas sur une liste vide qui effacerait la VMA « séances ».
+  // Journalisée dans error_logs (relecture du 13/11/2026) : le repli change la VMA, en silence sinon.
+  if (seancesVmaRes.error) {
+    const e = seancesVmaRes.error as { code?: string; message: string };
+    console.error("[coach] séances de la VMA illisibles, repli sur les 60 dernières :", e.message);
+    await journaliserEchecUneFois(null, { source: "coach-vma", userId, message: `Séances de la VMA illisibles, repli sur les 60 dernières : ${e.code ?? "?"} ${e.message}` });
+  }
+  const seancesVma = seancesVmaRes.error ? workouts : ((seancesVmaRes.data ?? []) as unknown as Wk[]);
   // Palier gratuit : du formulaire d'après-séance, ce que l'athlète DÉCLARE et qui le protège
   // — la douleur signalée, et le RESSENTI (RPE) depuis le 30/10/2026 (Cyprien : « ressenti lu
   // par le plan gratuit »). Un « 9/10, épuisé » qui laissait le lendemain inchangé était un
@@ -858,9 +876,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // précisément l'analyse que ce palier ne fait pas.
     // Même tri d'efforts que la VMA affichée (`fcMaxPourEfforts`, 12/11/2026) : sans FC max, le pic
     // des séances reste un garde-fou au lieu d'aucun tri.
-    // LA lecture des efforts, la même que chaque écran (`effortDesSeances`, 12/11/2026) : ses 60 séances,
-    // course seulement, FC max commune, acclimatation à la chaleur.
-    fromRuns: objectifSeul ? null : effortDesSeances(workouts as never, fcMaxEst, now)?.vma ?? estimateVmaFromRuns(runs, fcMaxEst, now),
+    // LA lecture des efforts, la même que chaque écran (`effortDesSeances`, 12/11/2026) : les séances des
+    // 120 derniers jours (13/11/2026), course seulement, FC max commune, acclimatation à la chaleur.
+    fromRuns: objectifSeul ? null : effortDesSeances(seancesVma as never, fcMaxEst, now)?.vma ?? estimateVmaFromRuns(runs, fcMaxEst, now),
   });
   const vmaIsEst = vmaSource !== "test" && vma != null;
 
@@ -1456,9 +1474,19 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Le coach ignorait les courses du calendrier : une VMA pouvait tomber le jour même.
   const dateObjectifVise = objective?.raceDate ? String(objective.raceDate).slice(0, 10) : null;
   const secondaire = courseSecondaireDeLaSemaine(saison, todayStr, dateObjectifVise);
-  const secondaireMotif = secondaire
-    ? tr((l) => MOTIF_T[l].courseSecondaire(secondaire.course.nom,
-        formatDateCivile(secondaire.course.date, l, { weekday: "long", day: "numeric", month: "long" }), secondaire.course.priorite === "B"))
+  // Une course C trop près de la course A (veille, avant-veille ; semaine d'affûtage d'un semi ou d'un
+  // marathon), ou pendant la récupération de toute course courue, est ÉCARTÉE (décisions de Cyprien,
+  // 13/11/2026, lib/coach/courseCEcartee) : elle ne retire pas de qualité et n'est annoncée ni dans les
+  // motifs ni à l'IA. Le plan la signale au jour où elle tombait.
+  const cEcartee = courseCEcarteeDe({
+    courseSecondaire: secondaire ? { idx: secondaire.idx, nom: secondaire.course.nom, priorite: secondaire.course.priorite } : null,
+    daysToRace, distanceA: objective?.distanceKm != null ? Number(objective.distanceKm) : null, nomA: objective?.race ?? null,
+    recuperation: recup ? { course: recup.nom, fin: recup.fin } : null, aujourdhui: todayStr,
+  });
+  const secondaireActive = cEcartee ? null : secondaire;
+  const secondaireMotif = secondaireActive
+    ? tr((l) => MOTIF_T[l].courseSecondaire(secondaireActive.course.nom,
+        formatDateCivile(secondaireActive.course.date, l, { weekday: "long", day: "numeric", month: "long" }), secondaireActive.course.priorite === "B"))
     : null;
   /** Course B dans la semaine `i` du plan (0 = celle qui commence aujourd'hui) : mini-affûtage. */
   const partCourseB = (i: number) => saison.some((c) => {
@@ -1525,7 +1553,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   };
   const qb = computeQualityBudget(entreeQualite);
   // Une course B ou C dans la semaine EST une séance dure : elle prend la place d'une qualité.
-  const qBudget = Math.max(0, qb.qBudget - (secondaire ? 1 : 0));
+  const qBudget = Math.max(0, qb.qBudget - (secondaireActive ? 1 : 0));
   const { structuralQBudget, easeReasons, expCapped, expCap } = qb;
 
   // ── VERDICT DE FRAÎCHEUR DU JOUR — calculé, pas laissé à l'appréciation de l'IA ──
@@ -2153,7 +2181,9 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         : wkUntil <= 1 ? "Fraîcheur — repos, rappels d'allure" : "Volume −, on garde l'intensité (fraîcheur jour J)";
       // Une course B ou C de la semaine se lit dans la feuille de route, comme dans le plan.
       const cs = courseDeLaSemaine(i);
-      out.push({ week: i + 1, phase: ph, volumeKm, quality, longRunKm, focus: cs ? `${focus} · course ${cs.priorite} : ${cs.nom}` : focus });
+      // Une course C écartée cette semaine est dite écartée, pas annoncée (13/11/2026).
+      const ecarteeIci = i === 0 && cs && cEcartee && cs.priorite === "C" && cs.nom === cEcartee.nom;
+      out.push({ week: i + 1, phase: ph, volumeKm, quality, longRunKm, focus: cs ? `${focus} · course ${cs.priorite}${ecarteeIci ? " écartée" : ""} : ${cs.nom}` : focus });
     }
     return out;
   })();
@@ -2560,7 +2590,7 @@ FORME & RÉCUPÉRATION (aujourd'hui)
 
 CHARGE D'ENTRAÎNEMENT
 ${demonstratedKm ? `- 📈 CAPACITÉ DÉJÀ DÉMONTRÉE : ${demonstratedKm} km/semaine tenus sur ses meilleures semaines des 6 derniers mois. Son système musculo-tendineux CONNAÎT ce volume — il y reviendra bien plus vite qu'il n'y est monté la première fois. Ne le traite pas comme un débutant sous prétexte que ses dernières semaines sont basses ; mais ne t'en sers pas non plus pour justifier une charge élevée AUJOURD'HUI : c'est la fraîcheur du moment qui en décide.\n` : ""}- Volume : ${Math.round(weekKm)} km COURUS cette semaine${cross.label ? ` (+ ${fmtMinutes(cross.minutes)} d'AUTRES SPORTS, ${cross.tss} TSS = ${cross.sharePct} % de sa charge : ${cross.label}${cross.impactMinutes > 0 ? ` — dont ${fmtMinutes(cross.impactMinutes)} avec impact sur les jambes, qui s'ajoutent à l'usure de la course` : " — sans impact sur les jambes : ça fatigue le cardio, pas les tendons"}. Ça compte dans la charge, mais ce N'EST PAS du volume de course : ne dimensionne AUCUNE séance dessus)` : ""} · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
-${lacune ? `- ⚠️ TROU DE DONNÉES : ${lacune.jours} jours SANS AUCUNE trace (ni séance, ni nuit, ni VFC) du ${lacune.debut} au ${lacune.fin}. Une coupure, une blessure et une montre non portée produisent exactement ce silence — et appellent des plans OPPOSÉS. Les moyennes qui traversent cette période sont donc peu fiables : DIS-LUI que tu l'as remarqué et DEMANDE-LUI ce qui s'est passé, ne suppose pas.\n` : ""}${secondaire ? `- 🏁 COURSE ${secondaire.course.priorite} CETTE SEMAINE : ${secondaire.course.nom} le ${secondaire.course.date}${secondaire.course.distanceKm ? ` (${secondaire.course.distanceKm} km)` : ""} — ${secondaire.course.priorite === "B" ? "course de préparation : deux jours calmes avant, semaine allégée, récupération après" : "course d'entraînement : elle remplace une séance de qualité, sans affûtage"}.\n` : ""}${marcheCourse ? `- 🚶 PROGRAMME MARCHE-COURSE, étape ${marcheCourse.etape}/${marcheCourse.total} : ${"continuMin" in marcheCourse.seance ? `${marcheCourse.seance.continuMin} min de course continue` : `${marcheCourse.seance.reps} × (${marcheCourse.seance.courseMin} min de course / ${marcheCourse.seance.marcheMin} min de marche)`}, trois fois par semaine, ${dureesMarcheCourse(marcheCourse.seance).totalMin} min marche comprise. Il ne court pas encore 30 minutes d'affilée : AUCUNE allure, AUCUN volume en kilomètres, AUCUNE séance de qualité ni test VMA. Encourage la régularité ; la marche fait partie de la séance.` : `- 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.`}
+${lacune ? `- ⚠️ TROU DE DONNÉES : ${lacune.jours} jours SANS AUCUNE trace (ni séance, ni nuit, ni VFC) du ${lacune.debut} au ${lacune.fin}. Une coupure, une blessure et une montre non portée produisent exactement ce silence — et appellent des plans OPPOSÉS. Les moyennes qui traversent cette période sont donc peu fiables : DIS-LUI que tu l'as remarqué et DEMANDE-LUI ce qui s'est passé, ne suppose pas.\n` : ""}${cEcartee && secondaire ? `- 🏁 COURSE C ÉCARTÉE : ${secondaire.course.nom} le ${secondaire.course.date} — ${cEcartee.motif === "apres" ? `pendant la récupération de ${cEcartee.courseA ? `« ${cEcartee.courseA} »` : "la course A"}` : "trop près de la course A"}. Elle n'est pas au plan : ne la propose pas.\n` : ""}${secondaireActive ? `- 🏁 COURSE ${secondaireActive.course.priorite} CETTE SEMAINE : ${secondaireActive.course.nom} le ${secondaireActive.course.date}${secondaireActive.course.distanceKm ? ` (${secondaireActive.course.distanceKm} km)` : ""} — ${secondaireActive.course.priorite === "B" ? "course de préparation : deux jours calmes avant, semaine allégée, récupération après" : "course d'entraînement : elle remplace une séance de qualité, sans affûtage"}.\n` : ""}${marcheCourse ? `- 🚶 PROGRAMME MARCHE-COURSE, étape ${marcheCourse.etape}/${marcheCourse.total} : ${"continuMin" in marcheCourse.seance ? `${marcheCourse.seance.continuMin} min de course continue` : `${marcheCourse.seance.reps} × (${marcheCourse.seance.courseMin} min de course / ${marcheCourse.seance.marcheMin} min de marche)`}, trois fois par semaine, ${dureesMarcheCourse(marcheCourse.seance).totalMin} min marche comprise. Il ne court pas encore 30 minutes d'affilée : AUCUNE allure, AUCUN volume en kilomètres, AUCUNE séance de qualité ni test VMA. Encourage la régularité ; la marche fait partie de la séance.` : `- 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.`}
 - 🔄 PHASE DU CYCLE : ${cycleLabel}.
 - 📆 DISPONIBILITÉS : ${availDaysPerWeek} séance(s) de course par semaine${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""}${declaredDpw ? " (déclaré par l'athlète)" : " (déduit de son niveau et de sa pratique actuelle — demande-lui de le préciser)"}. NE DÉPASSE PAS ce nombre : un plan qu'il ne peut pas suivre ne vaut rien.
 - ⏱️ Dernière séance DURE réellement effectuée : ${lastHardDaysAgo == null ? "aucune trace récente" : lastHardDaysAgo === 0 ? "AUJOURD'HUI ⚠️ → pas de deuxième séance dure aujourd'hui ni demain" : `il y a ${lastHardDaysAgo} j`}${lastHardDaysAgo != null && lastHardDaysAgo * 24 < hardGapH ? ` ⚠️ moins de ${hardGapH} h se sont écoulées : la prochaine qualité doit attendre.` : ""}${qualiteRecente.manquees.length ? `\n- ⏭️ QUALITÉ PRESCRITE ET NON FAITE (7 derniers jours) : ${qualiteRecente.manquees.join(", ")} — elle compte dans la semaine et NE SE RATTRAPE PAS : ne la re-propose pas le lendemain.` : ""}${skippedWeekdays.length ? `\n- 🚫 JOURS SYSTÉMATIQUEMENT RATÉS : ${skippedWeekdays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")} — prescrits plusieurs fois, jamais courus. Ne t'obstine pas : place-y du repos ou rien, et redistribue ailleurs.` : ""}
@@ -2738,6 +2768,7 @@ ${catalog}`;
     objectiveWarnings,
     recuperation: recup ? { course: recup.nom, reprise: recup.reprise, fin: recup.fin, phase: recup.phase } : null,
     marcheCourse: marcheCourse ? { etape: marcheCourse.etape, total: marcheCourse.total, seance: marcheCourse.seance } : null,
+    courseCEcartee: cEcartee,
     courseSecondaire: secondaire
       ? { idx: secondaire.idx, nom: secondaire.course.nom, distanceKm: secondaire.course.distanceKm, priorite: secondaire.course.priorite }
       : null,
@@ -2754,7 +2785,8 @@ ${catalog}`;
 export async function getEffectiveVma(sb: SupabaseClient, userId: string): Promise<number | null> {
   const [baseRes, woRes, profRes] = await Promise.all([
     sb.from("performance_baselines").select("vma_kmh").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
-    fetchWorkouts(sb, userId),
+    // La lecture unique des séances de la VMA (120 jours, 13/11/2026), comme le coach et les écrans.
+    lireSeancesVma(sb, userId),
     sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
   ]);
   // ⚠️ UNE PANNE N'EST PAS « VMA INCONNUE » (08/11/2026). Aucune des trois erreurs n'était
