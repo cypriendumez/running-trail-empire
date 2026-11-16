@@ -1383,7 +1383,7 @@ export const ARTICLES: Article[] = [
   {
     slug: "sommeil-et-performance-du-coureur",
     cle: "p18",
-    maj: "15 novembre 2026",
+    maj: "16 novembre 2026",
     chapo:
       "C'est la seule séance de la semaine que personne n'écrit sur son calendrier, et la littérature la chiffre plutôt bien quand on manque de sommeil. Elle est en revanche beaucoup plus pauvre qu'on ne le croit sur ce qui t'intéresse vraiment : dormir plus, et ce que ta montre en sait.",
     avertissement:
