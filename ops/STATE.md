@@ -1,6 +1,6 @@
 # État de l'équipe d'agents Pacevo
 
-*Tenu par `@Nexus`. Mis à jour le 13/11/2026 à 7 h (routine Direction). Chaque ligne dit ce qui TOURNE VRAIMENT,
+*Tenu par `@Nexus`. Mis à jour le 13/11/2026 à 7 h (routine Direction) ; retouché en session le 16/11/2026 (production, PR #47 et #51). Chaque ligne dit ce qui TOURNE VRAIMENT,
 pas ce qui est prévu : un agent écrit dans la constitution mais sans routine planifiée n'existe pas.*
 
 > ⚠️ **Dépôt PUBLIC** (`cypriendumez/running-trail-empire`). Rien de personnel, de comptable ni
@@ -51,6 +51,8 @@ https://pacevo.fr (HTTP 200) et https://pacevo.fr/version.json (alerte si « com
 
 **Production** (13/11) : pacevo.fr sert 96f288c1 (fusion de #45), `main` est à ff51926 (fusion de
 #46). Une fusion de retard, déploiement sur GO de Cyprien (`/deployer`).
+**Production au 16/11** (relevé en session) : pacevo.fr sert `ef3d2c6b`, la tête de `main` avant la
+fusion de cette PR de documentation (#48, #49, #50, #52 et #53 en ligne). Plus de retard.
 
 ## Vague 1 : 12 agents sur 12 en place
 
@@ -124,9 +126,11 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
 1. **Sauvegarde des données personnelles** : couverte chaque semaine sur le Mac (chiffrée), mais
    pas de copie quotidienne côté hébergeur tant que Supabase est sur l'offre gratuite. Passage à
    l'offre Pro à décider au lancement.
-2. **PR Direction du 13/11** (`ops/ATLAS_SYNC.md`, `ops/greffier/API-MONTRES.md`,
-   `ops/memory/LESSONS_LEARNED.md`) : à ouvrir. Les nouveaux visas de `@Strategos` et `@Trésorier` sur
-   les versions corrigées sont à redemander, puis fusion sur GO de Cyprien.
+2. **PR Direction du 13/11** (#47) : visas redemandés en session le 16/11/2026, verdicts complets dans
+   la description de la PR. `@Trésorier` : VISA ACCORDÉ au second tour du 16/11, après reprise de
+   `ops/greffier/API-MONTRES.md` (créer un client Polar vaut acceptation d'un accord de licence : Niveau 3,
+   Cyprien seul). `@Strategos` : VISA ACCORDÉ au troisième tour du 16/11, après deux reprises de
+   `ops/memory/LESSONS_LEARNED.md`. GO de fusion donné par Cyprien en session le 16/11.
 3. **Garmin** : la page officielle relue le 13/11 ne dit plus « suspendu », mais aucun texte daté ne
    confirme la reprise. La correction 6 de `ops/CONSTITUTION.md` et `.claude/agents/maestro.md` disent
    encore « suspendu ». À reformuler ou non : décision de Cyprien.
@@ -137,6 +141,13 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
 6. **Visas des PR de session** : les PR ouvertes en session doivent-elles aussi porter le visa de leur
    directeur (texte du plan → `@Architect`, i18n → `@Maestro`, IA → `@Conductor`, texte légal →
    `@Trésorier`) ? Décision de Cyprien.
+
+7. **Gazette, candidats périmés** : 1er passage de la routine le 15/11 ; sa PR #51 a été fermée sans fusion
+   le 16/11 (visa `@Maestro` BLOQUÉ : l'édition était choisie sur les candidats du 09/11). Sans édition
+   fusionnée, la lettre du 16/11 suit son ordre automatique (envoi non contrôlé dans cette session). Cause probable, relue dans `src/app/api/newsletter/candidats/route.ts`
+   et constatée en ligne le 16/11 : `unstable_cache` sert l'ancienne collecte au premier appel après une longue
+   pause et ne la refait qu'en arrière-plan. Non corrigé. À décider par Cyprien : la route refait la collecte
+   quand `genere` a plus de 30 minutes, ou la routine refuse des candidats de plus de 24 heures.
 
 ## Résolues le 13/11/2026
 
