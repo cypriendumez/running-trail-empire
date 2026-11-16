@@ -33,6 +33,7 @@ export const TITRES_BLOG: Record<Lang, Record<string, string>> = {
     p15: "Plaque carbone en trail : ce qu'elle doit à la route, ce qu'elle ne prouve pas encore",
     p16: "Courir dans le froid et la nuit : voies respiratoires et visibilité",
     p17: "Quelle application de coaching running choisir en 2027 ? Six questions à poser",
+    p18: "Le sommeil, la séance que personne ne planifie",
   },
   en: {
     p1: "Why AI will be your best coach (and what a human can't do)",
@@ -52,6 +53,7 @@ export const TITRES_BLOG: Record<Lang, Record<string, string>> = {
     p15: "Carbon plates in trail shoes: what they owe to the road, what they haven't yet proven",
     p16: "Running in the cold and the dark: airways and being seen",
     p17: "Which running coaching app to choose in 2027? Six questions to ask",
+    p18: "Sleep: the session nobody puts on the calendar",
   },
   de: {
     p1: "Warum KI dein bester Coach wird (und was ein Mensch nicht kann)",
@@ -71,6 +73,7 @@ export const TITRES_BLOG: Record<Lang, Record<string, string>> = {
     p15: "Carbonplatte im Trailschuh: was sie der Straße verdankt, was sie noch nicht beweist",
     p16: "Laufen bei Kälte und Dunkelheit: Atemwege und Sichtbarkeit",
     p17: "Welche Lauf-Coaching-App 2027 wählen? Sechs Fragen, die du stellen solltest",
+    p18: "Schlaf: die Einheit, die niemand einplant",
   },
   es: {
     p1: "Por qué la IA será tu mejor entrenador (y lo que un humano no puede hacer)",
@@ -90,6 +93,7 @@ export const TITRES_BLOG: Record<Lang, Record<string, string>> = {
     p15: "Placa de carbono en trail: lo que debe a la carretera, lo que aún no demuestra",
     p16: "Correr con frío y de noche: vías respiratorias y visibilidad",
     p17: "¿Qué aplicación de entrenamiento de running elegir en 2027? Seis preguntas que hacer",
+    p18: "El sueño, la sesión que nadie planifica",
   },
   pt: {
     p1: "Porque a IA será o teu melhor treinador (e o que um humano não consegue fazer)",
@@ -109,5 +113,6 @@ export const TITRES_BLOG: Record<Lang, Record<string, string>> = {
     p15: "Placa de carbono em trail: o que deve à estrada, o que ainda não prova",
     p16: "Correr com frio e à noite: vias respiratórias e visibilidade",
     p17: "Que aplicação de treino de corrida escolher em 2027? Seis perguntas a fazer",
+    p18: "O sono, a sessão que ninguém planeia",
   },
 };
