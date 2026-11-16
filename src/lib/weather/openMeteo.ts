@@ -145,10 +145,14 @@ export function windAdvice(windKmh: number | null, lang: Lang = "fr"): { penalty
 }
 
 /** Températures maximales quotidiennes passées à une position — UN seul appel pour
- *  toute la période. Sert à mesurer l'exposition réelle à la chaleur. */
-export async function archiveDailyMax(lat: number, lon: number, days: number): Promise<Map<string, number>> {
-  const end = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
-  const start = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+ *  toute la période. Sert à mesurer l'exposition réelle à la chaleur.
+ *  `maintenant` : l'instant d'où se comptent la veille et le début de la période. Le coach passe la
+ *  fin du jour du coureur (`finDuJourCoureur`) : à l'heure du serveur (UTC), entre minuit et 1 h
+ *  (2 h l'été) à Paris, la veille du coureur manquait, et une sortie courue sous la chaleur la veille
+ *  ne comptait pas dans l'acclimatation (relecture du 17/11/2026). */
+export async function archiveDailyMax(lat: number, lon: number, days: number, maintenant = Date.now()): Promise<Map<string, number>> {
+  const end = new Date(maintenant - 86400_000).toISOString().slice(0, 10);
+  const start = new Date(maintenant - days * 86400_000).toISOString().slice(0, 10);
   const url = `${ARCHIVE}?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}`
     + `&start_date=${start}&end_date=${end}&daily=temperature_2m_max&timezone=auto`;
   const out = new Map<string, number>();

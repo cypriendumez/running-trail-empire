@@ -53,7 +53,7 @@ export function effortDesSeances(seances: readonly SeanceVma[], fcMax: number | 
   const debut = debutFenetreVma(maintenant);
   const lues = (seances ?? []).filter((w) => String(w.date ?? "").slice(0, 10) >= debut);
   const courses = lues.filter((w) => isRun(w.sport));
-  return meilleurEffort(courses, fcMaxPourEfforts(fcMax, courses), JOURS_VMA, acclimatationDesSeances(lues, maintenant));
+  return meilleurEffort(courses, fcMaxPourEfforts(fcMax, courses), JOURS_VMA, acclimatationDesSeances(lues, maintenant), maintenant);
 }
 
 export function vmaAffichee(i: {

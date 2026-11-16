@@ -89,6 +89,35 @@ export function instantDuJour(jour: string): Date {
 }
 
 /**
+ * L'INSTANT DE RÉFÉRENCE des fenêtres sur des DATES CIVILES vues le jour `jour` (« AAAA-MM-JJ ») : le
+ * dernier instant qui est encore `jour` À LA FOIS en UTC et dans le fuseau du coureur (à Paris :
+ * 23 h 59 min 59,999 s, soit 22:59:59.999Z l'hiver et 21:59:59.999Z l'été). NaN si `jour` est illisible.
+ *
+ * Les dates de séance, de nuit, de VFC sont stockées « AAAA-MM-JJ » et lues à minuit UTC. Une fenêtre
+ * « de N jours » écrite `maintenant - date <= N × 24 h` retient aujourd'hui et les N-1 jours d'avant
+ * tant que `maintenant` tombe le même jour UTC que le coureur. Sur un serveur en UTC, entre minuit et
+ * 1 h (2 h l'été) à Paris, ce n'est plus vrai : chaque fenêtre gardait un jour de trop, et le volume
+ * visé, la charge ou le niveau de forme changeaient pour le même jour du coureur (16/11/2026).
+ * Comptée depuis cet instant-ci, une fenêtre retient le même ensemble de jours à toute heure : celui
+ * que donnait le calcul en journée. Une fenêtre ancrée à MIDI (`T12:00:00Z`), qui basculait à midi
+ * UTC, retient désormais toute la journée ce qu'elle retenait l'après-midi.
+ *
+ * ⚠️ LES DEUX JOURS À LA FOIS, pas la fin du jour UTC : 23:59:59.999Z est déjà le lendemain à Paris,
+ * et les fonctions qui relisent le jour du coureur depuis l'instant (`jourLocal`, volume en semaines
+ * de calendrier) comptaient alors depuis demain (relecture du 16/11/2026).
+ * ⚠️ POUR DES DATES SEULEMENT. Un horodatage (`created_at`, point de courbe) se compare à l'instant réel.
+ */
+export function finDuJourCoureur(jour: string, tz: string = FUSEAU_DEFAUT): number {
+  const j = String(jour ?? "").slice(0, 10);
+  let t = Date.parse(`${j}T23:59:59.999Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(j) || !Number.isFinite(t)) return Number.NaN;
+  // D'heure en heure vers le passé jusqu'à retomber sur `jour` chez le coureur : aucun fuseau n'est
+  // à plus de 14 h de l'UTC. À l'ouest de l'UTC, la fin du jour UTC est déjà son jour : rien à reculer.
+  for (let i = 0; i <= 14 && jourCivil(t, tz) !== j; i++) t -= 3600000;
+  return jourCivil(t, tz) === j ? t : Number.NaN;
+}
+
+/**
  * Écrit une DATE CIVILE stockée (« 2026-09-03 »).
  *
  * ⚠️ AUCUN FUSEAU, ET C'EST LE POINT. On ancre à midi UTC puis on met en forme EN UTC :

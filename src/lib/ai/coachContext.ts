@@ -42,7 +42,7 @@ const dureeLoc = (min: number, l: Lang) => {
   return h ? `${h} h ${String(m).padStart(2, "0")}` : `${m} min`;
 };
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
-import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile } from "@/lib/time/fuseau";
+import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile, finDuJourCoureur } from "@/lib/time/fuseau";
 import { apresCourse, facteurVolumeApresCourse, type PhaseApresCourse } from "@/lib/coach/apresCourse";
 import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle } from "@/lib/coach/repriseArret";
 import { programmeMarcheCourse, dureesMarcheCourse, type SeanceMarcheCourse } from "@/lib/coach/marcheCourse";
@@ -141,13 +141,13 @@ const estimateTSS = (w: Wk) => w.tss != null ? Number(w.tss) : Math.round(((w.du
  * moyenne réelle, et on déroule toute la fenêtre disponible pour que l'amorce
  * s'efface d'elle-même.
  */
-function computeLoad(workouts: Wk[]) {
+function computeLoad(workouts: Wk[], now: number) {
   const tssMap: Record<string, number> = {};
   let oldest = 0;
   for (const w of workouts) {
     const d = String(w.date).slice(0, 10);
     tssMap[d] = (tssMap[d] ?? 0) + estimateTSS(w);
-    oldest = Math.max(oldest, Math.floor((Date.now() - new Date(w.date).getTime()) / 86400000));
+    oldest = Math.max(oldest, Math.floor((now - new Date(w.date).getTime()) / 86400000));
   }
   // Fenêtre : tout l'historique disponible, borné à 180 j (au-delà, l'amorce ne pèse plus).
   const span = Math.min(180, Math.max(42, oldest));
@@ -157,7 +157,7 @@ function computeLoad(workouts: Wk[]) {
   const seed = span > 0 ? total / span : 0;
   let ctl = seed, atl = seed;
   for (let i = span; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const d = new Date(now - i * 86400000).toISOString().slice(0, 10);
     const tss = tssMap[d] ?? 0;
     ctl += (tss - ctl) / 42; atl += (tss - atl) / 7;
   }
@@ -481,6 +481,22 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Une lecture qu'on ne fait pas : la forme exacte d'une réponse vide de PostgREST.
   const nonLu = () => Promise.resolve({ data: [] as never[], error: null });
   const nonLuUne = () => Promise.resolve({ data: null, error: null });
+  // ── LE JOUR DU COUREUR ET L'INSTANT DE RÉFÉRENCE DES FENÊTRES (16/11/2026) ──
+  // `todayStr` : le jour du COUREUR (son fuseau), pas celui du serveur (UTC sur Vercel). C'est le
+  // jour 0 du plan (`jour0`) ; J- de la course, semaine du bloc, dernière séance dure, fraîcheur de la
+  // nuit et prescriptions passées se comptent depuis lui.
+  // `now` : le dernier instant qui est encore ce jour en UTC ET pour le coureur (`finDuJourCoureur`,
+  // 23 h 59 à Paris), et NON l'heure du serveur.
+  // Toutes les fenêtres sur des DATES (km des 7 à 42 jours, charge CTL/ATL, monotonie, VFC, sommeil,
+  // pics de FC, VMA, poids, requêtes bornées par date…) se comptent depuis lui : elles retiennent le
+  // même ensemble de jours à toute heure. À l'heure du serveur, entre minuit et 1 h (2 h l'été) à
+  // Paris, elles gardaient un jour de trop : +15 à +26 % de volume visé, un débutant en rouge à 0 h 30
+  // et en jaune à 9 h. En journée, les fenêtres ancrées à minuit ne changent pas ; celles ancrées à
+  // midi (`T12:00:00Z`) retiennent toute la journée ce qu'elles retenaient l'après-midi.
+  // ⚠️ Un HORODATAGE (`created_at`, point de la courbe de VMA) se compare à l'instant réel,
+  // `Date.now()`, jamais à `now`, qui peut être jusqu'à 24 h dans le futur.
+  const todayStr = aujourdhui(FUSEAU_DEFAUT);
+  const now = finDuJourCoureur(todayStr);
   const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes, lactateRes, planifieesRes, seancesVmaRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
@@ -512,13 +528,13 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // coureur habitué à 80 km/semaine était traité comme un débutant à 31 km après une
     // coupure. Trois colonnes sur 180 jours coûtent moins qu'un plan sous-dimensionné.
     sb.from("workouts").select("date, sport, distance_km").eq("user_id", userId)
-      .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
+      .gte("date", new Date(now - 190 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(400),
     objectifSeul ? nonLu() : sb.from("sleep_data").select("date").eq("user_id", userId)
-      .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
+      .gte("date", new Date(now - 190 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(200),
     objectifSeul || essentielle ? nonLu() : sb.from("hrv_data").select("date").eq("user_id", userId)
-      .gte("date", new Date(Date.now() - 190 * 86400000).toISOString().slice(0, 10))
+      .gte("date", new Date(now - 190 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(200),
     // Fenêtre LONGUE et colonnes minimales, pour mesurer la PENTE de forme : la requête
     // principale ne lit que 60 séances, soit deux mois — trop court pour distinguer une
@@ -526,7 +542,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // pourtant une, nette, sur 32 semaines).
     objectifSeul ? nonLu() : sb.from("workouts").select("date, sport, distance_km, duration_seconds, avg_hr, gap_min_km, elevation_gain_m")
       .eq("user_id", userId).not("avg_hr", "is", null)
-      .gte("date", new Date(Date.now() - 280 * 86400000).toISOString().slice(0, 10))
+      .gte("date", new Date(now - 280 * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(500),
     // ── FC MAX DES SIX DERNIERS MOIS — UNE LIGNE (fenêtre `PIC_FC_JOURS` depuis le 07/11/2026) ──
     // `fetchWorkouts` est plafonné à 60 séances, soit environ deux mois. La FC max d'un
@@ -539,7 +555,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // ⚠️ LES SIX DERNIERS MOIS, PLUS TOUT L'HISTORIQUE (07/11/2026, `PIC_FC_JOURS`) : la FC max
     // d'aujourd'hui, pas celle d'il y a deux ans. Voir `maxDeReference` (lib/coach/fcCible).
     objectifSeul ? nonLuUne() : sb.from("workouts").select("max_hr").eq("user_id", userId)
-      .not("max_hr", "is", null).gte("date", new Date(Date.now() - PIC_FC_JOURS * 86400000).toISOString().slice(0, 10))
+      .not("max_hr", "is", null).gte("date", new Date(now - PIC_FC_JOURS * 86400000).toISOString().slice(0, 10))
       .order("max_hr", { ascending: false }).limit(1).maybeSingle(),
     // Test de lactate le plus récent (lib/coach/lactate) : une donnée DÉCLARÉE, lue pour
     // toutes les formules comme les autres réponses de l'athlète.
@@ -550,7 +566,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
       .order("created_at", { ascending: false }).limit(40),
     // Les séances de LA VMA : la lecture unique des écrans (120 jours, 13/11/2026). `fetchWorkouts`
     // s'arrête à 60 séances : 7 semaines de courses chez un coureur qui fait aussi du vélo.
-    objectifSeul ? nonLu() : lireSeancesVma(sb, userId),
+    objectifSeul ? nonLu() : lireSeancesVma(sb, userId, now),
   ]);
 
   // Palier gratuit : le profil réduit à ce qui est DÉCLARÉ, et du test de VMA, la VMA seule
@@ -619,18 +635,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // autre écrivain que le plan automatique était une séance de qualité (`qualiteRecente`).
   const coachSessions = ((csRes.data ?? []) as { data: Prescription & { date?: string; sessionType?: string } }[]).map(r => r.data).filter((d): d is Prescription & { date?: string; sessionType?: string } => !!d?.date);
 
-  const now = Date.now();
-  // Le jour du COUREUR (son fuseau), pas celui du serveur (UTC sur Vercel) : c'est le jour 0 du
-  // plan (`jour0`). Les comptes de jours et de semaines qui décident du plan se font depuis lui :
-  // J- de la course, semaine du bloc, âge de la dernière séance dure, fraîcheur de la dernière nuit,
-  // prescriptions des 14 et 28 derniers jours. Comptés à l'heure du serveur, ils contredisaient le
-  // plan entre minuit et 1 h (2 h l'été) à Paris (16/11/2026). En journée, rien ne change.
-  // ⚠️ PAS ENCORE les fenêtres de MESURE en millisecondes, défaut antérieur à traiter à part :
-  //   - à minuit UTC : km des 7 à 42 jours, charge CTL/ATL, monotonie, `runsPerWeekNow`. La nuit, le
-  //     volume visé peut différer, et le ratio aigu:chronique changer le niveau de forme ;
-  //   - à midi UTC (ancrées sur `T12:00:00Z`) : `dansLesJours`, `seancesRecentes`, `qeAgeDays`. Elles
-  //     changent entre 9 h et 14 h, pas la nuit.
-  const todayStr = aujourdhui(FUSEAU_DEFAUT);
+  // `todayStr` (le jour du coureur) et `now` (l'instant de référence des fenêtres) sont déclarés en
+  // tête de la fonction, avant les requêtes : voir là-haut.
   /** Borne basse de l'historique long — la MÊME que celle des requêtes ci-dessus. */
   const iso190 = () => new Date(now - 190 * 86400000).toISOString().slice(0, 10);
   // Semaine ISO du jour du coureur : ancre STABLE d'un jour à l'autre. Sert à faire varier le
@@ -681,7 +687,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // de bassin ne s'additionnent pas, et une heure de home-trainer ou de renfo (aucune
   // distance) valait zéro donc restait invisible. Voir lib/coach/crossTraining.
   const cross = summarizeCross(workouts, now, 7);
-  const load = computeLoad(workouts);
+  const load = computeLoad(workouts, now);
   // Jours sans COURIR : randonner tous les jours ne maintient pas la spécificité.
   // Compter la rando ici masquait une coupure de course sous une fausse régularité.
   const daysSinceLast = (() => { const r = workouts.find(w => isRun(w.sport)); return r?.date ? Math.floor((now - new Date(r.date).getTime()) / 86400000) : null; })();
@@ -945,7 +951,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
       .map(h => ({ t: new Date(h.at).getTime(), v: h.vma! }));
     // Le relevé courant complète la série s'il est plus récent que le dernier point.
     const cur = vmaFromPaceCurve(paceCurve?.best);
-    const at = paceCurve?.at ? new Date(paceCurve.at).getTime() : now;
+    // Un HORODATAGE, comme ceux de l'historique : l'instant réel, pas la fin du jour du coureur (qui
+    // ajouterait un point jusqu'à 24 h dans le futur et allongerait la série, donc la pente).
+    const at = paceCurve?.at ? new Date(paceCurve.at).getTime() : Date.now();
     if (cur && (!pts.length || at - pts[pts.length - 1].t > 86400000)) pts.push({ t: at, v: cur });
     return pts.sort((a, b) => a.t - b.t);
   })();
@@ -1420,11 +1428,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     return arretsLus.get(id)!;
   };
   const qeRaw = (p?.last_quality_exec ?? null) as { date?: string; repsSec?: number[]; avgHr?: number | null; fadeSec?: number | null } | null;
-  // ⚠️ ANCRÉ À MIDI, et laissé tel quel (choix de Cyprien, 16/11/2026) : la nuit, entre 0 h et 1 h
-  // (2 h l'été) à Paris, il donne déjà le même âge qu'à 9 h. Il bascule en revanche à midi UTC : une
-  // série de 13 jours est citée jusqu'à 13 h à Paris (14 h l'été), plus ensuite. Cela se traite avec
-  // les autres fenêtres ancrées à midi (`dansLesJours`, `seancesRecentes`), pas avec le jour 0.
-  const qeAgeDays = qeRaw?.date ? Math.floor((Date.now() - new Date(`${qeRaw.date}T12:00:00`).getTime()) / 86400_000) : null;
+  // Ancré à midi, compté depuis `now` (fin du jour du coureur) : c'est l'âge en jours du coureur, à
+  // toute heure. À l'heure du serveur, il basculait à midi UTC : une série de 13 jours était citée
+  // jusqu'à 13 h à Paris (14 h l'été), plus ensuite. Désormais, 12 jours au plus, toute la journée.
+  const qeAgeDays = qeRaw?.date ? Math.floor((now - new Date(`${qeRaw.date}T12:00:00`).getTime()) / 86400_000) : null;
   const qe = qeAgeDays != null && qeAgeDays <= 12 ? qeRaw : null;
   // ⚠️ DES RÉPÉTITIONS TENUES APRÈS DES RÉCUPÉRATIONS RALLONGÉES NE PROUVENT RIEN (choix de
   // Cyprien, 10/11/2026) : un arrêt d'au moins une minute pendant la séance de qualité, et
@@ -1714,7 +1721,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Un seul appel d'archive couvre les 21 jours.
   const heatAcclim = lecture.meteo ? lecture.meteo.heatAcclim : await (async () => {
     if (lat == null || lon == null) return { hotDays: 0, ...heatAcclimation(0) };
-    const past = await archiveDailyMax(lat, lon, 21).catch(() => new Map<string, number>());
+    const past = await archiveDailyMax(lat, lon, 21, now).catch(() => new Map<string, number>());
     if (!past.size) return { hotDays: 0, ...heatAcclimation(0) };
     const runDays = new Set(runs
       .filter(w => now - new Date(w.date).getTime() <= 21 * 86400000)
