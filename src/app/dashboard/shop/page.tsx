@@ -13,6 +13,7 @@ import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
 import { langueEcran } from "@/lib/i18n/serverLang";
+import { lireSeancesVma } from "@/lib/dashboard/seancesVma";
 
 export const metadata = { title: "Comparateur" };
 
@@ -34,7 +35,7 @@ export default async function ShopPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [seancesRes, pairesRes, objRes, profilRes, baseRes, fcMaxVma] = await Promise.all([
+  const [seancesRes, pairesRes, objRes, profilRes, baseRes, fcMaxVma, seancesVmaRes] = await Promise.all([
     supabase.from("workouts").select("date,type,distance_km,sport,elevation_gain_m,duration_seconds,avg_hr,max_hr,weather_temp_c")
       .eq("user_id", user.id).order("date", { ascending: false }).limit(200),
     supabase.from("shoes").select("brand,model,current_km,max_km,drop_mm,terrain")
@@ -45,10 +46,12 @@ export default async function ShopPage() {
       .order("tested_at", { ascending: false }).limit(1).maybeSingle(),
     // La FC max COMMUNE trie les efforts de la VMA (12/11/2026), comme partout.
     fcMaxDeLAthlete(supabase, user.id),
+    // Les séances de LA VMA : la lecture unique (120 jours, 13/11/2026).
+    lireSeancesVma(supabase, user.id),
   ]);
 
   // Une panne n'est pas « aucune donnée » : la VMA de la recommandation retomberait en silence (12/11/2026).
-  const pannes = await signalerLectures("boutique", user.id, [["seances", seancesRes], ["repere", baseRes], ["profil", profilRes]]);
+  const pannes = await signalerLectures("boutique", user.id, [["seances", seancesRes], ["seances", seancesVmaRes], ["repere", baseRes], ["profil", profilRes]]);
   const seances = seancesRes.data ?? [];
   const lang = langueDuCompte(profilRes.data?.preferred_language);
   const tx = (k: string, p?: Record<string, string | number>) => texteShop(lang, k, p);
@@ -60,7 +63,7 @@ export default async function ShopPage() {
     garminVo2: profilRes.data?.garmin_vo2max ?? null,
     // LA lecture des efforts (`effortDesSeances`, 12/11/2026), celle du coach : avant, 200 séances TOUS
     // sports sans aucun tri — la VMA de la recommandation pouvait venir d'une sortie vélo.
-    fromRuns: effortDesSeances(seances as never, fcMaxVma)?.vma ?? null,
+    fromRuns: effortDesSeances((seancesVmaRes.data ?? []) as never, fcMaxVma)?.vma ?? null,
   });
 
   // ⚠️ UNE PANNE DE LECTURE N'EST PAS « AUCUNE OFFRE ». Si `product_offers` devient

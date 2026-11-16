@@ -18,10 +18,19 @@ export type SourceVma =
 
 type SeanceVma = Parameters<typeof meilleurEffort>[0][number] & { max_hr?: number | null; sport?: string | null };
 
-/** Combien de séances (les plus récentes, tous sports) la VMA lit : le nombre que lit le coach
- *  (`fetchWorkouts`). Avant le 12/11/2026 : 40 au tableau de bord, 60 au coach, 120 aux Plans,
- *  200 en Santé et en Boutique — le même coureur avait plusieurs VMA selon l'écran. */
-export const SEANCES_VMA = 60;
+/** La fenêtre de la VMA « séances », en JOURS : les courses des 120 derniers jours, AUCUN plafond en
+ *  nombre (13/11/2026). C'est la fenêtre de forme de `meilleurEffort` (un record de mars ne pilote pas
+ *  les séances d'août). Avant : les 60 dernières séances TOUS SPORTS — un coureur qui fait aussi du vélo
+ *  n'y voyait que 7 semaines de courses, et sa VMA tombait de 17 à 14,2 km/h quand son 10 km sortait
+ *  de la liste (tests/profils.crash, profil 5). Avant le 12/11/2026 : 40, 60, 120 ou 200 séances
+ *  selon l'écran. */
+export const JOURS_VMA = 120;
+/** Garde-fou de la lecture (`lireSeancesVma`) : 500 séances en 120 jours, plus de 4 par jour. */
+export const PLAFOND_SEANCES_VMA = 500;
+/** Premier jour lu (« AAAA-MM-JJ ») : un jour de marge, la fenêtre exacte est appliquée par `effortDesSeances`. */
+export function debutFenetreVma(maintenant = Date.now()): string {
+  return new Date(maintenant - (JOURS_VMA + 1) * 86400000).toISOString().slice(0, 10);
+}
 
 /** Facteur d'acclimatation à la chaleur, déduit des séances elles-mêmes (jours ≥ 25 °C sur 30 jours),
  *  exactement comme le coach : un athlète acclimaté souffre moins, son chrono se corrige moins. */
@@ -35,19 +44,20 @@ export function acclimatationDesSeances(seances: readonly { date?: string | null
 
 /**
  * LE MEILLEUR EFFORT DE L'ATHLÈTE — la SEULE lecture des séances qui fonde la VMA « séances », pour
- * le coach comme pour chaque écran (12/11/2026) : les {@link SEANCES_VMA} séances les plus récentes,
- * course à pied seulement, efforts triés par la FC max commune (`fcMaxPourEfforts`), relus dans leurs
- * conditions avec l'acclimatation à la chaleur. `seances` peut en porter plus : elles sont triées et
- * coupées ici.
+ * le coach comme pour chaque écran (12/11/2026) : les séances des {@link JOURS_VMA} derniers jours,
+ * sans plafond en nombre (13/11/2026), course à pied seulement, efforts triés par la FC max commune (`fcMaxPourEfforts`), relus dans leurs
+ * conditions avec l'acclimatation à la chaleur. `seances` peut en porter plus (plus anciennes) : la
+ * fenêtre est appliquée ici, quel que soit l'ordre.
  */
 export function effortDesSeances(seances: readonly SeanceVma[], fcMax: number | null | undefined, maintenant = Date.now()): MeilleurEffort | null {
-  const lues = [...(seances ?? [])].sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? ""))).slice(0, SEANCES_VMA);
+  const debut = debutFenetreVma(maintenant);
+  const lues = (seances ?? []).filter((w) => String(w.date ?? "").slice(0, 10) >= debut);
   const courses = lues.filter((w) => isRun(w.sport));
-  return meilleurEffort(courses, fcMaxPourEfforts(fcMax, courses), 120, acclimatationDesSeances(lues, maintenant));
+  return meilleurEffort(courses, fcMaxPourEfforts(fcMax, courses), JOURS_VMA, acclimatationDesSeances(lues, maintenant));
 }
 
 export function vmaAffichee(i: {
-  /** Les séances lues (au moins les {@link SEANCES_VMA} plus récentes, tous sports) : triées et coupées ici. */
+  /** Les séances lues (au moins les {@link JOURS_VMA} derniers jours, tous sports : `lireSeancesVma`). */
   seances: readonly SeanceVma[];
   baseline: { vma_kmh?: number | null; tested_at?: string | null } | null;
   profil: { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null;

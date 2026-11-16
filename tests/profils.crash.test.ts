@@ -17,7 +17,10 @@
  * ne dépasse pas ce que le module lui-même a fixé comme cible.
  */
 import assert from "node:assert/strict";
-import { buildWeekPlan, type PlanDay } from "../src/lib/ai/autoPlan";
+import { buildWeekPlan, avecCourseCEcartee, type PlanDay } from "../src/lib/ai/autoPlan";
+import { appliquerConseils } from "../src/lib/ai/relectureSemaine";
+import { readFileSync } from "node:fs";
+import { PLAN_T } from "../src/lib/ai/planI18n";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
@@ -475,11 +478,14 @@ async function profilDouleur() {
     // Le renfo PRINCIPAL (un jour sans course, pas greffé le soir d'un footing) suit un autre
     // chemin : trois jours disponibles, course en début de semaine, contexte fabriqué.
     let principal = 0;
-    for (const dtr of [0, 1, 2]) {
+    // Deux jeux de jours : dimanche-mercredi-vendredi (course à J+0) et dimanche-lundi-jeudi (course à J+1).
+    for (const jours of [[0, 3, 5], [0, 1, 4]]) for (const dtr of [0, 1, 2]) {
       const ctx = mk({
         objective: { race: "Marathon", distanceKm: 42.195, targetPace: "5'40/km", targetTime: "4h", targetSeconds: 14400 },
         daysToRace: dtr, weeksToRace: 0, cycle: { deload: false, taper: true, label: "" },
-        availability: { daysPerWeek: 3, days: [0, 2, 4] },
+        // Avant le 13/11/2026, la reprise de J+2 était posée même un jour indisponible (avec les jours 0, 2, 4
+        // et une course le lundi : le mercredi). Ces jeux-ci laissent le renfo principal tomber après la course.
+        availability: { daysPerWeek: 3, days: jours },
         volume: { weekKm: 40, avg4wkKm: 40, targetKm: 20, longRunKm: 4 },
         macroPlan: [{ week: 1, phase: "Affûtage", volumeKm: 20, quality: [], longRunKm: 0, focus: "" }],
       });
@@ -490,7 +496,7 @@ async function profilDouleur() {
         assert.ok(!/bondissement/i.test(d.detail) && /RÉCUPÉRATION/.test(d.detail), `course à J+${dtr} : « ${d.detail.slice(0, 90)} » le ${d.date}, après un marathon`);
       }
     }
-    assert.ok(principal > 0, "le renfo principal n'est jamais tombé après la course : le second chemin n'est pas éprouvé");
+    assert.ok(principal >= 2, `le renfo principal n'est tombé que ${principal} fois après la course : le second chemin est à peine éprouvé`);
   });
 
   await testA("invite du coach IA : l'allure de course sans « /km/km », et aucun découpage sans chrono visé", async () => {
@@ -510,9 +516,368 @@ async function profilDouleur() {
   });
 }
 
+// ── PROFIL 5 — LE CYCLISTE QUI VIENT À LA COURSE (13/11/2026) ─────────────────────────────────
+// Beaucoup de vélo, peu de course. Deux invariants RELATIFS, sans seuil inventé : le vélo ne change
+// ni la VMA de course (lue sur les COURSES des 120 derniers jours, pas sur les 60 dernières séances
+// tous sports : 60 séances d'un multisport ne couvrent que 7 semaines), ni le volume de course prescrit.
+const CYCLISTE = { id: "u", preferred_language: "fr", full_name: "Test", age: 38, gender: "female", weight_kg: 60, max_hr: 185,
+  days_per_week: 4, available_days: [1, 3, 5, 6], health_conditions: [], injury_zones: [], health_declared: true };
+/** Deux footings par semaine sur 17 semaines (5'30/km, FC 140/185 : facile), et un 10 km couru en 40'00
+ *  il y a 9 semaines (FC 172 : l'effort qui fonde la VMA). */
+function coursesCycliste(jour: string) {
+  const footing = (n: number) => ({ user_id: "u", date: plusJours(jour, -n), type: "easy", sport: "run", distance_km: 8,
+    duration_seconds: 8 * 330, elevation_gain_m: 40, avg_hr: 140, max_hr: 150, tss: 40 });
+  const runs = Array.from({ length: 119 }, (_, k) => k + 1).filter((n) => n % 7 === 1 || n % 7 === 4).map(footing);
+  runs.push({ user_id: "u", date: plusJours(jour, -63), type: "race", sport: "run", distance_km: 10, duration_seconds: 2400,
+    elevation_gain_m: 30, avg_hr: 172, max_hr: 182, tss: 90 });
+  return runs;
+}
+/** Six sorties vélo par semaine (dont deux le dimanche), 17 semaines : 1 h 30, 40 km, FC 130. */
+function veloCycliste(jour: string) {
+  return Array.from({ length: 119 }, (_, k) => k + 1).filter((n) => n % 7 !== 1 && n % 7 !== 4)
+    .flatMap((n) => Array.from({ length: n % 7 === 0 ? 2 : 1 }, () => ({ user_id: "u", date: plusJours(jour, -n), type: "ride",
+      sport: "bike", distance_km: 40, duration_seconds: 5400, elevation_gain_m: 300, avg_hr: 130, max_hr: 150, tss: 70 })));
+}
+async function contexteCycliste(jour: string, seances: Ligne[]) {
+  return aLaDate(jour, async () => {
+    const ctx = await buildAthleteContext(fauxClient({ profiles: [CYCLISTE], performance_baselines: [], workouts: seances, notifications: [] }), "u");
+    return { ctx, plan: buildWeekPlan(ctx) };
+  });
+}
+async function profilCycliste() {
+  console.log("\nPROFIL 5 — CYCLISTE QUI VIENT À LA COURSE (6 vélos + 2 footings par semaine, 10 km en 40'00 il y a 9 semaines)");
+  const AUJ = aujourdhui(FUSEAU_DEFAUT);
+  await testA("le vélo ne change pas la VMA de course : le 10 km d'il y a 9 semaines compte, avec ou sans vélo", async () => {
+    for (const jour of [AUJ, plusJours(AUJ, 3)]) {
+      const seul = await contexteCycliste(jour, coursesCycliste(jour));
+      const avecVelo = await contexteCycliste(jour, [...coursesCycliste(jour), ...veloCycliste(jour)]);
+      assert.ok(seul.ctx.vma != null && seul.ctx.vma >= 15, `${jour} : la VMA de course seule n'est pas lue sur le 10 km (${seul.ctx.vma})`);
+      assert.equal(avecVelo.ctx.vma, seul.ctx.vma, `${jour} : le vélo change la VMA de course (${seul.ctx.vma} → ${avecVelo.ctx.vma}) : le 10 km est sorti des 60 dernières séances`);
+    }
+  });
+  await testA("le vélo ne gonfle pas le volume de COURSE prescrit (tendons) : cible et sortie longue", async () => {
+    const seul = await contexteCycliste(AUJ, coursesCycliste(AUJ));
+    const avecVelo = await contexteCycliste(AUJ, [...coursesCycliste(AUJ), ...veloCycliste(AUJ)]);
+    assert.ok(seul.ctx.volume.targetKm > 0 && seul.ctx.volume.longRunKm > 0, `précondition : volume de course nul (${seul.ctx.volume.targetKm} km, sortie longue ${seul.ctx.volume.longRunKm})`);
+    assert.ok(avecVelo.ctx.volume.targetKm <= seul.ctx.volume.targetKm, `cible de course ${seul.ctx.volume.targetKm} → ${avecVelo.ctx.volume.targetKm} km avec le vélo`);
+    assert.ok(avecVelo.ctx.volume.longRunKm <= seul.ctx.volume.longRunKm, `sortie longue ${seul.ctx.volume.longRunKm} → ${avecVelo.ctx.volume.longRunKm} km avec le vélo`);
+    const kmCourse = (plan: PlanDay[]) => plan.filter((d) => !/v[ée]lo|renfo|repos/i.test(`${d.type} ${d.title}`)).reduce((t, d) => t + kmDe(d), 0);
+    assert.ok(kmCourse(avecVelo.plan) <= kmCourse(seul.plan) + 0.5, `km de course de la semaine : ${kmCourse(seul.plan)} → ${kmCourse(avecVelo.plan)} avec le vélo`);
+  });
+}
+
+/** Historique de course régulier : `kmSem` km par semaine sur 10 semaines, les jours `jours` (0 = dimanche). */
+function historiqueRegulier(jour: string, kmSem: number, jours: number[], secKm: number, fc: { avg_hr?: number; max_hr?: number } = {}) {
+  return Array.from({ length: 70 }, (_, k) => k + 1).filter((n) => jours.includes(new Date(`${plusJours(jour, -n)}T12:00:00Z`).getUTCDay()))
+    .map((n) => ({ user_id: "u", date: plusJours(jour, -n), type: "easy", sport: "run", distance_km: kmSem / jours.length,
+      duration_seconds: Math.round((kmSem / jours.length) * secKm), elevation_gain_m: 30, avg_hr: fc.avg_hr ?? null, max_hr: fc.max_hr ?? null, tss: 40 }));
+}
+async function contexte(jour: string, tables: Record<string, Ligne[]>) {
+  return aLaDate(jour, async () => {
+    const ctx = await buildAthleteContext(fauxClient(tables), "u");
+    return { ctx, plan: buildWeekPlan(ctx) };
+  });
+}
+
+// ── PROFIL 6 — SENIOR (62 ans, VMA 12, 4 jours) — rejoué le 13/11/2026 ─────────────────────────────
+// Ce qu'un plan sensé fait : au plus 1-2 séances dures, une récupération plus longue, le renforcement
+// gardé. Absurde : 3 séances dures, ou une FC max « 220 − âge » (158) présentée comme une mesure.
+const SENIOR = { id: "u", preferred_language: "fr", full_name: "Test", age: 62, gender: "male", weight_kg: 72,
+  days_per_week: 4, available_days: [1, 3, 5, 6], health_conditions: [], injury_zones: [], health_declared: true };
+const tablesSenior = (jour: string, profil: Ligne = SENIOR) => ({ profiles: [profil],
+  performance_baselines: [{ user_id: "u", vma_kmh: 12, tested_at: plusJours(jour, -30) }],
+  workouts: historiqueRegulier(jour, 30, [1, 3, 5, 6], 390), notifications: [] });
+/** Les départs de référence (visa @HeadCoach du 13/11/2026) : les sept jours de la semaine, puis un jour
+ *  dans chacune des semaines suivantes du bloc de quatre — comme `profilMarathonienSub3`. */
+const DEPARTS = [0, 1, 2, 3, 4, 5, 6, 7, 15, 23];
+async function profilSenior() {
+  console.log("\nPROFIL 6 — SENIOR (62 ans, VMA 12, 4 jours, ~30 km/sem, aucune FC mesurée)");
+  const AUJ = aujourdhui(FUSEAU_DEFAUT);
+  const HORLOGES = DEPARTS.map((k) => plusJours(AUJ, k));
+  await testA("au plus deux séances dures sur sept jours, espacées de sa récupération (plus longue qu'à 34 ans)", async () => {
+    // « Au plus deux » vient du plafond par fréquence (4 jours déclarés), pas de l'âge ; l'âge, lui, allonge
+    // l'espacement. Précondition : au moins un départ porte une séance dure (une liste vide passerait tout).
+    let auMoinsUneDure = false;
+    for (const jour of HORLOGES) {
+      const { ctx, plan } = await contexte(jour, tablesSenior(jour));
+      const jeune = (await contexte(jour, tablesSenior(jour, { ...SENIOR, age: 34 }))).ctx;
+      assert.ok(ctx.hardGapHours > jeune.hardGapHours, `${jour} : récupération de ${ctx.hardGapHours} h à 62 ans, ${jeune.hardGapHours} h à 34 ans`);
+      const durs = plan.filter((d) => DURS.test(d.type)).map((d) => d.date).sort();
+      if (durs.length) auMoinsUneDure = true;
+      assert.ok(durs.length <= 2, `${jour} : ${durs.length} séances dures (${durs.join(", ")}) pour un coureur de 62 ans`);
+      for (let i = 1; i < durs.length; i++) {
+        const h = (Date.parse(durs[i]) - Date.parse(durs[i - 1])) / 3600000;
+        assert.ok(h >= ctx.hardGapHours, `${jour} : ${h} h entre deux séances dures (${durs[i - 1]}, ${durs[i]}), sa récupération est de ${ctx.hardGapHours} h`);
+      }
+    }
+    assert.ok(auMoinsUneDure, "précondition : aucune séance dure sur aucun départ, l'espacement n'est pas éprouvé");
+  });
+  await testA("le renforcement est gardé chaque semaine", async () => {
+    for (const jour of HORLOGES) {
+      const { plan } = await contexte(jour, tablesSenior(jour));
+      assert.ok(plan.some((d) => /renfo/i.test(d.type)), `${jour} : aucune séance de renforcement (${plan.map((d) => d.type).join(", ")})`);
+    }
+  });
+  await testA("aucune FC max tirée de l'âge (220 − 62 = 158) : sans mesure, le coach dit « FC max ? »", async () => {
+    const { ctx } = await contexte(AUJ, tablesSenior(AUJ));
+    assert.doesNotMatch(ctx.text, /\b158\b/, "158 bpm (220 − âge) apparaît dans l'invite du coach");
+    assert.match(ctx.text, /FC max \?/, "sans FC mesurée, l'invite ne dit plus que la FC max est inconnue");
+  });
+}
+
+// ── PROFIL 8 — ÉLITE SUB-33' AU 10 KM (VMA 20,5, 110 km/sem) — rejoué le 13/11/2026 ─────────────────
+// Ce qu'un plan sensé fait : un affûtage d'UNE semaine, de la VMA et du seuil. Absurde : 3 semaines
+// d'affûtage pour un 10 km, une séance dure la veille ou l'avant-veille.
+const ELITE = { id: "u", preferred_language: "fr", full_name: "Test", age: 27, gender: "male", weight_kg: 62, max_hr: 195,
+  days_per_week: 7, available_days: [0, 1, 2, 3, 4, 5, 6], health_conditions: [], injury_zones: [], health_declared: true };
+const tablesElite = (jour: string, joursAvantCourse: number) => ({ profiles: [ELITE],
+  performance_baselines: [{ user_id: "u", vma_kmh: 20.5, max_hr: 195, tested_at: plusJours(jour, -20) }],
+  workouts: historiqueRegulier(jour, 110, [0, 1, 2, 3, 4, 5, 6], 250, { avg_hr: 140, max_hr: 160 }),
+  notifications: [{ user_id: "u", type: "race_objective", data: { race: "10 km test", raceDate: plusJours(jour, joursAvantCourse), distanceKm: 10, targetTime: "32'50", targetSeconds: 1970, targetPace: "3'17/km" } }] });
+async function profilElite10() {
+  console.log("\nPROFIL 8 — ÉLITE SUB-33' AU 10 KM (VMA 20,5, 110 km/sem, 7 jours)");
+  const AUJ = aujourdhui(FUSEAU_DEFAUT);
+  await testA("10 km dans 8 semaines : UNE semaine d'affûtage, VMA et seuil au programme", async () => {
+    for (const jour of DEPARTS.map((k) => plusJours(AUJ, k))) {
+      const { ctx } = await contexte(jour, tablesElite(jour, 8 * 7 + 2));
+      const affutage = ctx.macroPlan.filter((w) => w.phase === "Affûtage").length;
+      assert.equal(affutage, 1, `${jour} : ${affutage} semaine(s) d'affûtage pour un 10 km`);
+      const qualites = ctx.macroPlan.flatMap((w) => w.quality).join(" ");
+      assert.ok(/VMA/.test(qualites) && /Seuil/.test(qualites), `${jour} : ni VMA ni seuil dans la feuille de route (${qualites})`);
+    }
+  });
+  await testA("la course dans la semaine OU juste après (J+7, J+8) : aucune séance dure la veille ni l'avant-veille", async () => {
+    // J+7 et J+8 : la course est hors des sept jours affichés, sa veille non (un seuil y tombait, 13/11/2026).
+    for (const k of DEPARTS) for (const avant of [3, 4, 5, 6, 7, 8]) {
+      const jour = plusJours(AUJ, k), course = plusJours(jour, avant);
+      const { plan } = await contexte(jour, tablesElite(jour, avant));
+      const proches = plan.filter((d) => (d.date === plusJours(course, -1) || d.date === plusJours(course, -2)) && DURS.test(d.type));
+      assert.equal(proches.length, 0, `course dans ${avant} j : ${proches.map((d) => `${d.type} le ${d.date}`).join(", ")}`);
+      if (avant >= 7) {
+        const veille = plan.find((d) => d.date === plusJours(course, -1));
+        assert.ok(!veille || /R[ée]cup|Repos/.test(veille.type), `course dans ${avant} j : la veille (${plusJours(course, -1)}) porte « ${veille?.type} »`);
+      }
+    }
+  });
+  await testA("course A à J+7 / J+8 AVEC une course B dans la semaine : aucune séance dure la veille ni l'avant-veille de la A", async () => {
+    // Visa @HeadCoach (2e tour, 13/11/2026) : la protection de J+7/J+8 était conditionnée par l'indice de
+    // N'IMPORTE QUELLE course de la semaine ; une B posée au jour 1 ou 2 la faisait sauter.
+    const DUR_OU_LONGUE = /VMA|Seuil|Sp[ée]cifique|Allure|C[oô]te/i;
+    let dures = 0, cas = 0;
+    for (const k of DEPARTS) for (const bIdx of [1, 2]) for (const dtr of [7, 8]) {
+      const debut = new Date(Date.parse("2026-09-07T08:00:00Z") + k * 86400000);
+      const ctx = mk({
+        objective: { race: "10 km A", distanceKm: 10, targetPace: "3'45/km", targetTime: "37'30", targetSeconds: 2250 },
+        daysToRace: dtr, weeksToRace: 1, cycle: { deload: false, taper: true, label: "" },
+        courseSecondaire: { idx: bIdx, nom: "10 km B", distanceKm: 10, priorite: "B" },
+        availability: { daysPerWeek: 5, days: [0, 1, 2, 3, 4, 5, 6] },
+        weekPlan: { qBudget: 2, quality: [{ type: "VMA", desc: "VMA : 10×400 m" }, { type: "Seuil", desc: "Seuil : 3×8 min" }], easyPace: "5'20", eased: false },
+      });
+      const plan = buildWeekPlan(ctx, debut);
+      cas++;
+      const jour = (n: number) => new Date(debut.getTime() + n * 86400000).toISOString().slice(0, 10);
+      dures += plan.filter((d) => DUR_OU_LONGUE.test(d.type)).length;
+      const proches = plan.filter((d) => (d.date === jour(dtr - 1) || d.date === jour(dtr - 2)) && DUR_OU_LONGUE.test(d.type));
+      assert.equal(proches.length, 0, `départ +${k}, B au jour ${bIdx}, A à J+${dtr} : ${proches.map((d) => `${d.type} le ${d.date}`).join(", ")}`);
+    }
+    assert.ok(cas >= 40 && dures > 0, `précondition : ${cas} cas, ${dures} séance(s) dure(s) posée(s) — rien n'éprouve la protection`);
+  });
+  await testA("course C : sa veille ne tombe jamais un jour indisponible ou systématiquement raté", async () => {
+    // Visa @HeadCoach (2e tour) : la veille de la course C était posée avant les étapes 1 et 1 bis, sans
+    // aucun contrôle de disponibilité, et consommait une sortie.
+    const debut = new Date("2026-09-07T08:00:00Z");
+    const jour = (n: number) => new Date(debut.getTime() + n * 86400000);
+    let vus = 0;
+    for (const cIdx of [2, 3, 4, 5, 6]) {
+      const veille = jour(cIdx - 1), jourSemaine = veille.getUTCDay();
+      for (const variante of ["indisponible", "raté"] as const) {
+        const ctx = mk({
+          courseSecondaire: { idx: cIdx, nom: "Cross C", distanceKm: 8, priorite: "C" },
+          availability: { daysPerWeek: 5, days: [0, 1, 2, 3, 4, 5, 6].filter((d) => variante === "raté" || d !== jourSemaine) },
+          skippedWeekdays: variante === "raté" ? [jourSemaine] : [],
+        });
+        const plan = buildWeekPlan(ctx, debut);
+        assert.ok(plan.some((d) => d.type === "Course"), `précondition : la course C du jour ${cIdx} n'est pas posée`);
+        vus++;
+        const ce = plan.filter((d) => d.date === veille.toISOString().slice(0, 10) && /R[ée]cup|Endurance|Sortie longue|VMA|Seuil|Sp[ée]cifique|Allure|C[oô]te/i.test(d.type));
+        assert.equal(ce.length, 0, `course C au jour ${cIdx}, veille ${variante} : ${ce.map((d) => d.type).join(", ")} le ${veille.toISOString().slice(0, 10)}`);
+      }
+    }
+    assert.equal(vus, 10, "précondition : tous les cas n'ont pas tourné");
+  });
+  await testA("course C trop près de la course A (2 jours avant, ou pendant sa récupération) : écartée, semaine sans elle, ET LE PLAN LE DIT (5 langues)", async () => {
+    // Décisions de Cyprien (13/11/2026) : avant la A, sa veille et son avant-veille ; après, jusqu'à la FIN
+    // de sa récupération (un jour par mile : 6 jours après un 10 km, 3 après un 5 km — lib/coach/apresCourse).
+    // Décision de Cyprien (13/11/2026). Relectures du 13/11 : une C écartée bloquait encore la sortie longue
+    // du lendemain et l'espacement des qualités ; posée un jour indisponible, la veille de la A n'arrêtait
+    // rien ; et au feu rouge, la réécriture du jour 0 effaçait le message.
+    const debut = new Date("2026-09-07T08:00:00Z");
+    const iso = (n: number) => new Date(debut.getTime() + n * 86400000).toISOString().slice(0, 10);
+    const NOM = "Cross du village";
+    const signature = (plan: PlanDay[]) => plan.map((d) => `${d.date} ${d.type} ${d.title}`).join(" | ");
+    let ecartees = 0, gardees = 0, rouges = 0, aptitudes = 0;
+    // 5, 10 km et semi ; la A de J+0 à J+12 (la semaine d'affûtage d'un semi déborde sur les 7 jours du plan).
+    for (const km of [10, 5, 21.1]) for (const dtr of [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12]) for (const cIdx of [0, 1, 2, 3, 4, 5, 6]) {
+      for (const variante of ["vert", "rouge", "dur aujourd'hui", "veille de la A indisponible", "aptitude en attente"] as const) {
+        const veilleA = new Date(debut.getTime() + (dtr - 1) * 86400000).getUTCDay();
+        const base = {
+          objective: { race: `${km} km A`, distanceKm: km, targetPace: "4'00/km", targetTime: "40'00", targetSeconds: 2400 },
+          daysToRace: dtr, weeksToRace: 0, cycle: { deload: false, taper: true, label: "" },
+          availability: { daysPerWeek: 6, days: [0, 1, 2, 3, 4, 5, 6].filter((d) => variante !== "veille de la A indisponible" || d !== veilleA) },
+          readiness: variante === "rouge" ? { level: "rouge", reasons: ["test"], advice: "" } : { level: "vert", reasons: [], advice: "" },
+          lastHardDaysAgo: variante === "dur aujourd'hui" ? 0 : null,
+          // Avis médical attendu : `appliquerAptitude` réécrit le « pourquoi » de chaque sortie, APRÈS le plan.
+          aptitude: variante === "aptitude en attente" ? { attente: true } : null,
+        };
+        const avecC = buildWeekPlan(mk({ ...base, courseSecondaire: { idx: cIdx, nom: NOM, distanceKm: 8, priorite: "C" } }), debut);
+        const courseC = avecC.find((d) => d.type === "Course" && d.date === iso(cIdx) && d.title.includes(NOM));
+        // Récupération : un jour par mile, arrondi (10 km → 6 jours, 5 km → 3 jours).
+        const recup = Math.round(km / 1.609);
+        // Avant la A : veille et avant-veille ; toute la semaine d'affûtage (J-6) avant un semi ou un marathon.
+        const avant = km >= 21 ? 6 : 2;
+        const motif = cIdx <= dtr && cIdx >= dtr - avant ? "avant" : cIdx > dtr && cIdx - dtr <= recup ? "apres" : null;
+        const ecartee = motif != null;
+        const attendu = (l: "fr" | "en" | "de" | "es" | "pt") => motif === "apres" ? PLAN_T[l].courseCEcarteeRecup(NOM, `${km} km A`) : PLAN_T[l].courseCEcartee(NOM);
+        if (!ecartee) {
+          if (variante === "aptitude en attente") continue;   // sans avis médical, aucune course n'est courue
+          assert.ok(courseC, `${km} km A à J+${dtr}, C au jour ${cIdx} (${variante}) : course C hors de la fenêtre, elle doit rester au plan`);
+          gardees++;
+          continue;
+        }
+        ecartees++; if (variante === "rouge" && cIdx === 0) rouges++; if (variante === "aptitude en attente") aptitudes++;
+        assert.ok(!courseC, `${km} km A à J+${dtr}, C au jour ${cIdx} (${variante}) : course C ${motif === "apres" ? "pendant la récupération" : "juste avant la A"}, encore au plan`);
+        // La semaine est EXACTEMENT celle d'un plan sans C (types et titres, jour par jour).
+        const sansC = buildWeekPlan(mk(base), debut);
+        assert.equal(signature(avecC), signature(sansC), `A à J+${dtr}, C au jour ${cIdx} (${variante}) : la C écartée pèse encore sur la semaine`);
+        // …et le jour de la C le dit, dans les 5 langues, après toutes les réécritures (feu rouge compris).
+        const jourC = avecC.filter((d) => d.date === iso(cIdx));
+        assert.ok(jourC.some((d) => d.why.includes(attendu("fr"))), `A à J+${dtr}, C au jour ${cIdx} (${variante}) : la C est écartée sans que le plan le dise (${jourC.map((d) => d.why.slice(-70)).join(" | ")})`);
+        for (const l of ["en", "de", "es", "pt"] as const)
+          assert.ok(jourC.some((d) => d.i18n?.[l]?.why?.includes(attendu(l))), `A à J+${dtr}, C au jour ${cIdx} (${variante}) : message absent en ${l}`);
+        assert.equal(avecC.filter((d) => d.why.includes(attendu("fr"))).length, 1, `A à J+${dtr}, C au jour ${cIdx} (${variante}) : le message n'est pas posé une seule fois`);
+      }
+    }
+    assert.ok(ecartees >= 150 && gardees >= 150 && rouges >= 3 && aptitudes >= 30, `précondition : ${ecartees} écartées, ${gardees} gardées, ${rouges} au feu rouge le jour même, ${aptitudes} sous avis médical attendu`);
+    // Le message existe vraiment dans chaque langue : il nomme la course (un texte vide « contiendrait » tout).
+    for (const l of ["fr", "en", "de", "es", "pt"] as const) {
+      assert.ok(PLAN_T[l].courseCEcartee(NOM).includes(NOM) && PLAN_T[l].courseCEcartee(NOM).trim().length > 40, `message vide ou sans le nom de la course en ${l}`);
+      const recup = PLAN_T[l].courseCEcarteeRecup(NOM, "Marathon A");
+      assert.ok(recup.includes(NOM) && recup.includes("Marathon A") && recup !== PLAN_T[l].courseCEcartee(NOM), `message de récupération vide, sans les noms ou identique en ${l}`);
+      assert.ok(PLAN_T[l].courseCEcarteeRecup(NOM, null).includes(NOM) && !PLAN_T[l].courseCEcarteeRecup(NOM, null).includes("null"), `message de récupération sans nom de course A cassé en ${l}`);
+    }
+  });
+  await testA("course C écartée : le coach repose le message APRÈS ses ajustements — une fois, au bon jour, 5 langues", async () => {
+    // Relecture du 13/11/2026 : le coach publie le plan APRÈS « alléger » (qui réécrit le « pourquoi »),
+    // « décaler » / « échanger » (qui déplacent le jour) et une seconde passe de consignes.
+    const debut = new Date("2026-09-07T08:00:00Z");
+    const iso = (n: number) => new Date(debut.getTime() + n * 86400000).toISOString().slice(0, 10);
+    const NOM = "Cross du village";
+    const ctx = mk({
+      objective: { race: "10 km A", distanceKm: 10, targetPace: "4'00/km", targetTime: "40'00", targetSeconds: 2400 },
+      daysToRace: 3, weeksToRace: 0, cycle: { deload: false, taper: true, label: "" },
+      courseSecondaire: { idx: 2, nom: NOM, distanceKm: 8, priorite: "C" },
+      availability: { daysPerWeek: 6, days: [0, 1, 2, 3, 4, 5, 6] },
+    });
+    const plan = buildWeekPlan(ctx, debut);
+    const porte = (w: PlanDay[], l: "fr" | "en" | "de" | "es" | "pt") => w.filter((d) =>
+      (l === "fr" ? d.why : d.i18n?.[l]?.why ?? "").includes(PLAN_T[l].courseCEcartee(NOM))).map((d) => d.date);
+    assert.deepEqual(porte(plan, "fr"), [iso(2)], "précondition : le message n'est pas sur le jour de la C");
+    // « alléger » : le « pourquoi » du jour de la C est remplacé (5 langues).
+    const allegee = plan.map((d) => d.date === iso(2) ? { ...d, why: "Allégée.", i18n: Object.fromEntries(Object.entries(d.i18n ?? {}).map(([l, t]) => [l, t ? { ...t, why: "Allégée." } : t])) } : d);
+    // « échanger » : le jour qui portait le message part au jour 5, et le jour 5 vient au jour 2.
+    const echangee = plan.map((d) => d.date === iso(2) ? { ...d, date: iso(5) } : d.date === iso(5) ? { ...d, date: iso(2) } : d);
+    for (const [nom, w] of [["alléger", allegee], ["échanger", echangee], ["deux passes", avecCourseCEcartee(ctx, plan, debut)]] as const) {
+      const fin = avecCourseCEcartee(ctx, w as PlanDay[], debut);
+      for (const l of ["fr", "en", "de", "es", "pt"] as const)
+        assert.deepEqual(porte(fin, l), [iso(2)], `${nom} (${l}) : le message est sur ${porte(fin, l).join(", ") || "aucun jour"}, pas une fois le ${iso(2)}`);
+    }
+    // Un jour doublé (matin + soir) : le message va sur la séance principale, pas sur le footing du soir.
+    const jourC = plan.find((d) => d.date === iso(2))!;
+    const double = [...plan.filter((d) => d.date !== iso(2)),
+      { ...jourC, moment: "soir" as const, title: "Footing du soir" }, { ...jourC, moment: "matin" as const, title: "Séance du matin" }];
+    const surDouble = avecCourseCEcartee(ctx, double, debut).filter((d) => d.why.includes(PLAN_T.fr.courseCEcartee(NOM)));
+    assert.deepEqual(surDouble.map((d) => d.title), ["Séance du matin"], `jour doublé : message sur ${surDouble.map((d) => d.title).join(", ") || "rien"}`);
+    // CE QUI EST ÉCRIT, pas la valeur en mémoire (visa @HeadCoach du 16/11/2026). La relecture Premium
+    // (`composerPourquoi`) remplit le « pourquoi » jusqu'à 640 caractères en coupant la FIN, puis l'écriture en
+    // base coupe à 640. Le message est donc posé EN TÊTE. Trois longueurs de motif — dont ~300, où un message
+    // posé en fin tombait coupé en plein milieu —, un conseil de 240 caractères exactement, 5 langues.
+    const CONSEIL = "Conseil d'exécution personnalisé : ".repeat(8).slice(0, 240);
+    assert.equal(CONSEIL.trim().length, 240, "précondition : le conseil ne fait pas 240 caractères");
+    for (const nb of [6, 17, 25]) {
+      const motif = (base: string) => "Raison du moteur. ".repeat(nb) + base;
+      const long = plan.map((d) => d.date === iso(2) ? { ...d, why: motif(d.why),
+        i18n: Object.fromEntries(Object.entries(d.i18n ?? {}).map(([l, t]) => [l, t ? { ...t, why: motif(t.why) } : t])) } : d) as PlanDay[];
+      // Le chemin du coach : le plan (message en tête), puis les conseils, puis le message reposé.
+      for (const l of ["fr", "en", "de", "es", "pt"] as const) {
+        const relue = avecCourseCEcartee(ctx, appliquerConseils(avecCourseCEcartee(ctx, long, debut), [{ date: iso(2), lang: l, texte: CONSEIL }]), debut);
+        const jour = relue.find((d) => d.date === iso(2) && d.moment !== "soir") as PlanDay | undefined;
+        const ecrit = (l === "fr" ? jour?.why ?? "" : jour?.i18n?.[l]?.why ?? "").slice(0, 640);   // la coupe de l'écriture (autoCoach)
+        const m = PLAN_T[l].courseCEcartee(NOM);
+        assert.ok(ecrit.startsWith(m), `motif ×${nb} (${l}) : le texte écrit ne commence pas par le message (« ${ecrit.slice(0, 60)}… »)`);
+        assert.equal(ecrit.split(NOM).length - 1, 1, `motif ×${nb} (${l}) : le nom de la course apparaît ${ecrit.split(NOM).length - 1} fois dans le texte écrit`);
+        assert.ok(ecrit.includes(CONSEIL.trim()), `motif ×${nb} (${l}) : le conseil Premium n'est plus entier dans le texte écrit`);
+      }
+    }
+    // Le coach l'appelle bien EN DERNIER, après ses ajustements et sa seconde passe de consignes.
+    const coach = readFileSync("src/lib/ai/autoCoach.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((x) => x.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
+    assert.match(coach, /const week = avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, maintenant\), maintenant\);/, "le coach publie sans reposer le message de la course C écartée");
+    assert.match(coach, /avecCourseCEcartee\(ctx, appliquerConseils\(week, relecture\.conseils\), maintenant\)/, "le message n'est plus reposé après la relecture Premium");
+    // La coupe simulée ci-dessus est celle de l'écriture : 640 caractères, en français et dans les 4 autres langues.
+    assert.equal((coach.match(/why: (?:d|t)\.why\.slice\(0, 640\),/g) ?? []).length, 2, "l'écriture du « pourquoi » ne coupe plus à 640 : le test ne simule plus la vraie coupe");
+  });
+  await testA("course de J+3 à J+8 : la veille, l'avant-veille et la reprise ne tombent jamais un jour systématiquement raté", async () => {
+    // Un jour « disponible » mais jamais couru (`skippedWeekdays`) reçoit « Repos » à l'étape 1 : le protocole
+    // de course, posé avant, ne doit pas l'occuper (visa @HeadCoach du 13/11/2026).
+    const debut = new Date("2026-09-07T08:00:00Z");
+    const jourDe = (n: number) => { const d = new Date(debut); d.setUTCDate(d.getUTCDate() + n); return d; };
+    let vus = 0;
+    for (const dtr of [3, 4, 5, 6, 7, 8]) for (const decal of [-2, -1, 2]) {
+      const cible = dtr + decal;
+      if (cible < 0 || cible > 6) continue;
+      vus++;
+      const ctx = mk({
+        objective: { race: "10 km", distanceKm: 10, targetPace: "4'00/km", targetTime: "40'00", targetSeconds: 2400 },
+        daysToRace: dtr, weeksToRace: 0, cycle: { deload: false, taper: true, label: "" },
+        availability: { daysPerWeek: 5, days: [0, 1, 2, 3, 4, 5, 6] }, skippedWeekdays: [jourDe(cible).getUTCDay()],
+      });
+      const plan = buildWeekPlan(ctx, debut);
+      const date = jourDe(cible).toISOString().slice(0, 10);
+      const ce = plan.filter((d) => d.date === date && /R[ée]cup|Endurance|Sortie longue|VMA|Seuil|Sp[ée]cifique|Allure|C[oô]te/i.test(d.type));
+      assert.equal(ce.length, 0, `course à J+${dtr} : ${ce.map((d) => d.type).join(", ")} le ${date}, jour systématiquement raté`);
+    }
+    assert.ok(vus >= 10, `précondition : ${vus} cas seulement`);
+  });
+  await testA("course de J+3 à J+8 chez un coureur à 3 ou 4 jours : veille protégée, jours indisponibles vides, budget tenu", async () => {
+    // Relecture du 13/11/2026 : la règle n'était éprouvée qu'à 7 jours sur 7 ; à 3 jours, la « Récup » de la
+    // veille tombait sur un jeudi déclaré indisponible. Chaque horloge de la semaine, chaque écart.
+    const COURSE = /R[ée]cup|Endurance|Sortie longue|VMA|Seuil|Sp[ée]cifique|Allure|C[oô]te|Course/i;
+    for (const jours of [[1, 3, 6], [1, 3, 5, 6]]) {
+      const profil = { ...ELITE, days_per_week: jours.length, available_days: jours };
+      // Avant le 13/11/2026, DANS la fenêtre aussi, la veille et la reprise tombaient sur un jour indisponible.
+      for (const k of DEPARTS) for (const avant of [3, 4, 5, 6, 7, 8]) {
+        const jour = plusJours(AUJ, k), course = plusJours(jour, avant);
+        const t = tablesElite(jour, avant);
+        const { plan } = await contexte(jour, { ...t, profiles: [profil], workouts: historiqueRegulier(jour, 45, jours, 250, { avg_hr: 140, max_hr: 160 }) });
+        const ctxt = `${jours.length} j, ${jour}, course le ${course}`;
+        const durs = plan.filter((d) => (d.date === plusJours(course, -1) || d.date === plusJours(course, -2)) && DURS.test(d.type));
+        assert.equal(durs.length, 0, `${ctxt} : ${durs.map((d) => `${d.type} le ${d.date}`).join(", ")}`);
+        const sorties = plan.filter((d) => COURSE.test(d.type));
+        // La course elle-même a sa date : elle peut tomber un jour « indisponible ». Pas ce qui l'entoure.
+        const horsDispo = sorties.filter((d) => d.type !== "Course" && !jours.includes(new Date(`${d.date}T12:00:00Z`).getUTCDay()));
+        assert.equal(horsDispo.length, 0, `${ctxt} : sortie un jour indisponible (${horsDispo.map((d) => `${d.type} le ${d.date}`).join(", ")})`);
+        const datesSorties = new Set(sorties.map((d) => d.date));
+        assert.ok(datesSorties.size <= jours.length, `${ctxt} : ${datesSorties.size} jours de course pour ${jours.length} déclarés`);
+      }
+    }
+  });
+}
+
 (async () => {
   await profilMarathonienSub3();
   await profilDouleur();
+  await profilCycliste();
+  await profilSenior();
+  await profilElite10();
   console.log(`\n${passed} test(s) d'archétypes passé(s), ${fails.length} échec(s)`);
   if (fails.length) { for (const f of fails) console.log("  ✗ " + f); process.exit(1); }
 })().catch((e) => { console.log("  ✗ plantage : " + (e as Error).stack); process.exit(1); });
