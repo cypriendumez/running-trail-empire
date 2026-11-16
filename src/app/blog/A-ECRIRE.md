@@ -3,7 +3,10 @@
 La routine Claude « Blog Pacevo — un article sourcé » (claude.ai/code/routines) tourne
 le 1er et le 15 de chaque mois. À chaque passage elle prend **le premier sujet non coché**,
 l'écrit selon les règles de `articles.ts` (aucun chiffre sans source citée et vérifiée
-via l'API NCBI), et le coche ici dans le même commit.
+via l'API NCBI), et le coche ici dans le même commit. Elle ajoute aussi la ligne de l'article
+dans `slugs.ts` (clé → adresse) et ses cinq titres dans `titres.ts` (copie exacte de ceux de
+`blogI18n.ts`) : c'est ce qui le relie à l'accueil, aux autres articles et
+aux pages de course ; `tests/blog-maillage.test.ts` rougit tant qu'elle manque.
 
 ## Le critère d'ordre : la pertinence pour les clients de Pacevo (Cyprien, 21/09/2026)
 
@@ -25,7 +28,7 @@ Catégories possibles pour la carte : `AI`, `TRAINING`, `NUTRITION`, `HEALTH`, `
 
 - [x] Courir par forte chaleur : ce que dit la littérature (acclimatation, hydratation, allure) — `HEALTH` (`courir-par-forte-chaleur-acclimatation-hydratation-allure`)
 - [x] Reprendre après une blessure : les principes de progression qui tiennent la route — `HEALTH` (`reprendre-apres-une-blessure-progression`)
-- [ ] Le sommeil, la séance que personne ne planifie : dette de sommeil et performance — `HEALTH`
+- [x] Le sommeil, la séance que personne ne planifie : dette de sommeil et performance — `HEALTH` (`sommeil-et-performance-du-coureur`)
 - [ ] Le seuil lactique expliqué sans jargon : pourquoi le coach le vise autant — `AI`
 - [ ] Marche-course : pourquoi alterner n'est pas « tricher » (reprise, débutants, ultra) — `TRAINING`
 - [ ] Récupération active ou repos complet : ce que montrent les études contrôlées — `TRAINING`
@@ -36,3 +39,4 @@ Catégories possibles pour la carte : `AI`, `TRAINING`, `NUTRITION`, `HEALTH`, `
 - [ ] Caféine avant la course : dose, délai, effets, et à qui ça ne convient pas — `NUTRITION`
 - [ ] Courir à jeun : ce que la littérature mesure vraiment (et ce qu'elle ne mesure pas) — `NUTRITION`
 - [ ] Bâtons en trail : gain d'économie mesuré, et le coût qu'on oublie — `GEAR`
+- [x] Quelle application de coaching running choisir en 2027 : six questions à poser, et nos réponses — `AI` (`quelle-application-coaching-running-2027-six-questions`) — hors carnet, demandé par Cyprien le 13/11/2026

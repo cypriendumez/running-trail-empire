@@ -88,6 +88,20 @@ export const POSTS = [
   // de sommets enneigés — a été retéléchargée au format servi et regardée avant d'être
   // écrite ici ; elle figure déjà dans AUDITEES.
   { id: 16, key: "p16", cat: "HEALTH", img: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=600&h=450&fit=crop&q=80", featured: false },
+  // Ajouté le 13/11/2026 à la demande de Cyprien (« six questions pour choisir une
+  // application »). Photo prise dans la RÉSERVE (`src/app/blog/reservePhotos.ts`),
+  // déjà dans AUDITEES : chaînes de montagnes dans la brume, soleil voilé. Retéléchargée
+  // au format servi (600×450) et regardée le 13/11/2026 : ni personne ni marque.
+  { id: 17, key: "p17", cat: "AI", img: "https://images.unsplash.com/photo-1762858741992-a254724623bd?w=600&h=450&fit=crop&q=80", featured: false },
+  // Ajouté le 15/11/2026 par la routine bimensuelle (sujet « sommeil »). La routine avait
+  // pris la DERNIÈRE entrée libre de la réserve, une piste de sable en plein soleil, en
+  // signalant elle-même qu'elle ne collait pas au sujet (`unsplash.com` ne résout pas
+  // depuis le conteneur : elle ne peut pas y DÉCOUVRIR une photo). Condition posée par
+  // @Mercator avant la mise en ligne : la remplacer. Fait le 16/11/2026 depuis le Mac :
+  // draps blancs froissés sur un lit, fenêtre au-dessus, pénombre bleutée. Téléchargée au
+  // format servi (600×450) et regardée ce jour-là : ni personne ni marque. Inscrite dans
+  // AUDITEES. La photo du désert est retournée, libre, dans la réserve.
+  { id: 18, key: "p18", cat: "HEALTH", img: "https://images.unsplash.com/photo-1521510535750-13af4de027e4?w=600&h=450&fit=crop&q=80", featured: false },
 ];
 
 /** Largeur servie aux moteurs et aux réseaux ; 1200 px est le minimum conseillé par Google. */
