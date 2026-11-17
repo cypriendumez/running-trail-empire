@@ -94,7 +94,7 @@ export type QualityBudgetInput = {
    *  et si elles excluent la qualité (pas d'intensité, ou une durée maximale par sortie). */
   consignesKine?: { motif: string; sansQualite: boolean } | null;
   /** Reprise après un arrêt de 6 à 28 jours (`lib/coach/repriseArret`, `qualitePendantReprise`) :
-   *  le nombre maximal de séances de qualité, 0 ou 1. Son motif s'affiche à part, comme la
+   *  le nombre maximal de séances de qualité par semaine, 0 ou 1. Son motif s'affiche à part, comme la
    *  marche-course : c'est le cadre de la reprise, pas un allègement de plus. */
   repriseArret?: { max: 0 | 1 } | null;
 };

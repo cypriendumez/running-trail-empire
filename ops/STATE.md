@@ -164,8 +164,10 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    coureur n'a pas couru au moins une sortie facile depuis l'arrêt ; ne pas appeler « sortie longue » une sortie
    plus courte qu'une sortie habituelle. Correction écrite le 17/11 en session, à la demande de Cyprien, sur la
    branche `fix/reprise-sans-qualite` (`qualitePendantReprise` dans `lib/coach/repriseArret`) : aucune qualité avant
-   une sortie facile, une seule ensuite, la seconde moitié de la reprise après plus de 14 jours d'arrêt. Le seuil
-   de 14 jours et la borne « une seule séance » sont des choix de la session, à confirmer par Cyprien.
+   une sortie facile, une seule par semaine ensuite (au seuil, courte), la seconde moitié de la reprise après plus de
+   14 jours d'arrêt ; sortie longue facile pendant toute la reprise, footings simples tant qu'aucune séance dure
+   n'est permise. Le seuil de 14 jours et la borne « une par semaine » sont des choix de la session, à confirmer
+   par Cyprien.
    À fusionner et à déployer sur GO de Cyprien.
 
 ## Résolues le 13/11/2026

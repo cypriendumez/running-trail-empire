@@ -93,12 +93,16 @@ export function repriseApresArret(joursCourus: readonly string[], aujourdhui: st
 //     Le plan étant reconstruit après chaque séance, la qualité revient d'elle-même ;
 //   · le jour de la première sortie de reprise, pas de qualité non plus ;
 //   · après un arrêt de plus de 14 jours, la qualité attend la seconde moitié de la reprise ;
-//   · jusqu'à la fin de la reprise, UNE séance de qualité au plus, écrite courte (le volume
-//     est à 50 puis 75 %) : la même borne que la reprise d'après-course.
+//   · jusqu'à la fin de la reprise, UNE séance de qualité PAR SEMAINE au plus, écrite courte
+//     et au seuil (le volume est à 50 puis 75 %) : la même borne que la reprise d'après-course.
+//     ⚠️ « Par semaine », pas « pour toute la reprise » (double relecture du 17/11/2026) : la
+//     borne est un budget, que le plan applique à n'importe quels sept jours consécutifs
+//     (`lib/coach/qualiteRecente`). Une reprise de trois semaines porte donc jusqu'à trois
+//     séances, jamais deux dans la même semaine.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type QualiteReprise = {
-  /** Nombre maximal de séances de qualité dans les sept jours du plan. */
+  /** Nombre maximal de séances de qualité sur sept jours consécutifs (un budget de semaine). */
   max: 0 | 1;
   /** Premier jour du plan (0 = aujourd'hui) où une qualité peut être posée ; 7 = aucun. */
   des: number;

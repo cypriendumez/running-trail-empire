@@ -422,7 +422,7 @@ async function main() {
     assert.deepEqual(qualitePendantReprise(reprise(25, 0, true)), { max: 0, des: 7 });
   });
 
-  await test("arrêt court (14 jours au plus) : une qualité au plus, et pas le jour de la première sortie", () => {
+  await test("arrêt court (14 jours au plus) : une qualité par semaine au plus, et pas le jour de la première sortie", () => {
     assert.equal(ARRET_LONG_JOURS, 14);
     assert.deepEqual(qualitePendantReprise(reprise(8, 0)), { max: 1, des: 1 }, "une qualité le jour même de la première sortie de reprise");
     assert.deepEqual(qualitePendantReprise(reprise(8, 2)), { max: 1, des: 0 });
@@ -465,11 +465,18 @@ async function main() {
       assert.notEqual(MOTIF_T[l].repriseArret("20", "50", false, 1), aucune, `${l} : le texte ignore le nombre de séances permises`);
     }
     assert.match(MOTIF_T.fr.repriseArret("8", "50", true, 0), /sans séance dure tant que tu n'as pas refait une sortie facile/);
-    assert.match(MOTIF_T.fr.repriseArret("8", "50", false, 1), /une seule séance de qualité au plus, courte/);
+    // « Par semaine » : la borne est un budget de sept jours, pas une séance pour toute la reprise.
+    assert.match(MOTIF_T.fr.repriseArret("8", "50", false, 1), /une seule séance de qualité par semaine au plus, courte/);
+    for (const [l, mot] of [["en", /a week/], ["de", /pro Woche/], ["es", /por semana/], ["pt", /por semana/]] as const)
+      assert.match(MOTIF_T[l].repriseArret("8", "50", false, 1), mot, `${l} : le motif promet une seule séance pour toute la reprise`);
     assert.match(MOTIF_T.fr.repriseArret("20", "50", false, 0), /aucune séance dure pendant la première moitié/);
     // Et le contexte lui passe le nombre que la règle a calculé, pas une constante.
     const ctxSrc = codeNu("src/lib/ai/coachContext.ts");
     assert.match(ctxSrc, /MOTIF_T\[l\]\.repriseArret\([^;]*repriseArret\.enCours, qualiteReprise\?\.max \?\? 1\)\)/);
+    // La seule séance de la semaine est le seuil, comme après une course ; et l'invite ne parle
+    // pas d'une « sortie longue de ~0 km » quand la reprise l'a retirée.
+    assert.match(ctxSrc, /if \(repriseCetteSemaine \|\| qualiteReprise != null\) menu = \[qSeuil, \.\.\.menu\.filter\(\(m\) => m !== qSeuil\)\];/);
+    assert.match(ctxSrc, /\$\{longRunKm > 0 \? `dont une sortie longue de ~\$\{longRunKm\} km` : "SANS sortie longue cette semaine/);
     // Une sortie longue retirée par la reprise n'est ni « raccourcie » ni attribuée à une douleur.
     assert.match(ctxSrc, /const longRunEased = !longueRetiree && longRunKm < longRunPlanned;/);
     assert.match(ctxSrc, /sortieLongue: !longueRetiree && longRunKm < longueSansDouleur \?/);
