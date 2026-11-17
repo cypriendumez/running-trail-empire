@@ -130,6 +130,26 @@ export function sortieHabituelleKm(distances: readonly (number | null | undefine
   return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
 }
 
+/** Fenêtre, en jours, sur laquelle se lit la sortie habituelle : les huit semaines d'avant l'arrêt. */
+export const HABITUDE_JOURS = 56;
+
+/**
+ * Les distances des sorties d'AVANT l'arrêt, sur huit semaines. ⚠️ Pas les sorties de la reprise
+ * elle-même : ses footings courts tireraient la médiane vers le bas, et la « sortie longue »
+ * reviendrait au fil de la reprise (relecture du 17/11/2026).
+ */
+export function distancesAvantArret(
+  sorties: readonly { date: string | null | undefined; distance_km?: number | null }[],
+  r: Pick<RepriseArret, "arretJours" | "joursRepris">, aujourdhui: string,
+): (number | null | undefined)[] {
+  // La dernière sortie d'avant l'arrêt remonte à `joursRepris + arretJours` jours au moins.
+  const borne = r.joursRepris + r.arretJours;
+  return sorties.filter((w) => {
+    const n = ecartJours(aujourdhui, String(w.date ?? ""));
+    return n != null && n >= borne && n <= borne + HABITUDE_JOURS;
+  }).map((w) => w.distance_km);
+}
+
 /**
  * Pendant une reprise, une « sortie longue » que le plafond de volume ramène SOUS la
  * sortie habituelle n'est pas une sortie longue : c'est un footing, et le plan ne la nomme

@@ -866,16 +866,20 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // des lignes droites (coût en fatigue quasi nul, entretien de la vitesse), ce qui
   // compte double une semaine sans aucune séance de qualité.
   const distances = repartirFootings(easySlots.length, easyKm, rawEasy >= 3 ? kmMinFooting : 3, easyCap);
-  const gardes = { taper: ctx.cycle.taper, semaineCourse: raceIdx >= 0, sansHistorique: ctx.noHistory, douleur,
-    // Tant que la reprise n'autorise aucune séance dure, les footings restent simples.
-    reprise: ctx.weekPlan.repriseArret === "sans-qualite" };
+  const gardes = { taper: ctx.cycle.taper, semaineCourse: raceIdx >= 0, sansHistorique: ctx.noHistory, douleur };
+  // ⚠️ PAR JOUR, pas par semaine (troisième double relecture, 17/11/2026) : pendant une reprise après
+  // un arrêt, un footing posé AVANT le premier jour où une séance dure est permise (`debutQualite`)
+  // reste simple. Lire l'état de la semaine (« sans-qualite ») laissait des lignes droites et un
+  // footing progressif dans la première moitié d'une reprise longue, quand la séance dure n'est
+  // permise qu'au 4ᵉ ou au 5ᵉ jour du plan.
+  const gardesDu = (i: number) => ({ ...gardes, reprise: !!ctx.weekPlan.repriseArret && i < debutQualite });
   easySlots.forEach((i, rang) => put(i, {
     type: "Endurance",
-    title: (l) => { const v = varianteFooting(rang, easySlots.length, gardes);
+    title: (l) => { const v = varianteFooting(rang, easySlots.length, gardesDu(i));
       return v === "lignes" ? PLAN_T[l].enduranceTitreLignes : v === "progressif" ? PLAN_T[l].enduranceTitreProg : PLAN_T[l].enduranceTitre; },
     detail: (l) => PLAN_T[l].enduranceDetail(decoupe(distances[rang] ?? easyKm, i).e, kmAndTime(decoupe(distances[rang] ?? easyKm, i).corps, paceFor(i), l),
       paceFor(i) ? ` (~${paceFor(i)}/km)` : "", decoupe(distances[rang] ?? easyKm, i).k, gapNote(l), doubles, cycleNote(l))
-      + (() => { const v = varianteFooting(rang, easySlots.length, gardes);
+      + (() => { const v = varianteFooting(rang, easySlots.length, gardesDu(i));
         return v === "lignes" ? PLAN_T[l].lignesDroites : v === "progressif" ? PLAN_T[l].footingProgressif : ""; })(),
     why: (l) => (ctx.tooMuchIntensity
       ? PLAN_T[l].enduranceWhyTropIntense(nRaw(ctx.tooMuchIntensity, l))

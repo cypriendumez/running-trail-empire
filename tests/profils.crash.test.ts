@@ -997,8 +997,10 @@ async function profilChaotique() {
         // Une sortie plus courte que ses 9 km habituels ne s'appelle pas « sortie longue ».
         assert.deepEqual(longues(r.plan).map((d) => d.date), [], `${ctxt} : « sortie longue » de ${r.ctx.volume.longRunKm} km pour une coureuse à 9 km par sortie`);
         // Le plan DIT pourquoi : le motif de la reprise annonce l'absence de séance dure.
-        assert.ok(r.ctx.readiness.reasons.some((m) => /sans séance dure tant que tu n'as pas refait une sortie facile/.test(m)),
-          `${ctxt} : le motif de la reprise ne dit pas qu'il n'y a pas de séance dure (${r.ctx.readiness.reasons.join(" | ")})`);
+        // Après plus de 14 jours d'arrêt, une sortie facile ne suffit pas : le texte dit la seconde moitié.
+        const attendu = arret > 14 ? /sans séance dure avant la seconde moitié de la reprise/ : /sans séance dure tant que tu n'as pas refait une sortie facile/;
+        assert.ok(r.ctx.readiness.reasons.some((m) => attendu.test(m)),
+          `${ctxt} : le motif de la reprise ne dit pas quand revient la séance dure (${r.ctx.readiness.reasons.join(" | ")})`);
         // Et la reprise reste une reprise : elle court, en footings.
         assert.ok(r.plan.filter((d) => COURSE_A_PIED.test(d.type)).length >= 2, `${ctxt} : la semaine de reprise n'a presque plus de sortie`);
         vus++;
@@ -1072,6 +1074,7 @@ async function profilChaotique() {
     const varies = (plan: PlanDay[]) => plan.filter((d) => d.type === "Endurance" && FOOTING_VARIE.test(d.title));
     const liste = (j: PlanDay[]) => j.map((d) => `${d.date} ${d.title}`).join(", ");
     let epiceeSansArret = 0, varieSansArret = 0, longueGardee = 0, deuxDuresSansArret = 0, autreQueSeuilSansArret = 0, revenueApresHuitJours = 0;
+    let footingsAvantQualite = 0, varieUneFoisPermise = 0;
     for (const jour of HORLOGES) {
       // Le contre-poids : sans arrêt, ce coureur a bien une sortie longue épicée et des footings variés.
       const regulier = await contexte(jour, tablesGros(jour, historiqueGros(jour)));
@@ -1104,6 +1107,21 @@ async function profilChaotique() {
         // Et cette séance est le SEUIL, écrit court : ni VMA ni allure spécifique au retour d'un arrêt.
         const pasSeuil = dures(r.plan).filter((d) => !/Seuil/i.test(d.type));
         assert.deepEqual(liste(pasSeuil), "", `${ctxt} : la séance de reprise n'est pas un seuil`);
+        // Le contre-poids des footings : dès qu'une séance dure est permise, ils peuvent de nouveau varier.
+        if ((r.ctx.weekPlan.qualiteDes ?? 0) === 0 && varies(r.plan).length) varieUneFoisPermise++;
+      }
+
+      // (b bis) ARRÊT LONG, PREMIÈRE MOITIÉ — arrêt de 20 jours repris depuis 3, 5 ou 6 jours : la séance dure
+      // n'est permise qu'au 7ᵉ, 5ᵉ ou 4ᵉ jour du plan. AVANT ce jour, ni séance dure ni footing varié
+      // (troisième double relecture : la garde lisait l'état de la SEMAINE, pas le jour).
+      for (const repris of [3, 5, 6]) {
+        const apres = Array.from({ length: Math.ceil(repris / 2) }, (_, k) => facile(jour, repris - 2 * k)).filter((w) => String(w.date) < jour);
+        const r = await contexte(jour, tablesGros(jour, [...historiqueGros(jour, 20 + repris), ...apres]));
+        const des = 10 - repris, permis = plusJours(jour, des), ctxt = `${jour}, 20 j d'arrêt, repris depuis ${repris} j`;
+        assert.equal(r.ctx.weekPlan.qualiteDes, des, `${ctxt} : précondition, la séance dure est permise au jour ${r.ctx.weekPlan.qualiteDes}, pas ${des}`);
+        assert.deepEqual(liste(dures(r.plan).filter((d) => d.date < permis)), "", `${ctxt} : séance dure avant la seconde moitié de la reprise (${permis})`);
+        assert.deepEqual(liste(varies(r.plan).filter((d) => d.date < permis)), "", `${ctxt} : footing varié avant le premier jour où une séance dure est permise (${permis})`);
+        if (r.plan.filter((d) => d.type === "Endurance" && d.date < permis).length >= 3) footingsAvantQualite++;
       }
 
       // (c) UNE PAR SEMAINE, PAS UNE PAR PLAN — arrêt de 20 jours, repris depuis 14, donc dans la seconde
@@ -1130,6 +1148,8 @@ async function profilChaotique() {
     assert.ok(longueGardee >= 1, "précondition : pendant la reprise, la sortie longue d'au moins 12 km n'est gardée sur aucun départ, le bloc d'allure n'est pas éprouvé");
     assert.ok(autreQueSeuilSansArret >= 1, "précondition : sans arrêt, ce coureur n'a que des seuils, « la séance de reprise est un seuil » ne prouve rien");
     assert.ok(revenueApresHuitJours >= 1, "une semaine après son seuil, la séance dure ne revient sur aucun départ : la borne vaut pour toute la reprise, pas par semaine");
+    assert.ok(footingsAvantQualite >= 1, "précondition : aucun plan n'a trois footings avant le jour permis, les footings variés (2ᵉ et 3ᵉ) ne sont pas éprouvés");
+    assert.ok(varieUneFoisPermise >= 1, "une fois la séance dure permise, les footings ne varient plus sur aucun départ : la garde vaut pour toute la reprise");
   });
   await testA("les jours déclarés changent d'une semaine à l'autre : le plan suit ceux de CETTE semaine", async () => {
     // Semaine A : lundi, mercredi, samedi, dimanche. Semaine B : mardi, jeudi, vendredi. Même historique.

@@ -44,7 +44,7 @@ const dureeLoc = (min: number, l: Lang) => {
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile } from "@/lib/time/fuseau";
 import { apresCourse, facteurVolumeApresCourse, type PhaseApresCourse } from "@/lib/coach/apresCourse";
-import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient } from "@/lib/coach/repriseArret";
+import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, ARRET_LONG_JOURS } from "@/lib/coach/repriseArret";
 import { programmeMarcheCourse, dureesMarcheCourse, type SeanceMarcheCourse } from "@/lib/coach/marcheCourse";
 import { testEnVigueur, allureFacileMaxSec, fmtAllure, TYPE_TEST_LACTATE, type TestLactate } from "@/lib/coach/lactate";
 import { courseCEcarteeDe, type CourseCEcartee } from "@/lib/coach/courseCEcartee";
@@ -248,8 +248,8 @@ export type AthleteContext = {
     qualiteDes?: number;
     /** Reprise après un arrêt en cours (`lib/coach/repriseArret`), absent hors reprise. Tant
      *  qu'elle dure, la sortie longue reste FACILE (ni bloc d'allure ni finish progressif :
-     *  ce serait une seconde séance dure) ; « sans-qualite » : aucune séance dure n'est encore
-     *  permise, les footings restent simples (ni lignes droites ni progressif). */
+     *  ce serait une seconde séance dure), et un footing posé avant `qualiteDes` reste simple (ni
+     *  lignes droites ni progressif). « sans-qualite » : aucune séance dure dans ces sept jours. */
     repriseArret?: "sans-qualite" | "une-qualite";
   };
   /** Doubles séances (matin + soir) : autorisées ou non, et ce qui manque le cas
@@ -1528,7 +1528,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // L'arrêt se DIT, et sa cause possible aussi : une montre qui ne synchronise plus produit
   // le même silence qu'un vrai repos.
   const arretMotif = repriseArret
-    ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.arretJours, l), nRaw(Math.round(repriseArret.part * 100), l), repriseArret.enCours, qualiteReprise?.max ?? 1))
+    ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.arretJours, l), nRaw(Math.round(repriseArret.part * 100), l), repriseArret.enCours, qualiteReprise?.max ?? 1, repriseArret.arretJours > ARRET_LONG_JOURS))
     : null;
   // ── ARBITRAGE DU BUDGET DE QUALITÉ ───────────────────────────────────────────
   // Extrait dans `lib/coach/qualityBudget` : c'est la décision la plus lourde du coach
@@ -2415,11 +2415,10 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // PAS UNE (16/11/2026) : le plafond de 30 % du volume réduit annonçait une « sortie longue »
   // de 4 km à une coureuse qui court 9 km par sortie. Le plan ne la pose pas (0 km : il ne
   // nomme « sortie longue » qu'à partir de 4 km) et ses kilomètres restent des footings.
-  // La sortie habituelle = la médiane des sorties des huit dernières semaines ; inconnue,
-  // on ne tranche pas.
-  const habituelleKm = sortieHabituelleKm(runs
-    .filter((w) => now - new Date(w.date).getTime() <= 56 * 86400000)
-    .map((w) => w.distance_km));
+  // La sortie habituelle = la médiane des sorties des huit semaines d'AVANT l'arrêt (les footings
+  // courts de la reprise tireraient la médiane vers le bas, et la « sortie longue » reviendrait
+  // en cours de reprise) ; inconnue, on ne tranche pas.
+  const habituelleKm = repriseArret ? sortieHabituelleKm(distancesAvantArret(runs, repriseArret, todayStr)) : null;
   const longueRetiree = repriseArret != null && !sortieLongueTient(longRunKmBorne, habituelleKm);
   const longRunKm = longueRetiree ? 0 : longRunKmBorne;
   const longRunEased = !longueRetiree && longRunKm < longRunPlanned;
@@ -2730,7 +2729,9 @@ ${catalog}`;
     // ⚠️ Allure CORRIGÉE par la relecture : c'est elle qui doit partir dans le plan,
     // sinon la boucle mesure sans jamais rien changer.
     weekPlan: {
-      qBudget, quality: chosen, easyPace: easyPaceCorrige, eased: easeReasons.length > 0, floored: qb.floored,
+      // Pendant une reprise après un arrêt, la séance est DÉJÀ écrite courte (`doseReduite`) : la dire
+      // « sauvée par le plancher » la couperait une seconde fois, sous un texte qui parle de charge.
+      qBudget, quality: chosen, easyPace: easyPaceCorrige, eased: easeReasons.length > 0, floored: qb.floored && qualiteReprise == null,
       // La reprise après une course : séance marquée comme telle, et jamais avant son jour.
       // Et jamais avant le jour que fixe la reprise après un arrêt (`qualitePendantReprise`).
       reprise: repriseCetteSemaine && qBudget > 0,

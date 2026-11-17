@@ -23,7 +23,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
-import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, ARRET_LONG_JOURS } from "../src/lib/coach/repriseArret";
+import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, ARRET_LONG_JOURS } from "../src/lib/coach/repriseArret";
 import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { MOTIF_T } from "../src/lib/coach/reasonsI18n";
 import { varianteFooting, lignesRetireesParDouleur } from "../src/lib/coach/footings";
@@ -459,20 +459,28 @@ async function main() {
 
   await test("le motif de la reprise dit l'intensité, dans les cinq langues", () => {
     for (const l of Object.keys(MOTIF_T) as (keyof typeof MOTIF_T)[]) {
-      const enCours = MOTIF_T[l].repriseArret("8", "50", true, 0), une = MOTIF_T[l].repriseArret("8", "50", false, 1), aucune = MOTIF_T[l].repriseArret("20", "50", false, 0);
-      // Trois situations, trois textes : celui d'« une séance » ne sert pas à « aucune ».
-      assert.equal(new Set([enCours, une, aucune]).size, 3, `${l} : deux situations de reprise ont le même texte`);
-      assert.notEqual(MOTIF_T[l].repriseArret("20", "50", false, 1), aucune, `${l} : le texte ignore le nombre de séances permises`);
+      const enCours = MOTIF_T[l].repriseArret("8", "50", true, 0, false), enCoursLong = MOTIF_T[l].repriseArret("20", "50", true, 0, true);
+      const une = MOTIF_T[l].repriseArret("8", "50", false, 1, false), aucune = MOTIF_T[l].repriseArret("20", "50", false, 0, true);
+      // Quatre situations, quatre textes : celui d'« une séance » ne sert pas à « aucune ».
+      assert.equal(new Set([enCours.replace("8", "20"), enCoursLong, une, aucune]).size, 4, `${l} : deux situations de reprise ont le même texte`);
+      assert.notEqual(MOTIF_T[l].repriseArret("20", "50", false, 1, true), aucune, `${l} : le texte ignore le nombre de séances permises`);
     }
-    assert.match(MOTIF_T.fr.repriseArret("8", "50", true, 0), /sans séance dure tant que tu n'as pas refait une sortie facile/);
+    assert.match(MOTIF_T.fr.repriseArret("8", "50", true, 0, false), /sans séance dure tant que tu n'as pas refait une sortie facile/);
+    // Après plus de 14 jours d'arrêt, une sortie facile ne suffit pas : le texte ne le laisse pas croire.
+    assert.match(MOTIF_T.fr.repriseArret("20", "50", true, 0, true), /sans séance dure avant la seconde moitié de la reprise/);
+    assert.doesNotMatch(MOTIF_T.fr.repriseArret("20", "50", true, 0, true), /tant que tu n'as pas refait une sortie facile/);
     // « Par semaine » : la borne est un budget de sept jours, pas une séance pour toute la reprise.
-    assert.match(MOTIF_T.fr.repriseArret("8", "50", false, 1), /une seule séance de qualité par semaine au plus, courte/);
+    assert.match(MOTIF_T.fr.repriseArret("8", "50", false, 1, false), /une seule séance de qualité par semaine au plus, courte/);
     for (const [l, mot] of [["en", /a week/], ["de", /pro Woche/], ["es", /por semana/], ["pt", /por semana/]] as const)
-      assert.match(MOTIF_T[l].repriseArret("8", "50", false, 1), mot, `${l} : le motif promet une seule séance pour toute la reprise`);
-    assert.match(MOTIF_T.fr.repriseArret("20", "50", false, 0), /aucune séance dure pendant la première moitié/);
+      assert.match(MOTIF_T[l].repriseArret("8", "50", false, 1, false), mot, `${l} : le motif promet une seule séance pour toute la reprise`);
+    assert.match(MOTIF_T.fr.repriseArret("20", "50", false, 0, true), /aucune séance dure pendant la première moitié/);
     // Et le contexte lui passe le nombre que la règle a calculé, pas une constante.
     const ctxSrc = codeNu("src/lib/ai/coachContext.ts");
-    assert.match(ctxSrc, /MOTIF_T\[l\]\.repriseArret\([^;]*repriseArret\.enCours, qualiteReprise\?\.max \?\? 1\)\)/);
+    assert.match(ctxSrc, /MOTIF_T\[l\]\.repriseArret\([^;]*repriseArret\.enCours, qualiteReprise\?\.max \?\? 1, repriseArret\.arretJours > ARRET_LONG_JOURS\)\)/);
+    // La séance de reprise, déjà écrite courte, n'est pas en plus « sauvée par le plancher ».
+    assert.match(ctxSrc, /floored: qb\.floored && qualiteReprise == null,/);
+    // La sortie habituelle se lit AVANT l'arrêt : les footings de la reprise ne la font pas baisser.
+    assert.match(ctxSrc, /const habituelleKm = repriseArret \? sortieHabituelleKm\(distancesAvantArret\(runs, repriseArret, todayStr\)\) : null;/);
     // La seule séance de la semaine est le seuil, comme après une course ; et l'invite ne parle
     // pas d'une « sortie longue de ~0 km » quand la reprise l'a retirée.
     assert.match(ctxSrc, /if \(repriseCetteSemaine \|\| qualiteReprise != null\) menu = \[qSeuil, \.\.\.menu\.filter\(\(m\) => m !== qSeuil\)\];/);
@@ -493,8 +501,10 @@ async function main() {
     assert.equal(lignesRetireesParDouleur(3, { reprise: true }), false);
     const plan = codeNu("src/lib/ai/autoPlan.ts"), ctxSrc = codeNu("src/lib/ai/coachContext.ts"), coach = codeNu("src/lib/ai/autoCoach.ts");
     assert.match(plan, /const canSpice = [^;]*&& !ctx\.weekPlan\.repriseArret;/, "la sortie longue peut de nouveau porter un bloc d'allure pendant une reprise");
-    assert.match(plan, /reprise: ctx\.weekPlan\.repriseArret === "sans-qualite" \};/);
-    assert.match(coach, /reprise: ctx\.weekPlan\.repriseArret === "sans-qualite" \}/, "l'écran Santé attribue de nouveau à la douleur des lignes droites que la reprise a retirées");
+    // La garde est PAR JOUR : tout footing placé avant le premier jour où une séance dure est permise.
+    assert.match(plan, /const gardesDu = \(i: number\) => \(\{ \.\.\.gardes, reprise: !!ctx\.weekPlan\.repriseArret && i < debutQualite \}\);/);
+    assert.equal((plan.match(/varianteFooting\(rang, easySlots\.length, gardesDu\(i\)\)/g) ?? []).length, 2, "le titre ou le détail d'un footing ne lit plus la garde du jour");
+    assert.match(coach, /reprise: !!ctx\.weekPlan\.repriseArret && avantQualite \}/, "l'écran Santé attribue de nouveau à la douleur des lignes droites que la reprise a retirées");
     assert.match(ctxSrc, /\.\.\.\(qualiteReprise \? \{ repriseArret: qualiteReprise\.max === 0 \? "sans-qualite" as const : "une-qualite" as const \} : \{\}\),/);
   });
 
@@ -504,10 +514,24 @@ async function main() {
     assert.equal(sortieHabituelleKm([]), null);
     assert.equal(sortieHabituelleKm([null, undefined, 0, NaN]), null, "une distance inconnue devient une sortie habituelle");
     assert.equal(sortieLongueTient(4, 9), false);
-    assert.equal(sortieLongueTient(9, 9), true, "une sortie longue égale à la sortie habituelle est retirée");
+    assert.equal(sortieLongueTient(9, 9), true, "une sortie longue égale à la sortie habituelle ne tient plus");
     assert.equal(sortieLongueTient(12, 9), true);
     // Sans sortie habituelle connue, on ne tranche pas.
     assert.equal(sortieLongueTient(4, null), true);
+    // La sortie habituelle se lit sur les huit semaines d'AVANT l'arrêt, jamais sur la reprise.
+    const sorties = [
+      { date: ilYa(1), distance_km: 5 }, { date: ilYa(3), distance_km: 5 },             // la reprise : footings courts
+      { date: ilYa(15), distance_km: 12 }, { date: ilYa(17), distance_km: 10 },          // juste avant l'arrêt de 11 jours
+      { date: ilYa(70), distance_km: 10 }, { date: ilYa(69), distance_km: 30 },          // dans les huit semaines d'avant (14 + 56 = 70 jours)
+      { date: ilYa(71), distance_km: 40 },                                                // un jour trop ancien
+    ];
+    const r = repriseApresArret(sorties.map((w) => w.date), AUJOURDHUI)!;
+    assert.deepEqual({ arret: r.arretJours, repris: r.joursRepris }, { arret: 11, repris: 3 }, "précondition : la reprise simulée n'est pas celle attendue");
+    assert.deepEqual(distancesAvantArret(sorties, r, AUJOURDHUI), [12, 10, 10, 30], "la sortie habituelle compte la reprise, ou oublie les semaines d'avant");
+    assert.equal(sortieHabituelleKm(distancesAvantArret(sorties, r, AUJOURDHUI)), 11);
+    // Pas encore repris : toutes les sorties précèdent l'arrêt.
+    const arrete = repriseApresArret([ilYa(8), ilYa(10)], AUJOURDHUI)!;
+    assert.deepEqual(distancesAvantArret([{ date: ilYa(8), distance_km: 9 }, { date: ilYa(10), distance_km: 7 }], arrete, AUJOURDHUI), [9, 7]);
   });
 
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
