@@ -7,7 +7,8 @@
 //
 //  Déterministe (pas d'appel LLM) → fiable pour un cron qui tourne sans surveillance.
 // ─────────────────────────────────────────────────────────────────────────────
-import { lignesRetireesParDouleur } from "@/lib/coach/footings";
+import { lignesRetireesParDouleur, lignesRetireesParReprise } from "@/lib/coach/footings";
+import { ecartJours } from "@/lib/coach/recuperation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, consignesSurPlan, avecCourseCEcartee, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
@@ -526,10 +527,16 @@ export async function autoCoachForUser(
     // l'écran Santé les montre au coureur, sans relire le texte du plan.
     douleurEffets: ctx.effetsDouleur ? {
       ...ctx.effetsDouleur,
-      lignesDroites: lignesRetireesParDouleur(
-        week.filter((d: PlanDay) => d.date >= from && d.type === "Endurance").length,
-        { taper: ctx.cycle.taper, semaineCourse: week.some((d: PlanDay) => d.type === "Course"), sansHistorique: ctx.noHistory },
-      ),
+      lignesDroites: (() => {
+        const footings = week.filter((d: PlanDay) => d.date >= from && d.type === "Endurance");
+        // Le footing qui aurait porté les lignes droites est le DEUXIÈME : pendant une reprise après un
+        // arrêt, la reprise les a déjà retirées s'il tombe avant le premier jour où une séance dure est permise.
+        const deuxieme = footings[1]?.date;
+        return lignesRetireesParDouleur(footings.length,
+          { taper: ctx.cycle.taper, semaineCourse: week.some((d: PlanDay) => d.type === "Course"), sansHistorique: ctx.noHistory,
+            reprise: lignesRetireesParReprise({ reprise: !!ctx.weekPlan.repriseArret, qualiteDes: ctx.weekPlan.qualiteDes ?? 0,
+              deuxiemeFootingJour: deuxieme == null ? null : ecartJours(deuxieme, today) }) });
+      })(),
     } : null,
     consignes: ctx.consignes ?? null,
     // L'objectif tel qu'il a RÉELLEMENT été pris en compte : c'est ce qui permet à

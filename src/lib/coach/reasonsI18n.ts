@@ -40,8 +40,15 @@ export type TextesMotifs = {
    *  jour d'entraînement normal (date déjà mise en forme). */
   repriseApresCourse: (course: string, jours: string, fin: string, volumePct: string) => string;
   /** Reprise après un arrêt de 6 à 28 jours (`lib/coach/repriseArret`). `enCours` : aucune
-   *  sortie depuis — la montre peut aussi avoir cessé de synchroniser, on le dit. */
-  repriseArret: (jours: string, volumePct: string, enCours: boolean) => string;
+   *  sortie depuis — la montre peut aussi avoir cessé de synchroniser, on le dit. `qualite` :
+   *  le nombre de séances dures permises PAR SEMAINE (0 ou 1), dit lui aussi. `arretLong` : plus
+   *  de 14 jours d'arrêt — la séance dure attend la seconde moitié de la reprise, une sortie
+   *  facile ne suffit pas, et le texte ne le laisse pas croire. */
+  repriseArret: (jours: string, volumePct: string, enCours: boolean, qualite: 0 | 1, arretLong: boolean) => string;
+  /** Reprise après un arrêt de PLUS de 28 jours (`arretHorsEchelle`) : la règle de volume de
+   *  Daniels ne s'y applique plus, aucun pourcentage n'est annoncé, mais l'intensité se dit —
+   *  rien de dur pendant les deux premières semaines, puis une séance par semaine. */
+  repriseLongArret: (jours: string, enCours: boolean, qualite: 0 | 1) => string;
   /** Programme marche-course en cours (`lib/coach/marcheCourse`). */
   marcheCourse: (etape: string, total: string) => string;
   /** Course B ou C dans les sept jours du plan (`lib/coach/saison`) ; date déjà mise en forme. */
@@ -68,9 +75,12 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     chargeVueMaisMaintenue: (p) => `charge récente élevée (${p}) MAIS VFC nettement au-dessus de sa base, sommeil correct et aucune douleur : la qualité est maintenue. À surveiller si la VFC redescend.`,
     apresCourse: (c, j, r, v) => `récupération après ${c} (J+${j}) : pas d'intensité avant le ${r}, footings seulement d'ici là, et ${v} % de ton volume habituel cette semaine — un jour facile par tranche de 3 km courus`,
     repriseApresCourse: (c, j, f, v) => `reprise après ${c} (J+${j}) : une seule séance de qualité par semaine, courte et au seuil, et ${v} % de ton volume habituel cette semaine ; entraînement normal à partir du ${f} — ni VMA ni course avant un jour par mile couru`,
-    repriseArret: (j, v, enCours) => enCours
-      ? `aucune course enregistrée depuis ${j} jours : on repart à ${v} % de ton volume habituel cette semaine (règle de Daniels). Si tu as couru, ta montre ne synchronise plus : vérifie sa connexion`
-      : `reprise après ${j} jours sans courir : ${v} % de ton volume habituel cette semaine — la reprise dure autant que l'arrêt (règle de Daniels)`,
+    repriseArret: (j, v, enCours, q, long) => enCours
+      ? `aucune course enregistrée depuis ${j} jours : on repart à ${v} % de ton volume habituel cette semaine (règle de Daniels), ${long ? "sans séance dure avant la seconde moitié de la reprise" : "sans séance dure tant que tu n'as pas refait une sortie facile"}. Si tu as couru, ta montre ne synchronise plus : vérifie sa connexion`
+      : `reprise après ${j} jours sans courir : ${v} % de ton volume habituel cette semaine — la reprise dure autant que l'arrêt (règle de Daniels) ; ${q ? "une seule séance de qualité par semaine au plus, courte, jusqu'à la fin de la reprise" : "aucune séance dure pendant la première moitié de la reprise"}`,
+    repriseLongArret: (j, enCours, q) => enCours
+      ? `aucune course enregistrée depuis ${j} jours : on reprend par des footings, sans séance dure pendant les deux premières semaines de reprise. Si tu as couru, ta montre ne synchronise plus : vérifie sa connexion`
+      : `reprise après ${j} jours sans courir : ${q ? "une seule séance de qualité par semaine au plus, courte, jusqu'à la fin de la quatrième semaine de reprise" : "aucune séance dure pendant les deux premières semaines de reprise, puis une seule par semaine jusqu'à la quatrième"}`,
     marcheCourse: (e, t) => `programme marche-course, étape ${e}/${t} : ni séance de qualité ni test VMA tant que tu ne cours pas 30 minutes d'affilée — la course s'allonge à chaque étape`,
     courseSecondaire: (n, d, b) => b ? `course B cette semaine : ${n} (${d}) — deux jours calmes avant et une semaine allégée de 15 %, puis la récupération` : `course C cette semaine : ${n} (${d}) — elle remplace une séance de qualité, sans affûtage`,
   },
@@ -93,9 +103,12 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     chargeVueMaisMaintenue: (p) => `high recent load (${p}) BUT HRV clearly above baseline, decent sleep and no pain: the quality session stays. To watch if HRV comes back down.`,
     apresCourse: (c, j, r, v) => `recovering from ${c} (day ${j} after): no hard sessions before ${r}, easy runs only until then, and ${v}% of your usual volume this week — one easy day per 3 km raced`,
     repriseApresCourse: (c, j, f, v) => `easing back after ${c} (day ${j} after): one short threshold session a week at most, and ${v}% of your usual volume this week; normal training from ${f} — no VO2max work or racing before one day per mile raced`,
-    repriseArret: (j, v, enCours) => enCours
-      ? `no run recorded for ${j} days: we restart at ${v}% of your usual volume this week (Daniels' rule). If you did run, your watch is no longer syncing: check its connection`
-      : `back after ${j} days without running: ${v}% of your usual volume this week — the comeback lasts as long as the break (Daniels' rule)`,
+    repriseArret: (j, v, enCours, q, long) => enCours
+      ? `no run recorded for ${j} days: we restart at ${v}% of your usual volume this week (Daniels' rule), ${long ? "with no hard session before the second half of the comeback" : "with no hard session until you have done one easy run again"}. If you did run, your watch is no longer syncing: check its connection`
+      : `back after ${j} days without running: ${v}% of your usual volume this week — the comeback lasts as long as the break (Daniels' rule); ${q ? "one quality session a week at most, a short one, until the comeback is over" : "no hard session during the first half of the comeback"}`,
+    repriseLongArret: (j, enCours, q) => enCours
+      ? `no run recorded for ${j} days: we restart with easy runs only, with no hard session during the first two weeks back. If you did run, your watch is no longer syncing: check its connection`
+      : `back after ${j} days without running: ${q ? "one quality session a week at most, a short one, until the end of your fourth week back" : "no hard session during the first two weeks back, then one a week until the fourth"}`,
     marcheCourse: (e, t) => `walk/run programme, stage ${e}/${t}: no hard sessions and no VO2max test until you can run 30 minutes non-stop — the running gets longer at every stage`,
     courseSecondaire: (n, d, b) => b ? `B race this week: ${n} (${d}) — two easy days before and a week 15% lighter, then recovery` : `C race this week: ${n} (${d}) — it replaces a quality session, no taper`,
   },
@@ -118,9 +131,12 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     chargeVueMaisMaintenue: (p) => `hohe jüngste Belastung (${p}), ABER HRV deutlich über dem Ausgangswert, ordentlicher Schlaf und keine Schmerzen: die Qualitätseinheit bleibt. Im Auge behalten, falls die HRV wieder fällt.`,
     apresCourse: (c, j, r, v) => `Erholung nach ${c} (Tag ${j} danach): keine intensiven Einheiten vor dem ${r}, bis dahin nur lockere Läufe, und ${v} % deines üblichen Umfangs diese Woche — ein lockerer Tag pro 3 gelaufene Kilometer`,
     repriseApresCourse: (c, j, f, v) => `Wiedereinstieg nach ${c} (Tag ${j} danach): höchstens eine kurze Schwelleneinheit pro Woche und ${v} % deines üblichen Umfangs diese Woche; normales Training ab dem ${f} — kein VO2max-Training und kein Wettkampf vor einem Tag pro gelaufener Meile`,
-    repriseArret: (j, v, enCours) => enCours
-      ? `seit ${j} Tagen kein Lauf aufgezeichnet: Diese Woche starten wir mit ${v} % deines üblichen Umfangs neu (Daniels-Regel). Falls du gelaufen bist, synchronisiert deine Uhr nicht mehr: Prüfe ihre Verbindung`
-      : `Wiedereinstieg nach ${j} Tagen ohne Laufen: ${v} % deines üblichen Umfangs diese Woche — der Wiedereinstieg dauert so lange wie die Pause (Daniels-Regel)`,
+    repriseArret: (j, v, enCours, q, long) => enCours
+      ? `seit ${j} Tagen kein Lauf aufgezeichnet: Diese Woche starten wir mit ${v} % deines üblichen Umfangs neu (Daniels-Regel), ${long ? "ohne harte Einheit vor der zweiten Hälfte des Wiedereinstiegs" : "ohne harte Einheit, bevor du wieder einen lockeren Lauf gemacht hast"}. Falls du gelaufen bist, synchronisiert deine Uhr nicht mehr: Prüfe ihre Verbindung`
+      : `Wiedereinstieg nach ${j} Tagen ohne Laufen: ${v} % deines üblichen Umfangs diese Woche — der Wiedereinstieg dauert so lange wie die Pause (Daniels-Regel); ${q ? "höchstens eine kurze Qualitätseinheit pro Woche, bis der Wiedereinstieg abgeschlossen ist" : "keine harte Einheit in der ersten Hälfte des Wiedereinstiegs"}`,
+    repriseLongArret: (j, enCours, q) => enCours
+      ? `seit ${j} Tagen kein Lauf aufgezeichnet: Wir steigen nur mit lockeren Läufen wieder ein, ohne harte Einheit in den ersten zwei Wochen. Falls du gelaufen bist, synchronisiert deine Uhr nicht mehr: Prüfe ihre Verbindung`
+      : `Wiedereinstieg nach ${j} Tagen ohne Laufen: ${q ? "höchstens eine kurze Qualitätseinheit pro Woche, bis zum Ende der vierten Woche" : "keine harte Einheit in den ersten zwei Wochen, danach höchstens eine pro Woche bis zur vierten"}`,
     marcheCourse: (e, t) => `Geh-Lauf-Programm, Stufe ${e}/${t}: keine intensiven Einheiten und kein VMA-Test, bis du 30 Minuten am Stück laufen kannst — das Laufen wird mit jeder Stufe länger`,
     courseSecondaire: (n, d, b) => b ? `B-Rennen diese Woche: ${n} (${d}) — zwei ruhige Tage davor und eine um 15 % leichtere Woche, danach Erholung` : `C-Rennen diese Woche: ${n} (${d}) — es ersetzt eine Qualitätseinheit, ohne Tapering`,
   },
@@ -143,9 +159,12 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     chargeVueMaisMaintenue: (p) => `carga reciente elevada (${p}) PERO VFC claramente por encima de su base, sueño correcto y sin dolor: la sesión de calidad se mantiene. A vigilar si la VFC vuelve a bajar.`,
     apresCourse: (c, j, r, v) => `recuperación tras ${c} (día ${j} después): sin intensidad antes del ${r}, solo rodajes suaves hasta entonces, y un ${v} % de tu volumen habitual esta semana — un día suave por cada 3 km corridos`,
     repriseApresCourse: (c, j, f, v) => `vuelta tras ${c} (día ${j} después): como máximo una sesión corta de umbral por semana y un ${v} % de tu volumen habitual esta semana; entrenamiento normal a partir del ${f} — ni VMA ni carreras antes de un día por cada milla corrida`,
-    repriseArret: (j, v, enCours) => enCours
-      ? `ninguna carrera registrada desde hace ${j} días: esta semana retomamos al ${v} % de tu volumen habitual (regla de Daniels). Si has corrido, tu reloj ya no sincroniza: revisa su conexión`
-      : `vuelta tras ${j} días sin correr: un ${v} % de tu volumen habitual esta semana; la vuelta dura tanto como la pausa (regla de Daniels)`,
+    repriseArret: (j, v, enCours, q, long) => enCours
+      ? `ninguna carrera registrada desde hace ${j} días: esta semana retomamos al ${v} % de tu volumen habitual (regla de Daniels), ${long ? "sin sesión dura antes de la segunda mitad de la vuelta" : "sin sesión dura hasta que hayas hecho de nuevo una salida suave"}. Si has corrido, tu reloj ya no sincroniza: revisa su conexión`
+      : `vuelta tras ${j} días sin correr: un ${v} % de tu volumen habitual esta semana; la vuelta dura tanto como la pausa (regla de Daniels); ${q ? "como máximo una sesión de calidad por semana, corta, hasta el final de la vuelta" : "ninguna sesión dura durante la primera mitad de la vuelta"}`,
+    repriseLongArret: (j, enCours, q) => enCours
+      ? `ninguna carrera registrada desde hace ${j} días: retomamos solo con rodajes suaves, sin sesión dura durante las dos primeras semanas. Si has corrido, tu reloj ya no sincroniza: revisa su conexión`
+      : `vuelta tras ${j} días sin correr: ${q ? "como máximo una sesión de calidad por semana, corta, hasta el final de la cuarta semana" : "ninguna sesión dura durante las dos primeras semanas, después una por semana hasta la cuarta"}`,
     marcheCourse: (e, t) => `programa de caminar y correr, etapa ${e}/${t}: ni sesiones de calidad ni test de VMA hasta que corras 30 minutos seguidos; la carrera se alarga en cada etapa`,
     courseSecondaire: (n, d, b) => b ? `carrera B esta semana: ${n} (${d}); dos días tranquilos antes y una semana un 15 % más suave, luego la recuperación` : `carrera C esta semana: ${n} (${d}); sustituye una sesión de calidad, sin puesta a punto`,
   },
@@ -168,9 +187,12 @@ export const MOTIF_T: Record<Lang, TextesMotifs> = {
     chargeVueMaisMaintenue: (p) => `carga recente elevada (${p}) MAS VFC claramente acima da sua base, sono correto e sem dores: a sessão de qualidade mantém-se. A vigiar se a VFC voltar a descer.`,
     apresCourse: (c, j, r, v) => `recuperação após ${c} (dia ${j} depois): sem intensidade antes de ${r}, só corridas fáceis até lá, e ${v} % do teu volume habitual esta semana — um dia fácil por cada 3 km corridos`,
     repriseApresCourse: (c, j, f, v) => `retoma após ${c} (dia ${j} depois): no máximo uma sessão curta de limiar por semana e ${v} % do teu volume habitual esta semana; treino normal a partir de ${f} — nem VMA nem provas antes de um dia por cada milha corrida`,
-    repriseArret: (j, v, enCours) => enCours
-      ? `nenhuma corrida registada há ${j} dias: esta semana retomamos a ${v} % do teu volume habitual (regra de Daniels). Se correste, o teu relógio deixou de sincronizar: verifica a ligação`
-      : `retoma após ${j} dias sem correr: ${v} % do teu volume habitual esta semana; a retoma dura tanto quanto a pausa (regra de Daniels)`,
+    repriseArret: (j, v, enCours, q, long) => enCours
+      ? `nenhuma corrida registada há ${j} dias: esta semana retomamos a ${v} % do teu volume habitual (regra de Daniels), ${long ? "sem sessão dura antes da segunda metade da retoma" : "sem sessão dura enquanto não voltares a fazer uma corrida fácil"}. Se correste, o teu relógio deixou de sincronizar: verifica a ligação`
+      : `retoma após ${j} dias sem correr: ${v} % do teu volume habitual esta semana; a retoma dura tanto quanto a pausa (regra de Daniels); ${q ? "no máximo uma sessão de qualidade por semana, curta, até ao fim da retoma" : "nenhuma sessão dura durante a primeira metade da retoma"}`,
+    repriseLongArret: (j, enCours, q) => enCours
+      ? `nenhuma corrida registada há ${j} dias: retomamos só com corridas fáceis, sem sessão dura nas duas primeiras semanas. Se correste, o teu relógio deixou de sincronizar: verifica a ligação`
+      : `retoma após ${j} dias sem correr: ${q ? "no máximo uma sessão de qualidade por semana, curta, até ao fim da quarta semana" : "nenhuma sessão dura nas duas primeiras semanas, depois uma por semana até à quarta"}`,
     marcheCourse: (e, t) => `programa de caminhada e corrida, etapa ${e}/${t}: nem sessões de qualidade nem teste de VMA até conseguires correr 30 minutos seguidos; a corrida aumenta a cada etapa`,
     courseSecondaire: (n, d, b) => b ? `prova B esta semana: ${n} (${d}); dois dias calmos antes e uma semana 15 % mais leve, depois a recuperação` : `prova C esta semana: ${n} (${d}); substitui uma sessão de qualidade, sem afinamento`,
   },

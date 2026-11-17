@@ -891,12 +891,12 @@ const CHAOS = { id: "u", preferred_language: "fr", full_name: "Test", age: 36, g
 const SEMAINES_CHAOS = [[1, 3, 6], [2, 4, 0], [1, 5, 6, 0], [3, 4, 0]];
 const jourSem = (j: string) => new Date(`${j}T12:00:00Z`).getUTCDay();
 /** Dix semaines de footings faciles (aucune séance dure courue) ; rien les `trou` derniers jours ; `sauf` : jours jamais courus. */
-function historiqueChaos(jour: string, trou = 0, sauf: number[] = []) {
+function historiqueChaos(jour: string, trou = 0, sauf: number[] = [], km = 9) {
   const out: Ligne[] = [];
   for (let n = trou + 1; n <= 70; n++) {
     const d = plusJours(jour, -n);
     if (!SEMAINES_CHAOS[Math.floor(n / 7) % 4].includes(jourSem(d)) || sauf.includes(jourSem(d))) continue;
-    out.push({ user_id: "u", date: d, type: "easy", sport: "run", distance_km: 9, duration_seconds: 9 * 330,
+    out.push({ user_id: "u", date: d, type: "easy", sport: "run", distance_km: km, duration_seconds: km * 330,
       elevation_gain_m: 30, avg_hr: 140, max_hr: 155, tss: 45 });
   }
   return out;
@@ -931,10 +931,15 @@ async function profilChaotique() {
       const dAvec = durs(avec.plan), dSans = durs(sans.plan);
       assert.ok(dAvec.length <= dSans.length, `${ctxt} : ${dAvec.length} qualités après deux manquées (${dAvec.join(", ")}), ${dSans.length} sans (${dSans.join(", ")})`);
       if (dAvec.length < dSans.length) retiree++;
-      // Sur N'IMPORTE QUELS sept jours consécutifs, manquées + posées ≤ budget de la semaine.
+      // Sur N'IMPORTE QUELS sept jours consécutifs qui contiennent une qualité POSÉE, manquées +
+      // posées ≤ budget de la semaine. ⚠️ Une fenêtre faite des seules qualités manquées n'est pas
+      // une décision du plan : depuis le 16/11/2026, la reprise après un arrêt ramène le budget à 0
+      // (variante « trou de 5 jours » : sur certains départs la dernière sortie remonte à 7 jours ou plus), et deux qualités déjà
+      // manquées ne peuvent pas « tenir » dans un budget nul. Ce qui compte : le plan n'en AJOUTE pas.
       const tous = [...(avec.ctx.qualiteRecente?.jours ?? []), ...dAvec].sort();
       for (const debut of tous) {
         const dedans = tous.filter((d) => d >= debut && d <= plusJours(debut, 6));
+        if (!dedans.some((d) => dAvec.includes(d))) continue;
         assert.ok(dedans.length <= avec.ctx.weekPlan.qBudget, `${ctxt} : ${dedans.length} qualités du ${debut} au ${plusJours(debut, 6)} (${dedans.join(", ")}) pour un budget de ${avec.ctx.weekPlan.qBudget}`);
       }
       // Ni rattrapage le lendemain du trou : rien de dur aujourd'hui ni demain.
@@ -946,11 +951,9 @@ async function profilChaotique() {
     assert.ok(retiree >= 1, "précondition : les qualités manquées ne retirent rien sur aucun départ, le rattrapage n'est pas éprouvé");
   });
   await testA("après 6 jours ou plus sans courir, le volume manqué ne s'ajoute pas à la semaine suivante", async () => {
-    let qualiteDesLaReprise = 0; const sortiesLongues: number[] = [];
     // ⚠️ CE TEST NE FIGE PAS LA RÈGLE DE DANIELS (50 % puis 75 %, `plan-reprise.test.ts`) : sans elle, le
     // plafond « 1,4 × la semaine écoulée » tient encore la cible. Il fige l'absence de RATTRAPAGE.
-    // ⚠️ NON COUVERT (16/11/2026, décision de Cyprien) : après le trou, le plan pose UNE séance dure, au seuil
-    // dès le premier jour sur 8 départs sur 10. Pas d'assertion ici tant que la règle n'est pas tranchée.
+    // L'INTENSITÉ de la reprise (aucune séance dure avant une sortie facile) a son propre test, plus bas.
     // Rien les 5 derniers jours : avec ses jours irréguliers, sa dernière sortie remonte à 6 jours ou plus.
     for (const jour of HORLOGES) {
       const derniere = historiqueChaos(jour, 5).map((w) => String(w.date)).sort().at(-1)!;
@@ -959,12 +962,227 @@ async function profilChaotique() {
       const trou = await contexte(jour, tablesChaos(jour, { workouts: historiqueChaos(jour, 5) }));
       assert.ok(regulier.ctx.volume.targetKm > 0, `${jour} : précondition, cible nulle`);
       assert.ok(trou.ctx.volume.targetKm <= regulier.ctx.volume.targetKm, `${jour} : cible de ${trou.ctx.volume.targetKm} km après un trou, ${regulier.ctx.volume.targetKm} km sans`);
-      if (trou.plan.some((d) => DURS.test(d.type) && d.date <= plusJours(jour, 1))) qualiteDesLaReprise++;
-      sortiesLongues.push(trou.ctx.volume.longRunKm);
       assert.ok(trou.ctx.volume.longRunKm <= regulier.ctx.volume.longRunKm, `${jour} : sortie longue de ${trou.ctx.volume.longRunKm} km après un trou, ${regulier.ctx.volume.longRunKm} km sans`);
     }
-    // OBSERVATION, sans assertion (défaut ouvert, décision de Cyprien) : qualité le jour même ou le lendemain.
-    console.log(`      observation : qualité au jour 0 ou 1 de la reprise sur ${qualiteDesLaReprise}/${HORLOGES.length} départs ; sortie longue visée ${[...new Set(sortiesLongues)].join("/")} km`);
+  });
+  // ⚠️ DÉFAUT TROUVÉ ICI LE 16/11/2026 (observation de ce profil, rejouée par `@HeadCoach` jusqu'à 25 jours
+  // d'arrêt) : la reprise ne bornait que le volume. Le plan posait une séance au seuil le jour même du retour
+  // sur 8 départs sur 10, et une « sortie longue » de 4 km à une coureuse qui court 9 km par sortie.
+  // LA RÈGLE (`lib/coach/repriseArret`, `qualitePendantReprise`) : aucune qualité tant qu'aucune sortie n'a
+  // suivi l'arrêt ; une seule PAR SEMAINE ensuite jusqu'à la fin de la reprise ; après plus de 14 jours d'arrêt, pas avant
+  // la seconde moitié de la reprise ; et une sortie plus courte que la sortie habituelle n'est pas « longue ».
+  await testA("reprise après un arrêt : du facile d'abord, aucune séance dure avant une sortie facile, puis une seule par semaine", async () => {
+    const durs = (plan: PlanDay[]) => [...new Set(plan.filter((d) => DURS.test(d.type)).map((d) => d.date))].sort();
+    const longues = (plan: PlanDay[]) => plan.filter((d) => /Sortie longue/i.test(d.type));
+    const ecart = (a: string, b: string) => Math.round((Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`)) / 86400000);
+    const facile = (jour: string, n: number): Ligne => ({ user_id: "u", date: plusJours(jour, -n), type: "easy", sport: "run",
+      distance_km: 6, duration_seconds: 6 * 340, elevation_gain_m: 20, avg_hr: 138, max_hr: 150, tss: 30 });
+    const derniereDe = (w: Ligne[]) => w.map((x) => String(x.date)).sort().at(-1)!;
+    let qualiteSansArret = 0, longueSansArret = 0, qualiteRevenue = 0, vus = 0;
+    for (const jour of HORLOGES) {
+      // Le contre-poids : sans arrêt, cette coureuse a bien des qualités et une sortie longue.
+      const regulier = await contexte(jour, tablesChaos(jour));
+      if (durs(regulier.plan).length) qualiteSansArret++;
+      if (longues(regulier.plan).length) longueSansArret++;
+
+      // (a) PAS ENCORE REPRIS — arrêt de 6 jours ou plus, de 13 ou plus, de 20 ou plus. L'arrêt se compte en
+      // jours SANS COURIR : la dernière sortie remonte à `arret + 1` jours (elle n'a pas encore couru aujourd'hui).
+      for (const trou of [6, 13, 20]) {
+        const workouts = historiqueChaos(jour, trou);
+        const arret = ecart(jour, derniereDe(workouts)) - 1;
+        const ctxt = `${jour}, ${arret} j sans courir`;
+        assert.ok(arret >= 6 && arret <= 28, `${ctxt} : précondition, l'arrêt sort de la règle de Daniels (6 à 28 jours)`);
+        const r = await contexte(jour, tablesChaos(jour, { workouts }));
+        assert.equal(r.ctx.weekPlan.qBudget, 0, `${ctxt} : budget de ${r.ctx.weekPlan.qBudget} qualité(s) avant la première sortie de reprise`);
+        assert.deepEqual(durs(r.plan), [], `${ctxt} : séance dure le ${durs(r.plan).join(", ")} avant la moindre sortie facile`);
+        // Une sortie plus courte que ses 9 km habituels ne s'appelle pas « sortie longue ».
+        assert.deepEqual(longues(r.plan).map((d) => d.date), [], `${ctxt} : « sortie longue » de ${r.ctx.volume.longRunKm} km pour une coureuse à 9 km par sortie`);
+        // Le plan DIT pourquoi : le motif de la reprise annonce l'absence de séance dure.
+        // Après plus de 14 jours SANS COURIR, une sortie facile ne suffit pas : le texte dit la seconde moitié.
+        const attendu = arret > 14 ? /sans séance dure avant la seconde moitié de la reprise/ : /sans séance dure tant que tu n'as pas refait une sortie facile/;
+        // Et le motif dit « depuis N jours » avec N = jours écoulés depuis la dernière sortie.
+        assert.ok(r.ctx.readiness.reasons.some((m) => m.includes(`aucune course enregistrée depuis ${arret + 1} jours`)),
+          `${ctxt} : le motif n'annonce pas « depuis ${arret + 1} jours » (${r.ctx.readiness.reasons.join(" | ")})`);
+        assert.ok(r.ctx.readiness.reasons.some((m) => attendu.test(m)),
+          `${ctxt} : le motif de la reprise ne dit pas quand revient la séance dure (${r.ctx.readiness.reasons.join(" | ")})`);
+        // Et la reprise reste une reprise : elle court, en footings.
+        assert.ok(r.plan.filter((d) => COURSE_A_PIED.test(d.type)).length >= 2, `${ctxt} : la semaine de reprise n'a presque plus de sortie`);
+        vus++;
+      }
+
+      // (b) REPRIS HIER après un arrêt court (8 à 11 jours) : une qualité au plus.
+      const court = [...historiqueChaos(jour, 9), facile(jour, 1)];
+      const arretCourt = ecart(plusJours(jour, -1), derniereDe(historiqueChaos(jour, 9))) - 1;
+      assert.ok(arretCourt >= 6 && arretCourt <= 14, `${jour} : précondition, arrêt court de ${arretCourt} j`);
+      const rc = await contexte(jour, tablesChaos(jour, { workouts: court }));
+      assert.ok(durs(rc.plan).length <= 1, `${jour}, repris hier après ${arretCourt} j : ${durs(rc.plan).length} séances dures (${durs(rc.plan).join(", ")})`);
+      if (durs(rc.plan).length === 1) qualiteRevenue++;
+      assert.ok(rc.ctx.readiness.reasons.some((m) => /une seule séance de qualité par semaine au plus, courte, jusqu'à la fin de la reprise/.test(m)),
+        `${jour}, repris hier : le motif n'annonce pas la séance unique (${rc.ctx.readiness.reasons.join(" | ")})`);
+
+      // (c) REPRIS IL Y A 3 JOURS après un arrêt long (16 à 19 jours) : rien avant la seconde moitié.
+      const long = [...historiqueChaos(jour, 19), facile(jour, 3), facile(jour, 1)];
+      const arretLong = ecart(plusJours(jour, -3), derniereDe(historiqueChaos(jour, 19))) - 1;
+      assert.ok(arretLong > 14 && arretLong <= 28, `${jour} : précondition, arrêt long de ${arretLong} j`);
+      const premierJour = Math.ceil(arretLong / 2) - 3; // jours restants avant la seconde moitié
+      assert.ok(premierJour >= 1, `${jour} : précondition, la seconde moitié a déjà commencé`);
+      const rl = await contexte(jour, tablesChaos(jour, { workouts: long }));
+      const tropTot = durs(rl.plan).filter((d) => d < plusJours(jour, premierJour));
+      assert.deepEqual(tropTot, [], `${jour}, ${arretLong} j d'arrêt, repris depuis 3 j : séance dure le ${tropTot.join(", ")}, avant la seconde moitié de la reprise (${plusJours(jour, premierJour)})`);
+      assert.ok(durs(rl.plan).length <= 1, `${jour}, arrêt long : ${durs(rl.plan).length} séances dures`);
+      if (premierJour > 6) assert.ok(rl.ctx.readiness.reasons.some((m) => /aucune séance dure pendant la première moitié de la reprise/.test(m)),
+        `${jour}, arrêt long : le motif n'annonce pas l'attente de la seconde moitié (${rl.ctx.readiness.reasons.join(" | ")})`);
+
+      // (d) LE CONTRE-POIDS DE LA SORTIE LONGUE : une coureuse à 4 km par sortie garde la sienne,
+      // la règle ne retire que ce qui est PLUS COURT que l'habitude.
+      const petites = await contexte(jour, tablesChaos(jour, { workouts: historiqueChaos(jour, 5, [], 4) }));
+      assert.ok(petites.ctx.volume.longRunKm >= 4, `${jour} : sortie longue retirée (${petites.ctx.volume.longRunKm} km) alors qu'elle vaut la sortie habituelle de 4 km`);
+    }
+    assert.equal(vus, HORLOGES.length * 3, "précondition : tous les départs n'ont pas tourné");
+    assert.ok(qualiteSansArret >= 1, "précondition : sans arrêt, ce profil n'a de séance dure sur aucun départ, « aucune qualité » ne prouve rien");
+    assert.ok(longueSansArret >= 1, "précondition : sans arrêt, ce profil n'a de sortie longue sur aucun départ");
+    assert.ok(qualiteRevenue >= 1, "une fois la première sortie facile courue, la séance dure ne revient sur aucun départ : la règle interdit au lieu de différer");
+  });
+
+  // ⚠️ DOUBLE RELECTURE DU 17/11/2026 (ÉCHOUE ×2) : le budget de qualité ne suffit pas. Sur un coureur à gros
+  // volume, la sortie longue conservée atteint 12 km et le plan y glissait un bloc à allure course ou un
+  // finish progressif (`canSpice`, autoPlan) : une séance dure AVANT la moindre sortie facile, et une SECONDE
+  // séance dure une fois repris. La coureuse à 9 km par sortie ne pouvait pas le voir (sa sortie longue est
+  // retirée), et `DURS` ne juge que le type de séance. D'où ce second profil, et un juge qui lit le titre.
+  await testA("reprise d'un coureur à gros volume : la sortie longue reste facile, les footings restent simples", async () => {
+    const GROS = { ...CHAOS, age: 34, gender: "male", weight_kg: 66, max_hr: 190, days_per_week: 7 };
+    // Marathon dans 45 jours : la phase est « Spécifique », où le menu met l'allure spécifique EN TÊTE. C'est ce
+    // qui éprouve « la séance de reprise est un seuil » (à 70 jours, le seuil était déjà premier : test muet).
+    /** Dix semaines : 10 km du lundi au vendredi (un tempo le mercredi), 20 km le samedi et le dimanche. Rien les `trou` derniers jours. */
+    const historiqueGros = (jour: string, trou = 0): Ligne[] => {
+      const out: Ligne[] = [];
+      for (let n = trou + 1; n <= 70; n++) {
+        const d = plusJours(jour, -n), j = jourSem(d), km = j === 0 || j === 6 ? 20 : 10, dur = j === 3;
+        out.push({ user_id: "u", date: d, type: dur ? "tempo" : "easy", sport: "run", distance_km: km, duration_seconds: km * (dur ? 255 : 310),
+          elevation_gain_m: 40, avg_hr: dur ? 172 : 142, max_hr: dur ? 184 : 158, tss: dur ? 85 : km * 5 });
+      }
+      return out;
+    };
+    const tablesGros = (jour: string, workouts: Ligne[]) => ({
+      profiles: [GROS],
+      performance_baselines: [{ user_id: "u", vma_kmh: 17, max_hr: 190, tested_at: plusJours(jour, -30) }],
+      workouts,
+      notifications: [{ user_id: "u", type: "race_objective", data: { race: "Marathon test", raceDate: plusJours(jour, 45), distanceKm: 42.195, targetTime: "3h10'00", targetSeconds: 11400, targetPace: "4'30/km" } }],
+    });
+    const facile = (jour: string, n: number): Ligne => ({ user_id: "u", date: plusJours(jour, -n), type: "easy", sport: "run",
+      distance_km: 8, duration_seconds: 8 * 320, elevation_gain_m: 20, avg_hr: 140, max_hr: 152, tss: 38 });
+    const ecart = (a: string, b: string) => Math.round((Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`)) / 86400000);
+    // Une séance DURE, pour le coureur : le type, mais aussi une sortie longue à bloc d'allure ou progressive.
+    const LONGUE_EPICEE = /bloc sp[ée]cifique|progressive/i, FOOTING_VARIE = /lignes droites|progressif/i;
+    const dures = (plan: PlanDay[]) => plan.filter((d) => DURS.test(d.type) || (/Sortie longue/i.test(d.type) && LONGUE_EPICEE.test(d.title)));
+    const varies = (plan: PlanDay[]) => plan.filter((d) => d.type === "Endurance" && FOOTING_VARIE.test(d.title));
+    const liste = (j: PlanDay[]) => j.map((d) => `${d.date} ${d.title}`).join(", ");
+    let epiceeSansArret = 0, varieSansArret = 0, longueGardee = 0, deuxDuresSansArret = 0, autreQueSeuilSansArret = 0, revenueApresHuitJours = 0;
+    let footingsAvantQualite = 0, varieUneFoisPermise = 0, horsEchelleVu = 0;
+    for (const jour of HORLOGES) {
+      // Le contre-poids : sans arrêt, ce coureur a bien une sortie longue épicée et des footings variés.
+      const regulier = await contexte(jour, tablesGros(jour, historiqueGros(jour)));
+      if (regulier.plan.some((d) => /Sortie longue/i.test(d.type) && LONGUE_EPICEE.test(d.title))) epiceeSansArret++;
+      if (varies(regulier.plan).length) varieSansArret++;
+      if (dures(regulier.plan).length >= 2) deuxDuresSansArret++;
+      if (regulier.plan.some((d) => DURS.test(d.type) && !/Seuil/i.test(d.type))) autreQueSeuilSansArret++;
+
+      // (a) PAS ENCORE REPRIS, après 8, 12 et 20 jours d'arrêt : rien de dur, footings simples.
+      for (const arret of [8, 12, 20]) {
+        // `historiqueGros(jour, arret)` : dernière sortie il y a `arret + 1` jours, soit `arret` jours sans courir.
+        const r = await contexte(jour, tablesGros(jour, historiqueGros(jour, arret)));
+        const ctxt = `${jour}, ${arret} j sans courir`;
+        assert.equal(r.ctx.weekPlan.repriseArret, "sans-qualite", `${ctxt} : précondition, le plan ne reçoit pas l'état de la reprise`);
+        assert.deepEqual(liste(dures(r.plan)), "", `${ctxt} : séance dure avant la moindre sortie facile`);
+        assert.deepEqual(liste(varies(r.plan)), "", `${ctxt} : footing varié alors que le motif annonce « sans séance dure »`);
+        if (r.plan.some((d) => /Sortie longue/i.test(d.type)) && r.ctx.volume.longRunKm >= 12) longueGardee++;
+      }
+
+      // (b) REPRIS, reprise en cours (arrêt de 10 jours repris depuis 8 ; de 6 repris depuis 4 ; de 14 repris
+      // depuis 8) : UNE séance dure au plus, sortie longue épicée comprise.
+      for (const [arret, repris] of [[10, 8], [6, 4], [14, 8]] as const) {
+        const apres = Array.from({ length: Math.ceil(repris / 2) }, (_, k) => facile(jour, repris - 2 * k)).filter((w) => String(w.date) < jour);
+        const avant = historiqueGros(jour, arret + repris);
+        const premiere = apres.map((w) => String(w.date)).sort()[0], derniere = avant.map((w) => String(w.date)).sort().at(-1)!;
+        const ctxt = `${jour}, ${arret} j d'arrêt, repris depuis ${repris} j`;
+        assert.equal(ecart(premiere, derniere) - 1, arret, `${ctxt} : précondition, l'arrêt simulé ne dure pas ${arret} jours`);
+        const r = await contexte(jour, tablesGros(jour, [...avant, ...apres]));
+        assert.equal(r.ctx.weekPlan.repriseArret, "une-qualite", `${ctxt} : précondition, la reprise n'est pas en cours`);
+        assert.ok(dures(r.plan).length <= 1, `${ctxt} : ${dures(r.plan).length} séances dures (${liste(dures(r.plan))})`);
+        // Et cette séance est le SEUIL, écrit court : ni VMA ni allure spécifique au retour d'un arrêt.
+        const pasSeuil = dures(r.plan).filter((d) => !/Seuil/i.test(d.type));
+        assert.deepEqual(liste(pasSeuil), "", `${ctxt} : la séance de reprise n'est pas un seuil`);
+        // Le contre-poids des footings : dès qu'une séance dure est permise, ils peuvent de nouveau varier.
+        if ((r.ctx.weekPlan.qualiteDes ?? 0) === 0 && varies(r.plan).length) varieUneFoisPermise++;
+      }
+
+      // (b bis) ARRÊT LONG, PREMIÈRE MOITIÉ — arrêt de 20 jours repris depuis 3, 5 ou 6 jours : la séance dure
+      // n'est permise qu'au 7ᵉ, 5ᵉ ou 4ᵉ jour du plan. AVANT ce jour, ni séance dure ni footing varié
+      // (troisième double relecture : la garde lisait l'état de la SEMAINE, pas le jour).
+      for (const repris of [3, 5, 6]) {
+        const apres = Array.from({ length: Math.ceil(repris / 2) }, (_, k) => facile(jour, repris - 2 * k)).filter((w) => String(w.date) < jour);
+        const r = await contexte(jour, tablesGros(jour, [...historiqueGros(jour, 20 + repris), ...apres]));
+        const des = 10 - repris, permis = plusJours(jour, des), ctxt = `${jour}, 20 j d'arrêt, repris depuis ${repris} j`;
+        assert.equal(r.ctx.weekPlan.qualiteDes, des, `${ctxt} : précondition, la séance dure est permise au jour ${r.ctx.weekPlan.qualiteDes}, pas ${des}`);
+        assert.deepEqual(liste(dures(r.plan).filter((d) => d.date < permis)), "", `${ctxt} : séance dure avant la seconde moitié de la reprise (${permis})`);
+        assert.deepEqual(liste(varies(r.plan).filter((d) => d.date < permis)), "", `${ctxt} : footing varié avant le premier jour où une séance dure est permise (${permis})`);
+        if (r.plan.filter((d) => d.type === "Endurance" && d.date < permis).length >= 3) footingsAvantQualite++;
+      }
+
+      // (b ter) AU-DELÀ DE 28 JOURS — arrêt de 34 jours (visa du directeur scientifique, 17/11/2026 : la règle
+      // s'arrêtait à 28 jours ; le plan posait un seuil de 4×10 min le jour du retour et une sortie longue de
+      // 22 km dans une semaine visée à 20 km). Pas encore repris, puis repris depuis 3 et 10 jours.
+      for (const repris of [-1, 3, 10]) {
+        const apres = repris < 0 ? [] : Array.from({ length: Math.ceil(repris / 2) }, (_, k) => facile(jour, repris - 2 * k)).filter((w) => String(w.date) < jour);
+        const r = await contexte(jour, tablesGros(jour, [...historiqueGros(jour, 34 + Math.max(0, repris)), ...apres]));
+        const ctxt = `${jour}, 34 j d'arrêt, ${repris < 0 ? "pas encore repris" : `repris depuis ${repris} j`}`;
+        const des = repris < 0 ? 7 : Math.max(0, 14 - repris), permis = plusJours(jour, des);
+        assert.equal(r.ctx.weekPlan.repriseArret, des > 6 ? "sans-qualite" : "une-qualite", `${ctxt} : précondition, l'état de la reprise transmis au plan est « ${r.ctx.weekPlan.repriseArret} »`);
+        assert.deepEqual(liste(dures(r.plan).filter((d) => d.date < permis)), "", `${ctxt} : séance dure avant le 14ᵉ jour de reprise (${permis})`);
+        assert.ok(dures(r.plan).length <= 1, `${ctxt} : ${dures(r.plan).length} séances dures (${liste(dures(r.plan))})`);
+        assert.deepEqual(liste(varies(r.plan).filter((d) => d.date < permis)), "", `${ctxt} : footing varié avant le premier jour permis (${permis})`);
+        // La sortie longue ne dépasse pas 30 % de la semaine visée (ou n'est pas posée).
+        const plafond = Math.max(4, Math.round(r.ctx.volume.targetKm * 0.3));
+        assert.ok(r.ctx.volume.longRunKm <= plafond, `${ctxt} : sortie longue de ${r.ctx.volume.longRunKm} km dans une semaine visée à ${r.ctx.volume.targetKm} km`);
+        // Le motif le dit, sans pourcentage de volume (la règle de Daniels ne s'applique plus au-delà de 28 jours).
+        const attendu = repris < 0 ? /sans séance dure pendant les deux premières semaines de reprise/ : des > 6 ? /aucune séance dure pendant les deux premières semaines/ : /une seule séance de qualité par semaine au plus, courte/;
+        assert.ok(r.ctx.readiness.reasons.some((m) => attendu.test(m)), `${ctxt} : le motif ne dit pas l'intensité (${r.ctx.readiness.reasons.join(" | ")})`);
+        if (repris < 0) horsEchelleVu++;
+      }
+      // Le contre-poids : quatre semaines après le retour, la reprise est finie, les séances dures reviennent.
+      {
+        const apres = Array.from({ length: 15 }, (_, k) => facile(jour, 29 - 2 * k)).filter((w) => String(w.date) < jour);
+        const r = await contexte(jour, tablesGros(jour, [...historiqueGros(jour, 34 + 29), ...apres]));
+        assert.equal(r.ctx.weekPlan.repriseArret, undefined, `${jour} : 29 jours après le retour d'un arrêt de 34 jours, la reprise dure encore`);
+      }
+
+      // (c) UNE PAR SEMAINE, PAS UNE PAR PLAN — arrêt de 20 jours, repris depuis 14, donc dans la seconde
+      // moitié : un seuil prescrit ET couru il y a 2, 4 ou 6 jours interdit toute séance dure dans les sept
+      // jours qui le suivent ; couru il y a 8 jours, il laisse revenir la suivante (la reprise dure encore).
+      for (const k of [2, 4, 6, 8]) {
+        const avant = historiqueGros(jour, 20 + 14);
+        const apres = [14, 12, 10, 8, 6, 4, 2].map((n) => n === k
+          ? { ...facile(jour, n), type: "tempo", distance_km: 10, duration_seconds: 10 * 255, avg_hr: 172, max_hr: 184, tss: 85 }
+          : facile(jour, n));
+        const deja = plusJours(jour, -k), ctxt = `${jour}, 20 j d'arrêt, repris depuis 14 j, seuil couru il y a ${k} j`;
+        const r = await contexte(jour, { ...tablesGros(jour, [...avant, ...apres]),
+          notifications: [...tablesGros(jour, []).notifications, prescrit(jour, k, "Seuil")] });
+        assert.equal(r.ctx.weekPlan.repriseArret, "une-qualite", `${ctxt} : précondition, la reprise n'est pas en cours`);
+        if (k < 7) assert.ok(r.ctx.qualiteRecente?.jours.includes(deja), `${ctxt} : précondition, le seuil du ${deja} n'est pas compté dans la semaine écoulée`);
+        const tropPres = dures(r.plan).filter((d) => ecart(d.date, deja) < 7);
+        assert.deepEqual(liste(tropPres), "", `${ctxt} : seconde séance dure dans la même semaine que celle du ${deja}`);
+        if (k === 8 && dures(r.plan).length === 1) revenueApresHuitJours++;
+      }
+    }
+    assert.ok(epiceeSansArret >= 1, "précondition : sans arrêt, ce coureur n'a de sortie longue épicée sur aucun départ");
+    assert.ok(varieSansArret >= 1, "précondition : sans arrêt, ce coureur n'a de footing varié sur aucun départ");
+    assert.ok(deuxDuresSansArret >= 1, "précondition : sans arrêt, ce coureur n'a jamais deux séances dures, « une au plus » ne prouve rien");
+    assert.ok(longueGardee >= 1, "précondition : pendant la reprise, la sortie longue d'au moins 12 km n'est gardée sur aucun départ, le bloc d'allure n'est pas éprouvé");
+    assert.ok(autreQueSeuilSansArret >= 1, "précondition : sans arrêt, ce coureur n'a que des seuils, « la séance de reprise est un seuil » ne prouve rien");
+    assert.ok(revenueApresHuitJours >= 1, "une semaine après son seuil, la séance dure ne revient sur aucun départ : la borne vaut pour toute la reprise, pas par semaine");
+    assert.ok(footingsAvantQualite >= 1, "précondition : aucun plan n'a trois footings avant le jour permis, les footings variés (2ᵉ et 3ᵉ) ne sont pas éprouvés");
+    assert.ok(varieUneFoisPermise >= 1, "une fois la séance dure permise, les footings ne varient plus sur aucun départ : la garde vaut pour toute la reprise");
+    assert.equal(horsEchelleVu, HORLOGES.length, "précondition : l'arrêt de 34 jours n'a pas tourné sur tous les départs");
   });
   await testA("les jours déclarés changent d'une semaine à l'autre : le plan suit ceux de CETTE semaine", async () => {
     // Semaine A : lundi, mercredi, samedi, dimanche. Semaine B : mardi, jeudi, vendredi. Même historique.

@@ -89,14 +89,27 @@ export type Variante = "base" | "lignes" | "progressif";
 /**
  * La douleur a-t-elle VRAIMENT retiré des lignes droites cette semaine ? Seulement si, sans elle,
  * un footing en aurait porté : au moins deux footings, hors affûtage, hors semaine de course et
- * hors athlète sans historique (relecture du 10/11/2026 : l'écran l'affirmait toujours).
+ * hors athlète sans historique (relecture du 10/11/2026 : l'écran l'affirmait toujours), et hors
+ * reprise sans séance dure (17/11/2026 : la reprise les avait déjà retirées).
  */
-export function lignesRetireesParDouleur(nbFootings: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean }): boolean {
+export function lignesRetireesParDouleur(nbFootings: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean; reprise?: boolean }): boolean {
   return varianteFooting(1, nbFootings, { ...o, douleur: false }) === "lignes";
 }
 
-export function varianteFooting(rang: number, total: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean; douleur?: boolean }): Variante {
-  if (o.taper || o.semaineCourse || o.sansHistorique || o.douleur) return "base";
+/**
+ * Pendant une reprise après un arrêt, la REPRISE a-t-elle déjà retiré les lignes droites ? Oui si
+ * le footing qui les aurait portées (le deuxième) tombe avant le premier jour du plan où une séance
+ * dure est permise, ou s'il n'y en a pas. La douleur ne se voit alors rien attribuer (17/11/2026).
+ * `deuxiemeFootingJour` : rang du deuxième footing dans le plan (0 = aujourd'hui), ou `null`.
+ */
+export function lignesRetireesParReprise(o: { reprise: boolean; deuxiemeFootingJour: number | null; qualiteDes: number }): boolean {
+  return o.reprise && (o.deuxiemeFootingJour == null || o.deuxiemeFootingJour < o.qualiteDes);
+}
+
+export function varianteFooting(rang: number, total: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean; douleur?: boolean; reprise?: boolean }): Variante {
+  // `reprise` (17/11/2026) : après un arrêt, tant qu'aucune séance dure n'est permise, le plan
+  // annonce « sans séance dure » — ni accélérations ni fin de footing plus rapide non plus.
+  if (o.taper || o.semaineCourse || o.sansHistorique || o.douleur || o.reprise) return "base";
   if (!Number.isFinite(rang) || !Number.isFinite(total) || total < 2 || rang < 0) return "base";
   // Le PREMIER footing reste neutre : il suit souvent une séance dure ou une sortie
   // longue, et des accélérations sur des jambes chargées n'apportent rien de bon.

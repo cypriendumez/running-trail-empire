@@ -205,10 +205,12 @@ test("le plan varie ses footings", () => {
   assert.match(src, /repartirFootings\(easySlots\.length/, "la distance ne varie plus");
   // ⚠️ Le titre ET le détail dépendent de la variante : compter les occurrences, sinon
   // en remplacer une seule laisse ce test au vert (défaut trouvé par mutation).
-  const n = (src.match(/varianteFooting\(rang, easySlots\.length, gardes\)/g) ?? []).length;
+  // (17/11/2026 : la garde se lit par JOUR, `gardesDu(i)`, qui reprend toutes les gardes de la semaine.)
+  const n = (src.match(/varianteFooting\(rang, easySlots\.length, gardesDu\(i\)\)/g) ?? []).length;
   assert.equal(n, 2, `${n} appel(s) à varianteFooting : le titre et le détail doivent tous deux en dépendre`);
   // 09/11/2026 : seuil retiré pour une périostite, ses lignes droites revenaient en fin de footing.
   assert.match(src, /const gardes = \{[^}]*\bdouleur\b[^}]*\};/, "la douleur en cours ne garde plus les footings de toute accélération");
+  assert.match(src, /const gardesDu = \(i: number\) => \(\{ \.\.\.gardes,/, "la garde du jour ne reprend plus celles de la semaine (affûtage, course, douleur)");
   assert.doesNotMatch(src, /for \(const i of easySlots\) put\(i, \{\n\s*type: "Endurance", title: \(l\) => PLAN_T\[l\]\.enduranceTitre,/,
     "l'ancienne boucle qui posait la même séance partout est revenue");
 });

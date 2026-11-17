@@ -44,7 +44,7 @@ const dureeLoc = (min: number, l: Lang) => {
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile } from "@/lib/time/fuseau";
 import { apresCourse, facteurVolumeApresCourse, type PhaseApresCourse } from "@/lib/coach/apresCourse";
-import { repriseApresArret, partApresArret } from "@/lib/coach/repriseArret";
+import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle } from "@/lib/coach/repriseArret";
 import { programmeMarcheCourse, dureesMarcheCourse, type SeanceMarcheCourse } from "@/lib/coach/marcheCourse";
 import { testEnVigueur, allureFacileMaxSec, fmtAllure, TYPE_TEST_LACTATE, type TestLactate } from "@/lib/coach/lactate";
 import { courseCEcarteeDe, type CourseCEcartee } from "@/lib/coach/courseCEcartee";
@@ -246,6 +246,11 @@ export type AthleteContext = {
     reprise?: boolean;
     /** Premier jour du plan (0 = aujourd'hui) où une qualité peut être posée. */
     qualiteDes?: number;
+    /** Reprise après un arrêt en cours (`lib/coach/repriseArret`), absent hors reprise. Tant
+     *  qu'elle dure, la sortie longue reste FACILE (ni bloc d'allure ni finish progressif :
+     *  ce serait une seconde séance dure), et un footing posé avant `qualiteDes` reste simple (ni
+     *  lignes droites ni progressif). « sans-qualite » : aucune séance dure dans ces sept jours. */
+    repriseArret?: "sans-qualite" | "une-qualite";
   };
   /** Doubles séances (matin + soir) : autorisées ou non, et ce qui manque le cas
    *  échéant. Une case cochée qui ne produit rien est un mensonge silencieux —
@@ -1445,6 +1450,13 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // aussi longue que l'arrêt (Daniels). Sans elle, la semaine vide plafonnait tout à
   // 15 km — 14 km visés pour un coureur à 70 km par semaine (Cyprien, 05/11/2026).
   const repriseArret = repriseApresArret(runs.map((w) => String(w.date).slice(0, 10)), todayStr);
+  // ⚠️ ET L'INTENSITÉ (16/11/2026) : la reprise ne bornait que le volume ; le plan posait un
+  // seuil le jour même du retour. `null` hors reprise. Voir `qualitePendantReprise`.
+  // ⚠️ AU-DELÀ DE 28 JOURS AUSSI (visa du directeur scientifique, 17/11/2026) : la règle de volume
+  // ne s'y applique plus, mais l'intensité n'a pas de borne haute. `repriseIntensite` est la reprise
+  // en cours, quelle que soit la longueur de l'arrêt ; `repriseArret` reste la règle de VOLUME.
+  const repriseIntensite = repriseArret ?? arretHorsEchelle(runs.map((w) => String(w.date).slice(0, 10)), todayStr);
+  const qualiteReprise = qualitePendantReprise(repriseIntensite);
   const habitudeKm = robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm);
   /** Plafond de volume de la semaine qui commence dans `dansJours` jours (Infinity hors reprise). */
   const plafondArretKm = (dansJours = 0) => {
@@ -1520,8 +1532,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // L'arrêt se DIT, et sa cause possible aussi : une montre qui ne synchronise plus produit
   // le même silence qu'un vrai repos.
   const arretMotif = repriseArret
-    ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.arretJours, l), nRaw(Math.round(repriseArret.part * 100), l), repriseArret.enCours))
-    : null;
+    ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.depuisJours ?? repriseArret.arretJours, l), nRaw(Math.round(repriseArret.part * 100), l), repriseArret.enCours, qualiteReprise?.max ?? 1, arretLong(repriseArret)))
+    // Au-delà de 28 jours : pas de pourcentage de volume à annoncer, mais l'intensité se dit.
+    : repriseIntensite
+      ? tr((l) => MOTIF_T[l].repriseLongArret(nRaw(repriseIntensite.depuisJours ?? repriseIntensite.arretJours, l), repriseIntensite.enCours, qualiteReprise?.max ?? 1))
+      : null;
   // ── ARBITRAGE DU BUDGET DE QUALITÉ ───────────────────────────────────────────
   // Extrait dans `lib/coach/qualityBudget` : c'est la décision la plus lourde du coach
   // et elle était intestable au milieu des requêtes. Deux défauts y ont été corrigés —
@@ -1543,6 +1558,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     hasObjective: !!objective, daysToRace, isShortGoal,
     apresCourse: recupMotif ? { motif: recupMotif.fr, reprise: repriseCetteSemaine } : null,
     marcheCourse: !!marcheCourse,
+    repriseArret: qualiteReprise ? { max: qualiteReprise.max } : null,
     consignesKine: consignes || aptitudeAttente ? {
       motif: [
         consignes ? `consignes de ton kinésithérapeute jusqu'au ${consignes.jusquAu.slice(8, 10)}/${consignes.jusquAu.slice(5, 7)}` : null,
@@ -1868,7 +1884,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // REPRISE APRÈS UNE COURSE : la séance est écrite COURTE — le dosage de la semaine
   // d'assimilation —, pas « coupe un tiers » ajouté au texte : la montre lit le texte de
   // la séance, elle recevrait sinon la version complète.
-  const doseReduite = semaineAllegeeDuBloc || repriseCetteSemaine;
+  // Même dosage pendant la reprise après un ARRÊT : le volume est à 50 puis 75 %, la seule
+  // séance de qualité permise est écrite courte, elle aussi.
+  const doseReduite = semaineAllegeeDuBloc || repriseCetteSemaine || qualiteReprise != null;
   /** Nombre de répétitions, plafonné par la règle des 8 % sur la distance travaillée. */
   const prog = (base: number, repMeters?: number): number => {
     const n = doseReduite ? Math.max(2, Math.round(base * 0.7)) : base + Math.min(2, blockWeek);
@@ -1988,7 +2006,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   menu = specifiqueEnTete(menu, phaseSemaine);
   // REPRISE APRÈS UNE COURSE : la seule séance de la semaine est un SEUIL, quel que soit
   // l'objectif suivant — ni VMA ni côtes sur des fibres encore abîmées (lib/coach/apresCourse).
-  if (repriseCetteSemaine) menu = [qSeuil, ...menu.filter((m) => m !== qSeuil)];
+  // Même règle pendant la reprise après un ARRÊT (17/11/2026) : sa seule séance de la semaine est
+  // le seuil, écrit court. Sans elle, une VMA pouvait être la première séance dure du retour.
+  if (repriseCetteSemaine || qualiteReprise != null) menu = [qSeuil, ...menu.filter((m) => m !== qSeuil)];
   // ── DOUBLE SEUIL (méthode norvégienne, lib/coach/doubleSessions) ─────────────
   // ⚠️ IL N'ÉTAIT JAMAIS POSÉ. L'éligibilité se calculait et s'affichait dans le profil
   // (« le double seuil reste hors de portée : … »), le texte des séances existait, et le
@@ -2011,7 +2031,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // La récupération d'après-course n'a pas besoin d'être exclue ici : `etatDouble` refuse
   // tout double tant qu'elle dure (phase de reprise comprise) — vérifié par mutation.
   const doubleSeuilActif = !consignes && !aptitudeAttente && etatDoubles.seuilActif && allureSeuilConnue && qBudget >= 1
-    && !repriseArret && !marcheCourse;
+    && !repriseIntensite && !marcheCourse;
   const doseDS = doseDoubleSeuil(habitudeKm);
   const qDoubleSeuil: QualitySession = {
     ...quali("Seuil", (l) => seanceDoubleSeuil("soir", sPace, l, doseDS.soir)),
@@ -2372,7 +2392,9 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   const longRunPrevu = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.20 : 0.25));
   // Pendant la récupération, la sortie longue du macro-plan (28 km si l'objectif suivant est
   // un marathon) ne dépasse pas 30 % du volume réduit.
-  const longRunPlanned = recup || repriseArret ? Math.min(longRunPrevu, Math.round(targetKm * 0.3)) : longRunPrevu;
+  // Pendant TOUTE reprise après un arrêt, y compris de plus de 28 jours (17/11/2026) : sans cela, le
+  // plan posait une sortie longue de 22 km dans une semaine visée à 20 km, après 34 jours sans courir.
+  const longRunPlanned = recup || repriseIntensite ? Math.min(longRunPrevu, Math.round(targetKm * 0.3)) : longRunPrevu;
 
   /**
    * LA SORTIE LONGUE RÉPOND AU VERDICT DE FRAÎCHEUR, comme la qualité.
@@ -2397,8 +2419,20 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // footings, bornés à 85 % d'elle) : la distance que tient cette durée à l'allure facile.
   const kmConsigne = consignes?.dureeMaxMin != null ? kmPourDuree(consignes.dureeMaxMin, easyPaceCorrige) : null;
   const longRunKmBrut = Math.max(4, Math.round(longRunPlanned * longRunEase));
-  const longRunKm = kmConsigne != null ? Math.min(longRunKmBrut, kmConsigne) : longRunKmBrut;
-  const longRunEased = longRunKm < longRunPlanned;
+  const longRunKmBorne = kmConsigne != null ? Math.min(longRunKmBrut, kmConsigne) : longRunKmBrut;
+  // ⚠️ PENDANT UNE REPRISE, UNE « SORTIE LONGUE » PLUS COURTE QUE LA SORTIE HABITUELLE N'EN EST
+  // PAS UNE (16/11/2026) : le plafond de 30 % du volume réduit annonçait une « sortie longue »
+  // de 4 km à une coureuse qui court 9 km par sortie. Le plan ne la pose pas (0 km : il ne
+  // nomme « sortie longue » qu'à partir de 4 km) et ses kilomètres restent des footings.
+  // La sortie habituelle = la médiane des sorties des huit semaines d'AVANT l'arrêt (les footings
+  // courts de la reprise tireraient la médiane vers le bas, et la « sortie longue » reviendrait
+  // en cours de reprise) ; inconnue, on ne tranche pas.
+  // ⚠️ Sur l'historique LONG quand il existe (190 jours) : `runs` ne porte que les 60 dernières séances,
+  // tous sports confondus, et les huit semaines d'avant un arrêt d'un mois en sortaient en partie.
+  const habituelleKm = repriseIntensite ? sortieHabituelleKm(distancesAvantArret(histRuns.length ? histRuns : runs, repriseIntensite, todayStr)) : null;
+  const longueRetiree = repriseIntensite != null && !sortieLongueTient(longRunKmBorne, habituelleKm);
+  const longRunKm = longueRetiree ? 0 : longRunKmBorne;
+  const longRunEased = !longueRetiree && longRunKm < longRunPlanned;
   // CE QUE LA DOULEUR A CHANGÉ, pour l'écran Santé (« ton coach a retiré… ») : comparé au même
   // athlète SANS douleur, jamais déduit du texte du plan. Relecture du 10/11 : la sortie longue
   // était attribuée à la douleur même quand la fatigue ou la VFC la réduisaient. La douleur
@@ -2413,7 +2447,8 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const longueSansDouleur = kmConsigne != null ? Math.min(longueSansDouleurBrut, kmConsigne) : longueSansDouleurBrut;
     return {
       qualiteRetiree: Math.max(0, computeQualityBudget({ ...entreeQualite, pains: [] }).qBudget - qb.qBudget),
-      sortieLongue: longRunKm < longueSansDouleur ? { prevueKm: longueSansDouleur, reduiteKm: longRunKm } : null,
+      // Une sortie longue retirée par la REPRISE n'est pas une sortie longue réduite par la douleur.
+      sortieLongue: !longueRetiree && longRunKm < longueSansDouleur ? { prevueKm: longueSansDouleur, reduiteKm: longRunKm } : null,
       // Fixé par le coach automatique sur le plan RÉEL (lib/coach/footings, `lignesRetireesParDouleur`) :
       // ici on ne sait pas encore combien de footings la semaine portera.
       lignesDroites: false,
@@ -2590,7 +2625,7 @@ FORME & RÉCUPÉRATION (aujourd'hui)
 
 CHARGE D'ENTRAÎNEMENT
 ${demonstratedKm ? `- 📈 CAPACITÉ DÉJÀ DÉMONTRÉE : ${demonstratedKm} km/semaine tenus sur ses meilleures semaines des 6 derniers mois. Son système musculo-tendineux CONNAÎT ce volume — il y reviendra bien plus vite qu'il n'y est monté la première fois. Ne le traite pas comme un débutant sous prétexte que ses dernières semaines sont basses ; mais ne t'en sers pas non plus pour justifier une charge élevée AUJOURD'HUI : c'est la fraîcheur du moment qui en décide.\n` : ""}- Volume : ${Math.round(weekKm)} km COURUS cette semaine${cross.label ? ` (+ ${fmtMinutes(cross.minutes)} d'AUTRES SPORTS, ${cross.tss} TSS = ${cross.sharePct} % de sa charge : ${cross.label}${cross.impactMinutes > 0 ? ` — dont ${fmtMinutes(cross.impactMinutes)} avec impact sur les jambes, qui s'ajoutent à l'usure de la course` : " — sans impact sur les jambes : ça fatigue le cardio, pas les tendons"}. Ça compte dans la charge, mais ce N'EST PAS du volume de course : ne dimensionne AUCUNE séance dessus)` : ""} · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)
-${lacune ? `- ⚠️ TROU DE DONNÉES : ${lacune.jours} jours SANS AUCUNE trace (ni séance, ni nuit, ni VFC) du ${lacune.debut} au ${lacune.fin}. Une coupure, une blessure et une montre non portée produisent exactement ce silence — et appellent des plans OPPOSÉS. Les moyennes qui traversent cette période sont donc peu fiables : DIS-LUI que tu l'as remarqué et DEMANDE-LUI ce qui s'est passé, ne suppose pas.\n` : ""}${cEcartee && secondaire ? `- 🏁 COURSE C ÉCARTÉE : ${secondaire.course.nom} le ${secondaire.course.date} — ${cEcartee.motif === "apres" ? `pendant la récupération de ${cEcartee.courseA ? `« ${cEcartee.courseA} »` : "la course A"}` : "trop près de la course A"}. Elle n'est pas au plan : ne la propose pas.\n` : ""}${secondaireActive ? `- 🏁 COURSE ${secondaireActive.course.priorite} CETTE SEMAINE : ${secondaireActive.course.nom} le ${secondaireActive.course.date}${secondaireActive.course.distanceKm ? ` (${secondaireActive.course.distanceKm} km)` : ""} — ${secondaireActive.course.priorite === "B" ? "course de préparation : deux jours calmes avant, semaine allégée, récupération après" : "course d'entraînement : elle remplace une séance de qualité, sans affûtage"}.\n` : ""}${marcheCourse ? `- 🚶 PROGRAMME MARCHE-COURSE, étape ${marcheCourse.etape}/${marcheCourse.total} : ${"continuMin" in marcheCourse.seance ? `${marcheCourse.seance.continuMin} min de course continue` : `${marcheCourse.seance.reps} × (${marcheCourse.seance.courseMin} min de course / ${marcheCourse.seance.marcheMin} min de marche)`}, trois fois par semaine, ${dureesMarcheCourse(marcheCourse.seance).totalMin} min marche comprise. Il ne court pas encore 30 minutes d'affilée : AUCUNE allure, AUCUN volume en kilomètres, AUCUNE séance de qualité ni test VMA. Encourage la régularité ; la marche fait partie de la séance.` : `- 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, dont une sortie longue de ~${longRunKm} km. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.`}
+${lacune ? `- ⚠️ TROU DE DONNÉES : ${lacune.jours} jours SANS AUCUNE trace (ni séance, ni nuit, ni VFC) du ${lacune.debut} au ${lacune.fin}. Une coupure, une blessure et une montre non portée produisent exactement ce silence — et appellent des plans OPPOSÉS. Les moyennes qui traversent cette période sont donc peu fiables : DIS-LUI que tu l'as remarqué et DEMANDE-LUI ce qui s'est passé, ne suppose pas.\n` : ""}${cEcartee && secondaire ? `- 🏁 COURSE C ÉCARTÉE : ${secondaire.course.nom} le ${secondaire.course.date} — ${cEcartee.motif === "apres" ? `pendant la récupération de ${cEcartee.courseA ? `« ${cEcartee.courseA} »` : "la course A"}` : "trop près de la course A"}. Elle n'est pas au plan : ne la propose pas.\n` : ""}${secondaireActive ? `- 🏁 COURSE ${secondaireActive.course.priorite} CETTE SEMAINE : ${secondaireActive.course.nom} le ${secondaireActive.course.date}${secondaireActive.course.distanceKm ? ` (${secondaireActive.course.distanceKm} km)` : ""} — ${secondaireActive.course.priorite === "B" ? "course de préparation : deux jours calmes avant, semaine allégée, récupération après" : "course d'entraînement : elle remplace une séance de qualité, sans affûtage"}.\n` : ""}${marcheCourse ? `- 🚶 PROGRAMME MARCHE-COURSE, étape ${marcheCourse.etape}/${marcheCourse.total} : ${"continuMin" in marcheCourse.seance ? `${marcheCourse.seance.continuMin} min de course continue` : `${marcheCourse.seance.reps} × (${marcheCourse.seance.courseMin} min de course / ${marcheCourse.seance.marcheMin} min de marche)`}, trois fois par semaine, ${dureesMarcheCourse(marcheCourse.seance).totalMin} min marche comprise. Il ne court pas encore 30 minutes d'affilée : AUCUNE allure, AUCUN volume en kilomètres, AUCUNE séance de qualité ni test VMA. Encourage la régularité ; la marche fait partie de la séance.` : `- 🎯 VOLUME CIBLE de la semaine à venir : ~${targetKm} km, ${longRunKm > 0 ? `dont une sortie longue de ~${longRunKm} km` : "SANS sortie longue cette semaine (reprise après un arrêt : des footings seulement)"}. Dimensionne les séances sur CES chiffres, pas sur des durées passe-partout.`}
 - 🔄 PHASE DU CYCLE : ${cycleLabel}.
 - 📆 DISPONIBILITÉS : ${availDaysPerWeek} séance(s) de course par semaine${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""}${declaredDpw ? " (déclaré par l'athlète)" : " (déduit de son niveau et de sa pratique actuelle — demande-lui de le préciser)"}. NE DÉPASSE PAS ce nombre : un plan qu'il ne peut pas suivre ne vaut rien.
 - ⏱️ Dernière séance DURE réellement effectuée : ${lastHardDaysAgo == null ? "aucune trace récente" : lastHardDaysAgo === 0 ? "AUJOURD'HUI ⚠️ → pas de deuxième séance dure aujourd'hui ni demain" : `il y a ${lastHardDaysAgo} j`}${lastHardDaysAgo != null && lastHardDaysAgo * 24 < hardGapH ? ` ⚠️ moins de ${hardGapH} h se sont écoulées : la prochaine qualité doit attendre.` : ""}${qualiteRecente.manquees.length ? `\n- ⏭️ QUALITÉ PRESCRITE ET NON FAITE (7 derniers jours) : ${qualiteRecente.manquees.join(", ")} — elle compte dans la semaine et NE SE RATTRAPE PAS : ne la re-propose pas le lendemain.` : ""}${skippedWeekdays.length ? `\n- 🚫 JOURS SYSTÉMATIQUEMENT RATÉS : ${skippedWeekdays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")} — prescrits plusieurs fois, jamais courus. Ne t'obstine pas : place-y du repos ou rien, et redistribue ailleurs.` : ""}
@@ -2705,9 +2740,16 @@ ${catalog}`;
     // ⚠️ Allure CORRIGÉE par la relecture : c'est elle qui doit partir dans le plan,
     // sinon la boucle mesure sans jamais rien changer.
     weekPlan: {
-      qBudget, quality: chosen, easyPace: easyPaceCorrige, eased: easeReasons.length > 0, floored: qb.floored,
+      // Pendant une reprise après un arrêt, la séance est DÉJÀ écrite courte (`doseReduite`) : la dire
+      // « sauvée par le plancher » la couperait une seconde fois, sous un texte qui parle de charge.
+      qBudget, quality: chosen, easyPace: easyPaceCorrige, eased: easeReasons.length > 0, floored: qb.floored && qualiteReprise == null,
       // La reprise après une course : séance marquée comme telle, et jamais avant son jour.
-      reprise: repriseCetteSemaine && qBudget > 0, qualiteDes: repriseCetteSemaine ? joursAvantReprise : 0,
+      // Et jamais avant le jour que fixe la reprise après un arrêt (`qualitePendantReprise`).
+      reprise: repriseCetteSemaine && qBudget > 0,
+      qualiteDes: Math.max(repriseCetteSemaine ? joursAvantReprise : 0, qualiteReprise?.des ?? 0),
+      // ⚠️ Le budget ne suffit pas (double relecture du 17/11/2026) : la sortie longue « épicée »
+      // et les footings variés ne le lisent pas. Le plan reçoit donc l'état de la reprise.
+      ...(qualiteReprise ? { repriseArret: qualiteReprise.max === 0 ? "sans-qualite" as const : "une-qualite" as const } : {}),
     },
     // Doubles séances : on tranche ICI, avec le volume REPRÉSENTATIF (médiane des
     // semaines courues) et non le pic — une semaine à 90 km ne fait pas un athlète

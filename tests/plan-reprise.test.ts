@@ -23,7 +23,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
-import { repriseApresArret, partApresArret } from "../src/lib/coach/repriseArret";
+import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle, premierJourDeQualite, ARRET_LONG_JOURS } from "../src/lib/coach/repriseArret";
+import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
+import { MOTIF_T } from "../src/lib/coach/reasonsI18n";
+import { varianteFooting, lignesRetireesParDouleur, lignesRetireesParReprise } from "../src/lib/coach/footings";
 import { semainesAffutage, partAffutage, phaseDeSemaine, allegementDuBloc } from "../src/lib/coach/phase";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
@@ -102,8 +105,9 @@ async function main() {
   });
 
   await test("onze jours sans courir : reprise à 50 %, puis 75 % la semaine suivante", () => {
-    const r = repriseApresArret([ilYa(11), ilYa(12), ilYa(14)], AUJOURDHUI);
-    assert.deepEqual(r, { arretJours: 11, enCours: true, joursRepris: 0, part: 0.5 });
+    // Dernière sortie il y a 12 jours : onze jours SANS COURIR (17/11/2026, l'arrêt ne compte plus aujourd'hui).
+    const r = repriseApresArret([ilYa(12), ilYa(13), ilYa(15)], AUJOURDHUI);
+    assert.deepEqual(r, { arretJours: 11, enCours: true, joursRepris: 0, part: 0.5, depuisJours: 12 });
     assert.equal(partApresArret(r, 7), 0.75, "la semaine suivante n'est pas à 75 %");
     assert.equal(partApresArret(r, 14), 1, "la reprise déborde la durée de l'arrêt");
   });
@@ -380,7 +384,8 @@ async function main() {
     // `semaineAllegeeDuBloc` = `allegementDuBloc(blockWeek, …)` (09/11/2026) : la même horloge.
     assert.match(codeNu("src/lib/ai/coachContext.ts"), /const deload = !taper && semaineAllegeeDuBloc && /, "la semaine allégée a quitté l'horloge du bloc (ou ignore de nouveau la veille de l'affûtage)");
     // La dose des qualités suit la même règle, et ne fait pas de pic la veille de l'affûtage.
-    assert.match(codeNu("src/lib/ai/coachContext.ts"), /const doseReduite = semaineAllegeeDuBloc \|\| repriseCetteSemaine;/, "la dose des qualités a quitté la règle de la semaine allégée");
+    // (16/11/2026 : la reprise après un ARRÊT écrit elle aussi sa séance courte.)
+    assert.match(codeNu("src/lib/ai/coachContext.ts"), /const doseReduite = semaineAllegeeDuBloc \|\| repriseCetteSemaine \|\| qualiteReprise != null;/, "la dose des qualités a quitté la règle de la semaine allégée");
     assert.match(codeNu("src/lib/ai/coachContext.ts"), /const blocDose = veilleAffutage \? Math\.min\(blockWeek, 2\) : blockWeek;[\s\S]*base \+ blocDose \* 2/, "la veille de l'affûtage fait de nouveau un pic de qualité");
     assert.match(codeNu("src/lib/ai/coachContext.ts"), /const semaineAllegeeDuBloc = allegementDuBloc\(blockWeek, weeksToRace, objective\?\.distanceKm\);/, "la semaine allégée a quitté l'horloge du bloc");
     assert.equal(ctx.volume.targetKm, ctx.macroPlan[0].volumeKm, "le plan de la semaine ne vise pas la feuille de route");
@@ -405,6 +410,227 @@ async function main() {
     assert.doesNotMatch(tot, /fentes sautées|bondissements \d|nordic curls \d/i, `sauts ou excentrique pendant la récupération : ${tot}`);
     const reprise = renfo({ ...base, recuperation: { course: "Marathon", reprise: ilYa(2), fin: ilYa(-10), phase: "reprise" } });
     assert.match(reprise, /FONDATIONS/, `renforcement de reprise : ${reprise}`);
+  });
+
+  // ⚠️ 16/11/2026 (`@Sparring`, profil 7, rejoué par `@HeadCoach`) : la reprise ne bornait que le
+  // volume ; le plan posait un seuil le jour même du retour après 6 à 25 jours sans courir.
+  console.log("\nL'INTENSITÉ PENDANT LA REPRISE — du facile d'abord, puis une seule séance, courte");
+
+  const reprise = (arretJours: number, joursRepris: number, enCours = false) => ({ arretJours, enCours, joursRepris, part: 0.5 });
+  await test("hors reprise, aucune borne ; pas encore repris, aucune qualité", () => {
+    assert.equal(qualitePendantReprise(null), null);
+    assert.deepEqual(qualitePendantReprise(reprise(8, 0, true)), { max: 0, des: 7 });
+    assert.deepEqual(qualitePendantReprise(reprise(25, 0, true)), { max: 0, des: 7 });
+  });
+
+  await test("arrêt court (14 jours au plus) : une qualité par semaine au plus, et pas le jour de la première sortie", () => {
+    assert.equal(ARRET_LONG_JOURS, 14);
+    assert.deepEqual(qualitePendantReprise(reprise(8, 0)), { max: 1, des: 1 }, "une qualité le jour même de la première sortie de reprise");
+    assert.deepEqual(qualitePendantReprise(reprise(8, 2)), { max: 1, des: 0 });
+    assert.deepEqual(qualitePendantReprise(reprise(14, 3)), { max: 1, des: 0 }, "14 jours d'arrêt comptent comme un arrêt long");
+    // Dix jours d'arrêt ou plus : 48 h après la première sortie, pas le lendemain.
+    assert.deepEqual(qualitePendantReprise(reprise(9, 0)), { max: 1, des: 1 });
+    assert.deepEqual(qualitePendantReprise(reprise(12, 0)), { max: 1, des: 2 }, "un seuil le lendemain d'une seule sortie facile après douze jours d'arrêt");
+    assert.deepEqual(qualitePendantReprise(reprise(12, 1)), { max: 1, des: 1 });
+    assert.deepEqual(qualitePendantReprise(reprise(12, 2)), { max: 1, des: 0 });
+  });
+
+  await test("l'arrêt se compte en jours SANS COURIR, avant comme après la première sortie : 6, 14 et 28 jours bornent la même chose", () => {
+    assert.equal(arretLong({ arretJours: 14 }), false);
+    assert.equal(arretLong({ arretJours: 15 }), true);
+    // De 4 à 32 jours depuis la dernière sortie : ce que dit la règle le jour J (pas encore repris) et ce
+    // qu'elle dit une fois une sortie courue CE JOUR-LÀ doivent être la même reprise, ou la même absence.
+    for (let depuis = 4; depuis <= 32; depuis++) {
+      const avant = repriseApresArret([ilYa(depuis), ilYa(depuis + 2)], AUJOURDHUI);
+      const apres = repriseApresArret([ilYa(depuis), ilYa(depuis + 2), AUJOURDHUI], AUJOURDHUI);
+      const dedans = depuis - 1 >= 6 && depuis - 1 <= 28;
+      assert.equal(avant != null, dedans, `${depuis} j depuis la dernière sortie, pas encore repris : reprise ${avant ? "annoncée" : "absente"}`);
+      assert.equal(apres != null, dedans, `${depuis} j depuis la dernière sortie, sortie courue aujourd'hui : reprise ${apres ? "appliquée" : "absente"}`);
+      if (!avant || !apres) continue;
+      assert.deepEqual({ arret: avant.arretJours, enCours: avant.enCours, depuis: avant.depuisJours }, { arret: depuis - 1, enCours: true, depuis });
+      assert.deepEqual({ arret: apres.arretJours, enCours: apres.enCours }, { arret: depuis - 1, enCours: false }, `${depuis} j : l'arrêt change en courant aujourd'hui`);
+      assert.equal(arretLong(avant), arretLong(apres), `${depuis} j : arrêt long avant la sortie, court après (ou l'inverse)`);
+    }
+    // Les trois bornes, en clair : 6ᵉ jour (5 jours d'arrêt) rien ; 7ᵉ jour une reprise ; 15ᵉ jour encore court ; 16ᵉ long ; 29ᵉ dedans ; 30ᵉ dehors.
+    assert.equal(repriseApresArret([ilYa(6)], AUJOURDHUI), null, "au 6ᵉ jour, une reprise est annoncée pour 5 jours sans courir");
+    assert.equal(repriseApresArret([ilYa(7)], AUJOURDHUI)?.arretJours, 6);
+    assert.equal(arretLong(repriseApresArret([ilYa(15)], AUJOURDHUI)!), false, "au 15ᵉ jour, le motif annonce la règle des arrêts longs");
+    assert.equal(arretLong(repriseApresArret([ilYa(16)], AUJOURDHUI)!), true);
+    assert.equal(repriseApresArret([ilYa(29)], AUJOURDHUI)?.arretJours, 28, "au 29ᵉ jour (28 jours sans courir), la reprise est oubliée");
+    assert.equal(repriseApresArret([ilYa(30)], AUJOURDHUI), null);
+    // Et l'intensité suit : 14 jours d'arrêt, repris aujourd'hui → une séance dans 48 h ; 15 jours → pas avant la seconde moitié.
+    assert.deepEqual(qualitePendantReprise(repriseApresArret([ilYa(15), AUJOURDHUI], AUJOURDHUI)), { max: 1, des: 2 });
+    assert.deepEqual(qualitePendantReprise(repriseApresArret([ilYa(16), AUJOURDHUI], AUJOURDHUI)), { max: 0, des: 7 });
+  });
+
+  // ⚠️ VISA DU DIRECTEUR SCIENTIFIQUE (17/11/2026, RENVOYÉ) : la règle d'intensité s'arrêtait à 28 jours. Après
+  // 34 jours sans courir, le plan posait un seuil de 4×10 min le jour même du retour : 28 jours protégés, 29 rien.
+  await test("une garde ne baisse pas quand le risque monte : au-delà de 28 jours d'arrêt, l'intensité reste bornée", () => {
+    // La reprise que lit l'intensité : la règle de volume de 6 à 28 jours, l'arrêt hors échelle au-delà.
+    const vue = (jours: string[]) => repriseApresArret(jours, AUJOURDHUI) ?? arretHorsEchelle(jours, AUJOURDHUI);
+    // Pas encore repris, de 7 à 60 jours depuis la dernière sortie : aucune séance dure, quelle que soit la durée.
+    for (let depuis = 7; depuis <= 60; depuis++) {
+      assert.deepEqual(qualitePendantReprise(vue([ilYa(depuis), ilYa(depuis + 2)])), { max: 0, des: 7 }, `${depuis} j depuis la dernière sortie : une séance dure est permise avant toute sortie`);
+    }
+    // La règle de volume, elle, ne change pas au-delà de 28 jours : elle rend toujours `null`.
+    assert.equal(repriseApresArret([ilYa(35)], AUJOURDHUI), null);
+    assert.deepEqual(arretHorsEchelle([ilYa(35)], AUJOURDHUI), { arretJours: 34, enCours: true, joursRepris: 0, depuisJours: 35 });
+    assert.equal(arretHorsEchelle([ilYa(20)], AUJOURDHUI), null, "un arrêt de 19 jours est lu comme hors échelle");
+    // Repris depuis `repris` jours après `arret` jours sans courir : le premier jour du plan où une séance dure
+    // est permise (7 = aucun dans le plan, 0 = aucune borne). JAMAIS plus tôt quand l'arrêt est plus long.
+    const premierJourPermis = (arret: number, repris: number) => {
+      const sorties = [ilYa(repris + arret + 1), ...Array.from({ length: Math.floor(repris / 2) + 1 }, (_, k) => ilYa(repris - 2 * k))];
+      const q = qualitePendantReprise(vue(sorties));
+      return q ? (q.max === 0 ? 7 : q.des) : 0;
+    };
+    for (let repris = 0; repris <= 30; repris++) {
+      for (let arret = 6; arret < 60; arret++) {
+        const court = premierJourPermis(arret, repris), long = premierJourPermis(arret + 1, repris);
+        assert.ok(long >= court, `repris depuis ${repris} j : séance dure permise au jour ${long} après ${arret + 1} j d'arrêt, au jour ${court} après ${arret} j — la garde baisse quand l'arrêt s'allonge`);
+      }
+    }
+    // 34 jours d'arrêt : rien de dur avant le 14ᵉ jour de reprise, puis une par semaine, jusqu'au 28ᵉ.
+    assert.equal(premierJourDeQualite(34), 14);
+    assert.equal(premierJourPermis(34, 0), 7);
+    assert.equal(premierJourPermis(34, 7), 7);
+    assert.equal(premierJourPermis(34, 10), 4);
+    assert.equal(premierJourPermis(34, 14), 0);
+    assert.deepEqual(qualitePendantReprise(vue([ilYa(34 + 14 + 1), ilYa(14), ilYa(12), ilYa(10), ilYa(8), ilYa(6), ilYa(4), ilYa(2)])), { max: 1, des: 0 });
+    assert.equal(vue([ilYa(34 + 28 + 1), ...Array.from({ length: 15 }, (_, k) => ilYa(28 - 2 * k))]), null, "quatre semaines après le retour, la reprise dure encore");
+    // …et pas un jour plus tôt : au 27ᵉ jour de reprise, elle est toujours en cours.
+    assert.deepEqual(vue([ilYa(34 + 27 + 1), ...Array.from({ length: 14 }, (_, k) => ilYa(27 - 2 * k))]), { arretJours: 34, enCours: false, joursRepris: 27 }, "la reprise d'un arrêt de 34 jours s'arrête avant quatre semaines");
+    // Même borne dans l'échelle : la reprise dure AUTANT que l'arrêt, ni un jour de moins ni un jour de plus.
+    const ordinaire = (arret: number, repris: number) => repriseApresArret([ilYa(repris + arret + 1), ...Array.from({ length: Math.floor(repris / 2) + 1 }, (_, k) => ilYa(repris - 2 * k))], AUJOURDHUI);
+    assert.equal(ordinaire(12, 11)?.joursRepris, 11, "une reprise de 12 jours s'arrête au 11ᵉ");
+    assert.equal(ordinaire(12, 12), null, "une reprise de 12 jours dure encore au 12ᵉ jour");
+    // Continuité à la borne : 28 jours d'arrêt (dans l'échelle) et 29 (hors échelle) attendent le même 14ᵉ jour.
+    assert.equal(premierJourDeQualite(28), 14);
+    assert.equal(premierJourDeQualite(29), 14);
+    // Après dix jours d'arrêt, pas de seuil le lendemain d'une seule sortie facile : 48 h.
+    assert.deepEqual([6, 9, 10, 14, 15].map(premierJourDeQualite), [1, 1, 2, 2, 8]);
+  });
+
+  await test("arrêt long (plus de 14 jours) : la qualité attend la seconde moitié de la reprise", () => {
+    // 15 jours d'arrêt : la seconde moitié commence au 8ᵉ jour de reprise (`partApresArret` : jour ≥ 7,5).
+    assert.deepEqual(qualitePendantReprise(reprise(15, 3)), { max: 1, des: 5 });
+    assert.equal(partApresArret({ arretJours: 15, joursRepris: 3 }, 4), 0.5, "précondition : la veille est encore dans la première moitié");
+    assert.equal(partApresArret({ arretJours: 15, joursRepris: 3 }, 5), 0.75, "précondition : ce jour-là est dans la seconde moitié");
+    // 20 jours d'arrêt, repris aujourd'hui : la seconde moitié est à 10 jours, hors des sept jours du plan.
+    assert.deepEqual(qualitePendantReprise(reprise(20, 0)), { max: 0, des: 7 });
+    assert.deepEqual(qualitePendantReprise(reprise(20, 6)), { max: 1, des: 4 });
+    assert.deepEqual(qualitePendantReprise(reprise(20, 10)), { max: 1, des: 0 });
+  });
+
+  await test("le budget de qualité obéit à la reprise, sans qu'aucun plancher ne le relève", () => {
+    // Un coureur frais, objectif court dans trois semaines : tous les planchers jouent.
+    const frais: Parameters<typeof computeQualityBudget>[0] = {
+      level: "confirme", goal: "10k", phase: "SPÉCIFIQUE", noHistory: false, pains: [], seancesRecentes: 16,
+      hrvDown: false, hrvUp: false, badNight: false, acr: 1, tsb: 5, rpeHigh: false, rpeAvg: 5,
+      hardTimePct: null, fadeSec: null, plateau: false, noMaxEffort: false, runYears: 6,
+      weightLossMaxQuality: null, hasObjective: true, daysToRace: 21, isShortGoal: true,
+    };
+    const libre = computeQualityBudget(frais).qBudget;
+    assert.ok(libre >= 2, `précondition : ce coureur n'a que ${libre} qualité(s) hors reprise`);
+    assert.equal(computeQualityBudget({ ...frais, repriseArret: { max: 0 } }).qBudget, 0);
+    assert.equal(computeQualityBudget({ ...frais, repriseArret: { max: 1 } }).qBudget, 1);
+    assert.equal(computeQualityBudget({ ...frais, repriseArret: null }).qBudget, libre, "sans reprise, le budget a changé");
+    // La reprise ne RELÈVE rien : un budget déjà à zéro (aucun historique) y reste.
+    assert.equal(computeQualityBudget({ ...frais, noHistory: true, repriseArret: { max: 1 } }).qBudget, 0);
+  });
+
+  await test("le motif de la reprise dit l'intensité, dans les cinq langues", () => {
+    for (const l of Object.keys(MOTIF_T) as (keyof typeof MOTIF_T)[]) {
+      const enCours = MOTIF_T[l].repriseArret("8", "50", true, 0, false), enCoursLong = MOTIF_T[l].repriseArret("20", "50", true, 0, true);
+      const une = MOTIF_T[l].repriseArret("8", "50", false, 1, false), aucune = MOTIF_T[l].repriseArret("20", "50", false, 0, true);
+      // Quatre situations, quatre textes : celui d'« une séance » ne sert pas à « aucune ».
+      assert.equal(new Set([enCours.replace("8", "20"), enCoursLong, une, aucune]).size, 4, `${l} : deux situations de reprise ont le même texte`);
+      assert.notEqual(MOTIF_T[l].repriseArret("20", "50", false, 1, true), aucune, `${l} : le texte ignore le nombre de séances permises`);
+    }
+    assert.match(MOTIF_T.fr.repriseArret("8", "50", true, 0, false), /sans séance dure tant que tu n'as pas refait une sortie facile/);
+    // Après plus de 14 jours d'arrêt, une sortie facile ne suffit pas : le texte ne le laisse pas croire.
+    assert.match(MOTIF_T.fr.repriseArret("20", "50", true, 0, true), /sans séance dure avant la seconde moitié de la reprise/);
+    assert.doesNotMatch(MOTIF_T.fr.repriseArret("20", "50", true, 0, true), /tant que tu n'as pas refait une sortie facile/);
+    // « Par semaine » : la borne est un budget de sept jours, pas une séance pour toute la reprise.
+    assert.match(MOTIF_T.fr.repriseArret("8", "50", false, 1, false), /une seule séance de qualité par semaine au plus, courte/);
+    for (const [l, mot] of [["en", /a week/], ["de", /pro Woche/], ["es", /por semana/], ["pt", /por semana/]] as const)
+      assert.match(MOTIF_T[l].repriseArret("8", "50", false, 1, false), mot, `${l} : le motif promet une seule séance pour toute la reprise`);
+    assert.match(MOTIF_T.fr.repriseArret("20", "50", false, 0, true), /aucune séance dure pendant la première moitié/);
+    // Et le contexte lui passe le nombre que la règle a calculé, pas une constante.
+    const ctxSrc = codeNu("src/lib/ai/coachContext.ts");
+    assert.match(ctxSrc, /MOTIF_T\[l\]\.repriseArret\([^;]*repriseArret\.enCours, qualiteReprise\?\.max \?\? 1, arretLong\(repriseArret\)\)\)/);
+    // La séance de reprise, déjà écrite courte, n'est pas en plus « sauvée par le plancher ».
+    assert.match(ctxSrc, /floored: qb\.floored && qualiteReprise == null,/);
+    // La sortie habituelle se lit AVANT l'arrêt : les footings de la reprise ne la font pas baisser.
+    assert.match(ctxSrc, /const habituelleKm = repriseIntensite \? sortieHabituelleKm\(distancesAvantArret\(histRuns\.length \? histRuns : runs, repriseIntensite, todayStr\)\) : null;/);
+    // Au-delà de 28 jours : la même reprise d'intensité borne le budget, la sortie longue et le double seuil.
+    assert.match(ctxSrc, /const repriseIntensite = repriseArret \?\? arretHorsEchelle\(runs\.map\(\(w\) => String\(w\.date\)\.slice\(0, 10\)\), todayStr\);\s*const qualiteReprise = qualitePendantReprise\(repriseIntensite\);/);
+    assert.match(ctxSrc, /const longRunPlanned = recup \|\| repriseIntensite \? Math\.min\(longRunPrevu, Math\.round\(targetKm \* 0\.3\)\) : longRunPrevu;/, "après plus de 28 jours d'arrêt, la sortie longue dépasse de nouveau la semaine visée");
+    assert.match(ctxSrc, /&& !repriseIntensite && !marcheCourse;/, "le double seuil revient pendant une reprise de plus de 28 jours");
+    // Et son motif existe dans les cinq langues, distinct selon l'état.
+    for (const l of Object.keys(MOTIF_T) as (keyof typeof MOTIF_T)[]) {
+      const textes = [MOTIF_T[l].repriseLongArret("35", true, 0), MOTIF_T[l].repriseLongArret("34", false, 0), MOTIF_T[l].repriseLongArret("34", false, 1)];
+      assert.equal(new Set(textes).size, 3, `${l} : deux états d'une longue reprise ont le même texte`);
+      assert.ok(textes.every((t) => !/%/.test(t)), `${l} : un pourcentage de volume est annoncé au-delà de 28 jours, où la règle de Daniels ne s'applique plus`);
+    }
+    assert.match(MOTIF_T.fr.repriseLongArret("35", true, 0), /sans séance dure pendant les deux premières semaines de reprise/);
+    // La seule séance de la semaine est le seuil, comme après une course ; et l'invite ne parle
+    // pas d'une « sortie longue de ~0 km » quand la reprise l'a retirée.
+    assert.match(ctxSrc, /if \(repriseCetteSemaine \|\| qualiteReprise != null\) menu = \[qSeuil, \.\.\.menu\.filter\(\(m\) => m !== qSeuil\)\];/);
+    assert.match(ctxSrc, /\$\{longRunKm > 0 \? `dont une sortie longue de ~\$\{longRunKm\} km` : "SANS sortie longue cette semaine/);
+    // Une sortie longue retirée par la reprise n'est ni « raccourcie » ni attribuée à une douleur.
+    assert.match(ctxSrc, /const longRunEased = !longueRetiree && longRunKm < longRunPlanned;/);
+    assert.match(ctxSrc, /sortieLongue: !longueRetiree && longRunKm < longueSansDouleur \?/);
+  });
+
+  await test("tant qu'aucune séance dure n'est permise, les footings restent simples, et le plan reçoit l'état de la reprise", () => {
+    // Précondition : hors reprise, le deuxième footing porte des lignes droites, le troisième est progressif.
+    assert.equal(varianteFooting(1, 4, {}), "lignes");
+    assert.equal(varianteFooting(2, 4, {}), "progressif");
+    assert.equal(varianteFooting(1, 4, { reprise: true }), "base");
+    assert.equal(varianteFooting(2, 4, { reprise: true }), "base");
+    // La douleur n'a rien retiré que la reprise n'avait déjà retiré.
+    assert.equal(lignesRetireesParDouleur(3, {}), true);
+    assert.equal(lignesRetireesParDouleur(3, { reprise: true }), false);
+    const plan = codeNu("src/lib/ai/autoPlan.ts"), ctxSrc = codeNu("src/lib/ai/coachContext.ts"), coach = codeNu("src/lib/ai/autoCoach.ts");
+    assert.match(plan, /const canSpice = [^;]*&& !ctx\.weekPlan\.repriseArret;/, "la sortie longue peut de nouveau porter un bloc d'allure pendant une reprise");
+    // La garde est PAR JOUR : tout footing placé avant le premier jour où une séance dure est permise.
+    assert.match(plan, /const gardesDu = \(i: number\) => \(\{ \.\.\.gardes, reprise: !!ctx\.weekPlan\.repriseArret && i < debutQualite \}\);/);
+    assert.equal((plan.match(/varianteFooting\(rang, easySlots\.length, gardesDu\(i\)\)/g) ?? []).length, 2, "le titre ou le détail d'un footing ne lit plus la garde du jour");
+    // L'écran Santé : la reprise a déjà retiré les lignes droites si le DEUXIÈME footing tombe avant le jour permis.
+    assert.equal(lignesRetireesParReprise({ reprise: false, deuxiemeFootingJour: 2, qualiteDes: 7 }), false, "hors reprise, la reprise retire quelque chose");
+    assert.equal(lignesRetireesParReprise({ reprise: true, deuxiemeFootingJour: 2, qualiteDes: 4 }), true, "deuxième footing au jour 2, séance dure permise au jour 4 : la douleur se voit attribuer les lignes droites");
+    assert.equal(lignesRetireesParReprise({ reprise: true, deuxiemeFootingJour: 4, qualiteDes: 4 }), false, "le jour permis, le footing peut de nouveau porter des lignes droites");
+    assert.equal(lignesRetireesParReprise({ reprise: true, deuxiemeFootingJour: 5, qualiteDes: 4 }), false);
+    assert.equal(lignesRetireesParReprise({ reprise: true, deuxiemeFootingJour: 2, qualiteDes: 0 }), false);
+    assert.equal(lignesRetireesParReprise({ reprise: true, deuxiemeFootingJour: null, qualiteDes: 4 }), true);
+    assert.match(coach, /reprise: lignesRetireesParReprise\(\{ reprise: !!ctx\.weekPlan\.repriseArret, qualiteDes: ctx\.weekPlan\.qualiteDes \?\? 0,\s*deuxiemeFootingJour: deuxieme == null \? null : ecartJours\(deuxieme, today\) \}\) \}\);/, "l'écran Santé attribue de nouveau à la douleur des lignes droites que la reprise a retirées");
+    assert.match(ctxSrc, /\.\.\.\(qualiteReprise \? \{ repriseArret: qualiteReprise\.max === 0 \? "sans-qualite" as const : "une-qualite" as const \} : \{\}\),/);
+  });
+
+  await test("une « sortie longue » plus courte que la sortie habituelle n'en est pas une", () => {
+    assert.equal(sortieHabituelleKm([9, 9, 12, 9, 6]), 9);
+    assert.equal(sortieHabituelleKm([8, 10]), 9, "médiane d'un nombre pair de sorties");
+    assert.equal(sortieHabituelleKm([]), null);
+    assert.equal(sortieHabituelleKm([null, undefined, 0, NaN]), null, "une distance inconnue devient une sortie habituelle");
+    assert.equal(sortieLongueTient(4, 9), false);
+    assert.equal(sortieLongueTient(9, 9), true, "une sortie longue égale à la sortie habituelle ne tient plus");
+    assert.equal(sortieLongueTient(12, 9), true);
+    // Sans sortie habituelle connue, on ne tranche pas.
+    assert.equal(sortieLongueTient(4, null), true);
+    // La sortie habituelle se lit sur les huit semaines d'AVANT l'arrêt, jamais sur la reprise.
+    const sorties = [
+      { date: ilYa(1), distance_km: 5 }, { date: ilYa(3), distance_km: 5 },             // la reprise : footings courts
+      { date: ilYa(15), distance_km: 12 }, { date: ilYa(17), distance_km: 10 },          // juste avant l'arrêt de 11 jours
+      { date: ilYa(70), distance_km: 10 }, { date: ilYa(69), distance_km: 30 },          // dans les huit semaines d'avant (14 + 56 = 70 jours)
+      { date: ilYa(71), distance_km: 40 },                                                // un jour trop ancien
+    ];
+    const r = repriseApresArret(sorties.map((w) => w.date), AUJOURDHUI)!;
+    assert.deepEqual({ arret: r.arretJours, repris: r.joursRepris }, { arret: 11, repris: 3 }, "précondition : la reprise simulée n'est pas celle attendue");
+    assert.deepEqual(distancesAvantArret(sorties, r, AUJOURDHUI), [12, 10, 10, 30], "la sortie habituelle compte la reprise, ou oublie les semaines d'avant");
+    assert.equal(sortieHabituelleKm(distancesAvantArret(sorties, r, AUJOURDHUI)), 11);
+    // Pas encore repris : toutes les sorties précèdent l'arrêt.
+    const arrete = repriseApresArret([ilYa(8), ilYa(10)], AUJOURDHUI)!;
+    assert.deepEqual(distancesAvantArret([{ date: ilYa(8), distance_km: 9 }, { date: ilYa(10), distance_km: 7 }], arrete, AUJOURDHUI), [9, 7]);
   });
 
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

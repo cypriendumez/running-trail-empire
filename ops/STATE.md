@@ -162,7 +162,19 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    plan pose une séance au seuil le jour même sur 8 départs sur 10, et une « sortie longue » de 4 km : la reprise
    (`repriseArret`) ne borne que le volume, jamais l'intensité. Avis de `@HeadCoach` : aucune qualité tant que le
    coureur n'a pas couru au moins une sortie facile depuis l'arrêt ; ne pas appeler « sortie longue » une sortie
-   plus courte qu'une sortie habituelle. Non corrigé. Décision de Cyprien (Niveau 2).
+   plus courte qu'une sortie habituelle. Correction écrite le 17/11 en session, à la demande de Cyprien, sur la
+   branche `fix/reprise-sans-qualite` (`qualitePendantReprise` dans `lib/coach/repriseArret`) : aucune qualité avant
+   une sortie facile, une seule par semaine ensuite (au seuil, courte), la seconde moitié de la reprise après plus de
+   14 jours d'arrêt ; sortie longue facile pendant toute la reprise, footings simples avant le premier jour où
+   une séance dure est permise. L'arrêt se compte désormais en jours SANS COURIR avant comme après la première sortie : la
+   règle de volume existante s'applique donc de 6 à 28 jours sans courir, soit du 7ᵉ au 29ᵉ jour depuis la dernière
+   sortie (un jour plus tard qu'avant à la borne basse, un jour de plus à la borne haute). Le seuil de 14 jours, la
+   borne « une par semaine au seuil » et ce décompte ont été jugés conformes par `@HeadCoach` le 17/11 (visa RENVOYÉ
+   pour un autre motif, corrigé depuis) : au-delà de 28 jours d'arrêt, où la règle de volume ne s'applique plus,
+   l'intensité reste bornée (rien de dur avant le 14ᵉ jour d'une reprise de quatre semaines) ; et après dix jours
+   d'arrêt, pas de séance dure avant 48 h. Reste ouvert : le volume au-delà de 28 jours (plafond ordinaire inchangé)
+   et le retour d'un coup de la sortie longue à la fin de la reprise.
+   À fusionner et à déployer sur GO de Cyprien.
 
 ## Résolues le 13/11/2026
 

@@ -448,7 +448,12 @@ async function main() {
     assert.equal(lignesRetireesParDouleur(3, { taper: true }), false, "l'affûtage n'en porte pas");
     assert.equal(lignesRetireesParDouleur(3, { semaineCourse: true }), false, "la semaine de course n'en porte pas");
     assert.equal(lignesRetireesParDouleur(3, { sansHistorique: true }), false);
-    assert.match(codeOf("src/lib/ai/autoCoach.ts"), /lignesDroites: lignesRetireesParDouleur\(\s*week\.filter\(\(d: PlanDay\) => d\.date >= from && d\.type === "Endurance"\)\.length,/, "l'état du coach n'utilise plus le plan réel");
+    // Pendant une reprise après un arrêt, la reprise les a déjà retirées (17/11/2026).
+    assert.equal(lignesRetireesParDouleur(3, { reprise: true }), false, "la douleur se voit attribuer des lignes droites que la reprise avait retirées");
+    // Le plan RÉEL : les footings comptés sont ceux de la semaine posée, à partir du premier jour vivant.
+    const coach = codeOf("src/lib/ai/autoCoach.ts");
+    assert.match(coach, /const footings = week\.filter\(\(d: PlanDay\) => d\.date >= from && d\.type === "Endurance"\);/, "l'état du coach n'utilise plus le plan réel");
+    assert.match(coach, /return lignesRetireesParDouleur\(footings\.length,/, "l'état du coach n'utilise plus le plan réel");
   });
 
   await test("« consulte » après 10 jours ou si elle empire ; jamais sinon", () => {
