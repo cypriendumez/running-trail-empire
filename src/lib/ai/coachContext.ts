@@ -44,7 +44,7 @@ const dureeLoc = (min: number, l: Lang) => {
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile } from "@/lib/time/fuseau";
 import { apresCourse, facteurVolumeApresCourse, type PhaseApresCourse } from "@/lib/coach/apresCourse";
-import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, ARRET_LONG_JOURS } from "@/lib/coach/repriseArret";
+import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong } from "@/lib/coach/repriseArret";
 import { programmeMarcheCourse, dureesMarcheCourse, type SeanceMarcheCourse } from "@/lib/coach/marcheCourse";
 import { testEnVigueur, allureFacileMaxSec, fmtAllure, TYPE_TEST_LACTATE, type TestLactate } from "@/lib/coach/lactate";
 import { courseCEcarteeDe, type CourseCEcartee } from "@/lib/coach/courseCEcartee";
@@ -1528,7 +1528,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // L'arrêt se DIT, et sa cause possible aussi : une montre qui ne synchronise plus produit
   // le même silence qu'un vrai repos.
   const arretMotif = repriseArret
-    ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.arretJours, l), nRaw(Math.round(repriseArret.part * 100), l), repriseArret.enCours, qualiteReprise?.max ?? 1, repriseArret.arretJours > ARRET_LONG_JOURS))
+    ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.arretJours, l), nRaw(Math.round(repriseArret.part * 100), l), repriseArret.enCours, qualiteReprise?.max ?? 1, arretLong(repriseArret)))
     : null;
   // ── ARBITRAGE DU BUDGET DE QUALITÉ ───────────────────────────────────────────
   // Extrait dans `lib/coach/qualityBudget` : c'est la décision la plus lourde du coach

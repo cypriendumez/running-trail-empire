@@ -108,12 +108,26 @@ export type QualiteReprise = {
   des: number;
 };
 
+/**
+ * L'arrêt sera-t-il LONG (plus de 14 jours sans courir) une fois la reprise commencée ?
+ *
+ * ⚠️ `arretJours` NE COMPTE PAS LA MÊME CHOSE DANS LES DEUX ÉTATS (quatrième relecture, 17/11/2026).
+ * Pas encore repris, c'est le nombre de jours écoulés depuis la dernière sortie, AUJOURD'HUI
+ * COMPRIS : si le coureur court aujourd'hui, il sera resté `arretJours - 1` jours sans courir.
+ * Une fois repris, c'est déjà ce nombre de jours sans courir. Au 15ᵉ jour, le motif annonçait
+ * donc la règle des arrêts longs (« pas avant la seconde moitié »), et le plan du lendemain,
+ * après une sortie, posait un seuil : l'arrêt n'avait duré que 14 jours.
+ */
+export function arretLong(r: Pick<RepriseArret, "arretJours" | "enCours">): boolean {
+  return (r.enCours ? r.arretJours - 1 : r.arretJours) > ARRET_LONG_JOURS;
+}
+
 /** La qualité permise pendant une reprise, ou `null` hors reprise (aucune borne). */
 export function qualitePendantReprise(r: RepriseArret | null): QualiteReprise | null {
   if (!r) return null;
   // Pas encore repris : aucune qualité, quel que soit le jour.
   if (r.enCours) return { max: 0, des: 7 };
-  const des = r.arretJours > ARRET_LONG_JOURS
+  const des = arretLong(r)
     ? Math.max(0, Math.ceil(r.arretJours / 2) - r.joursRepris)
     : r.joursRepris === 0 ? 1 : 0;
   return des > 6 ? { max: 0, des: 7 } : { max: 1, des };

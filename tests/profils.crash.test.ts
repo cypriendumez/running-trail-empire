@@ -997,8 +997,10 @@ async function profilChaotique() {
         // Une sortie plus courte que ses 9 km habituels ne s'appelle pas « sortie longue ».
         assert.deepEqual(longues(r.plan).map((d) => d.date), [], `${ctxt} : « sortie longue » de ${r.ctx.volume.longRunKm} km pour une coureuse à 9 km par sortie`);
         // Le plan DIT pourquoi : le motif de la reprise annonce l'absence de séance dure.
-        // Après plus de 14 jours d'arrêt, une sortie facile ne suffit pas : le texte dit la seconde moitié.
-        const attendu = arret > 14 ? /sans séance dure avant la seconde moitié de la reprise/ : /sans séance dure tant que tu n'as pas refait une sortie facile/;
+        // Après plus de 14 jours SANS COURIR, une sortie facile ne suffit pas : le texte dit la seconde moitié.
+        // `arret` compte ici aujourd'hui (elle n'a pas encore couru) : en courant aujourd'hui, elle sera restée
+        // `arret - 1` jours sans courir. Au 15ᵉ jour, c'est donc encore la règle courte (quatrième relecture).
+        const attendu = arret - 1 > 14 ? /sans séance dure avant la seconde moitié de la reprise/ : /sans séance dure tant que tu n'as pas refait une sortie facile/;
         assert.ok(r.ctx.readiness.reasons.some((m) => attendu.test(m)),
           `${ctxt} : le motif de la reprise ne dit pas quand revient la séance dure (${r.ctx.readiness.reasons.join(" | ")})`);
         // Et la reprise reste une reprise : elle court, en footings.

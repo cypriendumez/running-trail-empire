@@ -23,7 +23,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
-import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, ARRET_LONG_JOURS } from "../src/lib/coach/repriseArret";
+import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, ARRET_LONG_JOURS } from "../src/lib/coach/repriseArret";
 import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { MOTIF_T } from "../src/lib/coach/reasonsI18n";
 import { varianteFooting, lignesRetireesParDouleur } from "../src/lib/coach/footings";
@@ -429,6 +429,25 @@ async function main() {
     assert.deepEqual(qualitePendantReprise(reprise(14, 3)), { max: 1, des: 0 }, "14 jours d'arrêt comptent comme un arrêt long");
   });
 
+  await test("le 15ᵉ jour sans courir n'est pas encore un arrêt long : le texte et le plan du lendemain disent la même chose", () => {
+    // Pas encore repris, `arretJours` compte aujourd'hui : en courant aujourd'hui, l'arrêt aura duré un jour de moins.
+    assert.equal(arretLong({ arretJours: 15, enCours: true }), false, "au 15ᵉ jour, le motif annonce la règle des arrêts longs");
+    assert.equal(arretLong({ arretJours: 16, enCours: true }), true);
+    assert.equal(arretLong({ arretJours: 14, enCours: false }), false);
+    assert.equal(arretLong({ arretJours: 15, enCours: false }), true);
+    // De bout en bout : dernière sortie il y a 15 jours, puis une sortie aujourd'hui → 14 jours d'arrêt, la règle courte.
+    const avant = repriseApresArret([ilYa(15), ilYa(17)], AUJOURDHUI)!;
+    assert.deepEqual({ arret: avant.arretJours, enCours: avant.enCours, long: arretLong(avant) }, { arret: 15, enCours: true, long: false });
+    const apres = repriseApresArret([ilYa(15), ilYa(17), AUJOURDHUI], AUJOURDHUI)!;
+    assert.deepEqual({ arret: apres.arretJours, enCours: apres.enCours, long: arretLong(apres) }, { arret: 14, enCours: false, long: false });
+    assert.deepEqual(qualitePendantReprise(apres), { max: 1, des: 1 }, "le lendemain d'un arrêt de 14 jours, la séance dure n'est pas permise");
+    // Et au 16ᵉ jour : la règle longue avant comme après la première sortie.
+    const avant16 = repriseApresArret([ilYa(16), ilYa(18)], AUJOURDHUI)!, apres16 = repriseApresArret([ilYa(16), ilYa(18), AUJOURDHUI], AUJOURDHUI)!;
+    assert.equal(arretLong(avant16), true);
+    assert.deepEqual({ arret: apres16.arretJours, long: arretLong(apres16) }, { arret: 15, long: true });
+    assert.deepEqual(qualitePendantReprise(apres16), { max: 0, des: 7 }, "15 jours d'arrêt, repris aujourd'hui : la seconde moitié commence dans 8 jours");
+  });
+
   await test("arrêt long (plus de 14 jours) : la qualité attend la seconde moitié de la reprise", () => {
     // 15 jours d'arrêt : la seconde moitié commence au 8ᵉ jour de reprise (`partApresArret` : jour ≥ 7,5).
     assert.deepEqual(qualitePendantReprise(reprise(15, 3)), { max: 1, des: 5 });
@@ -476,7 +495,7 @@ async function main() {
     assert.match(MOTIF_T.fr.repriseArret("20", "50", false, 0, true), /aucune séance dure pendant la première moitié/);
     // Et le contexte lui passe le nombre que la règle a calculé, pas une constante.
     const ctxSrc = codeNu("src/lib/ai/coachContext.ts");
-    assert.match(ctxSrc, /MOTIF_T\[l\]\.repriseArret\([^;]*repriseArret\.enCours, qualiteReprise\?\.max \?\? 1, repriseArret\.arretJours > ARRET_LONG_JOURS\)\)/);
+    assert.match(ctxSrc, /MOTIF_T\[l\]\.repriseArret\([^;]*repriseArret\.enCours, qualiteReprise\?\.max \?\? 1, arretLong\(repriseArret\)\)\)/);
     // La séance de reprise, déjà écrite courte, n'est pas en plus « sauvée par le plancher ».
     assert.match(ctxSrc, /floored: qb\.floored && qualiteReprise == null,/);
     // La sortie habituelle se lit AVANT l'arrêt : les footings de la reprise ne la font pas baisser.
