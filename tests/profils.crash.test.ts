@@ -1078,7 +1078,7 @@ async function profilChaotique() {
     const varies = (plan: PlanDay[]) => plan.filter((d) => d.type === "Endurance" && FOOTING_VARIE.test(d.title));
     const liste = (j: PlanDay[]) => j.map((d) => `${d.date} ${d.title}`).join(", ");
     let epiceeSansArret = 0, varieSansArret = 0, longueGardee = 0, deuxDuresSansArret = 0, autreQueSeuilSansArret = 0, revenueApresHuitJours = 0;
-    let footingsAvantQualite = 0, varieUneFoisPermise = 0;
+    let footingsAvantQualite = 0, varieUneFoisPermise = 0, horsEchelleVu = 0;
     for (const jour of HORLOGES) {
       // Le contre-poids : sans arrêt, ce coureur a bien une sortie longue épicée et des footings variés.
       const regulier = await contexte(jour, tablesGros(jour, historiqueGros(jour)));
@@ -1129,6 +1129,33 @@ async function profilChaotique() {
         if (r.plan.filter((d) => d.type === "Endurance" && d.date < permis).length >= 3) footingsAvantQualite++;
       }
 
+      // (b ter) AU-DELÀ DE 28 JOURS — arrêt de 34 jours (visa du directeur scientifique, 17/11/2026 : la règle
+      // s'arrêtait à 28 jours ; le plan posait un seuil de 4×10 min le jour du retour et une sortie longue de
+      // 22 km dans une semaine visée à 20 km). Pas encore repris, puis repris depuis 3 et 10 jours.
+      for (const repris of [-1, 3, 10]) {
+        const apres = repris < 0 ? [] : Array.from({ length: Math.ceil(repris / 2) }, (_, k) => facile(jour, repris - 2 * k)).filter((w) => String(w.date) < jour);
+        const r = await contexte(jour, tablesGros(jour, [...historiqueGros(jour, 34 + Math.max(0, repris)), ...apres]));
+        const ctxt = `${jour}, 34 j d'arrêt, ${repris < 0 ? "pas encore repris" : `repris depuis ${repris} j`}`;
+        const des = repris < 0 ? 7 : Math.max(0, 14 - repris), permis = plusJours(jour, des);
+        assert.equal(r.ctx.weekPlan.repriseArret, des > 6 ? "sans-qualite" : "une-qualite", `${ctxt} : précondition, l'état de la reprise transmis au plan est « ${r.ctx.weekPlan.repriseArret} »`);
+        assert.deepEqual(liste(dures(r.plan).filter((d) => d.date < permis)), "", `${ctxt} : séance dure avant le 14ᵉ jour de reprise (${permis})`);
+        assert.ok(dures(r.plan).length <= 1, `${ctxt} : ${dures(r.plan).length} séances dures (${liste(dures(r.plan))})`);
+        assert.deepEqual(liste(varies(r.plan).filter((d) => d.date < permis)), "", `${ctxt} : footing varié avant le premier jour permis (${permis})`);
+        // La sortie longue ne dépasse pas 30 % de la semaine visée (ou n'est pas posée).
+        const plafond = Math.max(4, Math.round(r.ctx.volume.targetKm * 0.3));
+        assert.ok(r.ctx.volume.longRunKm <= plafond, `${ctxt} : sortie longue de ${r.ctx.volume.longRunKm} km dans une semaine visée à ${r.ctx.volume.targetKm} km`);
+        // Le motif le dit, sans pourcentage de volume (la règle de Daniels ne s'applique plus au-delà de 28 jours).
+        const attendu = repris < 0 ? /sans séance dure pendant les deux premières semaines de reprise/ : des > 6 ? /aucune séance dure pendant les deux premières semaines/ : /une seule séance de qualité par semaine au plus, courte/;
+        assert.ok(r.ctx.readiness.reasons.some((m) => attendu.test(m)), `${ctxt} : le motif ne dit pas l'intensité (${r.ctx.readiness.reasons.join(" | ")})`);
+        if (repris < 0) horsEchelleVu++;
+      }
+      // Le contre-poids : quatre semaines après le retour, la reprise est finie, les séances dures reviennent.
+      {
+        const apres = Array.from({ length: 15 }, (_, k) => facile(jour, 29 - 2 * k)).filter((w) => String(w.date) < jour);
+        const r = await contexte(jour, tablesGros(jour, [...historiqueGros(jour, 34 + 29), ...apres]));
+        assert.equal(r.ctx.weekPlan.repriseArret, undefined, `${jour} : 29 jours après le retour d'un arrêt de 34 jours, la reprise dure encore`);
+      }
+
       // (c) UNE PAR SEMAINE, PAS UNE PAR PLAN — arrêt de 20 jours, repris depuis 14, donc dans la seconde
       // moitié : un seuil prescrit ET couru il y a 2, 4 ou 6 jours interdit toute séance dure dans les sept
       // jours qui le suivent ; couru il y a 8 jours, il laisse revenir la suivante (la reprise dure encore).
@@ -1155,6 +1182,7 @@ async function profilChaotique() {
     assert.ok(revenueApresHuitJours >= 1, "une semaine après son seuil, la séance dure ne revient sur aucun départ : la borne vaut pour toute la reprise, pas par semaine");
     assert.ok(footingsAvantQualite >= 1, "précondition : aucun plan n'a trois footings avant le jour permis, les footings variés (2ᵉ et 3ᵉ) ne sont pas éprouvés");
     assert.ok(varieUneFoisPermise >= 1, "une fois la séance dure permise, les footings ne varient plus sur aucun départ : la garde vaut pour toute la reprise");
+    assert.equal(horsEchelleVu, HORLOGES.length, "précondition : l'arrêt de 34 jours n'a pas tourné sur tous les départs");
   });
   await testA("les jours déclarés changent d'une semaine à l'autre : le plan suit ceux de CETTE semaine", async () => {
     // Semaine A : lundi, mercredi, samedi, dimanche. Semaine B : mardi, jeudi, vendredi. Même historique.

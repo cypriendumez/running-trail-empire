@@ -63,6 +63,43 @@ export function partApresArret(r: Pick<RepriseArret, "arretJours" | "joursRepris
  * ⚠️ `aujourdhui` EST FOURNI, jamais lu de l'horloge (voir `lib/time`).
  */
 export function repriseApresArret(joursCourus: readonly string[], aujourdhui: string): RepriseArret | null {
+  const a = dernierArret(joursCourus, aujourdhui);
+  if (!a || a.arretJours > ARRET_MAX_JOURS) return null;
+  if (a.enCours) return { arretJours: a.arretJours, enCours: true, joursRepris: 0, part: PARTS_REPRISE[0], depuisJours: a.depuisJours };
+  if (a.joursRepris >= a.arretJours) return null;
+  return { arretJours: a.arretJours, enCours: false, joursRepris: a.joursRepris, part: partApresArret(a) };
+}
+
+/** Ce qu'il faut savoir d'un arrêt pour borner l'INTENSITÉ (le volume, lui, lit `RepriseArret`). */
+export type ArretVu = Pick<RepriseArret, "arretJours" | "enCours" | "joursRepris" | "depuisJours">;
+
+/** Durée de la reprise appliquée à l'intensité après un arrêt de plus de 28 jours. */
+export const REPRISE_HORS_ECHELLE_JOURS = ARRET_MAX_JOURS;
+
+/**
+ * L'ARRÊT DE PLUS DE 28 JOURS, pour l'intensité seulement — `null` de 6 à 28 jours (c'est
+ * `repriseApresArret`) et une fois ses quatre semaines de reprise écoulées.
+ *
+ * ⚠️ UNE GARDE NE BAISSE PAS QUAND LE RISQUE MONTE (visa du directeur scientifique, 17/11/2026).
+ * Au-delà de 28 jours, la règle de Daniels change d'échelle pour le VOLUME, et ce module rendait
+ * `null` : la règle d'intensité s'arrêtait donc là où elle compte le plus. Rejoué : après 34
+ * jours sans courir, un seuil de 4×10 min le jour même du retour, et une sortie longue de 22 km
+ * dans une semaine visée à 20 km — alors qu'à 27 jours, rien de dur avant la seconde moitié.
+ * Le volume au-delà de 28 jours garde son plafond ordinaire ; l'intensité, elle, reçoit AU MOINS
+ * la règle de l'arrêt le plus long de l'échelle (voir `qualitePendantReprise`).
+ */
+export function arretHorsEchelle(joursCourus: readonly string[], aujourdhui: string): ArretVu | null {
+  const a = dernierArret(joursCourus, aujourdhui);
+  if (!a || a.arretJours <= ARRET_MAX_JOURS) return null;
+  if (!a.enCours && a.joursRepris >= REPRISE_HORS_ECHELLE_JOURS) return null;
+  return a;
+}
+
+/**
+ * Le DERNIER arrêt d'au moins 6 jours, quelle que soit sa longueur, et où en est ce qui l'a suivi.
+ * `arretJours` compte les jours SANS COURIR dans les deux états.
+ */
+function dernierArret(joursCourus: readonly string[], aujourdhui: string): ArretVu | null {
   const jours = [...new Set(joursCourus.map((d) => String(d).slice(0, 10)))]
     .filter((d) => d.length === 10 && d <= aujourdhui)
     .sort();
@@ -75,20 +112,12 @@ export function repriseApresArret(joursCourus: readonly string[], aujourdhui: st
   // « déjà repris » lira demain (`ecart - 1`). Borner `depuis` lui-même décalait la règle d'un
   // jour aux deux bouts : au 6ᵉ jour, une reprise annoncée puis oubliée après la sortie (5 jours
   // d'arrêt) ; au 29ᵉ, aucune reprise, puis une reprise le lendemain (28 jours d'arrêt).
-  const arret = depuis - 1;
-  if (arret >= ARRET_MIN_JOURS) {
-    return arret <= ARRET_MAX_JOURS ? { arretJours: arret, enCours: true, joursRepris: 0, part: PARTS_REPRISE[0], depuisJours: depuis } : null;
-  }
-  // Déjà repris : le DERNIER arrêt d'au moins 6 jours, et où en est la reprise qui l'a suivi.
+  if (depuis - 1 >= ARRET_MIN_JOURS) return { arretJours: depuis - 1, enCours: true, joursRepris: 0, depuisJours: depuis };
+  // Déjà repris : le DERNIER arrêt d'au moins 6 jours, et le temps écoulé depuis la sortie qui l'a suivi.
   for (let i = jours.length - 1; i > 0; i--) {
     const ecart = ecartJours(jours[i], jours[i - 1]);
-    if (ecart == null) continue;
-    const arret = ecart - 1;
-    if (arret < ARRET_MIN_JOURS) continue;
-    if (arret > ARRET_MAX_JOURS) return null;
-    const joursRepris = ecartJours(aujourdhui, jours[i]) ?? Infinity;
-    if (joursRepris >= arret) return null;
-    return { arretJours: arret, enCours: false, joursRepris, part: partApresArret({ arretJours: arret, joursRepris }) };
+    if (ecart == null || ecart - 1 < ARRET_MIN_JOURS) continue;
+    return { arretJours: ecart - 1, enCours: false, joursRepris: ecartJours(aujourdhui, jours[i]) ?? Infinity };
   }
   return null;
 }
@@ -104,8 +133,11 @@ export function repriseApresArret(joursCourus: readonly string[], aujourdhui: st
 //  LA RÈGLE (avis du directeur scientifique, 16/11/2026) :
 //   · aucune qualité tant qu'aucune sortie n'a suivi l'arrêt : on reprend par du facile.
 //     Le plan étant reconstruit après chaque séance, la qualité revient d'elle-même ;
-//   · le jour de la première sortie de reprise, pas de qualité non plus ;
+//   · le jour de la première sortie de reprise, pas de qualité non plus ; après dix jours
+//     d'arrêt ou plus, pas avant 48 h ;
 //   · après un arrêt de plus de 14 jours, la qualité attend la seconde moitié de la reprise ;
+//   · après un arrêt de plus de 28 jours, où la règle de volume ne s'applique plus, l'intensité
+//     garde AU MOINS cette protection : pas avant le 14ᵉ jour d'une reprise de quatre semaines ;
 //   · jusqu'à la fin de la reprise, UNE séance de qualité PAR SEMAINE au plus, écrite courte
 //     et au seuil (le volume est à 50 puis 75 %) : la même borne que la reprise d'après-course.
 //     ⚠️ « Par semaine », pas « pour toute la reprise » (double relecture du 17/11/2026) : la
@@ -131,14 +163,31 @@ export function arretLong(r: Pick<RepriseArret, "arretJours">): boolean {
 }
 
 /** La qualité permise pendant une reprise, ou `null` hors reprise (aucune borne). */
-export function qualitePendantReprise(r: RepriseArret | null): QualiteReprise | null {
+export function qualitePendantReprise(r: ArretVu | null): QualiteReprise | null {
   if (!r) return null;
   // Pas encore repris : aucune qualité, quel que soit le jour.
   if (r.enCours) return { max: 0, des: 7 };
-  const des = arretLong(r)
-    ? Math.max(0, Math.ceil(r.arretJours / 2) - r.joursRepris)
-    : r.joursRepris === 0 ? 1 : 0;
+  const des = Math.max(0, premierJourDeQualite(r.arretJours) - r.joursRepris);
   return des > 6 ? { max: 0, des: 7 } : { max: 1, des };
+}
+
+/** Arrêt à partir duquel la première séance dure attend 48 h après la première sortie facile. */
+export const ARRET_48H_JOURS = 10;
+
+/**
+ * Le rang du premier jour de reprise (0 = jour de la première sortie) où une séance dure est
+ * permise. ⚠️ JAMAIS DÉCROISSANT quand l'arrêt s'allonge (un test le vérifie de 6 à 60 jours) :
+ *  · de 6 à 9 jours d'arrêt : le lendemain de la première sortie ;
+ *  · de 10 à 14 jours : 48 h après (visa du directeur scientifique, 17/11/2026 : pas de seuil
+ *    le lendemain d'une seule sortie facile après dix jours d'arrêt) ;
+ *  · de 15 à 28 jours : le premier jour de la seconde moitié de la reprise ;
+ *  · au-delà de 28 jours : comme l'arrêt le plus long de l'échelle, le 14ᵉ jour d'une reprise
+ *    de quatre semaines.
+ */
+export function premierJourDeQualite(arretJours: number): number {
+  if (arretJours > ARRET_MAX_JOURS) return Math.ceil(REPRISE_HORS_ECHELLE_JOURS / 2);
+  if (arretLong({ arretJours })) return Math.ceil(arretJours / 2);
+  return arretJours >= ARRET_48H_JOURS ? 2 : 1;
 }
 
 /**
