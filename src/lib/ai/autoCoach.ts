@@ -7,7 +7,7 @@
 //
 //  Déterministe (pas d'appel LLM) → fiable pour un cron qui tourne sans surveillance.
 // ─────────────────────────────────────────────────────────────────────────────
-import { lignesRetireesParDouleur } from "@/lib/coach/footings";
+import { lignesRetireesParDouleur, lignesRetireesParReprise } from "@/lib/coach/footings";
 import { ecartJours } from "@/lib/coach/recuperation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
@@ -532,10 +532,10 @@ export async function autoCoachForUser(
         // Le footing qui aurait porté les lignes droites est le DEUXIÈME : pendant une reprise après un
         // arrêt, la reprise les a déjà retirées s'il tombe avant le premier jour où une séance dure est permise.
         const deuxieme = footings[1]?.date;
-        const avantQualite = deuxieme == null || (ecartJours(deuxieme, today) ?? 0) < (ctx.weekPlan.qualiteDes ?? 0);
         return lignesRetireesParDouleur(footings.length,
           { taper: ctx.cycle.taper, semaineCourse: week.some((d: PlanDay) => d.type === "Course"), sansHistorique: ctx.noHistory,
-            reprise: !!ctx.weekPlan.repriseArret && avantQualite });
+            reprise: lignesRetireesParReprise({ reprise: !!ctx.weekPlan.repriseArret, qualiteDes: ctx.weekPlan.qualiteDes ?? 0,
+              deuxiemeFootingJour: deuxieme == null ? null : ecartJours(deuxieme, today) }) });
       })(),
     } : null,
     consignes: ctx.consignes ?? null,

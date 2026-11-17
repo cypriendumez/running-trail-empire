@@ -2427,7 +2427,9 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // La sortie habituelle = la médiane des sorties des huit semaines d'AVANT l'arrêt (les footings
   // courts de la reprise tireraient la médiane vers le bas, et la « sortie longue » reviendrait
   // en cours de reprise) ; inconnue, on ne tranche pas.
-  const habituelleKm = repriseIntensite ? sortieHabituelleKm(distancesAvantArret(runs, repriseIntensite, todayStr)) : null;
+  // ⚠️ Sur l'historique LONG quand il existe (190 jours) : `runs` ne porte que les 60 dernières séances,
+  // tous sports confondus, et les huit semaines d'avant un arrêt d'un mois en sortaient en partie.
+  const habituelleKm = repriseIntensite ? sortieHabituelleKm(distancesAvantArret(histRuns.length ? histRuns : runs, repriseIntensite, todayStr)) : null;
   const longueRetiree = repriseIntensite != null && !sortieLongueTient(longRunKmBorne, habituelleKm);
   const longRunKm = longueRetiree ? 0 : longRunKmBorne;
   const longRunEased = !longueRetiree && longRunKm < longRunPlanned;

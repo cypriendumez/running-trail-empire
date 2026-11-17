@@ -26,7 +26,7 @@ import { buildWeekPlan } from "../src/lib/ai/autoPlan";
 import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle, premierJourDeQualite, ARRET_LONG_JOURS } from "../src/lib/coach/repriseArret";
 import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { MOTIF_T } from "../src/lib/coach/reasonsI18n";
-import { varianteFooting, lignesRetireesParDouleur } from "../src/lib/coach/footings";
+import { varianteFooting, lignesRetireesParDouleur, lignesRetireesParReprise } from "../src/lib/coach/footings";
 import { semainesAffutage, partAffutage, phaseDeSemaine, allegementDuBloc } from "../src/lib/coach/phase";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
@@ -497,6 +497,12 @@ async function main() {
     assert.equal(premierJourPermis(34, 14), 0);
     assert.deepEqual(qualitePendantReprise(vue([ilYa(34 + 14 + 1), ilYa(14), ilYa(12), ilYa(10), ilYa(8), ilYa(6), ilYa(4), ilYa(2)])), { max: 1, des: 0 });
     assert.equal(vue([ilYa(34 + 28 + 1), ...Array.from({ length: 15 }, (_, k) => ilYa(28 - 2 * k))]), null, "quatre semaines après le retour, la reprise dure encore");
+    // …et pas un jour plus tôt : au 27ᵉ jour de reprise, elle est toujours en cours.
+    assert.deepEqual(vue([ilYa(34 + 27 + 1), ...Array.from({ length: 14 }, (_, k) => ilYa(27 - 2 * k))]), { arretJours: 34, enCours: false, joursRepris: 27 }, "la reprise d'un arrêt de 34 jours s'arrête avant quatre semaines");
+    // Même borne dans l'échelle : la reprise dure AUTANT que l'arrêt, ni un jour de moins ni un jour de plus.
+    const ordinaire = (arret: number, repris: number) => repriseApresArret([ilYa(repris + arret + 1), ...Array.from({ length: Math.floor(repris / 2) + 1 }, (_, k) => ilYa(repris - 2 * k))], AUJOURDHUI);
+    assert.equal(ordinaire(12, 11)?.joursRepris, 11, "une reprise de 12 jours s'arrête au 11ᵉ");
+    assert.equal(ordinaire(12, 12), null, "une reprise de 12 jours dure encore au 12ᵉ jour");
     // Continuité à la borne : 28 jours d'arrêt (dans l'échelle) et 29 (hors échelle) attendent le même 14ᵉ jour.
     assert.equal(premierJourDeQualite(28), 14);
     assert.equal(premierJourDeQualite(29), 14);
@@ -555,7 +561,7 @@ async function main() {
     // La séance de reprise, déjà écrite courte, n'est pas en plus « sauvée par le plancher ».
     assert.match(ctxSrc, /floored: qb\.floored && qualiteReprise == null,/);
     // La sortie habituelle se lit AVANT l'arrêt : les footings de la reprise ne la font pas baisser.
-    assert.match(ctxSrc, /const habituelleKm = repriseIntensite \? sortieHabituelleKm\(distancesAvantArret\(runs, repriseIntensite, todayStr\)\) : null;/);
+    assert.match(ctxSrc, /const habituelleKm = repriseIntensite \? sortieHabituelleKm\(distancesAvantArret\(histRuns\.length \? histRuns : runs, repriseIntensite, todayStr\)\) : null;/);
     // Au-delà de 28 jours : la même reprise d'intensité borne le budget, la sortie longue et le double seuil.
     assert.match(ctxSrc, /const repriseIntensite = repriseArret \?\? arretHorsEchelle\(runs\.map\(\(w\) => String\(w\.date\)\.slice\(0, 10\)\), todayStr\);\s*const qualiteReprise = qualitePendantReprise\(repriseIntensite\);/);
     assert.match(ctxSrc, /const longRunPlanned = recup \|\| repriseIntensite \? Math\.min\(longRunPrevu, Math\.round\(targetKm \* 0\.3\)\) : longRunPrevu;/, "après plus de 28 jours d'arrêt, la sortie longue dépasse de nouveau la semaine visée");
@@ -590,7 +596,14 @@ async function main() {
     // La garde est PAR JOUR : tout footing placé avant le premier jour où une séance dure est permise.
     assert.match(plan, /const gardesDu = \(i: number\) => \(\{ \.\.\.gardes, reprise: !!ctx\.weekPlan\.repriseArret && i < debutQualite \}\);/);
     assert.equal((plan.match(/varianteFooting\(rang, easySlots\.length, gardesDu\(i\)\)/g) ?? []).length, 2, "le titre ou le détail d'un footing ne lit plus la garde du jour");
-    assert.match(coach, /reprise: !!ctx\.weekPlan\.repriseArret && avantQualite \}/, "l'écran Santé attribue de nouveau à la douleur des lignes droites que la reprise a retirées");
+    // L'écran Santé : la reprise a déjà retiré les lignes droites si le DEUXIÈME footing tombe avant le jour permis.
+    assert.equal(lignesRetireesParReprise({ reprise: false, deuxiemeFootingJour: 2, qualiteDes: 7 }), false, "hors reprise, la reprise retire quelque chose");
+    assert.equal(lignesRetireesParReprise({ reprise: true, deuxiemeFootingJour: 2, qualiteDes: 4 }), true, "deuxième footing au jour 2, séance dure permise au jour 4 : la douleur se voit attribuer les lignes droites");
+    assert.equal(lignesRetireesParReprise({ reprise: true, deuxiemeFootingJour: 4, qualiteDes: 4 }), false, "le jour permis, le footing peut de nouveau porter des lignes droites");
+    assert.equal(lignesRetireesParReprise({ reprise: true, deuxiemeFootingJour: 5, qualiteDes: 4 }), false);
+    assert.equal(lignesRetireesParReprise({ reprise: true, deuxiemeFootingJour: 2, qualiteDes: 0 }), false);
+    assert.equal(lignesRetireesParReprise({ reprise: true, deuxiemeFootingJour: null, qualiteDes: 4 }), true);
+    assert.match(coach, /reprise: lignesRetireesParReprise\(\{ reprise: !!ctx\.weekPlan\.repriseArret, qualiteDes: ctx\.weekPlan\.qualiteDes \?\? 0,\s*deuxiemeFootingJour: deuxieme == null \? null : ecartJours\(deuxieme, today\) \}\) \}\);/, "l'écran Santé attribue de nouveau à la douleur des lignes droites que la reprise a retirées");
     assert.match(ctxSrc, /\.\.\.\(qualiteReprise \? \{ repriseArret: qualiteReprise\.max === 0 \? "sans-qualite" as const : "une-qualite" as const \} : \{\}\),/);
   });
 
