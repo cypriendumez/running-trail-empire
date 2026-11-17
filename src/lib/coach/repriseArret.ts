@@ -28,8 +28,15 @@ export const PARTS_REPRISE = [0.5, 0.75] as const;
 export const ARRET_LONG_JOURS = 14;
 
 export type RepriseArret = {
-  /** Jours sans courir. */
+  /**
+   * Jours SANS COURIR — la même grandeur dans les deux états (17/11/2026). Tant que l'athlète
+   * n'a pas repris, c'est l'arrêt qu'il aura fait s'il reprend aujourd'hui : les jours écoulés
+   * depuis sa dernière sortie, moins aujourd'hui.
+   */
   arretJours: number;
+  /** Tant qu'il n'a pas repris : jours écoulés depuis la dernière sortie, aujourd'hui COMPRIS
+   *  (`arretJours + 1`). C'est le nombre que dit le motif (« aucune course depuis N jours »). */
+  depuisJours?: number;
   /** `true` tant qu'aucune sortie n'a suivi l'arrêt : l'athlète n'a pas encore repris. */
   enCours: boolean;
   /** Jours écoulés depuis la première sortie qui a suivi l'arrêt (0 tant qu'il n'a pas repris). */
@@ -63,8 +70,14 @@ export function repriseApresArret(joursCourus: readonly string[], aujourdhui: st
   // Toujours à l'arrêt : les jours écoulés depuis la dernière sortie, aujourd'hui compris.
   const depuis = ecartJours(aujourdhui, jours[jours.length - 1]);
   if (depuis == null) return null;
-  if (depuis >= ARRET_MIN_JOURS) {
-    return depuis <= ARRET_MAX_JOURS ? { arretJours: depuis, enCours: true, joursRepris: 0, part: PARTS_REPRISE[0] } : null;
+  // ⚠️ L'ARRÊT, C'EST `depuis - 1` (cinquième relecture, 17/11/2026) : en reprenant aujourd'hui,
+  // l'athlète sera resté `depuis - 1` jours sans courir, et c'est ce nombre-là que la branche
+  // « déjà repris » lira demain (`ecart - 1`). Borner `depuis` lui-même décalait la règle d'un
+  // jour aux deux bouts : au 6ᵉ jour, une reprise annoncée puis oubliée après la sortie (5 jours
+  // d'arrêt) ; au 29ᵉ, aucune reprise, puis une reprise le lendemain (28 jours d'arrêt).
+  const arret = depuis - 1;
+  if (arret >= ARRET_MIN_JOURS) {
+    return arret <= ARRET_MAX_JOURS ? { arretJours: arret, enCours: true, joursRepris: 0, part: PARTS_REPRISE[0], depuisJours: depuis } : null;
   }
   // Déjà repris : le DERNIER arrêt d'au moins 6 jours, et où en est la reprise qui l'a suivi.
   for (let i = jours.length - 1; i > 0; i--) {
@@ -109,17 +122,12 @@ export type QualiteReprise = {
 };
 
 /**
- * L'arrêt sera-t-il LONG (plus de 14 jours sans courir) une fois la reprise commencée ?
- *
- * ⚠️ `arretJours` NE COMPTE PAS LA MÊME CHOSE DANS LES DEUX ÉTATS (quatrième relecture, 17/11/2026).
- * Pas encore repris, c'est le nombre de jours écoulés depuis la dernière sortie, AUJOURD'HUI
- * COMPRIS : si le coureur court aujourd'hui, il sera resté `arretJours - 1` jours sans courir.
- * Une fois repris, c'est déjà ce nombre de jours sans courir. Au 15ᵉ jour, le motif annonçait
- * donc la règle des arrêts longs (« pas avant la seconde moitié »), et le plan du lendemain,
- * après une sortie, posait un seuil : l'arrêt n'avait duré que 14 jours.
+ * L'arrêt est-il LONG (plus de 14 jours sans courir) ? Une seule règle, lue par le plan et par
+ * le texte. `arretJours` compte les jours sans courir dans les deux états (voir `RepriseArret`) :
+ * au 15ᵉ jour depuis la dernière sortie, l'arrêt est de 14 jours, donc encore court.
  */
-export function arretLong(r: Pick<RepriseArret, "arretJours" | "enCours">): boolean {
-  return (r.enCours ? r.arretJours - 1 : r.arretJours) > ARRET_LONG_JOURS;
+export function arretLong(r: Pick<RepriseArret, "arretJours">): boolean {
+  return r.arretJours > ARRET_LONG_JOURS;
 }
 
 /** La qualité permise pendant une reprise, ou `null` hors reprise (aucune borne). */

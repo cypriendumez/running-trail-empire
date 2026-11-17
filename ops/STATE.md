@@ -166,8 +166,10 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    branche `fix/reprise-sans-qualite` (`qualitePendantReprise` dans `lib/coach/repriseArret`) : aucune qualité avant
    une sortie facile, une seule par semaine ensuite (au seuil, courte), la seconde moitié de la reprise après plus de
    14 jours d'arrêt ; sortie longue facile pendant toute la reprise, footings simples avant le premier jour où
-   une séance dure est permise. Le seuil de 14 jours et la borne « une par semaine » sont des choix de la session, à confirmer
-   par Cyprien.
+   une séance dure est permise. L'arrêt se compte désormais en jours SANS COURIR avant comme après la première sortie : la
+   règle de volume existante s'applique donc de 6 à 28 jours sans courir, soit du 7ᵉ au 29ᵉ jour depuis la dernière
+   sortie (un jour plus tard qu'avant à la borne basse, un jour de plus à la borne haute). Le seuil de 14 jours et
+   la borne « une par semaine » sont des choix de la session, à confirmer par Cyprien.
    À fusionner et à déployer sur GO de Cyprien.
 
 ## Résolues le 13/11/2026

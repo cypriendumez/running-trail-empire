@@ -105,8 +105,9 @@ async function main() {
   });
 
   await test("onze jours sans courir : reprise à 50 %, puis 75 % la semaine suivante", () => {
-    const r = repriseApresArret([ilYa(11), ilYa(12), ilYa(14)], AUJOURDHUI);
-    assert.deepEqual(r, { arretJours: 11, enCours: true, joursRepris: 0, part: 0.5 });
+    // Dernière sortie il y a 12 jours : onze jours SANS COURIR (17/11/2026, l'arrêt ne compte plus aujourd'hui).
+    const r = repriseApresArret([ilYa(12), ilYa(13), ilYa(15)], AUJOURDHUI);
+    assert.deepEqual(r, { arretJours: 11, enCours: true, joursRepris: 0, part: 0.5, depuisJours: 12 });
     assert.equal(partApresArret(r, 7), 0.75, "la semaine suivante n'est pas à 75 %");
     assert.equal(partApresArret(r, 14), 1, "la reprise déborde la durée de l'arrêt");
   });
@@ -429,23 +430,32 @@ async function main() {
     assert.deepEqual(qualitePendantReprise(reprise(14, 3)), { max: 1, des: 0 }, "14 jours d'arrêt comptent comme un arrêt long");
   });
 
-  await test("le 15ᵉ jour sans courir n'est pas encore un arrêt long : le texte et le plan du lendemain disent la même chose", () => {
-    // Pas encore repris, `arretJours` compte aujourd'hui : en courant aujourd'hui, l'arrêt aura duré un jour de moins.
-    assert.equal(arretLong({ arretJours: 15, enCours: true }), false, "au 15ᵉ jour, le motif annonce la règle des arrêts longs");
-    assert.equal(arretLong({ arretJours: 16, enCours: true }), true);
-    assert.equal(arretLong({ arretJours: 14, enCours: false }), false);
-    assert.equal(arretLong({ arretJours: 15, enCours: false }), true);
-    // De bout en bout : dernière sortie il y a 15 jours, puis une sortie aujourd'hui → 14 jours d'arrêt, la règle courte.
-    const avant = repriseApresArret([ilYa(15), ilYa(17)], AUJOURDHUI)!;
-    assert.deepEqual({ arret: avant.arretJours, enCours: avant.enCours, long: arretLong(avant) }, { arret: 15, enCours: true, long: false });
-    const apres = repriseApresArret([ilYa(15), ilYa(17), AUJOURDHUI], AUJOURDHUI)!;
-    assert.deepEqual({ arret: apres.arretJours, enCours: apres.enCours, long: arretLong(apres) }, { arret: 14, enCours: false, long: false });
-    assert.deepEqual(qualitePendantReprise(apres), { max: 1, des: 1 }, "le lendemain d'un arrêt de 14 jours, la séance dure n'est pas permise");
-    // Et au 16ᵉ jour : la règle longue avant comme après la première sortie.
-    const avant16 = repriseApresArret([ilYa(16), ilYa(18)], AUJOURDHUI)!, apres16 = repriseApresArret([ilYa(16), ilYa(18), AUJOURDHUI], AUJOURDHUI)!;
-    assert.equal(arretLong(avant16), true);
-    assert.deepEqual({ arret: apres16.arretJours, long: arretLong(apres16) }, { arret: 15, long: true });
-    assert.deepEqual(qualitePendantReprise(apres16), { max: 0, des: 7 }, "15 jours d'arrêt, repris aujourd'hui : la seconde moitié commence dans 8 jours");
+  await test("l'arrêt se compte en jours SANS COURIR, avant comme après la première sortie : 6, 14 et 28 jours bornent la même chose", () => {
+    assert.equal(arretLong({ arretJours: 14 }), false);
+    assert.equal(arretLong({ arretJours: 15 }), true);
+    // De 4 à 32 jours depuis la dernière sortie : ce que dit la règle le jour J (pas encore repris) et ce
+    // qu'elle dit une fois une sortie courue CE JOUR-LÀ doivent être la même reprise, ou la même absence.
+    for (let depuis = 4; depuis <= 32; depuis++) {
+      const avant = repriseApresArret([ilYa(depuis), ilYa(depuis + 2)], AUJOURDHUI);
+      const apres = repriseApresArret([ilYa(depuis), ilYa(depuis + 2), AUJOURDHUI], AUJOURDHUI);
+      const dedans = depuis - 1 >= 6 && depuis - 1 <= 28;
+      assert.equal(avant != null, dedans, `${depuis} j depuis la dernière sortie, pas encore repris : reprise ${avant ? "annoncée" : "absente"}`);
+      assert.equal(apres != null, dedans, `${depuis} j depuis la dernière sortie, sortie courue aujourd'hui : reprise ${apres ? "appliquée" : "absente"}`);
+      if (!avant || !apres) continue;
+      assert.deepEqual({ arret: avant.arretJours, enCours: avant.enCours, depuis: avant.depuisJours }, { arret: depuis - 1, enCours: true, depuis });
+      assert.deepEqual({ arret: apres.arretJours, enCours: apres.enCours }, { arret: depuis - 1, enCours: false }, `${depuis} j : l'arrêt change en courant aujourd'hui`);
+      assert.equal(arretLong(avant), arretLong(apres), `${depuis} j : arrêt long avant la sortie, court après (ou l'inverse)`);
+    }
+    // Les trois bornes, en clair : 6ᵉ jour (5 jours d'arrêt) rien ; 7ᵉ jour une reprise ; 15ᵉ jour encore court ; 16ᵉ long ; 29ᵉ dedans ; 30ᵉ dehors.
+    assert.equal(repriseApresArret([ilYa(6)], AUJOURDHUI), null, "au 6ᵉ jour, une reprise est annoncée pour 5 jours sans courir");
+    assert.equal(repriseApresArret([ilYa(7)], AUJOURDHUI)?.arretJours, 6);
+    assert.equal(arretLong(repriseApresArret([ilYa(15)], AUJOURDHUI)!), false, "au 15ᵉ jour, le motif annonce la règle des arrêts longs");
+    assert.equal(arretLong(repriseApresArret([ilYa(16)], AUJOURDHUI)!), true);
+    assert.equal(repriseApresArret([ilYa(29)], AUJOURDHUI)?.arretJours, 28, "au 29ᵉ jour (28 jours sans courir), la reprise est oubliée");
+    assert.equal(repriseApresArret([ilYa(30)], AUJOURDHUI), null);
+    // Et l'intensité suit : 14 jours d'arrêt, repris aujourd'hui → une séance dès demain ; 15 jours → pas avant la seconde moitié.
+    assert.deepEqual(qualitePendantReprise(repriseApresArret([ilYa(15), AUJOURDHUI], AUJOURDHUI)), { max: 1, des: 1 });
+    assert.deepEqual(qualitePendantReprise(repriseApresArret([ilYa(16), AUJOURDHUI], AUJOURDHUI)), { max: 0, des: 7 });
   });
 
   await test("arrêt long (plus de 14 jours) : la qualité attend la seconde moitié de la reprise", () => {

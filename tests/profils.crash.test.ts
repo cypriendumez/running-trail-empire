@@ -934,7 +934,7 @@ async function profilChaotique() {
       // Sur N'IMPORTE QUELS sept jours consécutifs qui contiennent une qualité POSÉE, manquées +
       // posées ≤ budget de la semaine. ⚠️ Une fenêtre faite des seules qualités manquées n'est pas
       // une décision du plan : depuis le 16/11/2026, la reprise après un arrêt ramène le budget à 0
-      // (variante « 5 jours sans courir », soit 6 jours d'arrêt au départ), et deux qualités déjà
+      // (variante « trou de 5 jours » : sur certains départs la dernière sortie remonte à 7 jours ou plus), et deux qualités déjà
       // manquées ne peuvent pas « tenir » dans un budget nul. Ce qui compte : le plan n'en AJOUTE pas.
       const tous = [...(avec.ctx.qualiteRecente?.jours ?? []), ...dAvec].sort();
       for (const debut of tous) {
@@ -985,10 +985,11 @@ async function profilChaotique() {
       if (durs(regulier.plan).length) qualiteSansArret++;
       if (longues(regulier.plan).length) longueSansArret++;
 
-      // (a) PAS ENCORE REPRIS — arrêt de 6 jours ou plus, de 13 ou plus, de 20 ou plus.
-      for (const trou of [5, 12, 19]) {
+      // (a) PAS ENCORE REPRIS — arrêt de 6 jours ou plus, de 13 ou plus, de 20 ou plus. L'arrêt se compte en
+      // jours SANS COURIR : la dernière sortie remonte à `arret + 1` jours (elle n'a pas encore couru aujourd'hui).
+      for (const trou of [6, 13, 20]) {
         const workouts = historiqueChaos(jour, trou);
-        const arret = ecart(jour, derniereDe(workouts));
+        const arret = ecart(jour, derniereDe(workouts)) - 1;
         const ctxt = `${jour}, ${arret} j sans courir`;
         assert.ok(arret >= 6 && arret <= 28, `${ctxt} : précondition, l'arrêt sort de la règle de Daniels (6 à 28 jours)`);
         const r = await contexte(jour, tablesChaos(jour, { workouts }));
@@ -998,9 +999,10 @@ async function profilChaotique() {
         assert.deepEqual(longues(r.plan).map((d) => d.date), [], `${ctxt} : « sortie longue » de ${r.ctx.volume.longRunKm} km pour une coureuse à 9 km par sortie`);
         // Le plan DIT pourquoi : le motif de la reprise annonce l'absence de séance dure.
         // Après plus de 14 jours SANS COURIR, une sortie facile ne suffit pas : le texte dit la seconde moitié.
-        // `arret` compte ici aujourd'hui (elle n'a pas encore couru) : en courant aujourd'hui, elle sera restée
-        // `arret - 1` jours sans courir. Au 15ᵉ jour, c'est donc encore la règle courte (quatrième relecture).
-        const attendu = arret - 1 > 14 ? /sans séance dure avant la seconde moitié de la reprise/ : /sans séance dure tant que tu n'as pas refait une sortie facile/;
+        const attendu = arret > 14 ? /sans séance dure avant la seconde moitié de la reprise/ : /sans séance dure tant que tu n'as pas refait une sortie facile/;
+        // Et le motif dit « depuis N jours » avec N = jours écoulés depuis la dernière sortie.
+        assert.ok(r.ctx.readiness.reasons.some((m) => m.includes(`aucune course enregistrée depuis ${arret + 1} jours`)),
+          `${ctxt} : le motif n'annonce pas « depuis ${arret + 1} jours » (${r.ctx.readiness.reasons.join(" | ")})`);
         assert.ok(r.ctx.readiness.reasons.some((m) => attendu.test(m)),
           `${ctxt} : le motif de la reprise ne dit pas quand revient la séance dure (${r.ctx.readiness.reasons.join(" | ")})`);
         // Et la reprise reste une reprise : elle court, en footings.
@@ -1087,7 +1089,8 @@ async function profilChaotique() {
 
       // (a) PAS ENCORE REPRIS, après 8, 12 et 20 jours d'arrêt : rien de dur, footings simples.
       for (const arret of [8, 12, 20]) {
-        const r = await contexte(jour, tablesGros(jour, historiqueGros(jour, arret - 1)));
+        // `historiqueGros(jour, arret)` : dernière sortie il y a `arret + 1` jours, soit `arret` jours sans courir.
+        const r = await contexte(jour, tablesGros(jour, historiqueGros(jour, arret)));
         const ctxt = `${jour}, ${arret} j sans courir`;
         assert.equal(r.ctx.weekPlan.repriseArret, "sans-qualite", `${ctxt} : précondition, le plan ne reçoit pas l'état de la reprise`);
         assert.deepEqual(liste(dures(r.plan)), "", `${ctxt} : séance dure avant la moindre sortie facile`);
