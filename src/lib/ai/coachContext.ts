@@ -246,6 +246,11 @@ export type AthleteContext = {
     reprise?: boolean;
     /** Premier jour du plan (0 = aujourd'hui) où une qualité peut être posée. */
     qualiteDes?: number;
+    /** Reprise après un arrêt en cours (`lib/coach/repriseArret`), absent hors reprise. Tant
+     *  qu'elle dure, la sortie longue reste FACILE (ni bloc d'allure ni finish progressif :
+     *  ce serait une seconde séance dure) ; « sans-qualite » : aucune séance dure n'est encore
+     *  permise, les footings restent simples (ni lignes droites ni progressif). */
+    repriseArret?: "sans-qualite" | "une-qualite";
   };
   /** Doubles séances (matin + soir) : autorisées ou non, et ce qui manque le cas
    *  échéant. Une case cochée qui ne produit rien est un mensonge silencieux —
@@ -2728,6 +2733,9 @@ ${catalog}`;
       // Et jamais avant le jour que fixe la reprise après un arrêt (`qualitePendantReprise`).
       reprise: repriseCetteSemaine && qBudget > 0,
       qualiteDes: Math.max(repriseCetteSemaine ? joursAvantReprise : 0, qualiteReprise?.des ?? 0),
+      // ⚠️ Le budget ne suffit pas (double relecture du 17/11/2026) : la sortie longue « épicée »
+      // et les footings variés ne le lisent pas. Le plan reçoit donc l'état de la reprise.
+      ...(qualiteReprise ? { repriseArret: qualiteReprise.max === 0 ? "sans-qualite" as const : "une-qualite" as const } : {}),
     },
     // Doubles séances : on tranche ICI, avec le volume REPRÉSENTATIF (médiane des
     // semaines courues) et non le pic — une semaine à 90 km ne fait pas un athlète

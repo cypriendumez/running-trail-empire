@@ -26,6 +26,7 @@ import { buildWeekPlan } from "../src/lib/ai/autoPlan";
 import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, ARRET_LONG_JOURS } from "../src/lib/coach/repriseArret";
 import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { MOTIF_T } from "../src/lib/coach/reasonsI18n";
+import { varianteFooting, lignesRetireesParDouleur } from "../src/lib/coach/footings";
 import { semainesAffutage, partAffutage, phaseDeSemaine, allegementDuBloc } from "../src/lib/coach/phase";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
@@ -472,6 +473,22 @@ async function main() {
     // Une sortie longue retirée par la reprise n'est ni « raccourcie » ni attribuée à une douleur.
     assert.match(ctxSrc, /const longRunEased = !longueRetiree && longRunKm < longRunPlanned;/);
     assert.match(ctxSrc, /sortieLongue: !longueRetiree && longRunKm < longueSansDouleur \?/);
+  });
+
+  await test("tant qu'aucune séance dure n'est permise, les footings restent simples, et le plan reçoit l'état de la reprise", () => {
+    // Précondition : hors reprise, le deuxième footing porte des lignes droites, le troisième est progressif.
+    assert.equal(varianteFooting(1, 4, {}), "lignes");
+    assert.equal(varianteFooting(2, 4, {}), "progressif");
+    assert.equal(varianteFooting(1, 4, { reprise: true }), "base");
+    assert.equal(varianteFooting(2, 4, { reprise: true }), "base");
+    // La douleur n'a rien retiré que la reprise n'avait déjà retiré.
+    assert.equal(lignesRetireesParDouleur(3, {}), true);
+    assert.equal(lignesRetireesParDouleur(3, { reprise: true }), false);
+    const plan = codeNu("src/lib/ai/autoPlan.ts"), ctxSrc = codeNu("src/lib/ai/coachContext.ts"), coach = codeNu("src/lib/ai/autoCoach.ts");
+    assert.match(plan, /const canSpice = [^;]*&& !ctx\.weekPlan\.repriseArret;/, "la sortie longue peut de nouveau porter un bloc d'allure pendant une reprise");
+    assert.match(plan, /reprise: ctx\.weekPlan\.repriseArret === "sans-qualite" \};/);
+    assert.match(coach, /reprise: ctx\.weekPlan\.repriseArret === "sans-qualite" \}/, "l'écran Santé attribue de nouveau à la douleur des lignes droites que la reprise a retirées");
+    assert.match(ctxSrc, /\.\.\.\(qualiteReprise \? \{ repriseArret: qualiteReprise\.max === 0 \? "sans-qualite" as const : "une-qualite" as const \} : \{\}\),/);
   });
 
   await test("une « sortie longue » plus courte que la sortie habituelle n'en est pas une", () => {

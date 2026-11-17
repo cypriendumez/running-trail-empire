@@ -620,7 +620,12 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
           // Méthode norvégienne : deux journées de double seuil portent TOUTE l'intensité de la
           // semaine ; la sortie longue reste facile, sans bloc ni finish progressif.
           const doubleSeuil = wp.quality.some((q) => !!q.matin);
-          const canSpice = longRunKm >= 12 && ctx.readiness.level !== "rouge" && !ctx.cycle.taper && !ctx.weekPlan.eased && !doubleSeuil;
+          // ⚠️ NI PENDANT UNE REPRISE APRÈS UN ARRÊT (17/11/2026) : le budget de qualité y est à 0
+          // ou 1, mais un bloc à allure course ou un finish progressif dans la sortie longue est
+          // une séance dure de plus, que ce budget ne compte pas. Constaté sur un coureur à gros
+          // volume : « Sortie longue progressive » posée avant la moindre sortie facile.
+          const canSpice = longRunKm >= 12 && ctx.readiness.level !== "rouge" && !ctx.cycle.taper && !ctx.weekPlan.eased && !doubleSeuil
+            && !ctx.weekPlan.repriseArret;
           const phase = ctx.macroPlan[0]?.phase ?? "Développement";
           const tagLong = (cat: "Spécifique" | "Progressif" | "Z2") => (l: Lang) =>
             [PLAN_T[l].tags["Long"], PLAN_T[l].tags[cat], PLAN_T[l].tagKm(nRaw(longRunKm, l))];
@@ -861,7 +866,9 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // des lignes droites (coût en fatigue quasi nul, entretien de la vitesse), ce qui
   // compte double une semaine sans aucune séance de qualité.
   const distances = repartirFootings(easySlots.length, easyKm, rawEasy >= 3 ? kmMinFooting : 3, easyCap);
-  const gardes = { taper: ctx.cycle.taper, semaineCourse: raceIdx >= 0, sansHistorique: ctx.noHistory, douleur };
+  const gardes = { taper: ctx.cycle.taper, semaineCourse: raceIdx >= 0, sansHistorique: ctx.noHistory, douleur,
+    // Tant que la reprise n'autorise aucune séance dure, les footings restent simples.
+    reprise: ctx.weekPlan.repriseArret === "sans-qualite" };
   easySlots.forEach((i, rang) => put(i, {
     type: "Endurance",
     title: (l) => { const v = varianteFooting(rang, easySlots.length, gardes);

@@ -1037,6 +1037,74 @@ async function profilChaotique() {
     assert.ok(longueSansArret >= 1, "précondition : sans arrêt, ce profil n'a de sortie longue sur aucun départ");
     assert.ok(qualiteRevenue >= 1, "une fois la première sortie facile courue, la séance dure ne revient sur aucun départ : la règle interdit au lieu de différer");
   });
+
+  // ⚠️ DOUBLE RELECTURE DU 17/11/2026 (ÉCHOUE ×2) : le budget de qualité ne suffit pas. Sur un coureur à gros
+  // volume, la sortie longue conservée atteint 12 km et le plan y glissait un bloc à allure course ou un
+  // finish progressif (`canSpice`, autoPlan) : une séance dure AVANT la moindre sortie facile, et une SECONDE
+  // séance dure une fois repris. La coureuse à 9 km par sortie ne pouvait pas le voir (sa sortie longue est
+  // retirée), et `DURS` ne juge que le type de séance. D'où ce second profil, et un juge qui lit le titre.
+  await testA("reprise d'un coureur à gros volume : la sortie longue reste facile, les footings restent simples", async () => {
+    const GROS = { ...CHAOS, age: 34, gender: "male", weight_kg: 66, max_hr: 190, days_per_week: 7 };
+    /** Dix semaines : 10 km du lundi au vendredi (un tempo le mercredi), 20 km le samedi et le dimanche. Rien les `trou` derniers jours. */
+    const historiqueGros = (jour: string, trou = 0): Ligne[] => {
+      const out: Ligne[] = [];
+      for (let n = trou + 1; n <= 70; n++) {
+        const d = plusJours(jour, -n), j = jourSem(d), km = j === 0 || j === 6 ? 20 : 10, dur = j === 3;
+        out.push({ user_id: "u", date: d, type: dur ? "tempo" : "easy", sport: "run", distance_km: km, duration_seconds: km * (dur ? 255 : 310),
+          elevation_gain_m: 40, avg_hr: dur ? 172 : 142, max_hr: dur ? 184 : 158, tss: dur ? 85 : km * 5 });
+      }
+      return out;
+    };
+    const tablesGros = (jour: string, workouts: Ligne[]) => ({
+      profiles: [GROS],
+      performance_baselines: [{ user_id: "u", vma_kmh: 17, max_hr: 190, tested_at: plusJours(jour, -30) }],
+      workouts,
+      notifications: [{ user_id: "u", type: "race_objective", data: { race: "Marathon test", raceDate: plusJours(jour, 70), distanceKm: 42.195, targetTime: "3h10'00", targetSeconds: 11400, targetPace: "4'30/km" } }],
+    });
+    const facile = (jour: string, n: number): Ligne => ({ user_id: "u", date: plusJours(jour, -n), type: "easy", sport: "run",
+      distance_km: 8, duration_seconds: 8 * 320, elevation_gain_m: 20, avg_hr: 140, max_hr: 152, tss: 38 });
+    const ecart = (a: string, b: string) => Math.round((Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`)) / 86400000);
+    // Une séance DURE, pour le coureur : le type, mais aussi une sortie longue à bloc d'allure ou progressive.
+    const LONGUE_EPICEE = /bloc sp[ée]cifique|progressive/i, FOOTING_VARIE = /lignes droites|progressif/i;
+    const dures = (plan: PlanDay[]) => plan.filter((d) => DURS.test(d.type) || (/Sortie longue/i.test(d.type) && LONGUE_EPICEE.test(d.title)));
+    const varies = (plan: PlanDay[]) => plan.filter((d) => d.type === "Endurance" && FOOTING_VARIE.test(d.title));
+    const liste = (j: PlanDay[]) => j.map((d) => `${d.date} ${d.title}`).join(", ");
+    let epiceeSansArret = 0, varieSansArret = 0, longueGardee = 0, deuxDuresSansArret = 0;
+    for (const jour of HORLOGES) {
+      // Le contre-poids : sans arrêt, ce coureur a bien une sortie longue épicée et des footings variés.
+      const regulier = await contexte(jour, tablesGros(jour, historiqueGros(jour)));
+      if (regulier.plan.some((d) => /Sortie longue/i.test(d.type) && LONGUE_EPICEE.test(d.title))) epiceeSansArret++;
+      if (varies(regulier.plan).length) varieSansArret++;
+      if (dures(regulier.plan).length >= 2) deuxDuresSansArret++;
+
+      // (a) PAS ENCORE REPRIS, après 8, 12 et 20 jours d'arrêt : rien de dur, footings simples.
+      for (const arret of [8, 12, 20]) {
+        const r = await contexte(jour, tablesGros(jour, historiqueGros(jour, arret - 1)));
+        const ctxt = `${jour}, ${arret} j sans courir`;
+        assert.equal(r.ctx.weekPlan.repriseArret, "sans-qualite", `${ctxt} : précondition, le plan ne reçoit pas l'état de la reprise`);
+        assert.deepEqual(liste(dures(r.plan)), "", `${ctxt} : séance dure avant la moindre sortie facile`);
+        assert.deepEqual(liste(varies(r.plan)), "", `${ctxt} : footing varié alors que le motif annonce « sans séance dure »`);
+        if (r.plan.some((d) => /Sortie longue/i.test(d.type)) && r.ctx.volume.longRunKm >= 12) longueGardee++;
+      }
+
+      // (b) REPRIS, reprise en cours (arrêt de 10 jours repris depuis 8 ; de 6 repris depuis 4 ; de 14 repris
+      // depuis 8) : UNE séance dure au plus, sortie longue épicée comprise.
+      for (const [arret, repris] of [[10, 8], [6, 4], [14, 8]] as const) {
+        const apres = Array.from({ length: Math.ceil(repris / 2) }, (_, k) => facile(jour, repris - 2 * k)).filter((w) => String(w.date) < jour);
+        const avant = historiqueGros(jour, arret + repris);
+        const premiere = apres.map((w) => String(w.date)).sort()[0], derniere = avant.map((w) => String(w.date)).sort().at(-1)!;
+        const ctxt = `${jour}, ${arret} j d'arrêt, repris depuis ${repris} j`;
+        assert.equal(ecart(premiere, derniere) - 1, arret, `${ctxt} : précondition, l'arrêt simulé ne dure pas ${arret} jours`);
+        const r = await contexte(jour, tablesGros(jour, [...avant, ...apres]));
+        assert.equal(r.ctx.weekPlan.repriseArret, "une-qualite", `${ctxt} : précondition, la reprise n'est pas en cours`);
+        assert.ok(dures(r.plan).length <= 1, `${ctxt} : ${dures(r.plan).length} séances dures (${liste(dures(r.plan))})`);
+      }
+    }
+    assert.ok(epiceeSansArret >= 1, "précondition : sans arrêt, ce coureur n'a de sortie longue épicée sur aucun départ");
+    assert.ok(varieSansArret >= 1, "précondition : sans arrêt, ce coureur n'a de footing varié sur aucun départ");
+    assert.ok(deuxDuresSansArret >= 1, "précondition : sans arrêt, ce coureur n'a jamais deux séances dures, « une au plus » ne prouve rien");
+    assert.ok(longueGardee >= 1, "précondition : pendant la reprise, la sortie longue d'au moins 12 km n'est gardée sur aucun départ, le bloc d'allure n'est pas éprouvé");
+  });
   await testA("les jours déclarés changent d'une semaine à l'autre : le plan suit ceux de CETTE semaine", async () => {
     // Semaine A : lundi, mercredi, samedi, dimanche. Semaine B : mardi, jeudi, vendredi. Même historique.
     let sorties = 0;

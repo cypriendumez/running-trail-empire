@@ -528,7 +528,8 @@ export async function autoCoachForUser(
       ...ctx.effetsDouleur,
       lignesDroites: lignesRetireesParDouleur(
         week.filter((d: PlanDay) => d.date >= from && d.type === "Endurance").length,
-        { taper: ctx.cycle.taper, semaineCourse: week.some((d: PlanDay) => d.type === "Course"), sansHistorique: ctx.noHistory },
+        { taper: ctx.cycle.taper, semaineCourse: week.some((d: PlanDay) => d.type === "Course"), sansHistorique: ctx.noHistory,
+          reprise: ctx.weekPlan.repriseArret === "sans-qualite" },
       ),
     } : null,
     consignes: ctx.consignes ?? null,
