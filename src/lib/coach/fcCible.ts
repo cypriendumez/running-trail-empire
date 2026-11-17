@@ -355,6 +355,18 @@ export function footingTropIntense(fcMoyenne: unknown, dureeSec: unknown, cibles
  *     (`referencesFc` garde le plus haut des deux) — sans autre source, ce pic seul.
  */
 export const PIC_FC_JOURS = 183;
+
+/** Les footings qui calent les cibles de FC : ceux des 60 derniers jours, aujourd'hui compris. */
+export const JOURS_FOOTINGS_FC = 60;
+/**
+ * Le premier jour (« AAAA-MM-JJ ») de la fenêtre des footings, vue depuis `maintenant` : J-59.
+ * ⚠️ UNE SEULE DÉFINITION pour le coach (`coachContext`) et pour la montre (`ciblesFcPour`, envois
+ * admin). Le coach retenait J-59 à J, la montre J-60 à J : un footing tombé pile à J-60 donnait
+ * 120-130 bpm à la montre et 136-146 au plan (@HeadCoach, 17/11/2026).
+ */
+export function premierJourFootingsFc(maintenant: number): string {
+  return new Date(maintenant - (JOURS_FOOTINGS_FC - 1) * 86400000).toISOString().slice(0, 10);
+}
 export const maxDeReference = (declaree: unknown, montre: unknown): number | null => {
   const v = (x: unknown) => { const n = Number(x); return x != null && x !== "" && Number.isFinite(n) && n > 100 && n < 240 ? n : null; };
   return v(declaree) ?? v(montre);

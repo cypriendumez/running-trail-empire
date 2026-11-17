@@ -6,7 +6,7 @@ import { GhostRunner } from "@/components/ghost-runner/GhostRunner";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { oneSessionPerSlot } from "@/lib/coach/sessions";
 import { getEffectiveVma } from "@/lib/ai/coachContext";
-import { aujourdhui, FUSEAU_DEFAUT } from "@/lib/time/fuseau";
+import { aujourdhui, FUSEAU_DEFAUT, repereDuJourCoureur } from "@/lib/time/fuseau";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
 import { langueEcran } from "@/lib/i18n/serverLang";
@@ -91,7 +91,7 @@ export default async function GhostRunnerPage() {
     // l'historique relevait les zones d'un pic d'été vieux d'un an — des cibles trop hautes.
     supabase.from("workouts")
       .select("max_hr").eq("user_id", user!.id).gt("max_hr", 150)
-      .gte("date", new Date(Date.now() - PIC_FC_JOURS * 86400000).toISOString().slice(0, 10))
+      .gte("date", new Date(repereDuJourCoureur() - PIC_FC_JOURS * 86400000).toISOString().slice(0, 10))
       .order("max_hr", { ascending: false }).limit(1),
     supabase.from("workouts")
       .select("distance_km, duration_seconds, avg_hr, type")

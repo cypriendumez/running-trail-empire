@@ -16,6 +16,7 @@ import { fcMaxConnue, seuilMesure, PIC_FC_JOURS } from "@/lib/coach/fcCible";
 import { langueDuCompte } from "@/lib/i18n/serverLang";
 import { journaliserEchec } from "@/lib/journal/echecServeur";
 import { pausesDeTrace, pointsStockes, vitesseEnMouvement } from "@/lib/activities/pauses";
+import { repereDuJourCoureur } from "@/lib/time/fuseau";
 
 /**
  * L'ANALYSE D'UNE SÉANCE — passée ou tout juste arrivée.
@@ -117,7 +118,7 @@ export async function POST(req: Request) {
     // Le pic des six derniers mois : la MÊME requête que le coach (12/11/2026). Le pic des 120
     // comparables n'avait ni fenêtre de date ni autre sport — un pic vieux d'un an comptait ici.
     supabase.from("workouts").select("max_hr").eq("user_id", user.id).not("max_hr", "is", null)
-      .gte("date", new Date(Date.now() - PIC_FC_JOURS * 86400000).toISOString().slice(0, 10))
+      .gte("date", new Date(repereDuJourCoureur() - PIC_FC_JOURS * 86400000).toISOString().slice(0, 10))
       .order("max_hr", { ascending: false }).limit(1).maybeSingle(),
   ]);
 

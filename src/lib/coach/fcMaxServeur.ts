@@ -10,6 +10,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fcMaxConnue, seuilMesure, PIC_FC_JOURS } from "@/lib/coach/fcCible";
 import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
+import { repereDuJourCoureur } from "@/lib/time/fuseau";
 
 /**
  * La FC max commune de l'athlète : la plus haute entre la déclarée (test, profil, sinon montre) et
@@ -18,13 +19,13 @@ import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
  * `undefined` = une lecture est en PANNE (journalisée une fois par jour) : ce n'est pas « FC max
  * inconnue ». L'appelant garde alors son repli d'avant plutôt que de calculer sur un trou.
  */
-export async function fcMaxDeLAthlete(sb: SupabaseClient, userId: string): Promise<number | null | undefined> {
+export async function fcMaxDeLAthlete(sb: SupabaseClient, userId: string, maintenant = repereDuJourCoureur()): Promise<number | null | undefined> {
   const [base, prof, pic] = await Promise.all([
     sb.from("performance_baselines").select("max_hr,lt_hr").eq("user_id", userId)
       .order("tested_at", { ascending: false }).limit(1).maybeSingle(),
     sb.from("profiles").select("max_hr, garmin_metrics").eq("id", userId).maybeSingle(),
     sb.from("workouts").select("max_hr").eq("user_id", userId).not("max_hr", "is", null)
-      .gte("date", new Date(Date.now() - PIC_FC_JOURS * 86400000).toISOString().slice(0, 10))
+      .gte("date", new Date(maintenant - PIC_FC_JOURS * 86400000).toISOString().slice(0, 10))
       .order("max_hr", { ascending: false }).limit(1).maybeSingle(),
   ]);
   const panne = base.error ?? prof.error ?? pic.error;

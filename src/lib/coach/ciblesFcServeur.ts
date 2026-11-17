@@ -8,9 +8,10 @@
  * une séance re-poussée depuis l'admin partirait avec d'autres battements que celle du coach.
  * Serveur uniquement : client service role.
  */
-import { referencesFc, ciblesFcAthlete, maxDeReference, fcMaxSaison, airFroid, PIC_FC_JOURS, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, type CiblesFc, type ReferencesFc, seuilMesure } from "@/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, premierJourFootingsFc, maxDeReference, fcMaxSaison, airFroid, PIC_FC_JOURS, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, type CiblesFc, type ReferencesFc, seuilMesure } from "@/lib/coach/fcCible";
 import { isRun } from "@/lib/intervals/sport";
 import { forecastWeek } from "@/lib/weather/openMeteo";
+import { repereDuJourCoureur } from "@/lib/time/fuseau";
 
 type Lecteur = { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -24,7 +25,7 @@ const jour = (ms: number) => new Date(ms).toISOString().slice(0, 10);
  * semaines l'an dernier (± 3 semaines autour de la date d'il y a un an). `null` si une lecture
  * échoue — on garde alors la référence, jamais un pic à moitié lu.
  */
-export async function picsSaison(sb: Lecteur, userId: string, maintenant = Date.now()): Promise<{ recent: number | null; anDernier: number | null } | null> {
+export async function picsSaison(sb: Lecteur, userId: string, maintenant = repereDuJourCoureur()): Promise<{ recent: number | null; anDernier: number | null } | null> {
   try {
     const pic = (depuis: string, jusque?: string) => {
       let q = sb.from("workouts").select("max_hr").eq("user_id", userId).not("max_hr", "is", null).gte("date", depuis);
@@ -50,9 +51,10 @@ export function avecSaison(refs: ReferencesFc, pics: { recent: number | null; an
   return saison != null && saison !== refs.max ? { ...refs, max: saison } : refs;
 }
 
-export async function ciblesFcPour(sb: Lecteur, userId: string, maintenant = Date.now()): Promise<CiblesFc | null> {
+export async function ciblesFcPour(sb: Lecteur, userId: string, maintenant = repereDuJourCoureur()): Promise<CiblesFc | null> {
   try {
-    const depuis = new Date(maintenant - 60 * 86400000).toISOString().slice(0, 10);
+    // Les footings des 60 derniers jours, aujourd'hui compris : la MÊME fenêtre que le coach.
+    const depuis = premierJourFootingsFc(maintenant);
     const [profil, base, fcMax, footings] = await Promise.all([
       sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
       sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle(),

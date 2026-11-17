@@ -8,10 +8,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { debutFenetreVma, PLAFOND_SEANCES_VMA } from "@/lib/dashboard/vmaAffichee";
+import { repereDuJourCoureur } from "@/lib/time/fuseau";
 
 export const COLONNES_SEANCES_VMA = "date,type,sport,distance_km,duration_seconds,avg_hr,max_hr,weather_temp_c";
 
-export function lireSeancesVma(sb: SupabaseClient, userId: string, maintenant = Date.now()) {
+export function lireSeancesVma(sb: SupabaseClient, userId: string, maintenant = repereDuJourCoureur()) {
   return sb.from("workouts").select(COLONNES_SEANCES_VMA).eq("user_id", userId)
     .gte("date", debutFenetreVma(maintenant)).order("date", { ascending: false }).limit(PLAFOND_SEANCES_VMA);
 }
