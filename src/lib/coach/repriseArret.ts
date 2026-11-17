@@ -24,6 +24,8 @@ export const ARRET_MIN_JOURS = 6;
 export const ARRET_MAX_JOURS = 28;
 /** Part du volume habituel pendant la première, puis la seconde moitié de la reprise. */
 export const PARTS_REPRISE = [0.5, 0.75] as const;
+/** Au-delà de ce nombre de jours d'arrêt, la qualité attend la SECONDE moitié de la reprise. */
+export const ARRET_LONG_JOURS = 14;
 
 export type RepriseArret = {
   /** Jours sans courir. */
@@ -76,4 +78,59 @@ export function repriseApresArret(joursCourus: readonly string[], aujourdhui: st
     return { arretJours: arret, enCours: false, joursRepris, part: partApresArret({ arretJours: arret, joursRepris }) };
   }
   return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  L'INTENSITÉ PENDANT LA REPRISE.
+//
+//  ⚠️ CONSTAT (`@Sparring`, 16/11/2026, profil « emploi du temps chaotique », rejoué par
+//  `@HeadCoach`) : la reprise ne bornait que le VOLUME. Après 6 à 25 jours sans courir, le
+//  plan posait une séance au SEUIL le jour même de la reprise sur 8 départs sur 10, et une
+//  « sortie longue » de 4 km pour une coureuse qui court 9 km par sortie.
+//
+//  LA RÈGLE (avis du directeur scientifique, 16/11/2026) :
+//   · aucune qualité tant qu'aucune sortie n'a suivi l'arrêt : on reprend par du facile.
+//     Le plan étant reconstruit après chaque séance, la qualité revient d'elle-même ;
+//   · le jour de la première sortie de reprise, pas de qualité non plus ;
+//   · après un arrêt de plus de 14 jours, la qualité attend la seconde moitié de la reprise ;
+//   · jusqu'à la fin de la reprise, UNE séance de qualité au plus, écrite courte (le volume
+//     est à 50 puis 75 %) : la même borne que la reprise d'après-course.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type QualiteReprise = {
+  /** Nombre maximal de séances de qualité dans les sept jours du plan. */
+  max: 0 | 1;
+  /** Premier jour du plan (0 = aujourd'hui) où une qualité peut être posée ; 7 = aucun. */
+  des: number;
+};
+
+/** La qualité permise pendant une reprise, ou `null` hors reprise (aucune borne). */
+export function qualitePendantReprise(r: RepriseArret | null): QualiteReprise | null {
+  if (!r) return null;
+  // Pas encore repris : aucune qualité, quel que soit le jour.
+  if (r.enCours) return { max: 0, des: 7 };
+  const des = r.arretJours > ARRET_LONG_JOURS
+    ? Math.max(0, Math.ceil(r.arretJours / 2) - r.joursRepris)
+    : r.joursRepris === 0 ? 1 : 0;
+  return des > 6 ? { max: 0, des: 7 } : { max: 1, des };
+}
+
+/**
+ * LA SORTIE HABITUELLE : la médiane des distances des sorties récentes, ou `null` quand
+ * aucune distance n'est connue (on ne l'invente pas).
+ */
+export function sortieHabituelleKm(distances: readonly (number | null | undefined)[]): number | null {
+  const v = distances.filter((d): d is number => typeof d === "number" && Number.isFinite(d) && d > 0).sort((a, b) => a - b);
+  if (!v.length) return null;
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+}
+
+/**
+ * Pendant une reprise, une « sortie longue » que le plafond de volume ramène SOUS la
+ * sortie habituelle n'est pas une sortie longue : c'est un footing, et le plan ne la nomme
+ * pas autrement. Sans sortie habituelle connue, on ne tranche pas (elle reste).
+ */
+export function sortieLongueTient(longueKm: number, habituelleKm: number | null): boolean {
+  return habituelleKm == null || longueKm >= habituelleKm;
 }

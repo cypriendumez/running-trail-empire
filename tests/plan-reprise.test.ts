@@ -23,7 +23,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
-import { repriseApresArret, partApresArret } from "../src/lib/coach/repriseArret";
+import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, ARRET_LONG_JOURS } from "../src/lib/coach/repriseArret";
+import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
+import { MOTIF_T } from "../src/lib/coach/reasonsI18n";
 import { semainesAffutage, partAffutage, phaseDeSemaine, allegementDuBloc } from "../src/lib/coach/phase";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
@@ -380,7 +382,8 @@ async function main() {
     // `semaineAllegeeDuBloc` = `allegementDuBloc(blockWeek, …)` (09/11/2026) : la même horloge.
     assert.match(codeNu("src/lib/ai/coachContext.ts"), /const deload = !taper && semaineAllegeeDuBloc && /, "la semaine allégée a quitté l'horloge du bloc (ou ignore de nouveau la veille de l'affûtage)");
     // La dose des qualités suit la même règle, et ne fait pas de pic la veille de l'affûtage.
-    assert.match(codeNu("src/lib/ai/coachContext.ts"), /const doseReduite = semaineAllegeeDuBloc \|\| repriseCetteSemaine;/, "la dose des qualités a quitté la règle de la semaine allégée");
+    // (16/11/2026 : la reprise après un ARRÊT écrit elle aussi sa séance courte.)
+    assert.match(codeNu("src/lib/ai/coachContext.ts"), /const doseReduite = semaineAllegeeDuBloc \|\| repriseCetteSemaine \|\| qualiteReprise != null;/, "la dose des qualités a quitté la règle de la semaine allégée");
     assert.match(codeNu("src/lib/ai/coachContext.ts"), /const blocDose = veilleAffutage \? Math\.min\(blockWeek, 2\) : blockWeek;[\s\S]*base \+ blocDose \* 2/, "la veille de l'affûtage fait de nouveau un pic de qualité");
     assert.match(codeNu("src/lib/ai/coachContext.ts"), /const semaineAllegeeDuBloc = allegementDuBloc\(blockWeek, weeksToRace, objective\?\.distanceKm\);/, "la semaine allégée a quitté l'horloge du bloc");
     assert.equal(ctx.volume.targetKm, ctx.macroPlan[0].volumeKm, "le plan de la semaine ne vise pas la feuille de route");
@@ -405,6 +408,82 @@ async function main() {
     assert.doesNotMatch(tot, /fentes sautées|bondissements \d|nordic curls \d/i, `sauts ou excentrique pendant la récupération : ${tot}`);
     const reprise = renfo({ ...base, recuperation: { course: "Marathon", reprise: ilYa(2), fin: ilYa(-10), phase: "reprise" } });
     assert.match(reprise, /FONDATIONS/, `renforcement de reprise : ${reprise}`);
+  });
+
+  // ⚠️ 16/11/2026 (`@Sparring`, profil 7, rejoué par `@HeadCoach`) : la reprise ne bornait que le
+  // volume ; le plan posait un seuil le jour même du retour après 6 à 25 jours sans courir.
+  console.log("\nL'INTENSITÉ PENDANT LA REPRISE — du facile d'abord, puis une seule séance, courte");
+
+  const reprise = (arretJours: number, joursRepris: number, enCours = false) => ({ arretJours, enCours, joursRepris, part: 0.5 });
+  await test("hors reprise, aucune borne ; pas encore repris, aucune qualité", () => {
+    assert.equal(qualitePendantReprise(null), null);
+    assert.deepEqual(qualitePendantReprise(reprise(8, 0, true)), { max: 0, des: 7 });
+    assert.deepEqual(qualitePendantReprise(reprise(25, 0, true)), { max: 0, des: 7 });
+  });
+
+  await test("arrêt court (14 jours au plus) : une qualité au plus, et pas le jour de la première sortie", () => {
+    assert.equal(ARRET_LONG_JOURS, 14);
+    assert.deepEqual(qualitePendantReprise(reprise(8, 0)), { max: 1, des: 1 }, "une qualité le jour même de la première sortie de reprise");
+    assert.deepEqual(qualitePendantReprise(reprise(8, 2)), { max: 1, des: 0 });
+    assert.deepEqual(qualitePendantReprise(reprise(14, 3)), { max: 1, des: 0 }, "14 jours d'arrêt comptent comme un arrêt long");
+  });
+
+  await test("arrêt long (plus de 14 jours) : la qualité attend la seconde moitié de la reprise", () => {
+    // 15 jours d'arrêt : la seconde moitié commence au 8ᵉ jour de reprise (`partApresArret` : jour ≥ 7,5).
+    assert.deepEqual(qualitePendantReprise(reprise(15, 3)), { max: 1, des: 5 });
+    assert.equal(partApresArret({ arretJours: 15, joursRepris: 3 }, 4), 0.5, "précondition : la veille est encore dans la première moitié");
+    assert.equal(partApresArret({ arretJours: 15, joursRepris: 3 }, 5), 0.75, "précondition : ce jour-là est dans la seconde moitié");
+    // 20 jours d'arrêt, repris aujourd'hui : la seconde moitié est à 10 jours, hors des sept jours du plan.
+    assert.deepEqual(qualitePendantReprise(reprise(20, 0)), { max: 0, des: 7 });
+    assert.deepEqual(qualitePendantReprise(reprise(20, 6)), { max: 1, des: 4 });
+    assert.deepEqual(qualitePendantReprise(reprise(20, 10)), { max: 1, des: 0 });
+  });
+
+  await test("le budget de qualité obéit à la reprise, sans qu'aucun plancher ne le relève", () => {
+    // Un coureur frais, objectif court dans trois semaines : tous les planchers jouent.
+    const frais: Parameters<typeof computeQualityBudget>[0] = {
+      level: "confirme", goal: "10k", phase: "SPÉCIFIQUE", noHistory: false, pains: [], seancesRecentes: 16,
+      hrvDown: false, hrvUp: false, badNight: false, acr: 1, tsb: 5, rpeHigh: false, rpeAvg: 5,
+      hardTimePct: null, fadeSec: null, plateau: false, noMaxEffort: false, runYears: 6,
+      weightLossMaxQuality: null, hasObjective: true, daysToRace: 21, isShortGoal: true,
+    };
+    const libre = computeQualityBudget(frais).qBudget;
+    assert.ok(libre >= 2, `précondition : ce coureur n'a que ${libre} qualité(s) hors reprise`);
+    assert.equal(computeQualityBudget({ ...frais, repriseArret: { max: 0 } }).qBudget, 0);
+    assert.equal(computeQualityBudget({ ...frais, repriseArret: { max: 1 } }).qBudget, 1);
+    assert.equal(computeQualityBudget({ ...frais, repriseArret: null }).qBudget, libre, "sans reprise, le budget a changé");
+    // La reprise ne RELÈVE rien : un budget déjà à zéro (aucun historique) y reste.
+    assert.equal(computeQualityBudget({ ...frais, noHistory: true, repriseArret: { max: 1 } }).qBudget, 0);
+  });
+
+  await test("le motif de la reprise dit l'intensité, dans les cinq langues", () => {
+    for (const l of Object.keys(MOTIF_T) as (keyof typeof MOTIF_T)[]) {
+      const enCours = MOTIF_T[l].repriseArret("8", "50", true, 0), une = MOTIF_T[l].repriseArret("8", "50", false, 1), aucune = MOTIF_T[l].repriseArret("20", "50", false, 0);
+      // Trois situations, trois textes : celui d'« une séance » ne sert pas à « aucune ».
+      assert.equal(new Set([enCours, une, aucune]).size, 3, `${l} : deux situations de reprise ont le même texte`);
+      assert.notEqual(MOTIF_T[l].repriseArret("20", "50", false, 1), aucune, `${l} : le texte ignore le nombre de séances permises`);
+    }
+    assert.match(MOTIF_T.fr.repriseArret("8", "50", true, 0), /sans séance dure tant que tu n'as pas refait une sortie facile/);
+    assert.match(MOTIF_T.fr.repriseArret("8", "50", false, 1), /une seule séance de qualité au plus, courte/);
+    assert.match(MOTIF_T.fr.repriseArret("20", "50", false, 0), /aucune séance dure pendant la première moitié/);
+    // Et le contexte lui passe le nombre que la règle a calculé, pas une constante.
+    const ctxSrc = codeNu("src/lib/ai/coachContext.ts");
+    assert.match(ctxSrc, /MOTIF_T\[l\]\.repriseArret\([^;]*repriseArret\.enCours, qualiteReprise\?\.max \?\? 1\)\)/);
+    // Une sortie longue retirée par la reprise n'est ni « raccourcie » ni attribuée à une douleur.
+    assert.match(ctxSrc, /const longRunEased = !longueRetiree && longRunKm < longRunPlanned;/);
+    assert.match(ctxSrc, /sortieLongue: !longueRetiree && longRunKm < longueSansDouleur \?/);
+  });
+
+  await test("une « sortie longue » plus courte que la sortie habituelle n'en est pas une", () => {
+    assert.equal(sortieHabituelleKm([9, 9, 12, 9, 6]), 9);
+    assert.equal(sortieHabituelleKm([8, 10]), 9, "médiane d'un nombre pair de sorties");
+    assert.equal(sortieHabituelleKm([]), null);
+    assert.equal(sortieHabituelleKm([null, undefined, 0, NaN]), null, "une distance inconnue devient une sortie habituelle");
+    assert.equal(sortieLongueTient(4, 9), false);
+    assert.equal(sortieLongueTient(9, 9), true, "une sortie longue égale à la sortie habituelle est retirée");
+    assert.equal(sortieLongueTient(12, 9), true);
+    // Sans sortie habituelle connue, on ne tranche pas.
+    assert.equal(sortieLongueTient(4, null), true);
   });
 
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

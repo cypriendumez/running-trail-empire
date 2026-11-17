@@ -93,6 +93,10 @@ export type QualityBudgetInput = {
   /** Consignes saisies d'après le kinésithérapeute (lib/health/consignesKine) : leur motif,
    *  et si elles excluent la qualité (pas d'intensité, ou une durée maximale par sortie). */
   consignesKine?: { motif: string; sansQualite: boolean } | null;
+  /** Reprise après un arrêt de 6 à 28 jours (`lib/coach/repriseArret`, `qualitePendantReprise`) :
+   *  le nombre maximal de séances de qualité, 0 ou 1. Son motif s'affiche à part, comme la
+   *  marche-course : c'est le cadre de la reprise, pas un allègement de plus. */
+  repriseArret?: { max: 0 | 1 } | null;
 };
 
 export type QualityBudget = {
@@ -258,6 +262,12 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   // MARCHE-COURSE : qui ne court pas encore 30 minutes d'affilée n'a rien à faire d'une
   // séance de VMA ou de seuil. En dernier, comme la récupération : aucun plancher ne la relève.
   if (i.marcheCourse) qBudget = 0;
+
+  // REPRISE APRÈS UN ARRÊT (16/11/2026) : la reprise ne bornait que le volume, et le plan
+  // posait un seuil le jour même du retour après 6 à 25 jours sans courir. En dernier, comme
+  // la récupération d'après-course : un coureur frais déclencherait sinon le plancher
+  // « jamais zéro qualité ». Elle ne relève rien : un budget déjà plus bas y reste.
+  if (i.repriseArret) qBudget = Math.min(qBudget, i.repriseArret.max);
 
   // CONSIGNES DU KINÉSITHÉRAPEUTE (10/11/2026) : c'est le professionnel qui fixe le cadre ;
   // aucun plancher ne le relève. Une durée maximale par sortie exclut aussi la qualité : un

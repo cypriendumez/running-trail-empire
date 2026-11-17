@@ -162,7 +162,11 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    plan pose une séance au seuil le jour même sur 8 départs sur 10, et une « sortie longue » de 4 km : la reprise
    (`repriseArret`) ne borne que le volume, jamais l'intensité. Avis de `@HeadCoach` : aucune qualité tant que le
    coureur n'a pas couru au moins une sortie facile depuis l'arrêt ; ne pas appeler « sortie longue » une sortie
-   plus courte qu'une sortie habituelle. Non corrigé. Décision de Cyprien (Niveau 2).
+   plus courte qu'une sortie habituelle. Correction écrite le 17/11 en session, à la demande de Cyprien, sur la
+   branche `fix/reprise-sans-qualite` (`qualitePendantReprise` dans `lib/coach/repriseArret`) : aucune qualité avant
+   une sortie facile, une seule ensuite, la seconde moitié de la reprise après plus de 14 jours d'arrêt. Le seuil
+   de 14 jours et la borne « une seule séance » sont des choix de la session, à confirmer par Cyprien.
+   À fusionner et à déployer sur GO de Cyprien.
 
 ## Résolues le 13/11/2026
 
