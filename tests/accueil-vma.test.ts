@@ -47,7 +47,7 @@ test("la carte suit la forme : un effort de plus de 120 jours ne compte plus", (
 test("la page transmet la source, et la carte l'affiche", () => {
   // Depuis le 04/10/2026, le calcul vit dans lib/dashboard/vmaAffichee (partagé avec la
   // page détaillée) : c'est LÀ que la VMA et sa source doivent venir du même effort.
-  assert.match(codeNu("src/lib/dashboard/vmaAffichee.ts"), /fromRuns: effort\?\.vma \?\? null/, "la VMA et sa source viendraient de deux recherches différentes");
+  assert.match(codeNu("src/lib/dashboard/vmaAffichee.ts"), /fromRuns: seancesVma\?\.vma \?\? null/, "la VMA et sa source viendraient de deux recherches différentes");
   const page = codeNu("src/app/dashboard/page.tsx");
   assert.match(page, /const \{ vma: currentVma, source: sourceVma \} = vmaAffichee\(\{/);
   assert.match(page, /sourceVma=\{sourceVma\}/);

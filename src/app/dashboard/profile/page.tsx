@@ -7,11 +7,12 @@ import { TYPE_ETAT_ABO, litEtatAbo } from "@/lib/billing/etatAbonnement";
 import { effectiveVma } from "@/lib/running/fitness";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { isRun } from "@/lib/intervals/sport";
-import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
+import { vmaDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
 import { langueEcran } from "@/lib/i18n/serverLang";
 import { lireSeancesVma } from "@/lib/dashboard/seancesVma";
+import { testVmaAEviter } from "@/lib/health/testVmaAEviter";
 
 export const metadata = { title: "Mon profil" };
 
@@ -67,12 +68,14 @@ export default async function ProfilePage() {
   // MÊME calcul que le coach (lib/running/fitness → effectiveVma). Cette chaîne-ci
   // ignorait la VO2max de la montre : le profil affichait une VMA que le plan ne
   // partageait pas. `vmaSource` dit laquelle des sources a gagné.
+  // Le test VMA (6 min à fond) n'est pas proposé à qui en est exempté : la règle du bandeau du test.
+  const testVmaExclu = await testVmaAEviter(supabase, user!.id);
   const { vma: estimatedVma, source: vmaSource } = effectiveVma({
     paceCurveBest,
     garminVo2: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null,
-    // LA lecture des efforts (`effortDesSeances`, 12/11/2026) : celle du coach et de chaque écran —
+    // LA VMA « séances » (`vmaDesSeances`, 17/11/2026 : l'effort réel, sinon l'estimation) : celle du coach et de chaque écran —
     // les courses des 120 derniers jours (`lireSeancesVma`, 13/11/2026), FC max commune, chaleur.
-    fromRuns: effortDesSeances(rw, fcMaxCommune)?.vma ?? null,
+    fromRuns: vmaDesSeances(rw, fcMaxCommune)?.vma ?? null,
   });
 
   // ── STATISTIQUES PAR SPORT ────────────────────────────────────────────────────
@@ -120,7 +123,7 @@ export default async function ProfilePage() {
       shoes={shoes ?? []}
       goals={goals ?? []}
       stats={{ kmYear, kmMonth, sessionsMonth, longestRun, streak, bySport }}
-      fitness={{ estimatedVma, vmaSource, fcMax: fcMaxZones, fcMaxPanne, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
+      fitness={{ estimatedVma, vmaSource, testVmaExclu, fcMax: fcMaxZones, fcMaxPanne, garminVo2max: Number((profile as { garmin_vo2max?: number | null } | null)?.garmin_vo2max) || null, garmin: ((profile as { garmin_metrics?: Record<string, number | null> | null } | null)?.garmin_metrics) ?? null }}
       userId={user!.id}
       catalogue={indexLeger()}
       etatAbo={litEtatAbo((ligneAbo as { data?: unknown } | null)?.data ?? null)}

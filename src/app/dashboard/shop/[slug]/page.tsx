@@ -10,7 +10,7 @@ import { evaluer } from "@/lib/shop/pourToi";
 import { construireProfil } from "@/lib/shop/profilAthlete";
 import { offresPour, meilleure, type Offre } from "@/lib/shop/offres";
 import { effectiveVma } from "@/lib/running/fitness";
-import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
+import { vmaDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
@@ -54,9 +54,9 @@ export default async function ModelePage({ params }: { params: Promise<{ slug: s
     vmaStored: baseRes.data?.vma_kmh ?? null,
     paceCurveBest: (profilRes.data?.pace_curve as { best?: { m: number; sec: number }[] } | null)?.best ?? null,
     garminVo2: profilRes.data?.garmin_vo2max ?? null,
-    // LA lecture des efforts (`effortDesSeances`, 12/11/2026), celle du coach : avant, 200 séances TOUS
+    // LA VMA « séances » (`vmaDesSeances`, 17/11/2026 : l'effort réel, sinon l'estimation), celle du coach : avant, 200 séances TOUS
     // sports sans aucun tri — la VMA de la recommandation pouvait venir d'une sortie vélo.
-    fromRuns: effortDesSeances((seancesVmaRes.data ?? []) as never, fcMaxVma)?.vma ?? null,
+    fromRuns: vmaDesSeances((seancesVmaRes.data ?? []) as never, fcMaxVma)?.vma ?? null,
   });
   const profil = construireProfil({
     seances, paires: pairesRes.data ?? [],

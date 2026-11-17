@@ -152,7 +152,7 @@ async function main() {
     assert.match(ac, /if \(eApt\) \{\s*await journaliserEchecUneFois[\s\S]{0,200}return \{ processed: false, reason: "aptitude illisible" \};/, "une panne de lecture passerait pour « rien à signaler »");
     // L'autre voie vers le test : le bandeau « Fais ton test VMA » du tableau de bord (relecture, tour 2).
     const dash = codeOf("src/app/dashboard/page.tsx");
-    assert.match(dash, /const sansTestVma = !!eApt \|\| avisAttendu\(lireAptitude\(/, "le bandeau ne lit plus le questionnaire (ou une panne l'affiche)");
+    assert.match(dash, /const sansTestVma = testVmaAEviterDe\(\{ data: lignesApt, error: eApt \}, etatCoachRes\);/, "le bandeau ne lit plus le questionnaire (ou une panne l'affiche)");
     assert.match(dash, /<TestVmaBanner measured=\{vmaMesuree \|\| estFondateur \|\| enMarcheCourse \|\| sansTestVma\} \/>/, "le bandeau du test VMA s'affiche malgré l'avis attendu");
     // Et le plan qu'il reçoit à la place : bâti sans VMA ni historique, sans aucune intensité.
     const ctx = await buildAthleteContext(fauxClient({ profiles: [PROFIL], performance_baselines: [], workouts: [], notifications: [APT(["poitrine"])] }), "u");
@@ -167,7 +167,9 @@ async function main() {
     const bento = codeOf("src/components/dashboard/BentoDashboard.tsx");
     assert.match(bento, /const displaySession = coachKey \?\? \(sansCourse \? sessionAttente : aiSession \?\? keySession\);/, "le repli peut de nouveau proposer une séance");
     assert.match(bento, /if \(sansCourse\) return;/, "l'IA est de nouveau appelée pendant l'attente");
-    assert.match(codeOf("src/app/dashboard/page.tsx"), /sansCourse=\{sansTestVma\}/, "le tableau de bord ne transmet plus l'attente");
+    const dashAttente = codeOf("src/app/dashboard/page.tsx");
+    assert.match(dashAttente, /const avisMedicalAttendu = avisMedicalEnAttenteDe\(\{ data: lignesApt, error: eApt \}\);/, "l'attente ne lit plus le questionnaire (ou une panne passe pour « rien à signaler »)");
+    assert.match(dashAttente, /sansCourse=\{avisMedicalAttendu\}/, "le tableau de bord ne transmet plus l'attente");
     // La route elle-même refuse (l'écran n'est pas la seule porte) ; une panne vaut refus.
     assert.match(codeOf("src/app/api/ai/session/route.ts"), /if \(eApt \|\| avisAttendu\(lireAptitude\(/, "la route propose une séance malgré l'avis attendu");
     // La troisième voie : le chat des cours reçoit le dossier et propose des séances (relecture).

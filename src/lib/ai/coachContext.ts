@@ -1,9 +1,9 @@
 import type { createClient } from "@/lib/supabase/server";
 import { sansAllureInconnue } from "@/lib/coach/allureInconnue";
-import { picsSaison, avecSaison } from "@/lib/coach/ciblesFcServeur";
+import { picsSaison, avecSaison, lireFootingsFc, fcDesFootings } from "@/lib/coach/ciblesFcServeur";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
-import { effortDesSeances, acclimatationDesSeances } from "@/lib/dashboard/vmaAffichee";
-import { referencesFc, ciblesFcAthlete, premierJourFootingsFc, footingTropIntense, maxDeReference, fcMaxConnue, estSortieFacile, PART_FC_FACILE, PART_FC_DURE, fcMaxPourEfforts, airFroid, PIC_FC_JOURS, type CiblesFc, seuilMesure } from "@/lib/coach/fcCible";
+import { vmaDesSeances, acclimatationDesSeances } from "@/lib/dashboard/vmaAffichee";
+import { referencesFc, ciblesFcAthlete, premierJourFootingsFc, estTypeDur, footingTropIntense, maxDeReference, fcMaxConnue, estSortieFacile, PART_FC_FACILE, PART_FC_DURE, fcMaxPourEfforts, airFroid, PIC_FC_JOURS, type CiblesFc, seuilMesure } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { menuSelonDenivele, preferenceDenivele } from "@/lib/coach/denivele";
@@ -164,38 +164,9 @@ function computeLoad(workouts: Wk[], now: number) {
   return { ctl, atl, tsb: ctl - atl, acr: ctl > 0 ? atl / ctl : 0 };
 }
 
-const isHardType = (t?: string | null) => {
-  const x = String(t ?? "").toLowerCase();
-  if (/easy|recovery|long|trail|endurance|footing|récup|fond|marche/.test(x)) return false;
-  return /interval|vma|tempo|seuil|race|hill|fractionn|côte|cote|sprint|vif|fartlek|threshold/.test(x);
-};
+// UNE définition pour le coach et la montre (`estTypeDur`, lib/coach/fcCible, 17/11/2026).
+const isHardType = (t?: string | null) => estTypeDur(t);
 const r1 = (n: number) => Math.round(n * 10) / 10;
-
-// Estime une VMA quand aucun test n'est enregistré : meilleure vitesse soutenue récente
-// (4–18 km, ≤ 45 j), calibrée par l'intensité FC réelle de la séance. Repli INDISPENSABLE
-// — sans VMA, tout le coaching se dégrade (niveau mal classé, aucune allure, intensité non dosée).
-function estimateVmaFromRuns(workouts: Wk[], fcMaxEst: number | null, now: number): number | null {
-  let best = 0;
-  for (const w of workouts) {
-    const km = w.distance_km ?? 0, sec = w.duration_seconds ?? 0;
-    if (km < 4 || km > 18 || sec <= 0) continue;
-    if (now - new Date(w.date).getTime() > 45 * 86400000) continue;
-    const spd = km / (sec / 3600);
-    if (!(spd > 6) || spd > 25) continue; // garde-fous : données aberrantes
-    // Fraction de VMA déduite de l'intensité (% FCmax) ; sinon hypothèse modérée prudente.
-    let frac = 0.80;
-    const hr = w.avg_hr ?? null;
-    if (hr && fcMaxEst) {
-      const pct = hr / fcMaxEst;
-      // % de VMA soutenu selon l'intensité FC — calibration CONSERVATRICE (mieux vaut sous-estimer
-      // la VMA que prescrire trop vite). Ex : un effort continu à ~90 % FCmax ≈ 90 % VMA.
-      frac = pct >= 0.95 ? 0.93 : pct >= 0.90 ? 0.90 : pct >= 0.85 ? 0.86 : pct >= 0.80 ? 0.81 : pct >= 0.75 ? 0.77 : 0.72;
-    }
-    const vmaImplied = spd / frac;
-    if (vmaImplied > best) best = vmaImplied;
-  }
-  return best > 0 ? Math.round(best * 10) / 10 : null;
-}
 
 // Reclasse une séance selon l'allure/FC RÉELLES (les imports intervals.icu arrivent souvent
 // TOUS en « easy ») → l'IA lit une histoire d'entraînement juste, pas une suite de faux footings.
@@ -497,7 +468,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // `Date.now()`, jamais à `now`, qui peut être jusqu'à 24 h dans le futur.
   const todayStr = aujourdhui(FUSEAU_DEFAUT);
   const now = finDuJourCoureur(todayStr);
-  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes, lactateRes, planifieesRes, seancesVmaRes] = await Promise.all([
+  const [profileRes, baseRes, hrvRes, sleepRes, woRes, fbRes, painRes, shoeRes, objRes, csRes, wlRes, histRes, sleepDatesRes, hrvDatesRes, formeRes, fcMaxRes, lactateRes, planifieesRes, seancesVmaRes, footingsRes] = await Promise.all([
     sb.from("profiles").select("*").eq("id", userId).single(),
     sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).single(),
     objectifSeul || essentielle ? nonLu() : sb.from("hrv_data").select(COLONNES_VFC).eq("user_id", userId).order("date", { ascending: false }).limit(30),
@@ -567,6 +538,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // Les séances de LA VMA : la lecture unique des écrans (120 jours, 13/11/2026). `fetchWorkouts`
     // s'arrête à 60 séances : 7 semaines de courses chez un coureur qui fait aussi du vélo.
     objectifSeul ? nonLu() : lireSeancesVma(sb, userId, now),
+    // Les footings qui calent les cibles de FC : LA lecture de la montre (`lireFootingsFc`, 60 jours).
+    // Les 60 dernières séances tous sports n'en montraient aucun à un coureur qui fait du vélo.
+    objectifSeul ? nonLu() : lireFootingsFc(sb, userId, now),
   ]);
 
   // Palier gratuit : le profil réduit à ce qui est DÉCLARÉ, et du test de VMA, la VMA seule
@@ -592,6 +566,14 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     await journaliserEchecUneFois(null, { source: "coach-vma", userId, message: `Séances de la VMA illisibles, repli sur les 60 dernières : ${e.code ?? "?"} ${e.message}` });
   }
   const seancesVma = seancesVmaRes.error ? workouts : ((seancesVmaRes.data ?? []) as unknown as Wk[]);
+  if (footingsRes.error) {
+    const e = footingsRes.error as { code?: string; message: string };
+    console.error("[coach] footings illisibles, repli sur les 60 dernières séances :", e.message);
+    await journaliserEchecUneFois(null, { source: "coach-footings", userId, message: `Footings illisibles, repli sur les 60 dernières séances : ${e.code ?? "?"} ${e.message}` });
+  }
+  // Les FC des footings (`fcDesFootings`, le même filtre que la montre). En panne : les séances déjà
+  // lues, dans la même fenêtre — moins complet, jamais inventé, et la panne est journalisée.
+  const fcFootings = fcDesFootings((footingsRes.error ? workouts : (footingsRes.data ?? [])) as Parameters<typeof fcDesFootings>[0], now);
   // Palier gratuit : du formulaire d'après-séance, ce que l'athlète DÉCLARE et qui le protège
   // — la douleur signalée, et le RESSENTI (RPE) depuis le 30/10/2026 (Cyprien : « ressenti lu
   // par le plan gratuit »). Un « 9/10, épuisé » qui laissait le lendemain inchangé était un
@@ -746,9 +728,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
       repos: num(b?.resting_hr) ?? num(p?.resting_hr) ?? num((((p as Record<string, unknown> | null)?.garmin_metrics) as Record<string, unknown> | null)?.restingHR),
       seuil: seuilMesure(b?.lt_hr, gmFc?.lthr),
     }), picsDeSaison, airFroid(forecast)),
-    workouts.filter((w) => isRun(w.sport) && !isHardType(w.type) && (num(w.duration_seconds) ?? 0) >= 20 * 60
-      && String(w.date).slice(0, 10) >= premierJourFootingsFc(now))
-      .map((w) => num(w.avg_hr)).filter((v): v is number => v != null),
+    fcFootings,
   );
   // Une séance est « dure » si son TYPE le dit OU si la FC révèle un effort élevé (≥ 90 % FCmax).
   // ⚠️ `isHardType` ne suffit PAS : mesuré sur 60 séances de ce compte, intervals.icu
@@ -911,7 +891,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // des séances reste un garde-fou au lieu d'aucun tri.
     // LA lecture des efforts, la même que chaque écran (`effortDesSeances`, 12/11/2026) : les séances des
     // 120 derniers jours (13/11/2026), course seulement, FC max commune, acclimatation à la chaleur.
-    fromRuns: objectifSeul ? null : effortDesSeances(seancesVma as never, fcMaxEst, now)?.vma ?? estimateVmaFromRuns(runs, fcMaxEst, now),
+    // 17/11/2026 : `vmaDesSeances`, la MÊME que les écrans et `getEffectiveVma` — l'effort réel, sinon
+    // l'estimation des sorties récentes. L'estimation était le repli du seul coach (Cyprien : « l'afficher partout »).
+    fromRuns: objectifSeul ? null : vmaDesSeances(seancesVma as never, fcMaxEst, now)?.vma ?? null,
   });
   const vmaIsEst = vmaSource !== "test" && vma != null;
 
@@ -2884,14 +2866,16 @@ export async function getEffectiveVma(sb: SupabaseClient, userId: string): Promi
   if (ePanne) throw new Error(`VMA illisible : ${ePanne.code ?? "?"} ${ePanne.message}`);
   const prof = profRes.data as { garmin_vo2max?: number | null; pace_curve?: { best?: { m: number; sec: number }[] } | null } | null;
   // Course à pied uniquement : une sortie vélo produirait une VMA fantaisiste.
-  // LA lecture des efforts (`effortDesSeances`) : celle du coach et de chaque écran, chaleur comprise.
-  const effort = effortDesSeances((woRes.data ?? []) as never, await fcMaxDeLAthlete(sb, userId));
+  // LA VMA « séances » (`vmaDesSeances`) : celle du coach et de chaque écran, chaleur comprise —
+  // l'effort réel, sinon l'estimation des sorties récentes. Sans elle, un coureur sans effort maximal
+  // récent recevait des envois admin sans allures et une course A sans chrono (17/11/2026).
+  const seances = vmaDesSeances((woRes.data ?? []) as never, await fcMaxDeLAthlete(sb, userId));
   // EXACTEMENT le calcul du coach — c'est la même fonction, pas « la même logique »
   // recopiée. Les deux ne peuvent donc plus diverger, ce qui était le cas ici.
   return effectiveVma({
     vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
     paceCurveBest: prof?.pace_curve?.best,
     garminVo2: Number(prof?.garmin_vo2max) || null,
-    fromRuns: effort?.vma ?? null,
+    fromRuns: seances?.vma ?? null,
   }).vma;
 }

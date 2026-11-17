@@ -42,6 +42,8 @@ export type DonneesFiche = {
   sommeil: { date: string; sleep_score: number | null; total_sleep_min: number | null }[];
   charge: SeanceCharge[];
   vma: { vma: number; source: SourceVma | null };
+  /** Test VMA à éviter (`testVmaAEviter` : avis médical attendu, marche-course, lecture en panne). */
+  testVmaExclu?: boolean;
   objectif: { race: string; distanceKm: number; raceDate: string; targetSeconds: number; targetTime: string } | null;
   plan: { start_date?: string | null; created_at?: string | null; race_date?: string | null } | null;
   fcRepos: number | null;
@@ -217,6 +219,7 @@ function vitesse(d: DonneesFiche): Fiche {
   const src = d.vma.source;
   const libelleSource = src?.type === "seances" && src.date ? t.srcSeances(dateCourte(L, src.date), nb(L, src.km ?? 0, 1))
     : src?.type === "test" && src.date ? t.srcTest(dateCourte(L, src.date))
+    : src?.type === "estimee" ? t.srcEstimee
     : src?.type === "courbe" ? t.srcCourbe : src?.type === "vo2max" ? t.srcVo2 : t.srcAucune;
   const vdot = vdotDeVma(vma) ?? 0;
   const socle = socleDesSeances(d.seances);
@@ -256,7 +259,7 @@ function vitesse(d: DonneesFiche): Fiche {
         ? t.cSocle(nb(L, socle.sortieLongueKm ?? 0, 1), nb(L, socle.volumeHebdoKm ?? 0), String(pret), `+${nb(L, penalite, 1)} %`)
         : t.cSocleInconnu,
     ],
-    conseils: [...(src?.type !== "test" ? [t.conseilTest] : []), t.conseilProgres, ...(pret < 100 ? [t.conseilLong] : [])],
+    conseils: [...(src?.type !== "test" && src?.type !== "estimee" && !d.testVmaExclu ? [t.conseilTest] : []), t.conseilProgres, ...(pret < 100 ? [t.conseilLong] : [])],
     liens: [{ libelle: T.commun.voirPlan, href: "/dashboard/calendrier" }, { libelle: T.commun.voirCours, href: "/dashboard/cours" }],
   };
 }

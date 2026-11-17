@@ -5,7 +5,7 @@ import { effectiveVma } from "@/lib/running/fitness";
 import { robustWeeklyKm } from "@/lib/running/volume";
 import { niveauDeVma } from "@/lib/plans/catalogue";
 import { PlansView } from "./PlansView";
-import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
+import { vmaDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
 import { langueEcran } from "@/lib/i18n/serverLang";
@@ -51,9 +51,9 @@ export default async function PlansPage() {
     vmaStored: Number((baseRes.data as { vma_kmh?: number } | null)?.vma_kmh) || null,
     paceCurveBest: ((profRes.data as { pace_curve?: { best?: { m: number; sec: number }[] } | null } | null)?.pace_curve)?.best,
     garminVo2: Number((profRes.data as { garmin_vo2max?: number } | null)?.garmin_vo2max) || null,
-    // LA lecture des efforts (`effortDesSeances`, 12/11/2026) : celle du coach et de chaque écran —
+    // LA VMA « séances » (`vmaDesSeances`, 17/11/2026 : l'effort réel, sinon l'estimation) : celle du coach et de chaque écran —
     // les courses des 120 derniers jours (`lireSeancesVma`, 13/11/2026), FC max commune, chaleur.
-    fromRuns: effortDesSeances((seancesVmaRes.data ?? []) as never, fcMaxVma)?.vma ?? null,
+    fromRuns: vmaDesSeances((seancesVmaRes.data ?? []) as never, fcMaxVma)?.vma ?? null,
   }).vma;
 
   // `null` si l'historique ne permet pas de conclure : la vue le dit alors franchement,

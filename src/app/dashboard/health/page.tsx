@@ -20,7 +20,7 @@ import { chargerDonnees } from "@/lib/indicateurs/donnees";
 import { TYPE_BILAN } from "@/lib/health/bilanMatin";
 import { donneesRecup, bilansRecents, type DonneesRecup } from "@/lib/health/recuperation";
 import { TYPE_APTITUDE, lireAptitude, avisAttendu, aRenouveler } from "@/lib/health/aptitude";
-import { effortDesSeances } from "@/lib/dashboard/vmaAffichee";
+import { vmaDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
@@ -82,9 +82,9 @@ export default async function HealthPage() {
       vmaStored: baseRes.data?.vma_kmh ?? null,
       paceCurveBest: (profilRes.data?.pace_curve as { best?: { m: number; sec: number }[] } | null)?.best ?? null,
       garminVo2: profilRes.data?.garmin_vo2max ?? null,
-      // LA lecture des efforts (`effortDesSeances`, 12/11/2026), celle du coach : avant, 200 séances TOUS
+      // LA VMA « séances » (`vmaDesSeances`, 17/11/2026 : l'effort réel, sinon l'estimation), celle du coach : avant, 200 séances TOUS
       // sports sans aucun tri — un coureur lisait ici 29,3 km/h (un vélo) quand le coach disait 19,1.
-      fromRuns: effortDesSeances((seancesVmaRes.data ?? []) as never, fcMaxVma)?.vma ?? null,
+      fromRuns: vmaDesSeances((seancesVmaRes.data ?? []) as never, fcMaxVma)?.vma ?? null,
     });
     coursesNutrition = coursesPourNutrition(
       objRes.data?.data as Parameters<typeof coursesPourNutrition>[0],
