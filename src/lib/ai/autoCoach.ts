@@ -13,6 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
 import { buildWeekPlan, consignesSurPlan, avecCourseCEcartee, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
+import { effortMaximalInterdit } from "@/lib/health/effortMaximal";
 import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
 import { pushIntervalsWorkout, supprimerIntervalsWorkout, buildWorkoutDescription, fcMaxMontre, ensureRunThresholdPace, litMontre } from "@/lib/watch/intervals";
 import { avecFcMaxMontre } from "@/lib/coach/fcCible";
@@ -161,7 +162,7 @@ export async function autoCoachForUser(
   //  Un compte en consultation garde tout ce qu'il a déjà : historique, courses,
   //  trophées, série, et le plan qui était en place. Il ne reçoit simplement plus de
   //  NOUVELLE prescription. On ne détruit rien, on cesse de produire.
-  const { data: profilAcces, error: eAcces } = await admin.from("profiles").select(`${COLONNES_ACCES}, email, preferred_language`).eq("id", userId).maybeSingle();
+  const { data: profilAcces, error: eAcces } = await admin.from("profiles").select(`${COLONNES_ACCES}, email, preferred_language, health_conditions`).eq("id", userId).maybeSingle();
   // ⚠️ UNE PANNE N'EST NI « COMPTE GRATUIT » NI « PAS LE FONDATEUR » (08/11/2026) : sans ce
   // profil, la formule tombait au plus bas et la suite prescrivait le test VMA. On ne touche
   // à rien : le plan en place reste, le passage suivant réessaie.
@@ -222,7 +223,12 @@ export async function autoCoachForUser(
     return { processed: false, reason: "aptitude illisible" };
   }
   const avisMedicalAttendu = avisAttendu(lireAptitude(((lignesApt ?? []) as { data?: unknown }[])[0]?.data));
-  if (!vmaMesuree && !estFondateur && !avisMedicalAttendu) {
+  // ⚠️ NI POUR UN ANTÉCÉDENT QUI INTERDIT L'EFFORT MAXIMAL (cardiaque, covid long, grossesse ; 19/11/2026) :
+  // le test est un effort maximal. Comme le fondateur, il reçoit son plan sans test : allures au ressenti
+  // tant que la VMA manque, une qualité au plus (le seuil bas). Seul un avis médical lèverait l'interdit,
+  // et Pacevo ne le recueille pas pour ces antécédents.
+  const effortMaxInterdit = effortMaximalInterdit((profilAcces as { health_conditions?: unknown } | null)?.health_conditions);
+  if (!vmaMesuree && !estFondateur && !avisMedicalAttendu && !effortMaxInterdit) {
     // ⚠️ SAUF EN MARCHE-COURSE. « Cours 6 minutes À FOND » était le premier effort de
     // coureur d'une personne qui ne court pas encore 30 minutes d'affilée (Cyprien,
     // 05/11/2026). Son programme ne dépend d'aucune allure : il démarre sans test, et le
@@ -537,6 +543,7 @@ export async function autoCoachForUser(
         const deuxieme = footings[1]?.date;
         return lignesRetireesParDouleur(footings.length,
           { taper: ctx.cycle.taper, semaineCourse: week.some((d: PlanDay) => d.type === "Course"), sansHistorique: ctx.noHistory,
+            effortMax: !!ctx.effortMaximalInterdit,
             reprise: lignesRetireesParReprise({ reprise: !!ctx.weekPlan.repriseArret, qualiteDes: ctx.weekPlan.qualiteDes ?? 0,
               deuxiemeFootingJour: deuxieme == null ? null : ecartJours(deuxieme, today) }) });
       })(),

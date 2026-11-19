@@ -51,9 +51,13 @@ export type TextesPlan = {
   courseWhy: (chrono: string | null) => string;
   veilleTitre: string;
   veilleDetail: string;
+  /** La veille SANS lignes droites : antécédent qui interdit l'effort maximal (19/11/2026). */
+  veilleDetailSansLignes: string;
   veilleWhy: string;
   avantVeilleTitre: string;
   avantVeilleDetail: string;
+  /** L'avant-veille SANS les 4×30 s à l'allure de course : antécédent qui interdit l'effort maximal (19/11/2026). */
+  avantVeilleDetailSansAllure: string;
   avantVeilleWhy: string;
   reposCourseTitre: string;
   reposCourseDetail: string;
@@ -115,7 +119,8 @@ export type TextesPlan = {
   qualiteTitreSpecifique: string;
   /** Suffixe « (allégée) » — appliqué au titre, jamais deux fois. */
   suffixeAllegee: string;
-  qualiteDetail: (echauff: number, corps: string, calme: number, affutage: boolean, allegee: boolean) => string;
+  /** `sansLignes` : sans les lignes droites de l'échauffement (antécédent qui interdit l'effort maximal). */
+  qualiteDetail: (echauff: number, corps: string, calme: number, affutage: boolean, allegee: boolean, sansLignes?: boolean) => string;
   qualiteWhySauvee: (origineCross: string) => string;
   /** Suffixe « (reprise) » : la séance qui suit une course courue (`lib/coach/apresCourse`). */
   suffixeReprise: string;
@@ -222,9 +227,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseWhy: (t) => (t ? `C'est le jour. Tout le bloc a été construit pour ce chrono de ${t}. Fais confiance à ta préparation et tiens ton allure.` : "C'est le jour. Fais confiance à ta préparation."),
     veilleTitre: "Déblocage — veille de course",
     veilleDetail: "20 min de footing très facile FC Z1 + 3 lignes droites de 80 m à l'allure de course. Rien de plus : on réveille les jambes, on ne les fatigue pas.",
+    veilleDetailSansLignes: "20 min de footing très facile FC Z1, rien d'autre. On réveille les jambes, on ne les fatigue pas.",
     veilleWhy: "La forme se construit avant, pas la veille. Une séance de plus ne t'apportera rien et peut te coûter la course.",
     avantVeilleTitre: "Avant-veille de course",
     avantVeilleDetail: "30 min de footing facile FC Z1-Z2, éventuellement 4×30 s à l'allure de course pour rester tonique.",
+    avantVeilleDetailSansAllure: "30 min de footing facile FC Z1-Z2, rien d'autre.",
     avantVeilleWhy: "On garde le contact avec l'allure sans entamer la fraîcheur.",
     reposCourseTitre: "Repos post-course",
     reposCourseDetail: "Repos complet. Marche, étirements doux, hydratation et alimentation soignées.",
@@ -285,7 +292,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     dsTitreMatin: "Double seuil · matin",
     dsTitreSoir: "Double seuil · soir",
     dsWhy: "Méthode norvégienne : deux séances au seuil le même jour, toutes deux SOUS le seuil — c'est le cumul qui construit le seuil, pas l'intensité. Elle se pilote normalement au lactate ; sans lactatemètre, l'erreur classique est de courir trop vite et d'en faire deux séances dures. Tiens l'allure écrite, même si tu te sens bien.",
-    qualiteDetail: (e, c, k, taper, all) => `Échauffement ${e} min progressif FC Z1→Z2 + 3 à 5 lignes droites de 80 m → Corps : ${c} → Retour au calme ${k} min FC Z1.${taper ? " ⚠️ Affûtage : garde l'intensité mais coupe le nombre de répétitions d'un tiers." : ""}${all ? " ⚠️ Version allégée : coupe le nombre de répétitions d'un tiers et garde l'allure. On préserve le stimulus, pas le volume." : ""}`,
+    qualiteDetail: (e, c, k, taper, all, sl) => `Échauffement ${e} min progressif FC Z1→Z2${sl ? "" : " + 3 à 5 lignes droites de 80 m"} → Corps : ${c} → Retour au calme ${k} min FC Z1.${taper ? " ⚠️ Affûtage : garde l'intensité mais coupe le nombre de répétitions d'un tiers." : ""}${all ? " ⚠️ Version allégée : coupe le nombre de répétitions d'un tiers et garde l'allure. On préserve le stimulus, pas le volume." : ""}`,
     qualiteWhySauvee: (o) => `Ta charge récente est très au-dessus de ta charge de fond${o} — mais ton échéance approche et une semaine sans la moindre allure spécifique se paie le jour J. Donc : UNE séance, raccourcie, plutôt que zéro. Si les sensations ne viennent pas à l'échauffement, transforme-la en footing sans culpabiliser.`,
     qualiteWhy: "La séance de qualité de ton bloc, calée sur ta VMA et ton objectif. C'est elle qui te fait progresser.",
 
@@ -351,9 +358,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseWhy: (t) => (t ? `This is the day. The whole block was built for that ${t}. Trust your preparation and hold your pace.` : "This is the day. Trust your preparation."),
     veilleTitre: "Shakeout — day before the race",
     veilleDetail: "20 min of very easy running at HR Z1 + 3 strides of 80 m at race pace. Nothing more: we wake the legs up, we do not tire them.",
+    veilleDetailSansLignes: "20 min of very easy running at HR Z1, nothing else. We wake the legs up, we do not tire them.",
     veilleWhy: "Fitness is built beforehand, not the day before. One more session will bring you nothing and can cost you the race.",
     avantVeilleTitre: "Two days before the race",
     avantVeilleDetail: "30 min of easy running at HR Z1-Z2, optionally 4×30 s at race pace to stay sharp.",
+    avantVeilleDetailSansAllure: "30 min of easy running at HR Z1-Z2, nothing else.",
     avantVeilleWhy: "We keep in touch with the pace without eating into your freshness.",
     reposCourseTitre: "Rest after the race",
     reposCourseDetail: "Complete rest. Walking, gentle stretching, careful hydration and nutrition.",
@@ -414,7 +423,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     dsTitreMatin: "Double threshold · morning",
     dsTitreSoir: "Double threshold · evening",
     dsWhy: "Norwegian method: two threshold sessions on the same day, both BELOW threshold — the total builds the threshold, not the intensity. It is normally steered by blood lactate; without a lactate meter, the classic mistake is running too fast and turning it into two hard sessions. Hold the written pace, even if you feel good.",
-    qualiteDetail: (e, c, k, taper, all) => `Warm-up ${e} min building HR Z1→Z2 + 3 to 5 strides of 80 m → Main set: ${c} → Cool-down ${k} min HR Z1.${taper ? " ⚠️ Taper: keep the intensity but cut the number of reps by a third." : ""}${all ? " ⚠️ Eased version: cut the number of reps by a third and keep the pace. We preserve the stimulus, not the volume." : ""}`,
+    qualiteDetail: (e, c, k, taper, all, sl) => `Warm-up ${e} min building HR Z1→Z2${sl ? "" : " + 3 to 5 strides of 80 m"} → Main set: ${c} → Cool-down ${k} min HR Z1.${taper ? " ⚠️ Taper: keep the intensity but cut the number of reps by a third." : ""}${all ? " ⚠️ Eased version: cut the number of reps by a third and keep the pace. We preserve the stimulus, not the volume." : ""}`,
     qualiteWhySauvee: (o) => `Your recent load is well above your chronic load${o} — but your race is coming and a week without any race-specific pace is paid for on the day. So: ONE session, shortened, rather than none. If the sensations do not come during the warm-up, turn it into an easy run without guilt.`,
     qualiteWhy: "The quality session of your block, set on your MAS and your goal. This is the one that makes you progress.",
 
@@ -480,9 +489,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseWhy: (t) => (t ? `Heute ist der Tag. Der ganze Block wurde für diese ${t} gebaut. Vertraue deiner Vorbereitung und halte dein Tempo.` : "Heute ist der Tag. Vertraue deiner Vorbereitung."),
     veilleTitre: "Lockermachen — Tag vor dem Wettkampf",
     veilleDetail: "20 min sehr lockerer Dauerlauf HF Z1 + 3 Steigerungen über 80 m im Wettkampftempo. Mehr nicht: Wir wecken die Beine, wir ermüden sie nicht.",
+    veilleDetailSansLignes: "20 min sehr lockerer Dauerlauf HF Z1, sonst nichts. Wir wecken die Beine, wir ermüden sie nicht.",
     veilleWhy: "Form baut man vorher auf, nicht am Vortag. Eine Einheit mehr bringt dir nichts und kann dich den Wettkampf kosten.",
     avantVeilleTitre: "Zwei Tage vor dem Wettkampf",
     avantVeilleDetail: "30 min lockerer Dauerlauf HF Z1-Z2, optional 4×30 s im Wettkampftempo, um spritzig zu bleiben.",
+    avantVeilleDetailSansAllure: "30 min lockerer Dauerlauf HF Z1-Z2, sonst nichts.",
     avantVeilleWhy: "Wir halten den Kontakt zum Tempo, ohne die Frische anzugreifen.",
     reposCourseTitre: "Ruhe nach dem Wettkampf",
     reposCourseDetail: "Vollständige Ruhe. Gehen, sanftes Dehnen, sorgfältig trinken und essen.",
@@ -543,7 +554,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     dsTitreMatin: "Doppelte Schwelle · Morgen",
     dsTitreSoir: "Doppelte Schwelle · Abend",
     dsWhy: "Norwegische Methode: zwei Schwelleneinheiten am selben Tag, beide UNTER der Schwelle — die Summe baut die Schwelle auf, nicht die Intensität. Normalerweise wird sie per Laktat gesteuert; ohne Laktatmessgerät ist der klassische Fehler, zu schnell zu laufen und daraus zwei harte Einheiten zu machen. Halte das angegebene Tempo, auch wenn du dich gut fühlst.",
-    qualiteDetail: (e, c, k, taper, all) => `Aufwärmen ${e} min ansteigend HF Z1→Z2 + 3 bis 5 Steigerungen über 80 m → Hauptteil: ${c} → Auslaufen ${k} min HF Z1.${taper ? " ⚠️ Tapering: Intensität halten, aber die Anzahl der Wiederholungen um ein Drittel kürzen." : ""}${all ? " ⚠️ Reduzierte Fassung: Anzahl der Wiederholungen um ein Drittel kürzen, Tempo beibehalten. Wir erhalten den Reiz, nicht den Umfang." : ""}`,
+    qualiteDetail: (e, c, k, taper, all, sl) => `Aufwärmen ${e} min ansteigend HF Z1→Z2${sl ? "" : " + 3 bis 5 Steigerungen über 80 m"} → Hauptteil: ${c} → Auslaufen ${k} min HF Z1.${taper ? " ⚠️ Tapering: Intensität halten, aber die Anzahl der Wiederholungen um ein Drittel kürzen." : ""}${all ? " ⚠️ Reduzierte Fassung: Anzahl der Wiederholungen um ein Drittel kürzen, Tempo beibehalten. Wir erhalten den Reiz, nicht den Umfang." : ""}`,
     qualiteWhySauvee: (o) => `Deine jüngste Belastung liegt deutlich über deiner Grundbelastung${o} — aber dein Termin rückt näher, und eine Woche ganz ohne wettkampfspezifisches Tempo zahlst du am Tag X. Also: EINE Einheit, verkürzt, statt keiner. Wenn beim Aufwärmen die Sensationen ausbleiben, mach ohne schlechtes Gewissen einen lockeren Dauerlauf daraus.`,
     qualiteWhy: "Die Qualitätseinheit deines Blocks, abgestimmt auf deine maximale aerobe Geschwindigkeit und dein Ziel. Sie ist es, die dich weiterbringt.",
 
@@ -609,9 +620,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseWhy: (t) => (t ? `Es el día. Todo el bloque se ha construido para ese ${t}. Confía en tu preparación y sostén tu ritmo.` : "Es el día. Confía en tu preparación."),
     veilleTitre: "Soltura — víspera de carrera",
     veilleDetail: "20 min de rodaje muy suave FC Z1 + 3 progresiones de 80 m a ritmo de carrera. Nada más: despertamos las piernas, no las cansamos.",
+    veilleDetailSansLignes: "20 min de rodaje muy suave FC Z1, nada más. Despertamos las piernas, no las cansamos.",
     veilleWhy: "La forma se construye antes, no la víspera. Una sesión más no te aportará nada y puede costarte la carrera.",
     avantVeilleTitre: "Dos días antes de la carrera",
     avantVeilleDetail: "30 min de rodaje suave FC Z1-Z2, y si acaso 4×30 s a ritmo de carrera para mantenerte tónico.",
+    avantVeilleDetailSansAllure: "30 min de rodaje suave FC Z1-Z2, nada más.",
     avantVeilleWhy: "Mantenemos el contacto con el ritmo sin tocar la frescura.",
     reposCourseTitre: "Descanso post-carrera",
     reposCourseDetail: "Descanso completo. Caminar, estiramientos suaves, hidratación y alimentación cuidadas.",
@@ -672,7 +685,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     dsTitreMatin: "Doble umbral · mañana",
     dsTitreSoir: "Doble umbral · tarde",
     dsWhy: "Método noruego: dos sesiones de umbral el mismo día, ambas POR DEBAJO del umbral; es la suma la que construye el umbral, no la intensidad. Normalmente se controla con lactato; sin lactatómetro, el error clásico es correr demasiado rápido y convertirlo en dos sesiones duras. Mantén el ritmo indicado, aunque te sientas bien.",
-    qualiteDetail: (e, c, k, taper, all) => `Calentamiento ${e} min progresivo FC Z1→Z2 + 3 a 5 progresiones de 80 m → Parte principal: ${c} → Vuelta a la calma ${k} min FC Z1.${taper ? " ⚠️ Afinamiento: mantén la intensidad pero recorta un tercio las repeticiones." : ""}${all ? " ⚠️ Versión aligerada: recorta un tercio las repeticiones y mantén el ritmo. Preservamos el estímulo, no el volumen." : ""}`,
+    qualiteDetail: (e, c, k, taper, all, sl) => `Calentamiento ${e} min progresivo FC Z1→Z2${sl ? "" : " + 3 a 5 progresiones de 80 m"} → Parte principal: ${c} → Vuelta a la calma ${k} min FC Z1.${taper ? " ⚠️ Afinamiento: mantén la intensidad pero recorta un tercio las repeticiones." : ""}${all ? " ⚠️ Versión aligerada: recorta un tercio las repeticiones y mantén el ritmo. Preservamos el estímulo, no el volumen." : ""}`,
     qualiteWhySauvee: (o) => `Tu carga reciente está muy por encima de tu carga de fondo${o} — pero tu cita se acerca y una semana sin nada de ritmo específico se paga el día D. Así que: UNA sesión, acortada, mejor que ninguna. Si las sensaciones no llegan en el calentamiento, conviértela en rodaje sin culpa.`,
     qualiteWhy: "La sesión de calidad de tu bloque, ajustada a tu VAM y a tu objetivo. Es la que te hace progresar.",
 
@@ -738,9 +751,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseWhy: (t) => (t ? `É o dia. Todo o bloco foi construído para esse ${t}. Confia na tua preparação e segura o teu ritmo.` : "É o dia. Confia na tua preparação."),
     veilleTitre: "Soltura — véspera de prova",
     veilleDetail: "20 min de corrida muito fácil FC Z1 + 3 progressões de 80 m a ritmo de prova. Nada mais: acordamos as pernas, não as cansamos.",
+    veilleDetailSansLignes: "20 min de corrida muito fácil FC Z1, nada mais. Acordamos as pernas, não as cansamos.",
     veilleWhy: "A forma constrói-se antes, não na véspera. Uma sessão a mais não te vai dar nada e pode custar-te a prova.",
     avantVeilleTitre: "Dois dias antes da prova",
     avantVeilleDetail: "30 min de corrida fácil FC Z1-Z2, eventualmente 4×30 s a ritmo de prova para te manteres tónico.",
+    avantVeilleDetailSansAllure: "30 min de corrida fácil FC Z1-Z2, nada mais.",
     avantVeilleWhy: "Mantemos o contacto com o ritmo sem mexer na frescura.",
     reposCourseTitre: "Descanso pós-prova",
     reposCourseDetail: "Descanso completo. Caminhar, alongamentos suaves, hidratação e alimentação cuidadas.",
@@ -801,7 +816,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     dsTitreMatin: "Duplo limiar · manhã",
     dsTitreSoir: "Duplo limiar · tarde",
     dsWhy: "Método norueguês: duas sessões de limiar no mesmo dia, ambas ABAIXO do limiar; é a soma que constrói o limiar, não a intensidade. Normalmente controla-se com lactato; sem lactatómetro, o erro clássico é correr depressa demais e transformá-la em duas sessões duras. Mantém o ritmo indicado, mesmo que te sintas bem.",
-    qualiteDetail: (e, c, k, taper, all) => `Aquecimento ${e} min progressivo FC Z1→Z2 + 3 a 5 progressões de 80 m → Parte principal: ${c} → Retorno à calma ${k} min FC Z1.${taper ? " ⚠️ Afinamento: mantém a intensidade mas corta um terço das repetições." : ""}${all ? " ⚠️ Versão aliviada: corta um terço das repetições e mantém o ritmo. Preservamos o estímulo, não o volume." : ""}`,
+    qualiteDetail: (e, c, k, taper, all, sl) => `Aquecimento ${e} min progressivo FC Z1→Z2${sl ? "" : " + 3 a 5 progressões de 80 m"} → Parte principal: ${c} → Retorno à calma ${k} min FC Z1.${taper ? " ⚠️ Afinamento: mantém a intensidade mas corta um terço das repetições." : ""}${all ? " ⚠️ Versão aliviada: corta um terço das repetições e mantém o ritmo. Preservamos o estímulo, não o volume." : ""}`,
     qualiteWhySauvee: (o) => `A tua carga recente está muito acima da tua carga de fundo${o} — mas a tua prova aproxima-se e uma semana sem qualquer ritmo específico paga-se no dia D. Portanto: UMA sessão, encurtada, em vez de nenhuma. Se as sensações não aparecerem no aquecimento, transforma-a em corrida fácil sem culpa.`,
     qualiteWhy: "A sessão de qualidade do teu bloco, ajustada à tua VAM e ao teu objetivo. É ela que te faz progredir.",
 

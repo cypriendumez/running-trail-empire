@@ -565,7 +565,7 @@ async function main() {
     // Au-delà de 28 jours : la même reprise d'intensité borne le budget, la sortie longue et le double seuil.
     assert.match(ctxSrc, /const repriseIntensite = repriseArret \?\? arretHorsEchelle\(runs\.map\(\(w\) => String\(w\.date\)\.slice\(0, 10\)\), todayStr\);\s*const qualiteReprise = qualitePendantReprise\(repriseIntensite\);/);
     assert.match(ctxSrc, /const longRunPlanned = recup \|\| repriseIntensite \? Math\.min\(longRunPrevu, Math\.round\(targetKm \* 0\.3\)\) : longRunPrevu;/, "après plus de 28 jours d'arrêt, la sortie longue dépasse de nouveau la semaine visée");
-    assert.match(ctxSrc, /&& !repriseIntensite && !marcheCourse;/, "le double seuil revient pendant une reprise de plus de 28 jours");
+    assert.match(ctxSrc, /&& !repriseIntensite && !marcheCourse(?: && !noMaxEffort)?;/, "le double seuil revient pendant une reprise de plus de 28 jours");
     // Et son motif existe dans les cinq langues, distinct selon l'état.
     for (const l of Object.keys(MOTIF_T) as (keyof typeof MOTIF_T)[]) {
       const textes = [MOTIF_T[l].repriseLongArret("35", true, 0), MOTIF_T[l].repriseLongArret("34", false, 0), MOTIF_T[l].repriseLongArret("34", false, 1)];
@@ -592,7 +592,7 @@ async function main() {
     assert.equal(lignesRetireesParDouleur(3, {}), true);
     assert.equal(lignesRetireesParDouleur(3, { reprise: true }), false);
     const plan = codeNu("src/lib/ai/autoPlan.ts"), ctxSrc = codeNu("src/lib/ai/coachContext.ts"), coach = codeNu("src/lib/ai/autoCoach.ts");
-    assert.match(plan, /const canSpice = [^;]*&& !ctx\.weekPlan\.repriseArret;/, "la sortie longue peut de nouveau porter un bloc d'allure pendant une reprise");
+    assert.match(plan, /const canSpice = [^;]*&& !ctx\.weekPlan\.repriseArret(?: && !ctx\.effortMaximalInterdit)?;/, "la sortie longue peut de nouveau porter un bloc d'allure pendant une reprise");
     // La garde est PAR JOUR : tout footing placé avant le premier jour où une séance dure est permise.
     assert.match(plan, /const gardesDu = \(i: number\) => \(\{ \.\.\.gardes, reprise: !!ctx\.weekPlan\.repriseArret && i < debutQualite \}\);/);
     assert.equal((plan.match(/varianteFooting\(rang, easySlots\.length, gardesDu\(i\)\)/g) ?? []).length, 2, "le titre ou le détail d'un footing ne lit plus la garde du jour");

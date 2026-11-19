@@ -48,7 +48,7 @@ test("une vraie question n'est jamais touchée ; une vraie allure non plus", () 
 
 test("le coach passe chaque séance de qualité par ce filtre", () => {
   const c = readFileSync("src/lib/ai/coachContext.ts", "utf8");
-  assert.match(c, /const descAll = tr\(\(l\) => sansAllureInconnue\(gabarit\(l\), l\)\);/);
+  assert.match(c, /const descAll = tr\(\(l\) => sansAllureInconnue\(gabarit\(l\), l(?:, noMaxEffort)?\)\);/);
   assert.match(c, /matin: tr\(\(l\) => sansAllureInconnue\(seanceDoubleSeuil\("matin"/);
 });
 

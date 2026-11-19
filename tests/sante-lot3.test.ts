@@ -147,12 +147,12 @@ async function main() {
     // Le verrou « test VMA d'abord » d'autoCoach ne s'applique pas tant que l'avis est attendu.
     const ac = codeOf("src/lib/ai/autoCoach.ts");
     const iAvis = ac.indexOf("const avisMedicalAttendu = avisAttendu(");
-    const iVerrou = ac.indexOf("if (!vmaMesuree && !estFondateur && !avisMedicalAttendu) {");
+    const iVerrou = ac.search(/if \(!vmaMesuree && !estFondateur && !avisMedicalAttendu(?: && !effortMaxInterdit)?\) \{/);
     assert.ok(iAvis > 0 && iVerrou > iAvis, "le test VMA est de nouveau prescrit sans regarder le questionnaire");
     assert.match(ac, /if \(eApt\) \{\s*await journaliserEchecUneFois[\s\S]{0,200}return \{ processed: false, reason: "aptitude illisible" \};/, "une panne de lecture passerait pour « rien à signaler »");
     // L'autre voie vers le test : le bandeau « Fais ton test VMA » du tableau de bord (relecture, tour 2).
     const dash = codeOf("src/app/dashboard/page.tsx");
-    assert.match(dash, /const sansTestVma = testVmaAEviterDe\(\{ data: lignesApt, error: eApt \}, etatCoachRes\);/, "le bandeau ne lit plus le questionnaire (ou une panne l'affiche)");
+    assert.match(dash, /const sansTestVma = testVmaAEviterDe\(\{ data: lignesApt, error: eApt \}, etatCoachRes, profileRes\);/, "le bandeau ne lit plus le questionnaire (ou une panne l'affiche)");
     assert.match(dash, /<TestVmaBanner measured=\{vmaMesuree \|\| estFondateur \|\| enMarcheCourse \|\| sansTestVma\} \/>/, "le bandeau du test VMA s'affiche malgré l'avis attendu");
     // Et le plan qu'il reçoit à la place : bâti sans VMA ni historique, sans aucune intensité.
     const ctx = await buildAthleteContext(fauxClient({ profiles: [PROFIL], performance_baselines: [], workouts: [], notifications: [APT(["poitrine"])] }), "u");
