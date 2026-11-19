@@ -44,7 +44,7 @@ const dureeLoc = (min: number, l: Lang) => {
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile, finDuJourCoureur } from "@/lib/time/fuseau";
 import { apresCourse, facteurVolumeApresCourse, type PhaseApresCourse } from "@/lib/coach/apresCourse";
-import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle } from "@/lib/coach/repriseArret";
+import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle, joursCourusPourArret, sortiesPourArret } from "@/lib/coach/repriseArret";
 import { programmeMarcheCourse, dureesMarcheCourse, type SeanceMarcheCourse } from "@/lib/coach/marcheCourse";
 import { testEnVigueur, allureFacileMaxSec, fmtAllure, TYPE_TEST_LACTATE, type TestLactate } from "@/lib/coach/lactate";
 import { courseCEcarteeDe, type CourseCEcartee } from "@/lib/coach/courseCEcartee";
@@ -1476,19 +1476,54 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // De 6 à 28 jours sans courir : 50 % puis 75 % du volume habituel pendant une reprise
   // aussi longue que l'arrêt (Daniels). Sans elle, la semaine vide plafonnait tout à
   // 15 km — 14 km visés pour un coureur à 70 km par semaine (Cyprien, 05/11/2026).
-  const repriseArret = repriseApresArret(runs.map((w) => String(w.date).slice(0, 10)), todayStr);
+  // ⚠️ L'ARRÊT SE LIT SUR L'HISTORIQUE LONG ET SUR LES SÉANCES RÉCENTES RÉUNIS (réserve du directeur
+  // scientifique, 17/11/2026) : `runs` vient des 60 dernières séances tous sports confondus, où
+  // soixante sorties à vélo effacent l'arrêt. Voir `joursCourusPourArret`.
+  const joursArret = joursCourusPourArret(histRuns, runs);
+  const repriseArret = repriseApresArret(joursArret, todayStr);
   // ⚠️ ET L'INTENSITÉ (16/11/2026) : la reprise ne bornait que le volume ; le plan posait un
   // seuil le jour même du retour. `null` hors reprise. Voir `qualitePendantReprise`.
   // ⚠️ AU-DELÀ DE 28 JOURS AUSSI (visa du directeur scientifique, 17/11/2026) : la règle de volume
   // ne s'y applique plus, mais l'intensité n'a pas de borne haute. `repriseIntensite` est la reprise
   // en cours, quelle que soit la longueur de l'arrêt ; `repriseArret` reste la règle de VOLUME.
-  const repriseIntensite = repriseArret ?? arretHorsEchelle(runs.map((w) => String(w.date).slice(0, 10)), todayStr);
+  const repriseIntensite = repriseArret ?? arretHorsEchelle(joursArret, todayStr);
   const qualiteReprise = qualitePendantReprise(repriseIntensite);
   const habitudeKm = robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm);
+  // ⚠️ L'HABITUDE DE LA REPRISE SE LIT LÀ OÙ L'ARRÊT S'EST LU (19/11/2026). L'arrêt se lit désormais
+  // aussi sur l'historique long ; `habitudeKm`, elle, vient des 60 dernières séances. Quand le vélo
+  // en a chassé les courses d'avant l'arrêt, elle vaut 0 ou quelques kilomètres : « 50 % de
+  // l'habitude » donnait alors 0 à 7 km visés et une semaine entière de repos pour un coureur à
+  // 60 km (rejoué). L'habitude de la reprise se lit donc sur l'HISTORIQUE LONG dès qu'il existe,
+  // et sur les séances récentes seulement s'il est vide (requête en échec) : c'est alors l'ancien
+  // comportement. Les deux lectures sont égales tant que les 60 dernières séances couvrent les
+  // huit semaines.
+  // ⚠️ PAS « LA PLUS HAUTE DES DEUX » (quatrième relecture, 19/11/2026) : quand le vélo réduit les
+  // 60 séances à quatre semaines, leur médiane ne porte plus que sur les semaines les plus récentes
+  // et peut dépasser celle des huit semaines. Rejoué : 50 km visés au lieu de 42 pendant une
+  // reprise, sous le même « 75 % de ton volume habituel » que le jumeau sans vélo.
+  // ⚠️ LA MÊME CHAÎNE DE REPLI que `habitudeKm` (médiane robuste, sinon moyenne des 4 dernières
+  // semaines), lue sur l'historique long : sans elle, un coureur irrégulier masqué par le vélo
+  // était dit « volume habituel inconnu » alors que ses distances sont dans l'historique, et
+  // recevait un autre plan que son jumeau sans vélo (double relecture du 19/11/2026). Le troisième
+  // maillon de `habitudeKm` (la semaine écoulée) n'est pas repris : il vaut toujours 0 quand les
+  // 28 jours valent 0.
+  const km28Hist = histRuns.filter((w) => now - new Date(w.date).getTime() <= 28 * 86400000).reduce((t, w) => t + (w.distance_km ?? 0), 0);
+  const habitudeHistKm = robustWeeklyKm(histRuns, now, 8)?.km ?? km28Hist / 4;
+  const habitudeArretKm = histRuns.length ? habitudeHistKm : habitudeKm;
+  // ⚠️ HABITUDE INCONNUE (aucune distance connue, ni récente ni dans l'historique) : la moitié de
+  // rien n'est pas un plafond. Aucun plafond de Daniels ne s'applique alors : la semaine vise ce
+  // qui vient d'être couru, avec la progression habituelle et au moins le plancher (`targetFrom`,
+  // qui pendant une reprise n'applique pas non plus le plafond « 1,4 fois la semaine écoulée »).
+  // NI le motif NI le bandeau n'annoncent de pourcentage (visa du directeur scientifique,
+  // 19/11/2026 : le texte disait « 50 % de ton volume habituel » au-dessus d'un plan au plancher).
+  // La garde d'intensité, elle, reste.
+  const habitudeArretInconnue = repriseArret != null && habitudeArretKm <= 0;
+  /** Part du volume habituel visée la semaine qui commence dans `dansJours` jours (1 = aucune réduction). */
+  const partArret = (dansJours = 0) => habitudeArretInconnue ? 1 : partApresArret(repriseArret, dansJours);
   /** Plafond de volume de la semaine qui commence dans `dansJours` jours (Infinity hors reprise). */
   const plafondArretKm = (dansJours = 0) => {
-    const part = partApresArret(repriseArret, dansJours);
-    return part < 1 ? Math.round(habitudeKm * part) : Infinity;
+    const part = partArret(dansJours);
+    return part < 1 ? Math.round(habitudeArretKm * part) : Infinity;
   };
   // ── APRÈS LA COURSE ─────────────────────────────────────────────────────────
   // L'objectif passé n'est plus l'objectif, mais il n'est pas oublié : s'il a été couru
@@ -1543,7 +1578,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const partVolumeRecup = recup ? facteurVolumeApresCourse(recup) : 1;
   // Ce que le bandeau annonce est ce que le plan vise : la plus basse des deux réductions,
   // jamais leur produit (un arrêt pendant la récupération ne divise pas deux fois).
-  const partVolumeAnnoncee = Math.min(partVolumeRecup, partApresArret(repriseArret));
+  const partVolumeAnnoncee = Math.min(partVolumeRecup, partArret());
   // LA REPRISE PEUT TOMBER DANS LES SEPT JOURS DU PLAN (0 = aujourd'hui). Le plan accueille
   // alors sa séance ce jour-là, pas avant : sinon, le plan étant reconstruit chaque matin,
   // la première qualité n'apparaissait au calendrier qu'une fois la reprise arrivée.
@@ -1559,7 +1594,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // L'arrêt se DIT, et sa cause possible aussi : une montre qui ne synchronise plus produit
   // le même silence qu'un vrai repos.
   const arretMotif = repriseArret
-    ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.depuisJours ?? repriseArret.arretJours, l), nRaw(Math.round(repriseArret.part * 100), l), repriseArret.enCours, qualiteReprise?.max ?? 1, arretLong(repriseArret)))
+    ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.depuisJours ?? repriseArret.arretJours, l), habitudeArretInconnue ? null : nRaw(Math.round(repriseArret.part * 100), l), repriseArret.enCours, qualiteReprise?.max ?? 1, arretLong(repriseArret)))
     // Au-delà de 28 jours : pas de pourcentage de volume à annoncer, mais l'intensité se dit.
     : repriseIntensite
       ? tr((l) => MOTIF_T[l].repriseLongArret(nRaw(repriseIntensite.depuisJours ?? repriseIntensite.arretJours, l), repriseIntensite.enCours, qualiteReprise?.max ?? 1))
@@ -1813,7 +1848,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // ses semaines, et qui dimensionnait pourtant tout son plan marathon.
     // Repli sur l'ancien calcul si moins de 3 semaines courues : on ne déduit pas un
     // niveau de deux points.
-    const chronic = robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm);
+    // Pendant une reprise après arrêt, la référence est l'habitude lue là où l'arrêt s'est lu
+    // (`habitudeArretKm`) : sinon le bandeau annonce « 50 % de ton volume habituel » au-dessus
+    // d'un plan dimensionné sur des séances récentes qui ne voient plus les courses.
+    const chronic = repriseArret ? habitudeArretKm : robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm);
     // Part de la semaine écoulée que l'on considère acquise. Plus le ratio est haut,
     // moins on entérine le pic — sans pour autant retomber sur la seule moyenne, qu'une
     // période creuse (voyage, coupure) tire artificiellement vers le bas : prescrire
@@ -2454,9 +2492,10 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // La sortie habituelle = la médiane des sorties des huit semaines d'AVANT l'arrêt (les footings
   // courts de la reprise tireraient la médiane vers le bas, et la « sortie longue » reviendrait
   // en cours de reprise) ; inconnue, on ne tranche pas.
-  // ⚠️ Sur l'historique LONG quand il existe (190 jours) : `runs` ne porte que les 60 dernières séances,
-  // tous sports confondus, et les huit semaines d'avant un arrêt d'un mois en sortaient en partie.
-  const habituelleKm = repriseIntensite ? sortieHabituelleKm(distancesAvantArret(histRuns.length ? histRuns : runs, repriseIntensite, todayStr)) : null;
+  // ⚠️ Sur la RÉUNION de l'historique long et des séances récentes, là où l'arrêt lui-même se lit
+  // (`sortiesPourArret`) : `runs` ne porte que les 60 dernières séances, tous sports confondus, et
+  // l'historique long s'arrête à 190 jours.
+  const habituelleKm = repriseIntensite ? sortieHabituelleKm(distancesAvantArret(sortiesPourArret(histRuns, runs), repriseIntensite, todayStr)) : null;
   const longueRetiree = repriseIntensite != null && !sortieLongueTient(longRunKmBorne, habituelleKm);
   const longRunKm = longueRetiree ? 0 : longRunKmBorne;
   const longRunEased = !longueRetiree && longRunKm < longRunPlanned;

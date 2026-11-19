@@ -23,7 +23,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
-import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle, premierJourDeQualite, ARRET_LONG_JOURS } from "../src/lib/coach/repriseArret";
+import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle, premierJourDeQualite, joursCourusPourArret, sortiesPourArret, ARRET_LONG_JOURS } from "../src/lib/coach/repriseArret";
 import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { MOTIF_T } from "../src/lib/coach/reasonsI18n";
 import { varianteFooting, lignesRetireesParDouleur, lignesRetireesParReprise } from "../src/lib/coach/footings";
@@ -68,6 +68,21 @@ function fauxClient(tables: Record<string, Ligne[]>) {
     return q;
   };
   return { from: (t: string) => requete(tables[t] ?? []) } as never;
+}
+
+/**
+ * Le même faux client, mais dont la requête d'HISTORIQUE LONG (`select("date, sport, distance_km")` sur
+ * `workouts`) ne rend rien : la requête a échoué. Les 60 dernières séances, elles, répondent.
+ */
+function fauxClientSansHistorique(tables: Record<string, Ligne[]>) {
+  type Chaine = Record<string, (...a: unknown[]) => unknown>;
+  const plein = fauxClient(tables) as unknown as { from: (t: string) => Chaine };
+  const vide = fauxClient({}) as unknown as { from: (t: string) => Chaine };
+  return { from: (t: string) => {
+    const q = plein.from(t);
+    if (t !== "workouts") return q;
+    return { ...q, select: (cols: unknown) => (cols === "date, sport, distance_km" ? vide.from(t).select() : q) };
+  } } as never;
 }
 
 // Le jour du COACH (Paris), pas celui d'UTC.
@@ -561,9 +576,9 @@ async function main() {
     // La séance de reprise, déjà écrite courte, n'est pas en plus « sauvée par le plancher ».
     assert.match(ctxSrc, /floored: qb\.floored && qualiteReprise == null,/);
     // La sortie habituelle se lit AVANT l'arrêt : les footings de la reprise ne la font pas baisser.
-    assert.match(ctxSrc, /const habituelleKm = repriseIntensite \? sortieHabituelleKm\(distancesAvantArret\(histRuns\.length \? histRuns : runs, repriseIntensite, todayStr\)\) : null;/);
+    assert.match(ctxSrc, /const habituelleKm = repriseIntensite \? sortieHabituelleKm\(distancesAvantArret\(sortiesPourArret\(histRuns, runs\), repriseIntensite, todayStr\)\) : null;/);
     // Au-delà de 28 jours : la même reprise d'intensité borne le budget, la sortie longue et le double seuil.
-    assert.match(ctxSrc, /const repriseIntensite = repriseArret \?\? arretHorsEchelle\(runs\.map\(\(w\) => String\(w\.date\)\.slice\(0, 10\)\), todayStr\);\s*const qualiteReprise = qualitePendantReprise\(repriseIntensite\);/);
+    assert.match(ctxSrc, /const repriseIntensite = repriseArret \?\? arretHorsEchelle\(joursArret, todayStr\);\s*const qualiteReprise = qualitePendantReprise\(repriseIntensite\);/);
     assert.match(ctxSrc, /const longRunPlanned = recup \|\| repriseIntensite \? Math\.min\(longRunPrevu, Math\.round\(targetKm \* 0\.3\)\) : longRunPrevu;/, "après plus de 28 jours d'arrêt, la sortie longue dépasse de nouveau la semaine visée");
     assert.match(ctxSrc, /&& !repriseIntensite && !marcheCourse;/, "le double seuil revient pendant une reprise de plus de 28 jours");
     // Et son motif existe dans les cinq langues, distinct selon l'état.
@@ -631,6 +646,249 @@ async function main() {
     // Pas encore repris : toutes les sorties précèdent l'arrêt.
     const arrete = repriseApresArret([ilYa(8), ilYa(10)], AUJOURDHUI)!;
     assert.deepEqual(distancesAvantArret([{ date: ilYa(8), distance_km: 9 }, { date: ilYa(10), distance_km: 7 }], arrete, AUJOURDHUI), [9, 7]);
+  });
+
+  // ⚠️ RÉSERVE DU DIRECTEUR SCIENTIFIQUE (17/11/2026) : l'arrêt se lisait sur les 60 DERNIÈRES SÉANCES,
+  // tous sports confondus. Un coureur blessé qui pédale chaque jour en fait sortir toutes ses courses :
+  // plus d'arrêt visible, plus de garde. Ces tests passent par le VRAI contexte et le faux client, qui
+  // applique la limite de 60 séances et la fenêtre de 190 jours de l'historique long.
+  const velo = (n: number) => ({ user_id: "u", date: ilYa(n), type: "ride", sport: "bike", distance_km: 30,
+    duration_seconds: 4200, elevation_gain_m: 200, avg_hr: 125, max_hr: 145, tss: 45 });
+  /** Deux sorties à vélo par jour, du jour `de` au jour `a` (inclus). */
+  const velos = (de: number, a: number) => Array.from({ length: a - de + 1 }, (_, k) => de + k).flatMap((n) => [velo(n), velo(n)]);
+  const DUR = /VMA|Seuil|Sp[ée]cifique|Allure|C[oô]te/i;
+  const dures = (ctx: AthleteContext) => buildWeekPlan(ctx, new Date(`${AUJOURDHUI}T08:00:00Z`)).filter((d) => DUR.test(d.type)).map((d) => `${d.date} ${d.title}`);
+
+  await test("soixante sorties à vélo n'effacent pas l'arrêt : la garde d'intensité tient sur l'historique long", async () => {
+    // Coureur régulier, puis 40 jours SANS COURIR à deux sorties à vélo par jour, puis une reprise d'une course par jour.
+    const cas = (repris: number) => {
+      const reprise = Array.from({ length: repris }, (_, k) => sortie(repris - k, 8));
+      return { reprise, seances: [...reguliere(repris + 41, repris + 110), ...velos(repris + 1, repris + 40), ...reprise] };
+    };
+    const jourDe = (ctx: AthleteContext, titre: string) => {
+      const jours = [...new Set(buildWeekPlan(ctx, new Date(`${AUJOURDHUI}T08:00:00Z`)).map((d) => d.date))].sort();
+      return jours.indexOf(titre.slice(0, 10));
+    };
+    /** Rang (0 = aujourd'hui) de la première séance dure du plan ; Infinity s'il n'y en a aucune. */
+    const premiereDure = (ctx: AthleteContext) => Math.min(Infinity, ...dures(ctx).map((t) => jourDe(ctx, t)));
+    // `permis` : le premier jour du plan où la garde autorise une séance dure (7 = aucun), voir plus bas.
+    for (const [repris, permis] of [[4, 7], [8, 6]] as const) {
+      const { reprise, seances } = cas(repris);
+      // Précondition : les 60 dernières séances ne portent plus que les courses de la REPRISE.
+      const recentes = [...seances].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).slice(0, 60);
+      assert.deepEqual(recentes.filter((w) => w.sport === "run").map((w) => w.date).sort(), reprise.map((w) => w.date).sort(), `repris depuis ${repris} j : précondition, les 60 dernières séances voient encore une course d'avant l'arrêt`);
+      // Contre-poids : sans les courses d'avant l'arrêt (rien à protéger), le même plan pose bien une séance dure
+      // AVANT le jour que la garde autorise. ⚠️ Pas « aujourd'hui » : selon le jour de la semaine, elle tombe
+      // un peu plus tard (rejoué à l'horloge décalée : le test rougissait deux jours sur sept).
+      const sansAvant = await contexte({ seances: [...velos(repris + 1, repris + 40), ...reprise] });
+      assert.equal(sansAvant.weekPlan.repriseArret, undefined, `repris depuis ${repris} j : précondition, une reprise est vue sans aucun arrêt`);
+      assert.ok(premiereDure(sansAvant) < permis, `repris depuis ${repris} j : précondition, sans la garde aucune séance dure avant le jour ${permis} du plan, le test ne prouverait rien (${dures(sansAvant).join(", ") || "aucune"})`);
+    }
+    // 4ᵉ jour de reprise après 40 jours d'arrêt : le 14ᵉ jour est hors des sept jours du plan, rien de dur.
+    const tot = await contexte({ seances: cas(4).seances });
+    assert.equal(tot.weekPlan.repriseArret, "sans-qualite", "l'arrêt de 40 jours n'est pas vu : la garde d'intensité est perdue");
+    assert.deepEqual(dures(tot), [], "une séance dure est posée au 4ᵉ jour de reprise d'un arrêt de 40 jours");
+    // 8ᵉ jour de reprise : la première séance dure est permise au 14ᵉ, soit le jour 6 du plan ; une seule, au seuil.
+    const tard = await contexte({ seances: cas(8).seances });
+    assert.deepEqual({ reprise: tard.weekPlan.repriseArret, des: tard.weekPlan.qualiteDes }, { reprise: "une-qualite", des: 6 });
+    assert.ok(dures(tard).length <= 1, `plus d'une séance dure la même semaine : ${dures(tard).join(", ")}`);
+    for (const t of dures(tard)) {
+      assert.ok(jourDe(tard, t) >= 6, `séance dure avant le 14ᵉ jour de reprise : ${t}`);
+      assert.match(t, /seuil/i, `la séance de reprise n'est pas au seuil : ${t}`);
+    }
+    // PAS ENCORE REPRIS : les 60 dernières séances ne portent plus AUCUNE course.
+    const pasRepris = await contexte({ seances: [...reguliere(41, 110), ...velos(1, 40)] });
+    assert.equal(pasRepris.weekPlan.repriseArret, "sans-qualite", "sans aucune course récente, l'arrêt en cours n'est pas vu");
+    assert.deepEqual(dures(pasRepris), []);
+  });
+
+  await test("arrêt court masqué par le vélo : la reprise vise la moitié de l'habitude RÉELLE, pas la moitié de rien", async () => {
+    // 20 jours sans courir à trois sorties à vélo par jour (60 séances), une course facile hier.
+    const avant = reguliere(22, 110);
+    const velos3 = Array.from({ length: 20 }, (_, k) => 2 + k).flatMap((n) => [velo(n), velo(n), velo(n)]);
+    const masque = await contexte({ seances: [...avant, ...velos3, sortie(1, 6)] });
+    // Le jumeau : les mêmes courses, sans le vélo. Les 60 dernières séances voient alors l'arrêt d'elles-mêmes.
+    const visible = await contexte({ seances: [...avant, sortie(1, 6)] });
+    assert.equal(visible.weekPlan.repriseArret, "sans-qualite", "précondition : le jumeau sans vélo n'est pas en reprise");
+    assert.ok(visible.volume.targetKm >= 25, `précondition : le jumeau sans vélo ne vise que ${visible.volume.targetKm} km`);
+    assert.equal(masque.weekPlan.repriseArret, "sans-qualite", "l'arrêt de 20 jours masqué par le vélo n'est pas vu");
+    assert.equal(masque.volume.targetKm, visible.volume.targetKm, "le vélo change le volume visé de la reprise : l'habitude n'est pas lue là où l'arrêt l'est");
+    const footings = buildWeekPlan(masque, new Date(`${AUJOURDHUI}T08:00:00Z`)).filter((d) => /Endurance|R[ée]cup/i.test(d.type)).length;
+    assert.ok(footings >= 3, `une semaine de reprise presque vide : ${footings} footing(s)`);
+    assert.deepEqual(dures(masque), []);
+    // Le bandeau annonce ce que le plan vise : « 50 % », et la moitié de l'habitude du jumeau.
+    const dit = (ctx: AthleteContext) => ctx.readiness.reasons.filter((r) => /sans courir|aucune course enregistrée/.test(r));
+    assert.match(dit(masque).join(" | "), /reprise après 20 jours sans courir : 50 % de ton volume habituel cette semaine/);
+    // LE COUREUR IRRÉGULIER (moins de trois semaines courues sur huit : pas de médiane) : ses distances sont
+    // dans l'historique long. Masqué par le vélo ou non, même habitude (la moyenne de quatre semaines), donc
+    // même volume visé et même texte — pas « volume habituel inconnu ».
+    const peu = [sortie(30, 8), sortie(25, 8), sortie(21, 8)];
+    const irregulier = await contexte({ seances: [...peu, ...Array.from({ length: 20 }, (_, k) => 1 + k).flatMap((n) => [velo(n), velo(n), velo(n)])] });
+    const jumeau = await contexte({ seances: peu });
+    assert.equal(jumeau.weekPlan.repriseArret, "sans-qualite", "précondition : le jumeau irrégulier n'est pas en reprise");
+    // LA VALEUR ABSOLUE, pas seulement l'égalité avec le jumeau (qui passe par la même formule) : deux
+    // sorties de 8 km dans les 28 derniers jours (celle d'il y a 30 jours n'en fait pas partie), soit
+    // 16 km sur quatre semaines = 4 km par semaine, dont la moitié : 2 km.
+    assert.equal(jumeau.volume.targetKm, 2, "l'habitude d'un coureur irrégulier n'est plus la moyenne des quatre dernières semaines (16 km / 4, dont la moitié)");
+    assert.match(dit(jumeau).join(" | "), /on repart à 50 % de ton volume habituel/, "précondition : le jumeau irrégulier n'annonce pas 50 %");
+    assert.equal(irregulier.weekPlan.repriseArret, "sans-qualite", "l'arrêt du coureur irrégulier masqué par le vélo n'est pas vu");
+    assert.equal(irregulier.volume.targetKm, jumeau.volume.targetKm, "coureur irrégulier : le vélo change le volume visé de la reprise");
+    assert.deepEqual(dit(irregulier), dit(jumeau), "coureur irrégulier : le vélo change ce que dit le motif");
+    // Une seconde valeur absolue, qui tombe sur un demi-kilomètre : 20 km en 28 jours = 5 km par semaine, dont
+    // la moitié 2,5 km, ARRONDIE à 3 (un diviseur de 5, ou un arrondi par défaut, donneraient 2).
+    const peu20 = [sortie(30, 8), sortie(25, 10), sortie(21, 10)];
+    assert.equal((await contexte({ seances: peu20 })).volume.targetKm, 3, "20 km en quatre semaines ne donnent plus 3 km visés à 50 % (5 km par semaine, moitié arrondie)");
+  });
+
+  await test("habitude de volume inconnue : ni plafond « moitié de rien », ni pourcentage annoncé ; la garde d'intensité reste", async () => {
+    const dit = (ctx: AthleteContext) => ctx.readiness.reasons.filter((r) => /sans courir|aucune course enregistrée/.test(r)).join(" | ");
+    // (a) Une seule sortie, de distance inconnue, il y a dix jours.
+    const inconnue = await contexte({ seances: [{ ...sortie(10), distance_km: null }] });
+    // (b) Montre sans GPS : un coureur régulier dont AUCUNE sortie n'a de distance, neuf jours sans courir.
+    const sansGps = (de: number, a: number) => reguliere(de, a).map((w) => ({ ...w, distance_km: null }));
+    const sansDistance = await contexte({ seances: sansGps(10, 80) });
+    // Contre-poids : le même coureur sans arrêt a une séance dure au plan — sinon « aucune séance dure » ne prouve rien.
+    const sansArret = await contexte({ seances: sansGps(1, 80) });
+    assert.equal(sansArret.weekPlan.repriseArret, undefined, "précondition : une reprise est vue chez un coureur sans GPS qui n'a pas arrêté");
+    assert.ok(dures(sansArret).length >= 1, "précondition : le coureur sans GPS n'a aucune séance dure hors reprise, le test ne prouverait rien");
+    for (const [nom, ctx] of [["distance inconnue", inconnue], ["montre sans GPS", sansDistance]] as const) {
+      assert.equal(ctx.weekPlan.repriseArret, "sans-qualite", `${nom} : précondition, l'arrêt n'est pas vu`);
+      assert.ok(ctx.volume.targetKm > 0, `${nom} : une habitude inconnue donne une semaine visée à 0 km`);
+      assert.match(dit(ctx), /ton volume habituel n'étant pas encore connu/, `${nom} : le motif ne dit pas que l'habitude est inconnue (${dit(ctx)})`);
+      assert.doesNotMatch(ctx.readiness.reasons.join(" | "), /% de ton volume habituel/, `${nom} : un pourcentage du volume habituel est annoncé au-dessus d'un plan qui ne le vise pas`);
+      assert.deepEqual(dures(ctx), [], `${nom} : la garde d'intensité est tombée avec le plafond`);
+    }
+    // LA FEUILLE DE ROUTE AUSSI : avec un objectif à dix semaines, aucune semaine suivante n'est ramenée à 0 km.
+    const avecObjectif = await contexte({ seances: sansGps(10, 80), notifications: [objectif({ race: "Semi test", raceDate: ilYa(-70), distanceKm: 21.1, targetTime: "1h45'00", targetSeconds: 6300, targetPace: "4'59/km" })] });
+    assert.equal(avecObjectif.weekPlan.repriseArret, "sans-qualite", "précondition : avec un objectif, l'arrêt n'est plus vu");
+    assert.ok(avecObjectif.macroPlan.length >= 4, `précondition : la feuille de route n'a que ${avecObjectif.macroPlan.length} semaine(s)`);
+    assert.ok(avecObjectif.macroPlan.every((w) => w.volumeKm > 0), `habitude inconnue : une semaine de la feuille de route vise 0 km (${avecObjectif.macroPlan.map((w) => w.volumeKm).join(", ")})`);
+    // UNE HABITUDE PETITE MAIS CONNUE n'est pas « inconnue » : une sortie de 4 km il y a dix jours → 1 km par
+    // semaine, le pourcentage est annoncé et le plafond s'applique (limite connue : la moitié de presque rien).
+    const petite = await contexte({ seances: [sortie(10, 4)] });
+    assert.match(dit(petite), /on repart à 50 % de ton volume habituel/, `une habitude de 1 km par semaine est dite inconnue (${dit(petite)})`);
+    assert.ok(petite.volume.targetKm <= 1, `habitude de 1 km par semaine : ${petite.volume.targetKm} km visés sous « 50 % »`);
+    // Les cinq langues : sans pourcentage quand l'habitude est inconnue, dans les deux états ; avec, sinon.
+    const INCONNU = { fr: /pas encore connu/, en: /not known yet/, de: /noch nicht bekannt/, es: /aún no se conoce/, pt: /ainda não é conhecido/ } as const;
+    const FOOTINGS = { fr: /footings/, en: /easy runs/, de: /lockeren? Läufen?/, es: /rodajes suaves/, pt: /corridas fáceis/ } as const;
+    for (const l of Object.keys(MOTIF_T) as (keyof typeof MOTIF_T)[]) {
+      for (const enCours of [true, false]) {
+        const sans = MOTIF_T[l].repriseArret("8", null, enCours, enCours ? 0 : 1, false), avec = MOTIF_T[l].repriseArret("8", "50", enCours, enCours ? 0 : 1, false);
+        assert.ok(!/%|50|null|undefined/.test(sans), `${l} : un pourcentage (ou une valeur vide) reste dans « ${sans} »`);
+        assert.match(avec, /50\s?%/, `${l} : le pourcentage a disparu du texte ordinaire`);
+        assert.notEqual(sans, avec);
+        assert.ok(sans.includes("8"), `${l} : le nombre de jours a disparu`);
+        assert.match(sans, INCONNU[l as keyof typeof INCONNU], `${l} : le texte ne dit plus que le volume habituel est inconnu (« ${sans} »)`);
+        // « On reprend par des footings » ne se dit que tant qu'il n'a pas repris : ensuite, une séance de
+        // qualité par semaine est permise, et le texte ne dit pas le contraire.
+        assert.equal(FOOTINGS[l as keyof typeof FOOTINGS].test(sans), enCours, `${l} : « ${sans} » ${enCours ? "ne dit plus qu'on reprend par des footings" : "promet des footings alors qu'une séance de qualité est permise"}`);
+      }
+    }
+    // Et le contexte ne passe le pourcentage que si l'habitude est connue ; le bandeau d'après-course suit la même part.
+    const ctxSrc = codeNu("src/lib/ai/coachContext.ts");
+    assert.match(ctxSrc, /habitudeArretInconnue \? null : nRaw\(Math\.round\(repriseArret\.part \* 100\), l\)/);
+    assert.match(ctxSrc, /const partVolumeAnnoncee = Math\.min\(partVolumeRecup, partArret\(\)\);/);
+    assert.doesNotMatch(ctxSrc, /partApresArret\(repriseArret(?!, dansJours\);\n)/, "une part de volume est lue sans passer par `partArret` (habitude inconnue ignorée)");
+  });
+
+  await test("l'habitude de la reprise se lit sur l'historique long, pas sur « la plus haute des deux lectures »", async () => {
+    // Trois grosses semaines (6 × 14 km) juste avant l'arrêt, des semaines à 6 × 8 km avant. Le vélo réduit
+    // les 60 dernières séances aux trois grosses semaines : leur médiane dépasse celle des huit semaines.
+    const semaines = (de: number, a: number, km: number) => Array.from({ length: a - de + 1 }, (_, k) => de + k).filter((n) => n % 7 !== 3).map((n) => sortie(n, km));
+    for (const [arret, repris] of [[10, 0], [12, 3], [10, 8]] as const) {
+      const reprise = Array.from({ length: repris }, (_, k) => sortie(repris - k, 6));
+      const debut = repris + arret + 1;
+      const grosses = semaines(debut, debut + 20, 14);
+      const courses = [...grosses, ...semaines(debut + 21, debut + 100, 8), ...reprise];
+      const velosIci = Array.from({ length: 60 - grosses.length - reprise.length }, (_, k) => velo(repris + 1 + Math.floor(k / 3)));
+      const seances = [...courses, ...velosIci];
+      // Précondition : les 60 dernières séances ne portent, d'avant l'arrêt, QUE les grosses semaines.
+      const recentes = [...seances].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).slice(0, 60).filter((w) => w.sport === "run");
+      assert.deepEqual([...new Set(recentes.map((w) => w.distance_km))].sort(), repris ? [14, 6] : [14], `arrêt ${arret} j, repris ${repris} j : précondition, les 60 dernières séances voient encore les petites semaines`);
+      const masque = await contexte({ seances }), jumeau = await contexte({ seances: courses });
+      assert.ok(jumeau.weekPlan.repriseArret, `arrêt ${arret} j, repris ${repris} j : précondition, le jumeau n'est pas en reprise`);
+      assert.equal(masque.weekPlan.repriseArret, jumeau.weekPlan.repriseArret);
+      assert.equal(masque.volume.targetKm, jumeau.volume.targetKm, `arrêt ${arret} j, repris ${repris} j : le vélo GONFLE le volume de la reprise (l'habitude est lue sur des séances récentes réduites aux grosses semaines)`);
+    }
+    // HUIT SEMAINES, PAS DOUZE : de grosses semaines (6 × 20 km) vieilles de plus de huit semaines ne
+    // relèvent pas l'habitude. Même coureur, avec et sans ces vieilles semaines : même volume de reprise.
+    // 12 jours sans courir ; dans les huit semaines : quatre semaines à 6 × 10 km puis deux à 6 × 20 km. Au-delà :
+    // huit semaines à 6 × 20 km, qui domineraient une médiane prise sur douze semaines.
+    const huit = [...semaines(13, 40, 10), ...semaines(41, 55, 20)];
+    const sansVieilles = await contexte({ seances: huit }), avecVieilles = await contexte({ seances: [...huit, ...semaines(57, 110, 20)] });
+    assert.equal(sansVieilles.weekPlan.repriseArret, "sans-qualite", "précondition : douze jours sans courir ne font pas une reprise");
+    assert.ok(sansVieilles.volume.targetKm >= 20, `précondition : ce coureur ne vise que ${sansVieilles.volume.targetKm} km`);
+    assert.equal(avecVieilles.volume.targetKm, sansVieilles.volume.targetKm, "des semaines vieilles de plus de huit semaines changent l'habitude de la reprise");
+    // L'HISTORIQUE LONG EN ÉCHEC (requête vide) : les séances récentes font foi, comme avant ce changement.
+    // Précondition : le faux client vide VRAIMENT l'historique long. Un arrêt que seul l'historique porte (40
+    // jours masqués par le vélo, voir plus haut) n'est plus vu à travers lui, alors que le client ordinaire le voit.
+    const masque40 = { profiles: [PROFIL], performance_baselines: BASE, notifications: [],
+      workouts: [...reguliere(45, 110), ...velos(5, 44), ...Array.from({ length: 4 }, (_, k) => sortie(4 - k, 8))] };
+    assert.equal((await buildAthleteContext(fauxClient(masque40), "u")).weekPlan.repriseArret, "sans-qualite", "précondition : l'arrêt de 40 jours masqué n'est pas vu par le client ordinaire");
+    assert.equal((await buildAthleteContext(fauxClientSansHistorique(masque40), "u")).weekPlan.repriseArret, undefined, "précondition : le faux client « sans historique » rend encore l'historique long (la suite passerait à vide)");
+    const HABITUDE_11 = reguliere(12, 70); // onze jours sans courir
+    const tables = { profiles: [PROFIL], performance_baselines: BASE, workouts: HABITUDE_11, notifications: [] };
+    const sansHist = await buildAthleteContext(fauxClientSansHistorique(tables), "u"), avecHist = await contexte({ seances: HABITUDE_11 });
+    assert.equal(avecHist.weekPlan.repriseArret, "sans-qualite", "précondition : onze jours sans courir ne font pas une reprise");
+    assert.ok(avecHist.volume.targetKm >= 20, `précondition : ce coureur ne vise que ${avecHist.volume.targetKm} km`);
+    assert.equal(sansHist.weekPlan.repriseArret, "sans-qualite", "sans historique long, l'arrêt n'est plus vu sur les séances récentes");
+    assert.equal(sansHist.volume.targetKm, avecHist.volume.targetKm, "sans historique long, l'habitude de la reprise n'est plus lue sur les séances récentes");
+    assert.match(sansHist.readiness.reasons.join(" | "), /on repart à 50 % de ton volume habituel/, "sans historique long, l'habitude est dite inconnue alors que les séances récentes la portent");
+  });
+
+  await test("de vraies doubles séances ne faussent pas la sortie habituelle : la sortie longue de reprise reste posée", async () => {
+    // Sept semaines identiques : deux jours à 2 × 6 km (matin et soir), trois jours à 10 km, une sortie de 16 km.
+    // Dernière sortie il y a 16 jours. Sortie habituelle : la médiane de 6, 6, 6, 6, 10, 10, 10, 16, soit 8 km.
+    const semaine = (j: number) => [sortie(j + 6, 16), sortie(j + 5, 6), sortie(j + 5, 6), sortie(j + 4, 10), sortie(j + 3, 6), sortie(j + 3, 6), sortie(j + 2, 10), sortie(j, 10)];
+    const seances = Array.from({ length: 7 }, (_, k) => semaine(16 + 7 * k)).flat();
+    assert.equal(sortieHabituelleKm(seances.map((w) => w.distance_km)), 8, "précondition : la sortie habituelle de ce coureur n'est pas de 8 km");
+    assert.ok(seances.length < 60, "précondition : ce coureur a plus de 60 séances, les deux sources ne se recouvrent plus entièrement");
+    const ctx = await contexte({ seances });
+    assert.ok(ctx.weekPlan.repriseArret, "précondition : quinze jours sans courir ne font pas une reprise");
+    assert.ok(ctx.volume.longRunPlanned >= 8, `précondition : la sortie longue prévue (${ctx.volume.longRunPlanned} km) est déjà sous la sortie habituelle de 8 km`);
+    assert.ok(ctx.volume.longRunKm >= 8, `les doubles séances sont comptées une seule fois : la sortie habituelle paraît plus longue, et la sortie longue de reprise (${ctx.volume.longRunPlanned} km prévus) n'est plus posée`);
+  });
+
+  await test("les jours courus de l'arrêt : la réunion des deux sources, au site d'appel", () => {
+    assert.deepEqual(joursCourusPourArret([{ date: "2026-10-01" }, { date: "2026-10-03T07:00:00Z" }], [{ date: "2026-10-03" }, { date: "2026-11-02" }, { date: null }]).filter(Boolean),
+      ["2026-10-01", "2026-10-03", "2026-10-03", "2026-11-02"]);
+    assert.deepEqual(joursCourusPourArret([], [{ date: "2026-11-02" }]), ["2026-11-02"]);
+    assert.deepEqual(joursCourusPourArret([{ date: "2026-10-01" }], []), ["2026-10-01"]);
+    // Les sorties (date + distance) des deux sources, sans compter deux fois la même.
+    assert.deepEqual(sortiesPourArret([{ date: "2026-10-01", distance_km: 10 }, { date: "2026-10-03", distance_km: 8 }], [{ date: "2026-10-03T07:00:00Z", distance_km: 8 }, { date: "2026-03-01", distance_km: 12 }]),
+      [{ date: "2026-10-01", distance_km: 10 }, { date: "2026-10-03", distance_km: 8 }, { date: "2026-03-01", distance_km: 12 }]);
+    assert.equal(sortiesPourArret([{ date: "2026-10-03", distance_km: 8 }], [{ date: "2026-10-03", distance_km: 5 }]).length, 2, "deux sorties différentes du même jour n'en font plus qu'une");
+    // ⚠️ DE VRAIES DOUBLES SÉANCES (sixième relecture, 19/11/2026) : deux sorties du même jour et de même
+    // distance, matin et soir, sont DEUX sorties. Seul le recouvrement entre les deux sources est retiré.
+    const matinSoir = [{ date: "2026-10-05", distance_km: 6 }, { date: "2026-10-05", distance_km: 6 }];
+    assert.equal(sortiesPourArret(matinSoir, []).length, 2, "une double séance de l'historique long est comptée une seule fois");
+    assert.equal(sortiesPourArret([], matinSoir).length, 2, "une double séance des séances récentes est comptée une seule fois");
+    assert.equal(sortiesPourArret(matinSoir, matinSoir).length, 2, "une double séance présente dans les deux sources n'est pas comptée deux fois, ni quatre");
+    assert.equal(sortiesPourArret([matinSoir[0]], matinSoir).length, 2, "la seconde sortie du jour, absente de l'historique long, est perdue");
+    assert.deepEqual(sortiesPourArret([...matinSoir, { date: "2026-10-06", distance_km: 10 }], [...matinSoir, { date: "2026-10-07", distance_km: 8 }]).map((w) => w.distance_km), [6, 6, 10, 8]);
+    // La clé est le JOUR, pas le mois : deux sorties de même distance à une semaine d'écart restent deux sorties.
+    assert.equal(sortiesPourArret([{ date: "2026-10-01", distance_km: 10 }, { date: "2026-10-08", distance_km: 10 }], [{ date: "2026-10-15", distance_km: 10 }]).length, 3, "des sorties de même distance, à des jours différents du même mois, sont confondues");
+    const ctxSrc = codeNu("src/lib/ai/coachContext.ts");
+    assert.match(ctxSrc, /const joursArret = joursCourusPourArret\(histRuns, runs\);\s*const repriseArret = repriseApresArret\(joursArret, todayStr\);/);
+    // Plus aucune lecture de l'arrêt sur les seules séances récentes.
+    assert.doesNotMatch(ctxSrc, /(repriseApresArret|arretHorsEchelle)\(runs\b/);
+  });
+
+  await test("l'historique long ne suffit pas seul : après une coupure de plus de six mois, les séances récentes portent l'arrêt", async () => {
+    // Coureur peu assidu : la dernière course d'avant l'arrêt a plus de 190 jours, hors de l'historique long,
+    // mais dans ses 60 dernières séances. Repris il y a 2 jours.
+    const anciennes = [200, 204, 207, 211, 214, 218, 221, 225].map((n) => sortie(n));
+    const seances = [...anciennes, sortie(2, 5)];
+    const jours = seances.map((w) => w.date);
+    assert.deepEqual(arretHorsEchelle(jours.filter((d) => d >= ilYa(190)), AUJOURDHUI), null, "précondition : même sans les séances récentes, l'historique long voit déjà l'arrêt (le test ne prouverait rien)");
+    assert.deepEqual(arretHorsEchelle(jours, AUJOURDHUI), { arretJours: 197, enCours: false, joursRepris: 2 });
+    const ctx = await contexte({ seances });
+    assert.equal(ctx.weekPlan.repriseArret, "sans-qualite", "en lisant le seul historique long, l'arrêt de 197 jours n'est plus vu");
+    assert.deepEqual(dures(ctx), []);
+    // La sortie habituelle (10 km, lue sur les sorties d'avant l'arrêt, hors de l'historique long) : une
+    // « sortie longue » plus courte n'en est pas une.
+    assert.ok(ctx.volume.longRunPlanned > 0 && ctx.volume.longRunPlanned < 10, `précondition : la sortie longue prévue (${ctx.volume.longRunPlanned} km) ne se compare pas à la sortie habituelle de 10 km`);
+    assert.equal(ctx.volume.longRunKm, 0, "la sortie habituelle d'avant une coupure de plus de six mois n'est pas lue : une « sortie longue » plus courte qu'elle est posée");
   });
 
   console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

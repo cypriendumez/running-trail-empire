@@ -96,6 +96,26 @@ export function arretHorsEchelle(joursCourus: readonly string[], aujourdhui: str
 }
 
 /**
+ * LES JOURS COURUS OÙ SE LIT L'ARRÊT : la RÉUNION de l'historique long et des séances récentes.
+ *
+ * ⚠️ NI L'UN NI L'AUTRE NE SUFFIT SEUL (réserve du directeur scientifique, 17/11/2026) :
+ *  · les séances récentes sont plafonnées à 60, TOUS SPORTS CONFONDUS. Un coureur blessé qui
+ *    pédale chaque jour en fait sortir toutes ses courses d'avant l'arrêt : plus d'arrêt visible,
+ *    plus de garde. Rejoué : 40 jours sans courir et deux sorties à vélo par jour, un seuil posé
+ *    le jour même au 4ᵉ jour de reprise, un seuil et une VMA au 8ᵉ ;
+ *  · l'historique long s'arrête à 190 jours. Après une coupure plus longue, la dernière course
+ *    d'avant l'arrêt n'y est plus, alors que les 60 dernières séances d'un coureur peu assidu
+ *    la portent encore.
+ * Les doublons ne gênent pas : la détection travaille sur des jours distincts.
+ */
+export function joursCourusPourArret(
+  historique: readonly { date: string | null | undefined }[],
+  recentes: readonly { date: string | null | undefined }[],
+): string[] {
+  return [...historique, ...recentes].map((w) => String(w.date ?? "").slice(0, 10));
+}
+
+/**
  * Le DERNIER arrêt d'au moins 6 jours, quelle que soit sa longueur, et où en est ce qui l'a suivi.
  * `arretJours` compte les jours SANS COURIR dans les deux états.
  */
@@ -219,6 +239,33 @@ export function distancesAvantArret(
     const n = ecartJours(aujourdhui, String(w.date ?? ""));
     return n != null && n >= borne && n <= borne + HABITUDE_JOURS;
   }).map((w) => w.distance_km);
+}
+
+/**
+ * LES SORTIES OÙ SE LIT LA SORTIE HABITUELLE : la même réunion que pour l'arrêt (voir
+ * `joursCourusPourArret`). Une même sortie figure dans les deux sources : la compter deux fois
+ * fausserait la médiane, donc seul ce RECOUVREMENT est retiré.
+ *
+ * ⚠️ DE VRAIES DOUBLES SÉANCES NE SONT PAS DES DOUBLONS (sixième relecture, 19/11/2026). Fusionner
+ * toutes les sorties de même jour et de même distance retirait la seconde sortie d'un coureur qui
+ * court 6 km matin et soir : sa sortie habituelle passait de 8 à 10 km, et la sortie longue de
+ * reprise (9 km) n'était plus posée. L'historique long est donc gardé EN ENTIER ; une sortie
+ * récente n'est écartée que si l'historique en porte déjà une, non encore appariée, du même jour
+ * et de même distance.
+ */
+export function sortiesPourArret<T extends { date: string | null | undefined; distance_km?: number | null }>(
+  historique: readonly T[], recentes: readonly T[],
+): T[] {
+  const cle = (w: T) => `${String(w.date ?? "").slice(0, 10)}|${w.distance_km ?? ""}`;
+  // Combien de sorties de l'historique long restent à apparier, par jour et par distance.
+  const restant = new Map<string, number>();
+  for (const w of historique) restant.set(cle(w), (restant.get(cle(w)) ?? 0) + 1);
+  const enPlus = recentes.filter((w) => {
+    const n = restant.get(cle(w)) ?? 0;
+    if (n > 0) { restant.set(cle(w), n - 1); return false; }
+    return true;
+  });
+  return [...historique, ...enPlus];
 }
 
 /**
