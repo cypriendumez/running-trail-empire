@@ -209,9 +209,20 @@ export function pickWorkouts(opts: { level?: Level; goal?: Goal; categories?: Wo
   );
 }
 
+/**
+ * Une séance d'EFFORT MAXIMAL : un test ou une évaluation (6 min, 12 min, 3 km, 5 km… à fond), une
+ * séance VO2max (100-105 % de la VMA), ou toute séance dont la structure dit « à fond » (sprints).
+ * Écartée de la palette d'un coureur exempté du test VMA (19/11/2026) : sinon le dossier de l'IA
+ * disait « ne lui propose pas de test » et lui donnait le protocole du test quelques lignes plus bas.
+ */
+export function estEffortMaximal(w: Pick<WorkoutTemplate, "category" | "structure">): boolean {
+  return w.category === "test" || w.category === "vo2max" || /à fond/i.test(w.structure);
+}
+
 // Catalogue condensé (texte) à injecter dans le prompt : l'IA pioche et adapte.
-export function buildSessionCatalog(opts: { level?: Level; goal?: Goal } = {}): string {
-  const picked = pickWorkouts(opts);
+// `sansEffortMaximal` : sans les séances d'effort maximal (`estEffortMaximal`), pour un coureur exempté.
+export function buildSessionCatalog(opts: { level?: Level; goal?: Goal; sansEffortMaximal?: boolean } = {}): string {
+  const picked = pickWorkouts(opts).filter((w) => !(opts.sansEffortMaximal && estEffortMaximal(w)));
   const byCat = new Map<WorkoutCategory, WorkoutTemplate[]>();
   for (const w of picked) { const a = byCat.get(w.category) ?? []; a.push(w); byCat.set(w.category, a); }
   const order: WorkoutCategory[] = ["recovery", "endurance", "long", "tempo", "threshold", "vo2max", "speed", "hills", "race_specific", "trail", "strength", "drills", "cross", "test"];

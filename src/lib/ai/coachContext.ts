@@ -1207,7 +1207,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const libGoal: Goal = !objective ? "general"
     : (/trail|utmb|ultra|vertical|\bkv\b|montagne/i.test(objective.race) || (objective.distanceKm ?? 0) > 45) ? ((objective.distanceKm ?? 0) > 60 ? "ultra" : "trail")
     : (objective.distanceKm ?? 99) <= 5 ? "5k" : (objective.distanceKm ?? 99) <= 10 ? "10k" : (objective.distanceKm ?? 99) <= 21.5 ? "semi" : "marathon";
-  const catalog = buildSessionCatalog({ level: libLevel, goal: libGoal });
+  // La palette elle-même (`catalog`) se bâtit plus bas, avec le dossier : elle dépend de l'exemption
+  // du test VMA (`testVmaExclu`), qui lit la marche-course, calculée après.
 
   // Phase de périodisation (selon l'échéance) → oriente l'emphase des séances.
   const phase = objective?.raceDate && weeksToRace != null
@@ -2578,6 +2579,26 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // (le plan est déterministe, le texte ne fait que s'adresser à l'athlète) et c'est une
   // donnée d'identité de plus envoyée à un tiers avec des données de santé.
   const prenomSeul = String(p?.full_name ?? "").trim().split(/\s+/)[0] || "Athlète";
+  // ⚠️ L'IA NE PROPOSE NI TEST VMA (6 MIN À FOND) NI EFFORT MAXIMAL À UN COUREUR EXEMPTÉ (19/11/2026) :
+  //  · avis d'un médecin attendu (questionnaire d'aptitude) ;
+  //  · programme marche-course ;
+  //  · antécédent qui interdit l'effort maximal (`noMaxEffort` : cardiaque, covid long, grossesse) ;
+  //  · consignes du kiné en vigueur « sans intensité » ou « durée maximale » (le plan est alors sans
+  //    qualité, `sansQualite` plus haut : le test n'y a pas sa place non plus).
+  // Le dossier les lui interdisait déjà, mais TROIS endroits l'invitaient au test : la ligne « VMA » d'une
+  // VMA estimée, la ligne « athlète sans historique » (l'état d'entrée de tout débutant) et la PALETTE DE
+  // SÉANCES où l'IA « pioche » (Test VMA 6 min à fond, Cooper 12 min, chronos, VO2max, sprints à fond).
+  // Des consignes contraires, et l'IA (séance-clé du jour, analyse de séance…) pouvait conseiller un
+  // effort maximal à qui le plan l'écarte (@HeadCoach, relecteurs, 19/11/2026). Une panne du questionnaire
+  // ou des consignes arrête déjà le contexte, plus haut.
+  // ⚠️ PAS ENCORE LA RÈGLE DE TOUS :
+  //  · l'interface (`testVmaAEviterDe`) et le verrou du plan (`autoCoach`) ignorent les antécédents et les
+  //    consignes du kiné (l'interface écarte en plus le test quand l'état du coach est illisible ; ici, la
+  //    marche-course se déduit des lectures du contexte) ;
+  //  · le facteur limitant « vitesse » propose encore « VMA courte, 30/30 » (plus haut) : ni test ni
+  //    séance « à fond », mais de l'intensité, que les autres lignes du dossier interdisent à ces coureurs.
+  const testVmaExclu = aptitudeAttente || !!marcheCourse || noMaxEffort || !!consignes?.sansIntensite || consignes?.dureeMaxMin != null;
+  const catalog = buildSessionCatalog({ level: libLevel, goal: libGoal, sansEffortMaximal: testVmaExclu });
   const text = `PROFIL
 - ${prenomSeul} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · mode ${p?.mode ?? "?"}
 - NIVEAU estimé : ${level}${vma ? ` (VMA ${vma} km/h${vmaIsEst ? " estimée" : ""})` : ""}
@@ -2645,11 +2666,11 @@ ${elev ? `- ${elev.rule}` : ""}
 ${tempRule ? `- MÉTÉO AUJOURD'HUI : ${tempRule}` : ""}${hotDays.length ? `\n- 🔥 CHALEUR ANNONCÉE : ${hotDays.slice(0, 4).map(f => `${f.date.slice(8)}/${f.date.slice(5, 7)} ${Math.round(f.tempMax)}°C`).join(" · ")} → déplace les séances de qualité de ces jours-là tôt le matin, ou échange-les avec un jour plus frais de la semaine. Prévois-le MAINTENANT, pas la veille.` : ""}
 
 CAPACITÉS (tests)
-- VMA : ${vma ?? "?"} km/h${vmaIsEst ? ` ⚠️ ESTIMÉE depuis ses séances (aucun test VMA enregistré) → recommande-lui un test VMA pour affiner, et reste un cran prudent sur la 1re séance VMA` : ""} · FC max ${maxHr ?? (vmaIsEst && fcMaxEst ? `~${fcMaxEst} (${fcMaxSource === "seuil" ? "déduite du seuil mesuré" : "obs."})` : "?")} · FC repos ${restHr ?? "?"} · FC seuil ${ltHr ?? "?"}
+- VMA : ${vma ?? "?"} km/h${vmaIsEst ? ` ⚠️ ESTIMÉE depuis ses séances (aucun test VMA enregistré) ${testVmaExclu ? "— ne lui propose PAS de test VMA ni aucun effort maximal, même pour affiner ce chiffre : ils sont écartés pour lui" : "→ recommande-lui un test VMA pour affiner, et reste un cran prudent sur la 1re séance VMA"}` : ""} · FC max ${maxHr ?? (vmaIsEst && fcMaxEst ? `~${fcMaxEst} (${fcMaxSource === "seuil" ? "déduite du seuil mesuré" : "obs."})` : "?")} · FC repos ${restHr ?? "?"} · FC seuil ${ltHr ?? "?"}
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
-${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${limiter ? `- 🎯 SON FACTEUR LIMITANT, à ce stade, c'est ${limiter.label}. ${limiter.action} C'est LA priorité : une séance qui ne s'adresse pas à ce point précis est une séance de perdue. ${limiters.length > 1 ? `Viennent ensuite : ${limiters.slice(1, 3).map(l => l.label).join(" ; ")}.` : ""}\n` : ""}${noHistory ? "- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne. Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n" : ""}${(() => { const d = driftW; if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
+${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${limiter ? `- 🎯 SON FACTEUR LIMITANT, à ce stade, c'est ${limiter.label}. ${limiter.action} C'est LA priorité : une séance qui ne s'adresse pas à ce point précis est une séance de perdue. ${limiters.length > 1 ? `Viennent ensuite : ${limiters.slice(1, 3).map(l => l.label).join(" ; ")}.` : ""}\n` : ""}${noHistory ? `- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ${testVmaExclu ? "et ses éventuelles douleurs. Ne lui propose ni test ni effort maximal : ils sont écartés pour lui." : "ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne."} Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n` : ""}${(() => { const d = driftW; if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
   const lines: string[] = [];
   // Cadence : sous 170 pas/min, l'appui est long et la foulée « aérienne » — surcoût
   // d'impact et de temps de contact. On ne juge pas dans l'absolu (elle dépend de la
