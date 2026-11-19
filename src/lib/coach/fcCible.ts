@@ -356,6 +356,19 @@ export function footingTropIntense(fcMoyenne: unknown, dureeSec: unknown, cibles
  */
 export const PIC_FC_JOURS = 183;
 
+/**
+ * Une séance est-elle DURE d'après son TYPE ? Les types d'endurance (easy, long, trail, footing,
+ * récup, fond, marche) d'abord écartés, puis les mots de la qualité.
+ * ⚠️ UNE SEULE DÉFINITION pour le coach (`isHardType`) et la montre (`ciblesFcPour`). La montre
+ * n'écartait pas les types d'endurance : « long tempo » ou « trail côte » étaient un footing pour le
+ * coach et une séance dure pour la montre, et leurs cibles de FC divergeaient (17/11/2026).
+ */
+export function estTypeDur(type?: string | null): boolean {
+  const x = String(type ?? "").toLowerCase();
+  if (/easy|recovery|long|trail|endurance|footing|récup|fond|marche/.test(x)) return false;
+  return /interval|vma|tempo|seuil|race|hill|fractionn|côte|cote|sprint|vif|fartlek|threshold/.test(x);
+}
+
 /** Les footings qui calent les cibles de FC : ceux des 60 derniers jours, aujourd'hui compris. */
 export const JOURS_FOOTINGS_FC = 60;
 /**

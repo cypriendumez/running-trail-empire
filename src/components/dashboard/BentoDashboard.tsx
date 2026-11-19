@@ -1082,7 +1082,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
               </div>
               <div className="text-[11px] text-zinc-400">{t("dash.vma.sub")}</div>
               {sourceVma && (
-                <div className="mt-0.5 text-[11px] leading-snug text-zinc-400">
+                <div className="mt-0.5 text-[11px] leading-snug text-zinc-500">
                   {/* Une séance sans distance mesurée ne se cite pas « (0 km) ». */}
                   {sourceVma.type === "seances" && sourceVma.date && (sourceVma.km ?? 0) > 0
                     ? t("dash.vma.src.seances", {
@@ -1091,6 +1091,7 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
                       })
                     : sourceVma.type === "test" && sourceVma.date
                       ? t("dash.vma.src.test", { d: formatDateCivile(sourceVma.date, lang, { day: "numeric", month: "long", year: "numeric" }) })
+                      : sourceVma.type === "estimee" ? t("dash.vma.src.estimee")
                       : sourceVma.type === "courbe" ? t("dash.vma.src.courbe")
                       : sourceVma.type === "vo2max" ? t("dash.vma.src.vo2max") : null}
                   {" · "}{t("dash.vma.maj")}

@@ -4,7 +4,8 @@ import { fuseauOuDefaut } from "@/lib/time/fuseau";
 import { createClient } from "@/lib/supabase/server";
 import type { AnalyseMemorisee } from "@/lib/dashboard/derniereAnalyse";
 import { BentoDashboard } from "@/components/dashboard/BentoDashboard";
-import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
+import { TYPE_APTITUDE } from "@/lib/health/aptitude";
+import { testVmaAEviterDe, avisMedicalEnAttenteDe } from "@/lib/health/testVmaAEviter";
 import { TestVmaBanner } from "@/components/dashboard/TestVmaBanner";
 import { InviteAvis } from "@/components/dashboard/InviteAvis";
 import { momentFavorable } from "@/lib/avis/invite";
@@ -259,7 +260,12 @@ export default async function DashboardPage() {
   const { data: lignesApt, error: eApt } = await supabase.from("notifications").select("data")
     .eq("user_id", user!.id).eq("type", TYPE_APTITUDE).order("created_at", { ascending: false }).limit(1);
   if (eApt) console.error("[tableau de bord] questionnaire d'aptitude illisible :", eApt.message);
-  const sansTestVma = !!eApt || avisAttendu(lireAptitude(((lignesApt ?? []) as { data?: unknown }[])[0]?.data));
+  // LA règle partagée (`testVmaAEviterDe`) : elle protège aussi quand l'état du coach est illisible,
+  // ce que la copie d'ici ignorait (un coureur en marche-course aurait vu « 6 min À FOND »).
+  const sansTestVma = testVmaAEviterDe({ data: lignesApt, error: eApt }, etatCoachRes);
+  // ⚠️ « PAS DE COURSE » N'EST PAS « PAS DE TEST » : la carte « Avis médical attendu » ne vaut que pour
+  // l'avis d'un médecin (ou un questionnaire illisible). Un coureur en marche-course court, en alternance.
+  const avisMedicalAttendu = avisMedicalEnAttenteDe({ data: lignesApt, error: eApt });
 
   /**
    * INVITER À DONNER SON AVIS — et seulement quand c'est mérité.
@@ -317,7 +323,7 @@ export default async function DashboardPage() {
       streak={streak}
       acces={acces}
       jourAujourdhui={streakToday}
-      sansCourse={sansTestVma}
+      sansCourse={avisMedicalAttendu}
     />
     <InviteAvis afficher={inviterAvis} />
     </>

@@ -4,11 +4,11 @@
  *
  * ⚠️ LES MÊMES RÈGLES QUE LE COACH (`buildAthleteContext`) : mêmes références (FC max réellement
  * atteinte en 6 mois, déclarée ou réglée sur la montre, FC de repos déclarée sinon celle de la montre, seuil mesuré), mêmes
- * footings (course ≥ 20 min, 60 jours, type non dur), même calcul (`ciblesFcAthlete`). Sinon
+ * footings (LA même lecture, `lireFootingsFc` + `fcDesFootings`), même calcul (`ciblesFcAthlete`). Sinon
  * une séance re-poussée depuis l'admin partirait avec d'autres battements que celle du coach.
  * Serveur uniquement : client service role.
  */
-import { referencesFc, ciblesFcAthlete, premierJourFootingsFc, maxDeReference, fcMaxSaison, airFroid, PIC_FC_JOURS, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, type CiblesFc, type ReferencesFc, seuilMesure } from "@/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, premierJourFootingsFc, estTypeDur, maxDeReference, fcMaxSaison, airFroid, PIC_FC_JOURS, FENETRE_SAISON_JOURS, DEMI_FENETRE_AN_DERNIER_JOURS, type CiblesFc, type ReferencesFc, seuilMesure } from "@/lib/coach/fcCible";
 import { isRun } from "@/lib/intervals/sport";
 import { forecastWeek } from "@/lib/weather/openMeteo";
 import { repereDuJourCoureur } from "@/lib/time/fuseau";
@@ -16,9 +16,36 @@ import { repereDuJourCoureur } from "@/lib/time/fuseau";
 type Lecteur = { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const num = (v: unknown): number | null => { const n = Number(v); return v != null && v !== "" && Number.isFinite(n) && n > 0 ? n : null; };
-const TYPE_DUR = /interval|vma|tempo|seuil|race|hill|fractionn|côte|cote|sprint|vif|fartlek|threshold/i;
 
 const jour = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/** Les colonnes d'une séance dont on a besoin pour les footings. */
+export const COLONNES_FOOTINGS_FC = "date,type,sport,duration_seconds,avg_hr";
+/**
+ * LA lecture des footings qui calent les cibles de FC, pour le coach ET la montre : toutes les
+ * séances de la fenêtre (`premierJourFootingsFc`, 60 jours), les plus récentes d'abord.
+ * ⚠️ Le coach les prenait dans ses 60 DERNIÈRES SÉANCES tous sports : chez un coureur qui fait
+ * aussi du vélo (62 sorties récentes), il n'en voyait plus aucun et retenait des cibles théoriques
+ * (136-146 bpm) quand la montre, sur 60 jours, calait 119-129 sur ses vrais footings (@HeadCoach,
+ * 17/11/2026). L'appelant lit `error` : une panne n'est pas « aucun footing ».
+ */
+export function lireFootingsFc(sb: Lecteur, userId: string, maintenant = repereDuJourCoureur()) {
+  return sb.from("workouts").select(COLONNES_FOOTINGS_FC).eq("user_id", userId)
+    .gte("date", premierJourFootingsFc(maintenant)).order("date", { ascending: false }).limit(200);
+}
+/**
+ * La FC moyenne des footings retenus : course, au moins 20 minutes, type non dur (`estTypeDur`),
+ * dans la fenêtre. Le filtre de date est rejoué ici, pour un appelant qui passe d'autres séances.
+ */
+export function fcDesFootings(
+  seances: readonly { date?: string | null; type?: string | null; sport?: string | null; duration_seconds?: unknown; avg_hr?: unknown }[],
+  maintenant = repereDuJourCoureur(),
+): number[] {
+  const debut = premierJourFootingsFc(maintenant);
+  return seances
+    .filter((w) => String(w.date ?? "").slice(0, 10) >= debut && isRun(w.sport ?? null) && !estTypeDur(w.type) && (num(w.duration_seconds) ?? 0) >= 20 * 60)
+    .map((w) => num(w.avg_hr)).filter((v): v is number => v != null);
+}
 
 /**
  * Les deux pics de la FC max de saison (`fcMaxSaison`) : 6 dernières semaines, et les mêmes
@@ -53,15 +80,14 @@ export function avecSaison(refs: ReferencesFc, pics: { recent: number | null; an
 
 export async function ciblesFcPour(sb: Lecteur, userId: string, maintenant = repereDuJourCoureur()): Promise<CiblesFc | null> {
   try {
-    // Les footings des 60 derniers jours, aujourd'hui compris : la MÊME fenêtre que le coach.
-    const depuis = premierJourFootingsFc(maintenant);
     const [profil, base, fcMax, footings] = await Promise.all([
       sb.from("profiles").select("*").eq("id", userId).maybeSingle(),
       sb.from("performance_baselines").select("*").eq("user_id", userId).order("tested_at", { ascending: false }).limit(1).maybeSingle(),
       sb.from("workouts").select("max_hr").eq("user_id", userId).not("max_hr", "is", null)
         .gte("date", new Date(maintenant - PIC_FC_JOURS * 86400000).toISOString().slice(0, 10))
         .order("max_hr", { ascending: false }).limit(1).maybeSingle(),
-      sb.from("workouts").select("type,sport,duration_seconds,avg_hr").eq("user_id", userId).gte("date", depuis).limit(200),
+      // LA lecture des footings, la même que le coach (`lireFootingsFc`).
+      lireFootingsFc(sb, userId, maintenant),
     ]);
     // Supabase RETOURNE son erreur : une lecture ratée ne doit pas fabriquer des cibles.
     if (profil.error || base.error || fcMax.error || footings.error) return null;
@@ -75,9 +101,7 @@ export async function ciblesFcPour(sb: Lecteur, userId: string, maintenant = rep
       // 12/11/2026 : la MÊME source de seuil que le coach (test, puis montre).
       seuil: seuilMesure(b?.lt_hr, garmin?.lthr),
     });
-    const fcs = ((footings.data ?? []) as { type?: string | null; sport?: string | null; duration_seconds?: unknown; avg_hr?: unknown }[])
-      .filter((w) => isRun(w.sport ?? null) && !TYPE_DUR.test(String(w.type ?? "")) && (num(w.duration_seconds) ?? 0) >= 20 * 60)
-      .map((w) => num(w.avg_hr)).filter((v): v is number => v != null);
+    const fcs = fcDesFootings((footings.data ?? []) as Parameters<typeof fcDesFootings>[0], maintenant);
     // La FC max de la SAISON (lib/coach/fcCible, `fcMaxSaison`) : en hiver, des zones calées
     // sur le pic de l'été sont trop hautes.
     // L'air froid chez lui (prévisions à sa dernière position) : sans hiver enregistré, −5 bpm.

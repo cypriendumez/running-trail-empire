@@ -350,7 +350,7 @@ test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien,
   }
   const v = code("src/lib/dashboard/vmaAffichee.ts");
   assert.match(v, /const courses = lues\.filter\(\(w\) => isRun\(w\.sport\)\);\s*return meilleurEffort\(courses, fcMaxPourEfforts\(fcMax, courses\), JOURS_VMA, acclimatationDesSeances\(lues, maintenant\), maintenant\);/, "effortDesSeances trie de nouveau avec son propre pic, lit d'autres sports ou oublie la chaleur");
-  assert.match(v, /const effort = effortDesSeances\(i\.seances, i\.fcMax\);/, "vmaAffichee a de nouveau son propre calcul d'effort");
+  assert.match(v, /const seancesVma = vmaDesSeances\(i\.seances, i\.fcMax\);\s*const effort = seancesVma\?\.effort \?\? null;/, "vmaAffichee a de nouveau son propre calcul d'effort");
   assert.doesNotMatch(v, /obsMaxHr/, "vmaAffichee recalcule son propre pic");
   // Chaque écran passe la FC max COMMUNE (lue par fcMaxDeLAthlete, ou déjà calculée par fcMaxConnue).
   const sites: [string, RegExp[]][] = [
@@ -361,17 +361,17 @@ test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien,
     ["src/lib/ai/bilanDonnees.ts", [/seances: seances as Parameters<typeof vmaAffichee>/]],
     ["src/app/dashboard/jour-j/page.tsx", [/fcMax: ePanneFc \? undefined : fcMax,/]],
     ["src/lib/ai/bilanDonnees.ts", [/profil: profilRes\.data as [^\n]*,\s*fcMax,\s*\}\);/]],
-    ["src/lib/ai/coachContext.ts", [/const effort = effortDesSeances\(\(woRes\.data \?\? \[\]\) as never, await fcMaxDeLAthlete\(sb, userId\)\);/, /fromRuns: effort\?\.vma \?\? null,/,
-      /fromRuns: objectifSeul \? null : effortDesSeances\(seancesVma as never, fcMaxEst, now\)\?\.vma \?\? estimateVmaFromRuns/,
+    ["src/lib/ai/coachContext.ts", [/const seances = vmaDesSeances\(\(woRes\.data \?\? \[\]\) as never, await fcMaxDeLAthlete\(sb, userId\)\);/, /fromRuns: seances\?\.vma \?\? null,/,
+      /fromRuns: objectifSeul \? null : vmaDesSeances\(seancesVma as never, fcMaxEst, now\)\?\.vma \?\? null,/,
       /objectifSeul \? nonLu\(\) : lireSeancesVma\(sb, userId, now\),/, /lireSeancesVma\(sb, userId\),\s*sb\.from\("profiles"\)\.select\("\*"\)\.eq\("id", userId\)\.maybeSingle\(\),/,
       /const seancesVma = seancesVmaRes\.error \? workouts : /,
       /if \(seancesVmaRes\.error\) \{[\s\S]{0,300}await journaliserEchecUneFois\(null, \{ source: "coach-vma", userId,/, /const acclimVma = acclimatationDesSeances\(workouts as never, now\);/]],
-    ["src/app/dashboard/plans/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
+    ["src/app/dashboard/plans/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: vmaDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
     ["src/app/dashboard/layout.tsx", [/lireSeancesVma\(supabase, user\.id\),/]],
-    ["src/app/dashboard/health/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
-    ["src/app/dashboard/shop/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
-    ["src/app/dashboard/shop/[slug]/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
-    ["src/app/dashboard/profile/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /fromRuns: effortDesSeances\(rw, fcMaxCommune\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user!\.id\),/,
+    ["src/app/dashboard/health/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: vmaDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
+    ["src/app/dashboard/shop/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: vmaDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
+    ["src/app/dashboard/shop/[slug]/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: vmaDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
+    ["src/app/dashboard/profile/page.tsx", [/fcMaxDeLAthlete\(supabase, user!\.id\),/, /fromRuns: vmaDesSeances\(rw, fcMaxCommune\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user!\.id\),/,
       /const fcMaxPanne = fcMaxCommune === undefined && fcMaxZones == null;/, /fcMax: fcMaxZones, fcMaxPanne,/,
       /const fcMaxZones = fcMaxCommune !== undefined \? fcMaxCommune : \(Number\(\(baseline as \{ max_hr\?: number \} \| null\)\?\.max_hr\) \|\| null\);/, /fcMax: fcMaxZones,/]],
     ["src/components/profile/ProfileSettings.tsx", [/const maxHr = fitness\?\.fcMax \?\? 0;/, /\{!zones && \([\s\S]{0,300}tr\(fitness\?\.fcMaxPanne \? "perf\.zonesPanne" : "perf\.zonesInconnues"\)/]],

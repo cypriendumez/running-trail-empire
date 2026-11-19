@@ -20,6 +20,7 @@ import { oneSessionPerSlot, slotKey } from "@/lib/coach/sessions";
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { estUnePanne } from "@/lib/dashboard/lectures";
 import { lireSeancesVma } from "@/lib/dashboard/seancesVma";
+import { testVmaAEviter } from "@/lib/health/testVmaAEviter";
 
 const decale = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const PANNE: Record<Lang, string> = {
@@ -65,8 +66,10 @@ export async function chargerDonnees(sb: SupabaseClient, userId: string, lang: L
   // UNE seule mesure de VFC (rMSSD, ou SDNN d'Apple Watch), état face à SA base :
   // exactement la série que reçoit la carte du tableau de bord (lib/health/vfc).
   const serie = serieVfc((vfc.data ?? []) as Pick<HRVData, "date" | "rmssd" | "sdnn">[]);
+  // Le test VMA n'est conseillé qu'à qui peut le faire : la règle du bandeau du test.
+  const testVmaExclu = await testVmaAEviter(sb, userId);
   return {
-    lang, aujourdhui,
+    lang, aujourdhui, testVmaExclu,
     seances: ws,
     historique: (historique.data ?? []) as Workout[],
     vfc: serie.lignes,

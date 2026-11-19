@@ -59,6 +59,11 @@ const P: Record<string, Record<string, string>> = {
     "gt.race": "Course cible", "gt.weekly": "Km hebdo", "gt.monthly": "Km mensuel", "gt.pace": "Allure cible", "gt.weight": "Poids cible",
     "perf.title": "Données de performance", "perf.vma": "VMA", "perf.maxHr": "FC Max", "perf.restHr": "FC Repos", "perf.lt": "Seuil lactique",
     "perf.vmaWarn": "VMA estimée depuis tes meilleures séances (pas de test enregistré). Fais un test VMA pour des allures et prédictions exactes.",
+    "perf.vmaWarnSansTest": "VMA estimée depuis tes séances, faute de mesure enregistrée.",
+    "perf.emptyDescSansTest": "Aucune séance ne permet encore d'estimer ta VMA.",
+    "perf.predDescTestSansTest": "Estimées depuis ta VMA enregistrée.",
+    "perf.predDescSessSansTest": "Estimées depuis ta VMA (tes séances récentes).",
+    "perf.predDescCurveSansTest": "Estimées depuis tes MEILLEURS EFFORTS mesurés (courbe d'allure). Sans effort maximal récent, elles peuvent sous-estimer ton niveau.",
     "perf.vo2est": "VO2max estimé", "perf.vo2from": "D'après {sources}", "perf.emptyTitle": "Aucune donnée de performance", "perf.emptyDesc": "Fais le test VMA (à l'inscription ou dans Paramètres) pour tout calibrer",
     "perf.predTitle": "Prédictions de chrono", "perf.vo2trend": "Tendance VO2max", "perf.predGraph": "Tendance des allures prédites", "perf.predDescTest": "Estimées depuis ta VMA (test). Un test VMA récent = des prédictions plus justes.", "perf.predDescSess": "Estimées depuis ta VMA (tes séances récentes). Un test VMA récent = des prédictions plus justes.", "perf.predDescGarmin": "Calées sur ta VO2max Garmin (mesurée par ta montre) — bien plus fiable qu'une estimation.", "perf.predDescCurve": "Estimées depuis tes MEILLEURS EFFORTS mesurés (courbe d'allure). Sans effort maximal récent, elles sous-estiment : un test VMA les recalerait.",
     "perf.zonesInconnues": "Zones cardiaques indisponibles : ta FC max n'est pas encore connue. Relie une montre avec capteur cardiaque (Sync Montre) : sa FC max, ou ton pic sur une séance soutenue, la donnera.", "perf.zonesPanne": "Zones cardiaques momentanément indisponibles : ta FC max n'a pas pu être lue. Réessaie dans un instant.", "perf.zonesTitle": "Zones de fréquence cardiaque", "perf.maxHrLabel": "FC max : {n} bpm", "perf.pacesTitle": "Allures de référence",
@@ -97,6 +102,11 @@ const P: Record<string, Record<string, string>> = {
     "gt.race": "Target race", "gt.weekly": "Weekly km", "gt.monthly": "Monthly km", "gt.pace": "Target pace", "gt.weight": "Target weight",
     "perf.title": "Performance data", "perf.vma": "vVO2max", "perf.maxHr": "Max HR", "perf.restHr": "Resting HR", "perf.lt": "Lactate threshold",
     "perf.vmaWarn": "vVO2max estimated from your best sessions (no test on record). Take a vVO2max test for exact paces and predictions.",
+    "perf.vmaWarnSansTest": "vVO2max estimated from your sessions, with no measurement on record.",
+    "perf.emptyDescSansTest": "Your sessions can't estimate your vVO2max yet.",
+    "perf.predDescTestSansTest": "Estimated from your recorded vVO2max.",
+    "perf.predDescSessSansTest": "Estimated from your vVO2max (your recent sessions).",
+    "perf.predDescCurveSansTest": "Estimated from your BEST MEASURED EFFORTS (pace curve). Without a recent maximal effort, they may underestimate your level.",
     "perf.vo2est": "Estimated VO2max", "perf.vo2from": "From {sources}", "perf.emptyTitle": "No performance data", "perf.emptyDesc": "Take the vVO2max test (at sign-up or in Settings) to calibrate everything",
     "perf.predTitle": "Time predictions", "perf.vo2trend": "VO2max trend", "perf.predGraph": "Predicted pace trend", "perf.predDescTest": "Estimated from your vVO2max (test). A recent test = sharper predictions.", "perf.predDescSess": "Estimated from your vVO2max (your recent sessions). A recent test = sharper predictions.", "perf.predDescGarmin": "Based on your Garmin VO2max (measured by your watch) — far more reliable than an estimate.", "perf.predDescCurve": "Estimated from your BEST MEASURED EFFORTS (pace curve). Without a recent maximal effort they underestimate: a vVO2max test would reset them.",
     "perf.zonesInconnues": "Heart rate zones unavailable: your max HR is not known yet. Connect a watch with a heart rate sensor (Watch Sync): its max HR, or your peak during a hard session, will provide it.", "perf.zonesPanne": "Heart rate zones temporarily unavailable: your max HR could not be read. Try again in a moment.", "perf.zonesTitle": "Heart rate zones", "perf.maxHrLabel": "Max HR: {n} bpm", "perf.pacesTitle": "Reference paces",
@@ -135,6 +145,11 @@ const P: Record<string, Record<string, string>> = {
     "gt.race": "Zielrennen", "gt.weekly": "Wochen-km", "gt.monthly": "Monats-km", "gt.pace": "Zieltempo", "gt.weight": "Zielgewicht",
     "perf.title": "Leistungsdaten", "perf.vma": "vVO2max", "perf.maxHr": "Max. Puls", "perf.restHr": "Ruhepuls", "perf.lt": "Laktatschwelle",
     "perf.vmaWarn": "vVO2max aus deinen besten Einheiten geschätzt (kein Test gespeichert). Mach einen vVO2max-Test für exakte Tempi und Prognosen.",
+    "perf.vmaWarnSansTest": "vVO2max aus deinen Einheiten geschätzt, ohne gespeicherte Messung.",
+    "perf.emptyDescSansTest": "Deine Einheiten erlauben noch keine Schätzung deiner vVO2max.",
+    "perf.predDescTestSansTest": "Geschätzt aus deiner gespeicherten vVO2max.",
+    "perf.predDescSessSansTest": "Geschätzt aus deiner vVO2max (deine letzten Einheiten).",
+    "perf.predDescCurveSansTest": "Geschätzt aus deinen BESTEN GEMESSENEN LEISTUNGEN (Tempokurve). Ohne aktuelle maximale Belastung können sie dein Niveau unterschätzen.",
     "perf.vo2est": "Geschätzte VO2max", "perf.vo2from": "Aus {sources}", "perf.emptyTitle": "Keine Leistungsdaten", "perf.emptyDesc": "Mach den vVO2max-Test (bei der Anmeldung oder in den Einstellungen) zum Kalibrieren",
     "perf.predTitle": "Zeitprognosen", "perf.vo2trend": "VO2max-Verlauf", "perf.predGraph": "Tempo-Prognose-Verlauf", "perf.predDescTest": "Geschätzt aus deiner vVO2max (Test). Ein aktueller Test = genauere Prognosen.", "perf.predDescSess": "Geschätzt aus deiner vVO2max (deine letzten Einheiten). Ein aktueller Test = genauere Prognosen.", "perf.predDescGarmin": "Basierend auf deiner Garmin-VO2max (von deiner Uhr gemessen) — viel zuverlässiger als eine Schätzung.", "perf.predDescCurve": "Geschätzt aus deinen BESTEN GEMESSENEN LEISTUNGEN (Tempokurve). Ohne aktuelle maximale Belastung unterschätzen sie: ein Test würde sie neu einordnen.",
     "perf.zonesInconnues": "Herzfrequenzzonen nicht verfügbar: deine maximale HF ist noch unbekannt. Verbinde eine Uhr mit Herzfrequenzsensor (Uhr-Sync): ihre maximale HF oder dein Spitzenwert bei einer harten Einheit liefert sie.", "perf.zonesPanne": "Herzfrequenzzonen vorübergehend nicht verfügbar: deine maximale HF konnte nicht gelesen werden. Versuche es gleich noch einmal.", "perf.zonesTitle": "Herzfrequenzzonen", "perf.maxHrLabel": "Max. Puls: {n} bpm", "perf.pacesTitle": "Referenz-Tempi",
@@ -173,6 +188,11 @@ const P: Record<string, Record<string, string>> = {
     "gt.race": "Carrera objetivo", "gt.weekly": "Km semanal", "gt.monthly": "Km mensual", "gt.pace": "Ritmo objetivo", "gt.weight": "Peso objetivo",
     "perf.title": "Datos de rendimiento", "perf.vma": "VAM", "perf.maxHr": "FC Máx", "perf.restHr": "FC Reposo", "perf.lt": "Umbral láctico",
     "perf.vmaWarn": "VAM estimada a partir de tus mejores sesiones (sin test registrado). Haz un test de VAM para ritmos y predicciones exactas.",
+    "perf.vmaWarnSansTest": "VAM estimada a partir de tus sesiones, sin medición registrada.",
+    "perf.emptyDescSansTest": "Tus sesiones aún no permiten estimar tu VAM.",
+    "perf.predDescTestSansTest": "Estimadas a partir de tu VAM registrada.",
+    "perf.predDescSessSansTest": "Estimadas a partir de tu VAM (tus sesiones recientes).",
+    "perf.predDescCurveSansTest": "Estimadas a partir de tus MEJORES ESFUERZOS medidos (curva de ritmos). Sin un esfuerzo máximo reciente pueden subestimar tu nivel.",
     "perf.vo2est": "VO2máx estimado", "perf.vo2from": "Según {sources}", "perf.emptyTitle": "Sin datos de rendimiento", "perf.emptyDesc": "Haz el test de VAM (al registrarte o en Ajustes) para calibrarlo todo",
     "perf.predTitle": "Predicciones de tiempo", "perf.vo2trend": "Tendencia VO2máx", "perf.predGraph": "Tendencia de ritmos previstos", "perf.predDescTest": "Estimadas a partir de tu VAM (test). Un test reciente = predicciones más exactas.", "perf.predDescSess": "Estimadas a partir de tu VAM (tus sesiones recientes). Un test reciente = predicciones más exactas.", "perf.predDescGarmin": "Basadas en tu VO2máx de Garmin (medida por tu reloj) — mucho más fiable que una estimación.", "perf.predDescCurve": "Estimadas a partir de tus MEJORES ESFUERZOS medidos (curva de ritmos). Sin un esfuerzo máximo reciente subestiman: un test las recalibraría.",
     "perf.zonesInconnues": "Zonas cardíacas no disponibles: todavía no se conoce tu FC máxima. Conecta un reloj con sensor cardíaco (Sincronizar reloj): su FC máxima, o tu pico en una sesión intensa, la dará.", "perf.zonesPanne": "Zonas cardíacas no disponibles por el momento: no se ha podido leer tu FC máxima. Vuelve a intentarlo en un momento.", "perf.zonesTitle": "Zonas de frecuencia cardíaca", "perf.maxHrLabel": "FC máx: {n} ppm", "perf.pacesTitle": "Ritmos de referencia",
@@ -211,6 +231,11 @@ const P: Record<string, Record<string, string>> = {
     "gt.race": "Prova-alvo", "gt.weekly": "Km semanal", "gt.monthly": "Km mensal", "gt.pace": "Ritmo-alvo", "gt.weight": "Peso-alvo",
     "perf.title": "Dados de desempenho", "perf.vma": "VAM", "perf.maxHr": "FC Máx", "perf.restHr": "FC Repouso", "perf.lt": "Limiar de lactato",
     "perf.vmaWarn": "VAM estimada a partir das tuas melhores sessões (sem teste registado). Faz um teste de VAM para ritmos e previsões exatas.",
+    "perf.vmaWarnSansTest": "VAM estimada a partir das tuas sessões, sem medição registada.",
+    "perf.emptyDescSansTest": "As tuas sessões ainda não permitem estimar a tua VAM.",
+    "perf.predDescTestSansTest": "Estimadas a partir da tua VAM registada.",
+    "perf.predDescSessSansTest": "Estimadas a partir da tua VAM (as tuas sessões recentes).",
+    "perf.predDescCurveSansTest": "Estimadas a partir dos teus MELHORES ESFORÇOS medidos (curva de ritmos). Sem um esforço máximo recente podem subestimar o teu nível.",
     "perf.vo2est": "VO2máx estimado", "perf.vo2from": "Segundo {sources}", "perf.emptyTitle": "Sem dados de desempenho", "perf.emptyDesc": "Faz o teste de VAM (no registo ou nas Definições) para calibrar tudo",
     "perf.predTitle": "Previsões de tempo", "perf.vo2trend": "Tendência VO2máx", "perf.predGraph": "Tendência dos ritmos previstos", "perf.predDescTest": "Estimadas a partir da tua VAM (teste). Um teste recente = previsões mais exatas.", "perf.predDescSess": "Estimadas a partir da tua VAM (as tuas sessões recentes). Um teste recente = previsões mais exatas.", "perf.predDescGarmin": "Baseadas na tua VO2máx Garmin (medida pelo teu relógio) — muito mais fiável que uma estimativa.", "perf.predDescCurve": "Estimadas a partir dos teus MELHORES ESFORÇOS medidos (curva de ritmos). Sem um esforço máximo recente subestimam: um teste voltaria a calibrá-las.",
     "perf.zonesInconnues": "Zonas cardíacas indisponíveis: a tua FC máxima ainda não é conhecida. Liga um relógio com sensor cardíaco (Sincronizar relógio): a FC máxima dele, ou o teu pico numa sessão intensa, vai dá-la.", "perf.zonesPanne": "Zonas cardíacas momentaneamente indisponíveis: não foi possível ler a tua FC máxima. Tenta de novo daqui a pouco.", "perf.zonesTitle": "Zonas de frequência cardíaca", "perf.maxHrLabel": "FC máx: {n} bpm", "perf.pacesTitle": "Ritmos de referência",
@@ -336,13 +361,20 @@ function Toggle({ enabled, onToggle, label }: { enabled: boolean; onToggle: () =
 // catalogue du comparateur (lib/gear/modelesChaussures) — plus une liste figée à la main.
 
 // ── Main Component ─────────────────────────────────────────────────────────────
+/** La légende des prédictions de chrono. Un coureur exempté du test VMA (avis médical attendu,
+ *  marche-course) lit la variante SANS invitation au test (17/11/2026). */
+export function clePredictions(source: VmaSource, testVmaExclu: boolean): string {
+  const cle = source === "test" ? "perf.predDescTest" : source === "vo2max" ? "perf.predDescGarmin" : source === "courbe" ? "perf.predDescCurve" : "perf.predDescSess";
+  return testVmaExclu && cle !== "perf.predDescGarmin" ? `${cle}SansTest` : cle;
+}
+
 export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals, stats, fitness, userId, etatAbo, catalogue = [] }: {
   profile: Record<string, unknown> | null;
   baseline: Record<string, unknown> | null;
   shoes: Record<string, unknown>[];
   goals: Record<string, unknown>[];
   stats: Stats;
-  fitness?: { estimatedVma: number | null; vmaSource?: VmaSource; /** La FC max COMMUNE (`fcMaxDeLAthlete`), pas un simple pic. */ fcMax: number | null; /** Lecture de la FC max en panne. */ fcMaxPanne?: boolean; garminVo2max?: number | null;
+  fitness?: { estimatedVma: number | null; vmaSource?: VmaSource; /** Test VMA à éviter (avis médical attendu, marche-course) : pas d'invitation. */ testVmaExclu?: boolean; /** La FC max COMMUNE (`fcMaxDeLAthlete`), pas un simple pic. */ fcMax: number | null; /** Lecture de la FC max en panne. */ fcMaxPanne?: boolean; garminVo2max?: number | null;
     garmin?: { vo2max?: number | null; restingHR?: number | null; lthr?: number | null; thresholdPaceSecPerKm?: number | null; ctl?: number | null; atl?: number | null; vo2maxHistory?: { date: string; v: number }[] | null } | null };
   userId: string;
   /** État Stripe mémorisé par le webhook : prélèvement, résiliation, échec. */
@@ -1561,7 +1593,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
                   {vmaSource === "séances" && (
                     <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-700">
                       <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                      <span>{tr("perf.vmaWarn")}</span>
+                      <span>{tr(fitness?.testVmaExclu ? "perf.vmaWarnSansTest" : "perf.vmaWarn")}</span>
                     </div>
                   )}
 
@@ -1604,8 +1636,8 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
               ) : (
                 <div className="text-center py-10">
                   <AlertCircle className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
-                  <p className="text-zinc-400 text-sm">{tr("perf.emptyTitle")}</p>
-                  <p className="text-zinc-300 text-xs mt-1">{tr("perf.emptyDesc")}</p>
+                  <p className="text-zinc-500 text-sm">{tr("perf.emptyTitle")}</p>
+                  <p className="text-zinc-500 text-xs mt-1">{tr(fitness?.testVmaExclu ? "perf.emptyDescSansTest" : "perf.emptyDesc")}</p>
                 </div>
               )}
             </div>
@@ -1634,7 +1666,7 @@ export function ProfileSettings({ profile, baseline, shoes, goals: initialGoals,
             {predictions.length > 0 && (
               <div className="bento-card space-y-3">
                 <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><Trophy className="w-4 h-4 text-amber-500" /> {tr("perf.predTitle")}</h3>
-                <p className="text-xs text-zinc-500 -mt-1">{tr(vmaSource === "test" ? "perf.predDescTest" : vmaSource === "vo2max" ? "perf.predDescGarmin" : vmaSource === "courbe" ? "perf.predDescCurve" : "perf.predDescSess")}</p>
+                <p className="text-xs text-zinc-500 -mt-1">{tr(clePredictions(vmaSource, !!fitness?.testVmaExclu))}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {predictions.map((p, i) => (
                     <div key={p.label} className="rounded-2xl bg-zinc-50 p-4 text-center">
