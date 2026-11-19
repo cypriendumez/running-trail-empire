@@ -8,6 +8,7 @@ import { meilleurEffort, effectiveVma, type MeilleurEffort } from "@/lib/running
 import { fcMaxPourEfforts } from "@/lib/coach/fcCible";
 import { isRun } from "@/lib/intervals/sport";
 import { heatAcclimation } from "@/lib/weather/openMeteo";
+import { repereDuJourCoureur } from "@/lib/time/fuseau";
 
 /** D'où vient la VMA affichée (dates au format AAAA-MM-JJ). */
 export type SourceVma =
@@ -28,13 +29,13 @@ export const JOURS_VMA = 120;
 /** Garde-fou de la lecture (`lireSeancesVma`) : 500 séances en 120 jours, plus de 4 par jour. */
 export const PLAFOND_SEANCES_VMA = 500;
 /** Premier jour lu (« AAAA-MM-JJ ») : un jour de marge, la fenêtre exacte est appliquée par `effortDesSeances`. */
-export function debutFenetreVma(maintenant = Date.now()): string {
+export function debutFenetreVma(maintenant = repereDuJourCoureur()): string {
   return new Date(maintenant - (JOURS_VMA + 1) * 86400000).toISOString().slice(0, 10);
 }
 
 /** Facteur d'acclimatation à la chaleur, déduit des séances elles-mêmes (jours ≥ 25 °C sur 30 jours),
  *  exactement comme le coach : un athlète acclimaté souffre moins, son chrono se corrige moins. */
-export function acclimatationDesSeances(seances: readonly { date?: string | null; weather_temp_c?: unknown }[], maintenant = Date.now()): number {
+export function acclimatationDesSeances(seances: readonly { date?: string | null; weather_temp_c?: unknown }[], maintenant = repereDuJourCoureur()): number {
   const jours = new Set((seances ?? [])
     .filter((w) => { const t = Number(w.weather_temp_c); return w.weather_temp_c != null && Number.isFinite(t) && t >= 25
       && maintenant - new Date(String(w.date ?? "")).getTime() <= 30 * 86400000; })
@@ -49,7 +50,7 @@ export function acclimatationDesSeances(seances: readonly { date?: string | null
  * conditions avec l'acclimatation à la chaleur. `seances` peut en porter plus (plus anciennes) : la
  * fenêtre est appliquée ici, quel que soit l'ordre.
  */
-export function effortDesSeances(seances: readonly SeanceVma[], fcMax: number | null | undefined, maintenant = Date.now()): MeilleurEffort | null {
+export function effortDesSeances(seances: readonly SeanceVma[], fcMax: number | null | undefined, maintenant = repereDuJourCoureur()): MeilleurEffort | null {
   const debut = debutFenetreVma(maintenant);
   const lues = (seances ?? []).filter((w) => String(w.date ?? "").slice(0, 10) >= debut);
   const courses = lues.filter((w) => isRun(w.sport));

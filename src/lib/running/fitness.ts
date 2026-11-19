@@ -6,6 +6,7 @@ import { jourLocal, ecartJours, MIN_JOURS_CHARGE } from "@/lib/streak/compute";
 // ─────────────────────────────────────────────────────────────────────────────
 import { heatAdvice } from "@/lib/weather/openMeteo";
 import { vdotDe, vmaDeVdot, vdotDeVma, tempsPourVdot, facteurSocle, SL_PLANCHER_KM, SL_PRET_KM, type Socle } from "./vdot";
+import { repereDuJourCoureur } from "@/lib/time/fuseau";
 export type { Socle } from "./vdot";
 
 export const RACE_DISTANCES: { label: string; km: number }[] = [
@@ -453,7 +454,7 @@ export function meilleurEffort(
    * minuit et 1 h (2 h l'été) à Paris, et la VMA, donc toutes les allures, changeait au matin
    * (@HeadCoach, 16/11/2026 : 17 puis 15,2 km/h, 29 s/km au seuil).
    */
-  maintenant = Date.now(),
+  maintenant = repereDuJourCoureur(),
 ): MeilleurEffort | null {
   let best: MeilleurEffort | null = null;
   const now = maintenant;

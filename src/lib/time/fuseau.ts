@@ -118,6 +118,18 @@ export function finDuJourCoureur(jour: string, tz: string = FUSEAU_DEFAUT): numb
 }
 
 /**
+ * La référence des fenêtres pour AUJOURD'HUI du coureur : `finDuJourCoureur` de son jour à
+ * l'instant `maintenant`. C'est l'instant PAR DÉFAUT des fonctions partagées qui comptent des jours
+ * (VMA « séances », FC max, cibles de FC) : les écrans, les routes et le coach retiennent ainsi les
+ * mêmes jours à toute heure. Avant, les écrans comptaient depuis l'heure du serveur : la nuit où le
+ * meilleur effort sortait des 120 jours, l'écran affichait 17 km/h pendant que le plan était calé
+ * sur 15,2, entre minuit et 1 h (2 h l'été) à Paris (17/11/2026).
+ */
+export function repereDuJourCoureur(maintenant: number = Date.now(), tz: string = FUSEAU_DEFAUT): number {
+  return finDuJourCoureur(aujourdhui(tz, new Date(maintenant)), tz);
+}
+
+/**
  * Écrit une DATE CIVILE stockée (« 2026-09-03 »).
  *
  * ⚠️ AUCUN FUSEAU, ET C'EST LE POINT. On ancre à midi UTC puis on met en forme EN UTC :

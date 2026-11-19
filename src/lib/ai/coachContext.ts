@@ -3,7 +3,7 @@ import { sansAllureInconnue } from "@/lib/coach/allureInconnue";
 import { picsSaison, avecSaison } from "@/lib/coach/ciblesFcServeur";
 import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { effortDesSeances, acclimatationDesSeances } from "@/lib/dashboard/vmaAffichee";
-import { referencesFc, ciblesFcAthlete, footingTropIntense, maxDeReference, fcMaxConnue, estSortieFacile, PART_FC_FACILE, PART_FC_DURE, fcMaxPourEfforts, airFroid, PIC_FC_JOURS, type CiblesFc, seuilMesure } from "@/lib/coach/fcCible";
+import { referencesFc, ciblesFcAthlete, premierJourFootingsFc, footingTropIntense, maxDeReference, fcMaxConnue, estSortieFacile, PART_FC_FACILE, PART_FC_DURE, fcMaxPourEfforts, airFroid, PIC_FC_JOURS, type CiblesFc, seuilMesure } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
 import { menuSelonDenivele, preferenceDenivele } from "@/lib/coach/denivele";
@@ -747,7 +747,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
       seuil: seuilMesure(b?.lt_hr, gmFc?.lthr),
     }), picsDeSaison, airFroid(forecast)),
     workouts.filter((w) => isRun(w.sport) && !isHardType(w.type) && (num(w.duration_seconds) ?? 0) >= 20 * 60
-      && now - new Date(String(w.date).slice(0, 10) + "T12:00:00Z").getTime() <= 60 * 86400000)
+      && String(w.date).slice(0, 10) >= premierJourFootingsFc(now))
       .map((w) => num(w.avg_hr)).filter((v): v is number => v != null),
   );
   // Une séance est « dure » si son TYPE le dit OU si la FC révèle un effort élevé (≥ 90 % FCmax).
