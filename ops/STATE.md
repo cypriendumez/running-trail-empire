@@ -1,6 +1,6 @@
 # État de l'équipe d'agents Pacevo
 
-*Tenu par `@Nexus`. Mis à jour le 13/11/2026 à 7 h (routine Direction) ; retouché en session le 16/11/2026 (production, PR #47, #51, #54, #55 et #56). Chaque ligne dit ce qui TOURNE VRAIMENT,
+*Tenu par `@Nexus`. Mis à jour le 13/11/2026 à 7 h (routine Direction) ; retouché en session le 16/11/2026 (production, PR #47, #51, #54, #55 et #56) et le 19/11/2026 (contrôle des agents : journaux des routines, tâches du Mac, GitHub Actions). Chaque ligne dit ce qui TOURNE VRAIMENT,
 pas ce qui est prévu : un agent écrit dans la constitution mais sans routine planifiée n'existe pas.*
 
 > ⚠️ **Dépôt PUBLIC** (`cypriendumez/running-trail-empire`). Rien de personnel, de comptable ni
@@ -21,6 +21,13 @@ avec les sessions de Cyprien ; en journée, 8 passages sur 10 étaient refusés 
 Leurs journaux (`list_runs`, `get_run_log`) ne sont pas lisibles depuis une routine : un passage
 sans PR ni rapport n'est classé ni « RAS » ni « refus » tant que Cyprien n'a pas lu le journal.
 
+**Contrôle du 19/11 (journaux lus en session) : la limite HEBDOMADAIRE a coupé l'équipe du 17/11 au
+soir au 19/11 à 12 h.** Journal : `rate_limit: rejected (seven_day)`, passage arrêté en une seconde. Touchés :
+Bugs (17/11 23 h, 18/11 6 h et 23 h, 19/11 6 h : les quatre ont duré une dizaine de secondes ; journaux lus
+pour 17/11 23 h et 19/11 6 h) et le courrier de `@Concierge` (19/11, aussi le 11/11). Les routines de nuit sont
+les premières à tomber quand les sessions de la semaine ont consommé la limite : un passage de moins de
+30 s est un refus, pas un RAS. Les 7 routines sont actives (`RemoteTrigger list`, 19/11).
+
 | Routine | Agents | Quand (heure de Paris) | Modèle |
 |---|---|---|---|
 | Bugs Pacevo | `@Sweeper` (+ visa `@Architect` depuis le 09/11, à prouver) | tous les jours, 6 h et 23 h | Sonnet 5.5 |
@@ -40,9 +47,9 @@ qu'une routine cloud ne peut pas faire. Leur état n'est pas visible depuis le c
 | Sauvegarde chiffrée de la base | `@TimeMachine` | dimanche 11 h |
 
 **Tâches GitHub Actions** (suivies dans /admin › Automatisation) : synchro du coach, sauvegarde
-hebdomadaire des tables publiques (dimanche 03 h 20), newsletter, veille des courses. Au 13/11 :
-derniers passages tous réussis ; sauvegarde publique réussie le 08/11 (prochaine le dimanche 15/11) ;
-`@Vigie` réussie le 13/11 à 01:58 UTC.
+hebdomadaire des tables publiques (dimanche 03 h 20), newsletter, veille des courses. Au 19/11 :
+les 60 derniers passages (12 tâches) tous réussis ; sauvegarde publique réussie le 15/11 ; lettre du
+lundi partie le 16/11 ; `@Vigie` réussie le 19/11 à 04:35 UTC.
 `@Vigie` (`vigie.yml`) sonde pacevo.fr : demandé toutes les 30 min, mais GitHub ne lance les
 planifications de ce dépôt que toutes les 3 à 4 heures (mesuré le 09/11 : 2 passages planifiés en
 15 h, comme `sync-coach`). Ce trou est comblé depuis le 09/11 par **UptimeRobot** (offre gratuite,
@@ -54,22 +61,24 @@ https://pacevo.fr (HTTP 200) et https://pacevo.fr/version.json (alerte si « com
 **Production au 16/11** (relevé en session, 15 h 40) : pacevo.fr sert `8476e160`, la tête de `main` avant
 la fusion de la PR #54 (#48, #49, #50, #52, #53, #55 et #56 en ligne ; #47 et #54 ne changent que `ops/` et
 des tests). Plus de retard de code.
+**Production au 19/11** (relevé en session) : pacevo.fr sert `24637bab`, la tête de `main` (#57 à #61 en ligne).
+Plus de retard de code.
 
 ## Vague 1 : 12 agents sur 12 en place
 
 | # | Agent | État | Preuve / remarque |
 |---|---|---|---|
 | 1 | `@Nexus` | **EXÉCUTÉ** | 13/11 (Direction, 1er passage) : ce fichier et le point de 2 minutes, à partir de `ops/ATLAS_SYNC.md`. |
-| 3 | `@Sparring` | **EXÉCUTÉ** | 09/11 (5 h) : profil marathonien sub-3 h ajouté ; 2 défauts du plan trouvés (« /km/km », seuil 3 jours après un marathon), PR #4 fusionnée et en ligne (1e2173c). 16/11 (5 h) : profil 7 (emploi du temps chaotique) éprouvé, PR #54 (tests et matrice seuls) ; les 8 profils de la matrice ont un test (`ops/sparring/PROFILS.md`) ; un défaut de reprise trouvé, non corrigé (voir « BLOQUÉES », point 8). |
+| 3 | `@Sparring` | **EXÉCUTÉ** | 09/11 (5 h) : profil marathonien sub-3 h ajouté ; 2 défauts du plan trouvés (« /km/km », seuil 3 jours après un marathon), PR #4 fusionnée et en ligne (1e2173c). 16/11 (5 h) : profil 7 (emploi du temps chaotique) éprouvé, PR #54 (tests et matrice seuls) ; les 8 profils de la matrice ont un test (`ops/sparring/PROFILS.md`) ; un défaut de reprise trouvé, corrigé par la PR #57, en ligne au 19/11 (voir « BLOQUÉES », point 8). |
 | 7 | `@SafeRun` | **EXÉCUTÉ** | 16/11 (Coach) : `kine.crash`, `douleurs-course` et `sante` verts ; Kiné IA toujours retiré ; aucun diagnostic dans les textes servis après une douleur ; rien à corriger (PR #54). |
-| 8 | `@Sweeper` | **EXÉCUTÉ** | 08/11 : pacevo.fr joignable depuis le cloud (version lue), aucun défaut sur 24 h. Filtre `localhost` en place à la source depuis le 06/11. Depuis le 09/11 à 23 h : aucune PR « Bugs », journal non lu (RAS ou refus, non tranché). |
+| 8 | `@Sweeper` | **EXÉCUTÉ** | 08/11 : pacevo.fr joignable depuis le cloud (version lue), aucun défaut sur 24 h. Filtre `localhost` en place à la source depuis le 06/11. Depuis le 09/11 à 23 h : aucune PR « Bugs ». Journal du 16/11 à 23 h lu le 19/11 : vrai RAS (`error_logs` vide hors source `reseau` sur 24 h, aucune PR ouverte). Du 17/11 à 23 h au 19/11 à 6 h : quatre passages refusés par la limite hebdomadaire. |
 | 9 | `@Bunker` | **EXÉCUTÉ** | 08/11 : 23 → 9 failles de dépendances, Next.js 16.4.5, déployé. Restent `zod` (importé nulle part) et la chaîne ESLint (non utilisée). |
 | 10 | `@Vault` | PLANIFIÉ | Sécurité, le 5/12. Lecture seule ; une faille non corrigée ne va jamais dans le dépôt. |
-| 21 | `@Plume` | **EXÉCUTÉ** | 09/11 : PR #6 « Courir dans le froid et la nuit » (p16) fusionnée et en ligne (e738e78), née de la relance manuelle du 07/11, avant le visa `@Mercator`. Blog sujets du 10/11 : aucune PR, journal non lu. Prochain article le 15/11 à 3 h (cron `0 3 1,15 * *`, heure de Paris). |
+| 21 | `@Plume` | **EXÉCUTÉ** | 09/11 : PR #6 « Courir dans le froid et la nuit » (p16) fusionnée et en ligne (e738e78), née de la relance manuelle du 07/11, avant le visa `@Mercator`. 15/11 (3 h) : PR #50 « Le sommeil », double relecture `verificateur-sources` et visa `@Mercator` ACCORDÉ, fusionnée. Blog sujets du 16/11 (journal lu le 19/11) : 6 sujets, RENVOYÉ par `@Mercator` (doublon de p17, chiffre « 14 000 courses » périmé, sujet contraire à `repriseArret.ts`), puis VISA ACCORDÉ à 5 sujets ; rapport rendu dans le journal, pas de PR (normal pour cette routine). |
 | 26 | `@Radar` | PLANIFIÉ | Sécurité et veille, le 5/12. Sites des concurrents autorisés dans le réseau cloud. |
 | 34 | `@Greffier` | **EXÉCUTÉ** | 13/11 (Direction, 1er passage) : `ops/greffier/API-MONTRES.md` mis à jour (Strava : interdiction IA confirmée par l'API Policy 2026 ; Garmin : la page officielle ne dit plus « suspendu », reprise non confirmée). Visa `@Trésorier` RENVOYÉ, corrigé, à redemander. |
-| 48 | `@TimeMachine` | **EXÉCUTÉ** | 08/11 : 1re sauvegarde chiffrée complète de la base, relue et recomptée. Tâche locale chaque dimanche ; passage du 15/11 non visible depuis le cloud. |
-| 61 | `@Concierge` | **EXÉCUTÉ** | 09/11 (8 h 05, 1er passage) : 9 fils classés, 1 brouillon propre (trou « à compléter » au lieu d'inventer), 0 envoi, briefing écrit dans `~/Desktop/Pacevo/`. Passages suivants non visibles depuis le cloud. Le connecteur ne voit pas le Spam. |
+| 48 | `@TimeMachine` | **EXÉCUTÉ** | 08/11 : 1re sauvegarde chiffrée complète de la base, relue et recomptée. Tâche locale chaque dimanche. **Le passage du 15/11 n'a rien produit** (aucune archive, aucune trace de passage dans l'app, cause inconnue) : 11 jours sans sauvegarde privée. Relancé en session le 19/11 : archive du 19/11 VALIDE (51 tables, 20 184 lignes, 12 comptes, 8,9 Mo), 2 archives gardées ; `journal.md` créé dans le dossier des sauvegardes (hors dépôt) pour voir un dimanche manqué. |
+| 61 | `@Concierge` | **EXÉCUTÉ** | 09/11 (8 h 05, 1er passage) : 9 fils classés, 1 brouillon propre (trou « à compléter » au lieu d'inventer), 0 envoi, briefing écrit dans `~/Desktop/Pacevo/`. Du 09/11 au 19/11 (relevé sur le Mac) : 8 passages réussis sur 11 jours ; échecs les 11/11 et 19/11 (limite hebdomadaire), aucun passage les 14, 15 et 18/11, plusieurs passages tardifs (Mac éteint ou en veille à 8 h, probablement). Courrier du 19/11 relancé en session. Le connecteur ne voit pas le Spam. |
 | 64 | `@PostMortem` | **EXÉCUTÉ** | 13/11 (Direction) : leçons de la semaine ajoutées à `ops/memory/LESSONS_LEARNED.md` (rechute FC max datée du 12/11, clause incorporée par renvoi, visa = bloc tagué). Visa `@Strategos` RENVOYÉ, corrigé, à redemander. |
 
 ## Direction (créée le 09/11/2026) : 11 unités définies, 7 branchées dans les routines, 1er passage Direction le 13/11
@@ -95,7 +104,7 @@ toutes les autres viennent de sessions de Cyprien, qui ne sont pas tenues au vis
 | 74 | `@HeadCoach` | pôle C, directeur scientifique | DÉFINI, branché le 09/11 ; appelé le 16/11 (deux visas RENVOYÉ recopiés dans la PR #54 de la routine, puis VISA ACCORDÉ en session le 16/11) | Coach (lundi 5 h), avant la PR ; ACTIF après lecture du journal du 16/11 |
 | 75 | `@Architect` | pôle D, technique et sécurité | DÉFINI, branché le 09/11 | Bugs (6 h, 23 h) et Sécurité et veille (le 5) ; aucun visa prouvé |
 | 76 | `@Maestro` | pôle E, produit et design | DÉFINI | Gazette (15/11) ; à la demande sur toute PR d'interface |
-| 77 | `@Mercator` | pôle F, marketing | DÉFINI, branché le 09/11 | Blog (15/11 à 3 h, lundi) et Sécurité et veille (rapport de `@Radar`) |
+| 77 | `@Mercator` | pôle F, marketing | ACTIF (Blog) : visa dans la PR #50 (15/11) et dans le journal des sujets du 16/11, lu le 19/11 (RENVOYÉ puis VISA ACCORDÉ) | Blog (le 1er et le 15, lundi) et Sécurité et veille (rapport de `@Radar`, le 5/12) |
 | 78 | `@Alliance` | pôle G, commercial et partenariats | DÉFINI | avec son pôle (en attente) ; à la demande |
 | 79 | `@Trésorier` | pôle H, finance et juridique | DÉFINI, branché le 09/11 ; appelé le 13/11 (RENVOYÉ sur `API-MONTRES.md`) | Direction ; ACTIF après lecture du journal du 13/11 |
 | 80 | `@Oracle` | pôle I, données | DÉFINI | avec son pôle (en attente) ; à la demande |
@@ -116,11 +125,14 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
 
 ## À RATTRAPER
 
-- Aucune connue. Les tâches locales (`@Concierge`, `@TimeMachine`) ne sont pas visibles depuis le cloud :
-  leur état depuis le 09/11 n'est pas vérifié.
-- Journaux à lire par Cyprien (`get_run_log`) : Bugs (huit passages du 09/11 23 h au 13/11 6 h, aucune PR),
-  Blog sujets du 10/11 (aucune PR), Direction du 13/11. Sans cette lecture, rien ne distingue un vrai RAS d'un
-  refus pour limite d'usage.
+- **Limite hebdomadaire** (19/11) : elle a coupé Bugs et le courrier du 17/11 au soir au 19/11 à 12 h. Le
+  remède n'est pas technique : moins de sessions en parallèle en début de semaine, ou une offre avec plus
+  d'usage. Décision de Cyprien.
+- **Veille des concurrents** (tâche locale unique prévue le 16/11) : jamais démarrée, son dossier de travail est
+  introuvable (`start_failed, folder_missing`). À re-dater avec le bon dossier, ou à abandonner : décision de Cyprien.
+- `@TimeMachine` : constater le passage automatique du dimanche 22/11 (une ligne de plus dans `journal.md`).
+- Journaux encore à lire (`get_run_log`) : Direction du 13/11, Coach du 16/11 (pour passer `@Atlas`,
+  `@Strategos`, `@Trésorier` et `@HeadCoach` en ACTIF).
 
 ## BLOQUÉES ou en cours
 
@@ -174,7 +186,8 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    l'intensité reste bornée (rien de dur avant le 14ᵉ jour d'une reprise de quatre semaines) ; et après dix jours
    d'arrêt, pas de séance dure avant 48 h. Reste ouvert : le volume au-delà de 28 jours (plafond ordinaire inchangé)
    et le retour d'un coup de la sortie longue à la fin de la reprise.
-   À fusionner et à déployer sur GO de Cyprien.
+   **Fusionné (PR #57, le 17/11) et EN LIGNE** : pacevo.fr sert `24637bab` le 19/11, qui contient #57 à #61.
+   Restent ouverts les deux points ci-dessus.
 
 ## Résolues le 13/11/2026
 
