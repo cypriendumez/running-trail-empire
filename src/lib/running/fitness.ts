@@ -447,9 +447,16 @@ export function meilleurEffort(
   windowDays = 120,
   /** Acclimatation à la chaleur (≤ 1) : un athlète acclimaté souffre moins, on corrige moins. */
   heatFactor = 1,
+  /**
+   * L'instant d'où se compte la fenêtre. Le coach passe la fin du jour du coureur
+   * (`finDuJourCoureur`) : à l'heure du serveur (UTC), un effort à J-120 comptait encore entre
+   * minuit et 1 h (2 h l'été) à Paris, et la VMA, donc toutes les allures, changeait au matin
+   * (@HeadCoach, 16/11/2026 : 17 puis 15,2 km/h, 29 s/km au seuil).
+   */
+  maintenant = Date.now(),
 ): MeilleurEffort | null {
   let best: MeilleurEffort | null = null;
-  const now = Date.now();
+  const now = maintenant;
   for (const w of workouts) {
     if (w.date && (now - new Date(w.date).getTime()) > windowDays * 86400000) continue;
     if (!w.distance_km || w.distance_km < 2 || !w.duration_seconds) continue;

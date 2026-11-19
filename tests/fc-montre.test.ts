@@ -162,7 +162,7 @@ test("la synchro garde la FC max de la montre ; coach et envois lisent 6 mois et
   for (const f of ["src/lib/intervals/syncUser.ts", "src/app/api/intervals/sync/route.ts"])
     assert.match(code(f), /maxHR: Number\(lastRun(Act)?\?\.athlete_max_hr\) \|\| null,/, `${f} ne garde plus la FC max de la montre`);
   const c = code("src/lib/ai/coachContext.ts");
-  assert.match(c, /\.not\("max_hr", "is", null\)\.gte\("date", new Date\(Date\.now\(\) - PIC_FC_JOURS \* 86400000\)/, "le coach ne limite plus le pic aux 6 derniers mois");
+  assert.match(c, /\.not\("max_hr", "is", null\)\.gte\("date", new Date\(now - PIC_FC_JOURS \* 86400000\)/, "le coach ne limite plus le pic aux 6 derniers mois");
   assert.match(c, /const gmFc = \(\(p as Record<string, unknown> \| null\)\?\.garmin_metrics \?\? null\) as Record<string, unknown> \| null;\s*const maxHrDeclare = maxDeReference\(num\(b\?\.max_hr\) \?\? num\(p\?\.max_hr\), gmFc\?\.maxHR\);/, "le coach ignore la FC max de la montre");
   assert.match(c, /\.filter\(w => now - new Date\(String\(w\.date\)\.slice\(0, 10\) \+ "T12:00:00Z"\)\.getTime\(\) <= PIC_FC_JOURS \* 86400000\)/, "les 60 séances lues peuvent remonter au-delà de 6 mois");
   const srv = code("src/lib/coach/ciblesFcServeur.ts");
@@ -277,7 +277,7 @@ test("UNE seule FC max : coach, zones, discipline, montre, Jour J, bilan, analys
   const SEUIL = /^seuil: seuilMesure\(.*\blt_hr\b.*, [^,]*\blthr\)/;
   const sites: [string, RegExp[]][] = [
     ["src/lib/ai/coachContext.ts", [/fcMaxConnue\(\{ declaree: maxHrDeclare, observee: obsMaxHr0, seuil: seuilMesure\(b\?\.lt_hr, gmFc\?\.lthr\) \}\)/,
-      /\.not\("max_hr", "is", null\)\.gte\("date", new Date\(Date\.now\(\) - PIC_FC_JOURS \* 86400000\)/]],
+      /\.not\("max_hr", "is", null\)\.gte\("date", new Date\(now - PIC_FC_JOURS \* 86400000\)/]],
     ["src/app/dashboard/jour-j/page.tsx", [/fcMaxConnue\(\{\s*declaree: Number\(base\?\.max_hr\) \|\| Number\(fcProfil\?\.max_hr\) \|\| null, montre: gm\?\.maxHR,\s*observee: picFcObserve\(seances, jour\), seuil: seuilMesure\(base\?\.lt_hr, gm\?\.lthr\)/]],
     ["src/lib/ai/bilanDonnees.ts", [/fcMaxConnue\(\{\s*declaree: Number\(base\?\.max_hr\) \|\| Number\(prof\?\.max_hr\) \|\| null, montre: gm\?\.maxHR,\s*observee: picFcObserve\(seances, jour\), seuil: seuilMesure\(base\?\.lt_hr, gm\?\.lthr\)/]],
     ["src/app/api/ai/analyse-seance/route.ts", [/fcMaxConnue\(\{\s*declaree: Number\(baseFc\?\.max_hr\) \|\| Number\(profFc\?\.max_hr\) \|\| null, montre: profFc\?\.garmin_metrics\?\.maxHR,\s*observee: \(picRes\.data [^)]*\)\?\.max_hr, seuil: seuilMesure\(baseFc\?\.lt_hr, profFc\?\.garmin_metrics\?\.lthr\)/,
@@ -349,7 +349,7 @@ test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien,
     assert.equal(avec, sans, `FC max ${fcMax} : la sortie vélo a changé la VMA affichée (${sans} → ${avec})`);
   }
   const v = code("src/lib/dashboard/vmaAffichee.ts");
-  assert.match(v, /const courses = lues\.filter\(\(w\) => isRun\(w\.sport\)\);\s*return meilleurEffort\(courses, fcMaxPourEfforts\(fcMax, courses\), JOURS_VMA, acclimatationDesSeances\(lues, maintenant\)\);/, "effortDesSeances trie de nouveau avec son propre pic, lit d'autres sports ou oublie la chaleur");
+  assert.match(v, /const courses = lues\.filter\(\(w\) => isRun\(w\.sport\)\);\s*return meilleurEffort\(courses, fcMaxPourEfforts\(fcMax, courses\), JOURS_VMA, acclimatationDesSeances\(lues, maintenant\), maintenant\);/, "effortDesSeances trie de nouveau avec son propre pic, lit d'autres sports ou oublie la chaleur");
   assert.match(v, /const effort = effortDesSeances\(i\.seances, i\.fcMax\);/, "vmaAffichee a de nouveau son propre calcul d'effort");
   assert.doesNotMatch(v, /obsMaxHr/, "vmaAffichee recalcule son propre pic");
   // Chaque écran passe la FC max COMMUNE (lue par fcMaxDeLAthlete, ou déjà calculée par fcMaxConnue).
@@ -363,7 +363,7 @@ test("la VMA estimée trie ses efforts avec la FC max COMMUNE, partout (Cyprien,
     ["src/lib/ai/bilanDonnees.ts", [/profil: profilRes\.data as [^\n]*,\s*fcMax,\s*\}\);/]],
     ["src/lib/ai/coachContext.ts", [/const effort = effortDesSeances\(\(woRes\.data \?\? \[\]\) as never, await fcMaxDeLAthlete\(sb, userId\)\);/, /fromRuns: effort\?\.vma \?\? null,/,
       /fromRuns: objectifSeul \? null : effortDesSeances\(seancesVma as never, fcMaxEst, now\)\?\.vma \?\? estimateVmaFromRuns/,
-      /objectifSeul \? nonLu\(\) : lireSeancesVma\(sb, userId\),/, /lireSeancesVma\(sb, userId\),\s*sb\.from\("profiles"\)\.select\("\*"\)\.eq\("id", userId\)\.maybeSingle\(\),/,
+      /objectifSeul \? nonLu\(\) : lireSeancesVma\(sb, userId, now\),/, /lireSeancesVma\(sb, userId\),\s*sb\.from\("profiles"\)\.select\("\*"\)\.eq\("id", userId\)\.maybeSingle\(\),/,
       /const seancesVma = seancesVmaRes\.error \? workouts : /,
       /if \(seancesVmaRes\.error\) \{[\s\S]{0,300}await journaliserEchecUneFois\(null, \{ source: "coach-vma", userId,/, /const acclimVma = acclimatationDesSeances\(workouts as never, now\);/]],
     ["src/app/dashboard/plans/page.tsx", [/fcMaxDeLAthlete\(supabase, user\.id\),/, /fromRuns: effortDesSeances\(\(seancesVmaRes\.data \?\? \[\]\) as never, fcMaxVma\)\?\.vma \?\? null,/, /lireSeancesVma\(supabase, user\.id\),/]],
