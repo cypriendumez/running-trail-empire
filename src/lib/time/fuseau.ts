@@ -76,6 +76,19 @@ export function aujourdhui(tz: string, maintenant: Date = new Date()): string {
 }
 
 /**
+ * Un INSTANT dont le jour LOCAL (getters `getDate`, `getDay`… du fuseau de la machine) est le jour
+ * civil `jour` (« AAAA-MM-JJ »), quel que soit ce fuseau : midi local de ce jour.
+ *
+ * Sert au jour 0 du plan (16/11/2026) : `construireSemaine` raisonne en jours LOCAUX. Lui passer
+ * `new Date()` sur un serveur en UTC faisait commencer le plan la veille, entre minuit et 1 h (2 h
+ * l'été) heure de Paris. Midi laisse douze heures de marge de part et d'autre : aucun changement
+ * d'heure ne fait basculer de jour.
+ */
+export function instantDuJour(jour: string): Date {
+  return new Date(`${String(jour).slice(0, 10)}T12:00:00`);
+}
+
+/**
  * Écrit une DATE CIVILE stockée (« 2026-09-03 »).
  *
  * ⚠️ AUCUN FUSEAU, ET C'EST LE POINT. On ancre à midi UTC puis on met en forme EN UTC :
