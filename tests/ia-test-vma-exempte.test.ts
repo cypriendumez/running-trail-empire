@@ -326,7 +326,10 @@ async function main() {
         assert.match(text, /^- ⛔ Cadre de santé : le terrain ne relève jamais le plafond d'intensité de ce dossier/m, `${nom} (${quand}) : la ligne du terrain manque`);
         assert.match(text.split("\n")[1], plafond === "seuilBas" ? /SEUIL BAS au plus/ : /AUCUNE intensité/, `${nom} (${quand}) : l'en-tête ne dit pas le plafond « ${plafond} »`);
         // Le seuil mesuré reste un repère ; le sous-seuil est la limite haute du seuil bas, et disparaît sans intensité.
-        if (/ALLURE SEUIL \*\*MESURÉE\*\*/.test(temoin.text)) {
+        if (/ALLURE SEUIL \*\*MESURÉE\*\*/.test(temoin.text) && /grossesse/.test(nom)) {
+          // Grossesse : tout à la sensation (décision de Cyprien, 20/11/2026) — ni seuil mesuré ni sous-seuil chiffrés.
+          assert.doesNotMatch(text, /ALLURE SEUIL|ALLURE SOUS-SEUIL/, `${nom} (${quand}) : une allure de seuil est chiffrée pour une grossesse`);
+        } else if (/ALLURE SEUIL \*\*MESURÉE\*\*/.test(temoin.text)) {
           assert.match(text, /ALLURE SEUIL \*\*MESURÉE\*\*.*Repère seulement : cadre de santé, aucune séance à cette allure\./, `${nom} (${quand}) : le seuil mesuré n'est pas un simple repère`);
           if (plafond === "seuilBas") assert.match(text, /ALLURE SOUS-SEUIL : \d+'\d{2}\/km — la LIMITE HAUTE de ses séances de seuil bas/, `${nom} (${quand}) : le sous-seuil n'est pas la limite du seuil bas`);
           else assert.doesNotMatch(text, /ALLURE SOUS-SEUIL/, `${nom} (${quand}) : une allure sous-seuil est donnée sans intensité permise`);

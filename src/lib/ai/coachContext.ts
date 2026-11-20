@@ -59,7 +59,7 @@ import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { TYPE_CONSIGNES, consignesEnVigueur, kmPourDuree, type ConsignesKine } from "@/lib/health/consignesKine";
 import { TYPE_BILAN, BILAN_T, bilanDuJour, effetBilan, type BilanMatin } from "@/lib/health/bilanMatin";
 import { TYPE_APTITUDE, APTITUDE_T, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
-import { effortMaximalInterdit, intensiteInterdite, EFFORT_MAX_T } from "@/lib/health/effortMaximal";
+import { effortMaximalInterdit, intensiteInterdite, pilotageSensation, EFFORT_MAX_T, MALAISE_T } from "@/lib/health/effortMaximal";
 import { recupAllongee, verdictExecution } from "@/lib/coach/arretsQualite";
 import { arretsMemorises, memoriserArrets } from "@/lib/activities/cacheArrets";
 import { estUnePanne } from "@/lib/dashboard/lectures";
@@ -301,6 +301,12 @@ export type AthleteContext = {
    *  intensité hors du budget de qualité (sortie longue, footings, échauffement). Optionnel : un contexte
    *  bâti à la main (tests) sans ce champ n'a pas d'antécédent. */
   effortMaximalInterdit?: boolean;
+  /** Antécédent qui interdit toute intensité (covid long). */
+  intensiteInterdite?: boolean;
+  /** Antécédent qui se pilote à la sensation (grossesse) : ni allure, ni FC, rien sur la montre. */
+  pilotageSensation?: boolean;
+  /** Covid long, bilan du matin à 4-5/5 dans les deux jours qui suivent une sortie : repos aujourd'hui. */
+  malaiseApresEffort?: boolean;
   /** Disponibilités déclarées : nb de séances de course/semaine et jours praticables (0 = dim). */
   availability: { daysPerWeek: number; days: number[] };
   /** Prévisions RÉELLES à 7 jours (Open-Meteo) — vide si la position est inconnue. */
@@ -1188,6 +1194,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const noMaxEffort = effortMaximalInterdit(p?.health_conditions);
   // Et toute intensité (covid long) : zéro qualité, ni lignes droites, ni sortie longue accélérée.
   const sansIntensite = intensiteInterdite(p?.health_conditions);
+  // Et la grossesse, à la sensation : aucune allure chiffrée (elles viendraient d'une VMA d'avant), aucune FC.
+  const sensation = pilotageSensation(p?.health_conditions);
+  // COVID LONG, plus mal après une séance (catalogue santé) : bilan du matin à 4-5/5 dans les deux jours qui
+  // suivent une sortie → la séance du jour devient un repos, et le motif oriente vers le médecin.
+  const malaiseApresEffort = sansIntensite && effetDuBilan.allege && daysSinceLast != null && daysSinceLast <= 2;
 
   // ── MODE PERTE DE POIDS ──
   // Ne s'active QUE si l'athlète l'a demandé ET que son profil y est éligible (les
@@ -1223,7 +1234,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     : "PROGRESSION GLOBALE (base aérobie + 1-2 qualités/sem selon le niveau ; jamais 100 % facile pour qui veut progresser)";
 
   // Allures cibles calculées depuis la VMA (repli si zones non stockées).
-  const paceAt = (pct: number) => { if (!vma) return "?"; const s = 3600 / (vma * pct / 100); return `${Math.floor(s / 60)}'${String(Math.round(s % 60)).padStart(2, "0")}`; };
+  // À la sensation (grossesse) : aucune allure chiffrée, comme sans VMA — « au ressenti » partout.
+  const paceAt = (pct: number) => { if (!vma || sensation) return "?"; const s = 3600 / (vma * pct / 100); return `${Math.floor(s / 60)}'${String(Math.round(s % 60)).padStart(2, "0")}`; };
   /**
    * L'allure de footing affichée et prescrite : la MESURE d'abord, le modèle ensuite.
    * `easyPaceSource` dit laquelle a servi — un athlète doit pouvoir savoir si son
@@ -1233,7 +1245,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     easyPaceMesure != null ? "mesurée" : vma ? "modèle" : null;
   // Le plafond d'un test de lactate (seuil 1) s'applique UNE fois, à la fin (`easyPaceCorrige`) :
   // posé ici, il faussait la relecture, qui « corrigeait » vers plus vite un écart fabriqué.
-  const easyPaceLisible = easyPaceMesure != null
+  const easyPaceLisible = sensation ? null : easyPaceMesure != null
     ? `${Math.floor(easyPaceMesure / 60)}'${String(Math.round(easyPaceMesure % 60)).padStart(2, "0")}`
     : vma ? paceAt(70) : null;
   /**
@@ -1374,7 +1386,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const fmtPace = (secPerKm: number) => `${Math.floor(secPerKm / 60)}'${String(Math.round(secPerKm % 60)).padStart(2, "0")}`;
   // ⚠️ UN TEST DE LACTATE PASSE DEVANT (lib/coach/lactate) : il MESURE le seuil, la vitesse
   // critique l'ajuste sur des efforts. Six mois au plus ; sinon, la vitesse critique.
-  const thresholdPace = lactate ? fmtAllure(lactate.lt2.allureSec)
+  const thresholdPace = sensation ? null : lactate ? fmtAllure(lactate.lt2.allureSec)
     : csMs && csMs > 1 ? fmtPace(1000 / csMs) : null;
   const bestLine = pc?.best?.length
     ? pc.best.map(b => {
@@ -1679,6 +1691,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   if (aptitudeAttente) infoFlags.push(tr((l) => APTITUDE_T[l].motif));
   // L'antécédent qui écarte l'effort maximal se DIT (catalogue santé : « Dis-le-lui clairement »), sans le nommer.
   if (noMaxEffort) infoFlags.push(tr((l) => EFFORT_MAX_T[l].motif(sansIntensite)));
+  if (malaiseApresEffort) infoFlags.push(tr((l) => MALAISE_T[l].motif));
   if (bilan && effetDuBilan.stressHaut) infoFlags.push(tr((l) => BILAN_T[l].stress(bilan.stress)));
   if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.map((x) => traduireDouleur(x, l)).join(", "))));
   // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
@@ -2296,6 +2309,9 @@ ${plafondIntensite === "normal" ? `RÈGLE 80/20 — À COMPRENDRE : c'est une r�
       const quality = sansQualite || sansIntensite ? [] : enReprise || noMaxEffort ? ["Seuil"] : priority.slice(0, Math.max(1, qn));
       const focus = sansQualite ? `Récupération après ${recup.nom} : footings seulement`
         : enReprise ? `Reprise après ${recup.nom} : une séance courte au seuil`
+        // Le focus vu par l'admin dit le cadre de santé, pas « VMA & seuil » (20/11/2026).
+        : sansIntensite ? "Endurance facile — cadre de santé"
+        : noMaxEffort ? "Endurance + un seuil bas au plus — cadre de santé"
         : ph === "Base" ? "Volume aérobie + pose de vitesse"
         : ph === "Développement" ? "VMA & seuil — montée en charge"
         : ph === "Spécifique" ? `Allure course${goalPace ? ` (${goalPace}/km)` : ""} + endurance spécifique`
@@ -2921,6 +2937,9 @@ ${catalog}`;
     bilanMatin: bilan ? { ...bilan, ...effetDuBilan } : null,
     aptitude: { attente: aptitudeAttente },
     effortMaximalInterdit: noMaxEffort,
+    intensiteInterdite: sansIntensite,
+    pilotageSensation: sensation,
+    malaiseApresEffort,
     sortiesRecentes: (() => {
       const jour = aujourdhui(FUSEAU_DEFAUT);
       const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 7);

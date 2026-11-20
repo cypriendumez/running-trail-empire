@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { missionSeanceDuJour } from "@/lib/ai/missionSeance";
 import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -114,10 +115,7 @@ VOICI L'ATHLÈTE (analyse CHAQUE ligne) :
 ${ctx.text}
 
 MISSION : recommande LA séance-clé à faire AUJOURD'HUI (${jour}), parfaitement calibrée sur sa forme du jour, sa charge et son objectif de course.
-- Si fatigué (VFC sous la base, sommeil bas, ou TSB très négatif) → récupération / facile.
-- Si la course est proche → affûtage (fraîcheur, volume réduit, quelques rappels d'allure).
-- Sinon, fais converger vers l'objectif : intègre par moments l'allure spécifique et la distance cible, en respectant le modèle polarisé et le niveau de l'athlète.
-- Dose le volume sur le volume hebdomadaire réel et reste prudent si une douleur est signalée.
+${missionSeanceDuJour(ctx)}
 
 Réponds UNIQUEMENT par un objet JSON valide (aucun texte autour) :
 {"title":"nom court de la séance","subtitle":"description concrète : structure, allure/zone, durée/distance","tags":["2 à 3 tags très courts ex Z2, 10 km, VMA, Allure marathon"],"why":"1 phrase de justification personnalisée citant une donnée clé FOURNIE ci-dessus (sommeil, charge, objectif, ou VFC si elle y figure) — jamais une donnée absente"}`;

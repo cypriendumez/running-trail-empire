@@ -38,12 +38,15 @@ export type EntreeJourJ = {
   poidsKg: number | null;
   /** Prévision du jour J (la fenêtre de prévision ne couvre que 7 jours), sinon `null`. */
   meteo: { tempC: number; humidite: number | null; ventKmh: number | null } | null;
+  /** Antécédent qui interdit l'effort maximal (`lib/health/effortMaximal`) : course à EFFORT CONTRÔLÉ,
+   *  sans chrono ni allure ni échauffement à l'allure de course (décision de Cyprien, 20/11/2026). */
+  effortControle?: boolean;
 };
 
-export type Echauffement = "court" | "moyen" | "leger" | "marche";
+export type Echauffement = "court" | "moyen" | "leger" | "marche" | "controle";
 
 export type PackJourJ = {
-  mode: "route" | "trail";
+  mode: "route" | "trail" | "controle";
   chrono: {
     viseSec: number;
     maintenantSec: number | null;
@@ -81,16 +84,18 @@ export const penaliteChaleurCourse = (tempC: number, humidite: number | null) =>
 export function packJourJ(e: EntreeJourJ): PackJourJ {
   const d = e.objectif.distanceKm;
   const trail = /trail|nature|montagne/i.test(e.terrain ?? "") || (e.dplusM != null && e.dplusM / d >= DPLUS_TRAIL_PAR_KM) || d > 42.5;
-  const mode = trail ? "trail" : "route";
+  // À effort contrôlé : ni projection, ni allure, ni passages, ni scénarios — le ravitaillement reste.
+  const controle = !!e.effortControle;
+  const mode = controle ? "controle" : trail ? "trail" : "route";
 
   // ── Le chrono : le MÊME calcul que le verdict de la carte d'objectif ─────────
-  const proj = !trail && e.vma && e.vma > 0
+  const proj = !trail && !controle && e.vma && e.vma > 0
     ? raceProjection(e.vma, d, e.objectif.viseSec, Math.max(0, e.joursRestants) / 7, e.ameliorationAttendue, e.socle)
     : null;
   // L'allure EXACTE (non arrondie) : arrondie à la seconde, 3'12 sur 5 km donnait 16'00 à
   // l'arrivée pour un objectif de 15'59. On n'arrondit qu'à l'affichage.
   const tempsCible = proj?.verdict === "irrealiste" ? proj.projectedSec : e.objectif.viseSec;
-  const allureCible = trail ? null : tempsCible / d;
+  const allureCible = trail || controle ? null : tempsCible / d;
 
   // ── Le tableau de marche ─────────────────────────────────────────────────────
   const pas = d <= 10.5 ? 1 : 5;
@@ -129,7 +134,7 @@ export function packJourJ(e: EntreeJourJ): PackJourJ {
     passages,
     meteo: { prevue, scenarios },
     nutrition: plan ? { plan, deroule: derouleCourse(plan) } : null,
-    echauffement: trail ? "marche" : d <= 10.5 ? "court" : d <= 21.5 ? "moyen" : "leger",
+    echauffement: controle ? "controle" : trail ? "marche" : d <= 10.5 ? "court" : d <= 21.5 ? "moyen" : "leger",
     veilleGlucidesG: plan?.avantCourseG ?? null,
     pps: e.objectif.officielle,
   };

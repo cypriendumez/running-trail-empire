@@ -438,7 +438,10 @@ export async function autoCoachForUser(
       // doublent. On sélectionne donc les dates, puis toutes leurs séances.
       const datesConfirmees = [...new Set(week.map((x) => x.date))].sort().slice(0, CONFIRMED_DAYS);
       for (const d of week.filter((x) => x.date >= from && datesConfirmees.includes(x.date))) {
-        const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin, montre, ciblesFc);
+        // À LA SENSATION (grossesse, décision de Cyprien du 20/11/2026) : rien sur la montre — une séance sans
+        // cible n'est pas un format éprouvé chez intervals.icu, et toute cible (allure, FC) est écartée. Le
+        // chemin « jour sans séance courable » retire aussi ce que le coach y avait posé avant.
+        const built = ctx.pilotageSensation ? null : buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin, montre, ciblesFc);
         // ⚠️ UN JOUR SANS SÉANCE COURABLE DOIT ÊTRE NETTOYÉ, PAS IGNORÉ. `continue` seul
         // laissait sur la montre la séance poussée la veille, quand ce jour portait encore
         // un footing. Résultat constaté le 31/08/2026 : plan « Repos », montre « Footing ».

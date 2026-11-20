@@ -90,6 +90,8 @@ export function PackJourJVue({ pack, t, lang, nom, date, joursRestants, dplusM }
               </p>
             )}
           </>
+        ) : pack.mode === "controle" ? (
+          <p className="mt-3 text-sm leading-relaxed text-zinc-700">{t.controle}</p>
         ) : (
           <p className="mt-3 text-sm leading-relaxed text-zinc-700">
             {t.trail}{dplusM != null ? ` ${t.trailDplus(n(dplusM))}` : ""}

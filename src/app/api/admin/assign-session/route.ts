@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { pilotageSensation } from "@/lib/health/effortMaximal";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -60,7 +61,8 @@ export async function POST(req: Request) {
       const vma = await getEffectiveVma(admin, user_id);
       await ensureRunThresholdPace({ athleteId, apiKey, vmaKmh: vma }); // pour que Garmin transmette l'allure
       const sessionType = `${title} ${(Array.isArray(tags) ? tags.join(" ") : "")}`;
-      const built = buildWorkoutDescription(title, subtitle ?? "", sessionType, objectiveRace, vma, warmMin, coolMin, await litMontre({ athleteId, apiKey }), avecFcMaxMontre(await ciblesFcPour(admin, user_id), await fcMaxMontre({ athleteId, apiKey })));
+      // À la sensation (grossesse, 20/11/2026) : rien sur la montre.
+      const built = pilotageSensation((prof as Record<string, unknown> | null)?.health_conditions) ? null : buildWorkoutDescription(title, subtitle ?? "", sessionType, objectiveRace, vma, warmMin, coolMin, await litMontre({ athleteId, apiKey }), avecFcMaxMontre(await ciblesFcPour(admin, user_id), await fcMaxMontre({ athleteId, apiKey })));
       if (built) {
         const r = await pushIntervalsWorkout({ athleteId, apiKey, userId: user_id, name: built.name, date: today, description: built.description, sport: built.sport });
         watchSent = r.ok;
