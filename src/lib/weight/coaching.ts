@@ -71,7 +71,10 @@ export function weightTrainingRules(plan: WeightPlan): WeightTrainingRules {
  * une IA à qui l'on décrit une situation improvise ; une IA à qui l'on donne une règle
  * l'applique. Même logique que les consignes de `healthCatalog.ts`.
  */
-export function weightCoachBlock(plan: WeightPlan): string {
+// `cadreSante` : un antécédent plafonne l'intensité du coureur (lib/ai/coachContext, tour 5, 20/11/2026). La règle
+// du poids (« une séance un peu soutenue », « entraînement classique », « N séances de qualité maximum ») ne la
+// relève pas : seules ses limites de volume, de renforcement et d'impact restent dites.
+export function weightCoachBlock(plan: WeightPlan, cadreSante = false): string {
   const rules = weightTrainingRules(plan);
   const v = trendVerdict(plan);
   const lines: string[] = [];
@@ -81,8 +84,11 @@ export function weightCoachBlock(plan: WeightPlan): string {
   lines.push(`Énergie : métabolisme de base ${plan.bmr} kcal, dépense totale estimée ${plan.tdee} kcal/jour (dont ${plan.training.kcalPerDay} kcal/jour de sport RÉEL sur 28 j), cible ${plan.targetKcal} kcal/jour, protéines ${plan.proteinG} g/jour.`);
   lines.push(`Tendance mesurée : ${v.message}`);
 
-  lines.push(`ENTRAÎNEMENT — ${rules.rationale}`);
-  lines.push(`Contraintes chiffrées à RESPECTER : progression du volume ≤ +${rules.maxWeeklyProgressPct} %/semaine, ${rules.maxQualityPerWeek === 0 ? "AUCUNE séance de qualité pour l'instant" : `${rules.maxQualityPerWeek} séance(s) de qualité maximum/semaine`}, ${rules.strengthPerWeek} séance(s) de renforcement/semaine (NON NÉGOCIABLE)${rules.lowImpactSharePct > 0 ? `, ~${rules.lowImpactSharePct} % du volume sans impact (vélo, elliptique, marche rapide, aqua-jogging)` : ""}.`);
+  lines.push(cadreSante
+    ? "ENTRAÎNEMENT — le cadre de santé de ce dossier fixe seul l'intensité ; le mode perte de poids n'y ajoute que ses limites de volume."
+    : `ENTRAÎNEMENT — ${rules.rationale}`);
+  const qualitePoids = cadreSante ? "" : `${rules.maxQualityPerWeek === 0 ? "AUCUNE séance de qualité pour l'instant" : `${rules.maxQualityPerWeek} séance(s) de qualité maximum/semaine`}, `;
+  lines.push(`Contraintes chiffrées à RESPECTER : progression du volume ≤ +${rules.maxWeeklyProgressPct} %/semaine, ${qualitePoids}${rules.strengthPerWeek} séance(s) de renforcement/semaine (NON NÉGOCIABLE)${rules.lowImpactSharePct > 0 ? `, ~${rules.lowImpactSharePct} % du volume sans impact (vélo, elliptique, marche rapide, aqua-jogging)` : ""}.`);
 
   if (rules.walkRunAdvised) {
     lines.push("FORMAT D'ENTRÉE : alterne course et marche (par exemple 1 min de course / 2 min de marche, répété). Présente-le comme la MÉTHODE des coureurs qui durent, jamais comme une version dégradée de la course. Allonger les blocs courus vient tout seul, semaine après semaine.");

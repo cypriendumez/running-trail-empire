@@ -233,17 +233,28 @@ export function estEffortMaximal(w: Pick<WorkoutTemplate, "category" | "structur
 export type PlafondIntensite = "aucune" | "seuilBas" | "normal";
 
 /**
- * La séance dépasse-t-elle ce plafond ? `aucune` : tout ce qui monte en Z3 ou au-delà, ou se court à
- * l'allure de course. `seuilBas` : l'effort maximal et la zone 5 (`estEffortMaximal`), l'allure de course
- * (5 et 10 km : ~90 % de la VMA et plus, au-delà des 86 % du seuil bas) et l'over-under (des passages
- * AU-DESSUS du seuil). Le renforcement (zone « — », force max, pliométrie) n'est pas jugé ici : il attend
- * sa propre décision (@SafeRun, Cyprien).
+ * La séance dépasse-t-elle ce plafond ? La ZONE ET LA STRUCTURE sont lues : « Z2 » en zone cachait
+ * « 10 dernières min Z3 », « 5 min Z2 / 3 min Z3 » ou « montées en Z2-Z3 » dans la structure (relecteurs,
+ * tour 5, 20/11/2026).
+ *  · les deux plafonds : l'effort maximal et la zone 5 (`estEffortMaximal`), la préparation spécifique et
+ *    toute allure ou tout effort « de course » (allure marathon, semi, cible : la course se court à effort
+ *    contrôlé, décision de Cyprien du 20/11/2026) ;
+ *  · `aucune` : en plus, tout ce qui monte en Z3 ou au-delà, le tempo, le seuil, le soutenu, la vitesse ;
+ *  · `seuilBas` : en plus, la zone 4 et le travail « au seuil » (le seuil bas reste SOUS le seuil), et
+ *    l'over-under (des passages AU-DESSUS du seuil).
+ * Le renforcement (zone « — », force max, pliométrie) n'est pas jugé ici : il attend sa propre décision
+ * (@SafeRun, Cyprien).
  */
 export function horsPlafond(w: Pick<WorkoutTemplate, "id" | "category" | "structure" | "zone">, plafond: PlafondIntensite): boolean {
   if (plafond === "normal") return false;
   if (estEffortMaximal(w)) return true;
-  if (plafond === "aucune") return /Z[3-5]|course/i.test(w.zone);
-  return w.category === "race_specific" || w.id === "thr-overunder";
+  const texte = `${w.zone} ${w.structure}`;
+  if (w.category === "race_specific" || /\bAM\b|allure (?:marathon|semi|de course|cible)|effort cible/i.test(texte)) return true;
+  if (plafond === "aucune") {
+    return ["tempo", "threshold", "vo2max", "speed"].includes(w.category)
+      || /course/i.test(w.zone) || /Z[3-5]|soutenu|seuil|tempo/i.test(texte);
+  }
+  return w.id === "thr-overunder" || /Z[45]|\bau seuil\b/i.test(texte);
 }
 
 // Catalogue condensé (texte) à injecter dans le prompt : l'IA pioche et adapte.

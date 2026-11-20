@@ -1013,6 +1013,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Objectif + faisabilité
   let daysToRace: number | null = null, weeksToRace: number | null = null;
   const objLines: string[] = [];
+  // Tout ce qui suit la ligne de la course (temps visé et allure cible, % de VMA, « gros travail de VMA »,
+  // feuille de route, progression mesurée) : sous plafond, UNE ligne « cadre de santé » le remplace dans le
+  // dossier (relecteurs, tour 5, 20/11/2026). Pour un coureur ordinaire, l'ordre et le texte sont inchangés.
+  const objLinesPerf: string[] = [];
   if (objective?.raceDate) {
     // Compté depuis le jour du coureur (`todayStr`, 16/11/2026) : l'horloge du serveur (UTC) affichait
     // un jour de trop (J-4 au lieu de J-3) entre minuit et 1 h, heure de Paris. La course, elle, était
@@ -1025,7 +1029,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
       // Un défi personnel le dit au modèle : sans ça, il parle de dossard, de ravitaillement
       // et de meneurs d'allure à quelqu'un qui court seul sur une piste.
       : `• Défi personnel, PAS une course officielle (ni dossard, ni ravitaillement, ni meneur d'allure : il court seul) : ${objective.race} — ${objective.distanceKm} km, le ${objective.raceDate} (J-${daysToRace}, ~${weeksToRace} sem.)`);
-    objLines.push(`• Temps visé : ${objective.targetTime} → allure cible ${objective.targetPace}`);
+    objLinesPerf.push(`• Temps visé : ${objective.targetTime} → allure cible ${objective.targetPace}`);
     if (vma && objective.distanceKm && objective.targetSeconds) {
       const targetSpeed = objective.distanceKm / (objective.targetSeconds / 3600);
       const pctVma = Math.round((targetSpeed / vma) * 100);
@@ -1037,13 +1041,13 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
         : pctVma < frac - 6
         ? "objectif confortable au vu de son niveau : il peut viser plus ambitieux."
         : "objectif cohérent avec son niveau actuel : la spécificité fera la différence.";
-      objLines.push(`• Allure cible = ${pctVma} % VMA (un ${objective.distanceKm} km se court ~${frac} % VMA). ${verdict}`);
+      objLinesPerf.push(`• Allure cible = ${pctVma} % VMA (un ${objective.distanceKm} km se court ~${frac} % VMA). ${verdict}`);
       // Feuille de route concrète : combien de VMA gagner, à quel rythme, est-ce réaliste.
       if (reqVma > vma && weeksToRace && weeksToRace > 0) {
         const gain = r1(reqVma - vma);
         const perWk = Math.round((gain / weeksToRace) * 100) / 100;
         const realism = perWk <= 0.08 ? "réaliste avec un bon bloc VMA" : perWk <= 0.15 ? "ambitieux mais jouable avec 2 séances VMA/sem et de la régularité" : "très difficile dans le délai — propose-lui un objectif intermédiaire (ex. viser ~5-8 s/km de plus) puis le vrai chrono plus tard";
-        objLines.push(`• Feuille de route : gagner +${gain} km/h de VMA en ${weeksToRace} sem (~+${perWk} km/h/sem) → ${realism}.`);
+        objLinesPerf.push(`• Feuille de route : gagner +${gain} km/h de VMA en ${weeksToRace} sem (~+${perWk} km/h/sem) → ${realism}.`);
         // Confrontation à sa progression MESURÉE : c'est ce qui distingue un objectif
         // ajusté sur des faits d'un objectif décoratif répété de semaine en semaine.
         // Projection à pente constante, calculée ici car elle dépend de weeksToRace.
@@ -1053,18 +1057,18 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
         if (vmaSlopePerWeek != null) {
           const trend = vmaSlopePerWeek > 0.02 ? `+${r1(vmaSlopePerWeek)} km/h/sem`
             : vmaSlopePerWeek < -0.02 ? `${r1(vmaSlopePerWeek)} km/h/sem (en BAISSE)` : "quasi nulle";
-          objLines.push(`• PROGRESSION RÉELLE MESURÉE : ${trend}${projectedVma ? `, ce qui le projette à ~${projectedVma} km/h le jour J (il lui en faudrait ${reqVma})` : ""}.`);
+          objLinesPerf.push(`• PROGRESSION RÉELLE MESURÉE : ${trend}${projectedVma ? `, ce qui le projette à ~${projectedVma} km/h le jour J (il lui en faudrait ${reqVma})` : ""}.`);
           if (projectedVma != null && projectedVma < reqVma) {
             const sec = Math.round((objective.distanceKm / (projectedVma * frac / 100)) * 3600);
             const hh = Math.floor(sec / 3600), mm = Math.floor((sec % 3600) / 60), ss = sec % 60;
             const chrono = hh ? `${hh}h${String(mm).padStart(2, "0")}` : `${mm}'${String(ss).padStart(2, "0")}`;
-            objLines.push(`• ⚠️ À CE RYTHME son objectif de ${objective.targetTime} n'est PAS atteignable : la projection donne plutôt ${chrono}. Propose-lui CE chrono comme cible révisée — un objectif ajusté sur des faits vaut mieux qu'un objectif décoratif qu'il ratera. Dis-le avec tact, en montrant d'abord le chemin parcouru.`);
+            objLinesPerf.push(`• ⚠️ À CE RYTHME son objectif de ${objective.targetTime} n'est PAS atteignable : la projection donne plutôt ${chrono}. Propose-lui CE chrono comme cible révisée — un objectif ajusté sur des faits vaut mieux qu'un objectif décoratif qu'il ratera. Dis-le avec tact, en montrant d'abord le chemin parcouru.`);
           } else if (projectedVma != null) {
-            objLines.push(`• ✅ À ce rythme son objectif est ATTEIGNABLE : dis-le-lui, c'est le meilleur carburant qui soit.`);
+            objLinesPerf.push(`• ✅ À ce rythme son objectif est ATTEIGNABLE : dis-le-lui, c'est le meilleur carburant qui soit.`);
           }
         }
       } else if (reqVma <= vma) {
-        objLines.push(`• Sa VMA actuelle suffit DÉJÀ pour le chrono : le travail = spécificité (tenir l'allure), endurance et pacing, pas plus de VMA brute.`);
+        objLinesPerf.push(`• Sa VMA actuelle suffit DÉJÀ pour le chrono : le travail = spécificité (tenir l'allure), endurance et pacing, pas plus de VMA brute.`);
       }
     }
   }
@@ -1438,13 +1442,15 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const arretsQualiteTxt = recupQualite
     ? `${recupQualite.n} arrêt${recupQualite.n > 1 ? "s" : ""} d'au moins une minute (${dureeCourte(recupQualite.totalSec)} au total)`
     : "";
-  const qeLine = qe?.repsSec?.length
+  const qeLigne = (cadre: boolean) => qe?.repsSec?.length
     ? `${qe.repsSec.length} répétitions le ${qe.date} : ${qe.repsSec.map(fmtPace).join(" · ")}/km${qe.avgHr ? ` (FC moy ${qe.avgHr})` : ""}. ${
         verdictQualite == null ? ""
         : verdictQualite === "decrochage" ? `⚠️ DÉCROCHAGE de ${qe.fadeSec} s/km entre le début et la fin : la séance était trop ambitieuse, réduis l'allure cible ou le nombre de répétitions la prochaine fois.${recupQualite ? ` (Malgré ${arretsQualiteTxt} : le signal n'en est que plus net.)` : ""}`
         : verdictQualite === "non_probant" ? `⏸️ Allure tenue, mais avec ${arretsQualiteTxt} : ses récupérations ont été plus longues que prévu. Cette séance NE PROUVE PAS qu'il peut durcir : ne durcis pas la prochaine sur cette base, garde la même charge.`
         : verdictQualite === "arrets_inconnus" ? "⏸️ Allure tenue, mais ses arrêts n'ont pas pu être relus : on ne sait pas si ses récupérations ont été plus longues que prévu. Ne durcis pas la prochaine sur cette seule base."
-        : verdictQualite === "accelere" ? `✅ Il a ACCÉLÉRÉ de ${-(qe.fadeSec ?? 0)} s/km sur la fin : il en avait sous le pied, tu peux durcir la prochaine.`
+        : verdictQualite === "accelere" ? (cadre
+          ? `✅ Il a fini ${-(qe.fadeSec ?? 0)} s/km plus vite qu'il n'a commencé : la séance était dans ses cordes — cadre de santé, on ne la durcit pas pour autant.`
+          : `✅ Il a ACCÉLÉRÉ de ${-(qe.fadeSec ?? 0)} s/km sur la fin : il en avait sous le pied, tu peux durcir la prochaine.`)
         : "✅ Allure tenue du début à la fin : la charge était bien calibrée."}`
     : null;
 
@@ -1491,6 +1497,16 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     : noMaxEffort ? "seuilBas" : "normal";
   // L'IA ne propose ni test VMA ni effort maximal à un coureur dont le plafond n'est pas « normal ».
   const testVmaExclu = plafondIntensite !== "normal";
+  // SOUS PLAFOND, TOUT LE DOSSIER (tour 5, 20/11/2026) : chaque relecture trouvait une ligne de plus qui poussait un
+  // exempté vers l'intensité — l'âge (« oser la densité »), le passif (« des blocs denses »), l'objectif (« un gros
+  // travail de VMA »), le verdict du jour (« ne sous-dose pas »), le seuil mesuré, le plateau (« change le
+  // stimulus »), la dérive (« tu peux durcir le spécifique »), la technique (« 6-8 lignes droites »), la répartition
+  // (« il ne progressera pas sans qualité »), la monotonie, le cycle, l'affûtage, le terrain, la perte de poids.
+  // Chacune a sa version « cadre de santé », et un en-tête dit que le cadre prime sur tout le dossier.
+  const sousPlafond = plafondIntensite !== "normal";
+  const qeLine = qeLigne(sousPlafond);
+  // Les consignes de terrain dans leur version « cadre de santé » (piste, tapis, montagne, plat : data/terrainCatalog).
+  const terrRegles = sousPlafond ? terrainCoachBlock(p?.main_terrains, p?.main_terrain, true).rules : terr.rules;
   const marcheCourseMotif = marcheCourse
     ? tr((l) => MOTIF_T[l].marcheCourse(nRaw(marcheCourse.etape, l), nRaw(marcheCourse.total, l)))
     : null;
@@ -1702,9 +1718,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     redFlags.length ? "rouge" : orangeFlags.length >= 2 ? "orange" : orangeFlags.length === 1 ? "jaune" : "vert";
   const READY = {
     rouge: { badge: "🔴 ROUGE", rule: "AUCUNE intensité aujourd'hui. Footing très facile, croisé sans impact ou repos complet — et dis-lui POURQUOI sans dramatiser. Reporter une séance dure de 24-48 h ne coûte rien ; la faire dans cet état coûte des semaines." },
-    orange: { badge: "🟠 ORANGE", rule: "Séance allégée : garde la qualité SI elle était prévue mais coupe le volume du corps de séance d'environ un tiers, ou bascule sur du footing. Réévalue demain." },
+    orange: { badge: "🟠 ORANGE", rule: sousPlafond ? "Séance allégée : coupe le volume du corps de séance d'environ un tiers, ou bascule sur du footing très facile. Réévalue demain." : "Séance allégée : garde la qualité SI elle était prévue mais coupe le volume du corps de séance d'environ un tiers, ou bascule sur du footing. Réévalue demain." },
     jaune: { badge: "🟡 JAUNE", rule: "Feu orange léger : la séance prévue peut se faire, mais reste attentif aux sensations sur l'échauffement — si ça ne vient pas dans les 15 premières minutes, transforme-la en footing." },
-    vert: { badge: "🟢 VERT", rule: "Il est frais : c'est le jour pour placer la séance exigeante prévue. Ne sous-dose pas par excès de prudence, ce serait du potentiel perdu." },
+    vert: { badge: "🟢 VERT", rule: sousPlafond ? "Il est frais : la séance prévue se fait telle quelle, DANS le cadre de santé — la fraîcheur n'autorise jamais à la durcir ni à y ajouter de l'intensité." : "Il est frais : c'est le jour pour placer la séance exigeante prévue. Ne sous-dose pas par excès de prudence, ce serait du potentiel perdu." },
   }[readyLevel];
   const readiness = READY.badge, readinessRule = READY.rule;
   // Le prompt du modèle reste INTÉGRALEMENT en français : il n'est pas lu par l'athlète.
@@ -1778,13 +1794,18 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   if (drift != null && drift >= 8) {
     limiters.push({ key: "endurance", severity: 90,
       label: `l'ENDURANCE AÉROBIE (dérive cardiaque ${drift > 0 ? "+" : ""}${drift} %)`,
-      action: "volume facile et sorties longues progressives AVANT toute recherche de vitesse. À ce niveau de dérive, il perdra en fin de course ce qu'il aura gagné en fractionné." });
+      // Sous plafond, ni « recherche de vitesse » ni « fractionné » à venir (tour 5, 20/11/2026).
+      action: sousPlafond
+        ? "volume facile et sorties longues progressives, dans le cadre de santé : c'est là, et seulement là, que se construit son endurance."
+        : "volume facile et sorties longues progressives AVANT toute recherche de vitesse. À ce niveau de dérive, il perdra en fin de course ce qu'il aura gagné en fractionné." });
   }
   // 3. DISCIPLINE DES FOOTINGS — courir trop vite en facile bride tout le reste.
   if (hardTimePct != null && hardTimePct > 25) {
     limiters.push({ key: "discipline", severity: 80,
       label: `la DISCIPLINE DES FOOTINGS (${hardTimePct} % du temps en Z3+)`,
-      action: "fais-le RALENTIR en facile. Tant que ses footings sont des tempos, il accumule de la fatigue sans stimulus — et sa qualité en pâtit." });
+      action: sousPlafond
+        ? "fais-le RALENTIR en facile : des footings courus comme des tempos sortent du cadre de santé."
+        : "fais-le RALENTIR en facile. Tant que ses footings sont des tempos, il accumule de la fatigue sans stimulus — et sa qualité en pâtit." });
   }
   // 4. EXÉCUTION — décrocher sur ses séries signe une prescription mal calibrée.
   if (fade != null && fade >= 12) {
@@ -2398,8 +2419,9 @@ ${plafondIntensite === "normal" ? `RÈGLE 80/20 — À COMPRENDRE : c'est une r�
   const objectiveWarnings: string[] = (() => {
     const out: string[] = [];
     if (!objective) return out;
-    // 1. Le chrono visé est-il atteignable au potentiel actuel ?
-    if (vma && objective.targetSeconds > 0) {
+    // 1. Le chrono visé est-il atteignable au potentiel actuel ? Sous plafond, pas de verdict de chrono : la
+    //    course se court à effort contrôlé, et ce verdict concluait sur « un gros bloc de VMA » (tour 5, 20/11/2026).
+    if (vma && objective.targetSeconds > 0 && !sousPlafond) {
       const needKmh = objective.distanceKm / (objective.targetSeconds / 3600);
       const pctVma = needKmh / vma;
       // Un marathon se court ~80 % de VMA, un semi ~85 %, un 10 km ~90 %.
@@ -2584,7 +2606,7 @@ ${plafondIntensite === "normal" ? `RÈGLE 80/20 — À COMPRENDRE : c'est une r�
     return { longRunMin, carbsPerH, carbsTotal, mlPerH, sodium, preRun, tempC: t };
   })();
 
-  const cycleLabel = taper ? "AFFÛTAGE — volume fortement réduit, on garde l'intensité pour arriver frais"
+  const cycleLabel = taper ? (sousPlafond ? "AFFÛTAGE — volume fortement réduit pour arriver frais, sans intensité ajoutée (cadre de santé)" : "AFFÛTAGE — volume fortement réduit, on garde l'intensité pour arriver frais")
     : deload ? "SEMAINE ALLÉGÉE (une semaine sur quatre, en fin de bloc) — volume −20 %, c'est là que le corps assimile"
     : "montée en charge normale";
 
@@ -2614,12 +2636,19 @@ ${plafondIntensite === "normal" ? `RÈGLE 80/20 — À COMPRENDRE : c'est une r�
   //  des lectures du contexte). Le reste du dossier dérive du plafond (`plafondIntensite`, plus haut).
   // (`testVmaExclu` et `plafondIntensite` sont calculés plus haut, juste après la marche-course.)
   const catalog = buildSessionCatalog({ level: libLevel, goal: libGoal, plafond: plafondIntensite });
-  const text = `PROFIL
+  // ⛔ LE CADRE DE SANTÉ EN TÊTE DU DOSSIER (tour 5, 20/11/2026) : les lignes repérées ont leur version « cadre de
+  // santé » ; l'en-tête dit au modèle que le cadre prime sur tout ce qui suit, y compris ce qui aurait échappé.
+  const cadreSanteTete = !sousPlafond ? "" : `⛔ CADRE DE SANTÉ — PRIME SUR TOUT LE RESTE DE CE DOSSIER
+- Plafond d'intensité : ${plafondIntensite === "aucune" ? "AUCUNE intensité — endurance facile seulement (Z1-Z2), à la conversation" : "SEUIL BAS au plus — en blocs longs SOUS le seuil ; jamais au seuil réel, jamais de VMA, de zone 5, de test ni d'effort maximal"}.
+- Rien dans ce dossier (fraîcheur, âge, passif, terrain, objectif, tendances, technique, palette) ne relève ce plafond : tu ne prescris, ne suggères ni ne promets aucune intensité au-dessus.
+
+`;
+  const text = `${cadreSanteTete}PROFIL
 - ${prenomSeul} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · mode ${p?.mode ?? "?"}
 - NIVEAU estimé : ${level}${vma ? ` (VMA ${vma} km/h${vmaIsEst ? " estimée" : ""})` : ""}
 - ANCIENNETÉ en course à pied : ${expLabel ?? "non renseignée (reste prudent sur la charge tant que tu ne sais pas)"}
 - TERRAINS habituels : ${terr.labels.length ? terr.labels.join(" + ") : "non renseignés"}${elev ? ` · dénivelé : ${elev.label}` : ""} · D+ réalisé cette semaine : ${elevWeek} m
-${p?.gender === "female" ? `- SEXE : femme → besoins en FER et disponibilité énergétique à surveiller (RED-S : une charge élevée + apport insuffisant coupe la progression et fragilise l'os) ; densité osseuse à protéger (renforcement + impacts dosés) ; ${cycle ? "cycle suivi (voir plus bas)" : "si elle synchronise son cycle, adapte l'intensité selon la phase"}. Ne calque pas mécaniquement des repères masculins.` : p?.gender === "male" ? "- SEXE : homme → tendance fréquente à partir trop vite en facile et à sur-doser l'intensité ; verrouille la discipline des footings." : ""}
+${p?.gender === "female" ? `- SEXE : femme → besoins en FER et disponibilité énergétique à surveiller (RED-S : une charge élevée + apport insuffisant coupe la progression et fragilise l'os) ; densité osseuse à protéger (renforcement + impacts dosés) ; ${cycle ? "cycle suivi (voir plus bas)" : sousPlafond ? "si elle synchronise son cycle, adapte la charge selon la phase, sans jamais plus d'intensité (cadre de santé)" : "si elle synchronise son cycle, adapte l'intensité selon la phase"}. Ne calque pas mécaniquement des repères masculins.` : p?.gender === "male" ? "- SEXE : homme → tendance fréquente à partir trop vite en facile et à sur-doser l'intensité ; verrouille la discipline des footings." : ""}
 
 ⚡ VERDICT DE FRAÎCHEUR DU JOUR (calculé à partir de la VFC, du sommeil, de la charge et du ressenti — CETTE CONCLUSION S'IMPOSE À TOI, ne la ré-arbitre pas)
 ${readinessBlock}
@@ -2628,7 +2657,7 @@ NUTRITION DU JOUR DE COURSE (${nRaw(Math.round(nutriCourse.dureeMin), "fr")} min
 - Glucides : ${nRaw(nutriCourse.glucidesParH, "fr")} g par heure à partir de la ${nRaw(nutriCourse.premierApportMin, "fr")}ᵉ minute — rien avant, les réserves y suffisent. Soit environ ${nRaw(nutriCourse.glucidesTotalG, "fr")} g au total, l'équivalent de ${nRaw(nutriCourse.gels, "fr")} gel(s) de 25 g.${nutriCourse.dureeMin >= 150 ? " Au-delà de 2 h 30, il faut des glucides MULTI-TRANSPORTABLES (glucose + fructose) : au-delà de 60 g/h, l'intestin ne suit pas avec du glucose seul." : ""}
 - Boisson : ${nRaw(nutriCourse.mlParH, "fr")} ml par heure, avec ${nRaw(nutriCourse.sodiumMgParL, "fr")} mg de sodium par litre.${nutriCourse.tempConnue ? ` Température prévue le jour J : ${nRaw(Math.round(nutriCourse.tempC ?? 0), "fr")} °C.` : " ⚠️ LA TEMPÉRATURE DU JOUR J EST INCONNUE (elle n'est prévisible qu'à une semaine) : ce chiffre suppose une journée tempérée. DIS-LE-LUI, et rappelle-lui de le réviser à la hausse s'il fait chaud — un plan d'hydratation faux par 30 °C est dangereux, pas seulement inexact."}
 ${nutriCourse.avantCourseG != null ? `- Avant la course : environ ${nRaw(nutriCourse.avantCourseG, "fr")} g de glucides à charger la veille et au petit-déjeuner (3 h avant le départ).` : "- Poids non renseigné : impossible de chiffrer la charge glucidique d'avant course."}
-- ⚠️ RIEN DE TOUT CELA NE S'ESSAIE LE JOUR J. Chaque produit doit avoir été testé en sortie longue, à l'allure de course.
+- ⚠️ RIEN DE TOUT CELA NE S'ESSAIE LE JOUR J. Chaque produit doit avoir été testé en sortie longue${sousPlafond ? "" : ", à l'allure de course"}.
 ` : ""}${objective ? (terrain ? `
 TERRAIN DE LA COURSE (dénivelé du catalogue, pas une estimation)
 - ${objective.race} : ${nRaw(terrain.dplusCourse, "fr")} m de D+ sur ${nRaw(objective.distanceKm, "fr")} km, soit ${nRaw(terrain.mParKm, "fr")} m par kilomètre — profil ${terrain.profil}.
@@ -2667,15 +2696,15 @@ ${cond.rules.length ? cond.rules.map((r) => `- ${r}`).join("\n")
   : "- ⚠️ Section santé JAMAIS renseignée (ce n'est pas « rien à signaler », c'est « on ne sait pas ») : reste un cran prudent sur l'intensité et invite-le à la remplir."}
 ${inj.rules.length ? inj.rules.map((r) => `- ${r}`).join("\n") : p?.health_declared ? "- Aucune zone de blessure récurrente." : ""}
 ${healthNotes ? `- 🗣️ Note santé écrite par l'athlète (LIS-LA et tiens-en compte) : « ${healthNotes} »` : ""}${noMaxEffort ? `\n- ⛔ EFFORT MAXIMAL INTERDIT au vu de ses antécédents : pas de VMA à 100 %+, pas de test d'effort, pas de sprint all-out. ${sansIntensite ? "Aucune intensité : de l'endurance facile seulement." : "Le développement passe par le volume et le seuil bas."}` : ""}
-${weightLoss ? weightCoachBlock(weightLoss.plan) : ""}
+${weightLoss ? weightCoachBlock(weightLoss.plan, sousPlafond) : ""}
 
 ÂGE & RÉCUPÉRATION
-- ${ageRule ?? "Âge non renseigné : applique un espacement prudent de 72 h entre deux séances dures."}
+- ${sousPlafond ? `Âge${age != null ? ` (${age} ans)` : ""} : c'est le cadre de santé, pas l'âge, qui fixe l'intensité — l'âge ne règle ici que la récupération entre deux sorties.` : ageRule ?? "Âge non renseigné : applique un espacement prudent de 72 h entre deux séances dures."}
 - Espacement MINIMUM entre deux séances dures pour CET athlète : ${hardGapH} h.
 
 PASSIF, TERRAIN & DÉNIVELÉ (leviers d'individualisation — à respecter dans la prescription)
-- ${expRule ?? "Ancienneté inconnue : demande-la, et en attendant reste sur une progression prudente (+10 %/sem max)."}
-${terr.rules.length ? terr.rules.map((r) => `- ${r}`).join("\n") : "- Terrain habituel inconnu : privilégie des consignes en durée + FC tant que tu ne sais pas sur quelle surface il court."}
+- ${sousPlafond ? `Passif${expLabel ? ` (${expLabel})` : ""} : c'est le cadre de santé qui fixe l'intensité — le passif ne règle ici que la progression du volume (+10 %/sem au plus).` : expRule ?? "Ancienneté inconnue : demande-la, et en attendant reste sur une progression prudente (+10 %/sem max)."}
+${terrRegles.length ? terrRegles.map((r) => `- ${r}`).join("\n") : "- Terrain habituel inconnu : privilégie des consignes en durée + FC tant que tu ne sais pas sur quelle surface il court."}${sousPlafond ? "\n- ⛔ Cadre de santé : le terrain ne relève jamais le plafond d'intensité de ce dossier — ni fractionné sur piste ou sur tapis, ni côtes au-delà de l'endurance facile." : ""}
 ${terr.rules.length > 1 ? `- ⚖️ Il alterne PLUSIEURS terrains (${terr.labels.join(", ")}) : c'est un atout anti-blessure, exploite-le. Attribue chaque séance à la surface qui lui convient — les séances CHIFFRÉES à l'allure sur surface dure (route/piste), l'endurance et le long sur terrain souple.` : ""}${terr.paceMeaningless ? `- ⚠️ Au moins un de ses terrains rend l'allure /km NON PERTINENTE (sable, montagne ou neige). Sur ces surfaces : consignes en DURÉE + FRÉQUENCE CARDIAQUE uniquement, jamais d'allure cible. Précise explicitement dans chaque séance sur quelle surface elle doit se faire.` : ""}
 ${elev ? `- ${plafondIntensite === "normal" ? elev.rule : `Dénivelé (${elev.label}) : des montées en endurance seulement, longues et faciles (Z1-Z2) — ni côtes courtes, ni explosivité, ni séance de côtes à la place d'une VMA (cadre de santé).`}` : ""}
 ${tempRule ? `- MÉTÉO AUJOURD'HUI : ${tempRule}` : ""}${hotDays.length ? `\n- 🔥 CHALEUR ANNONCÉE : ${hotDays.slice(0, 4).map(f => `${f.date.slice(8)}/${f.date.slice(5, 7)} ${Math.round(f.tempMax)}°C`).join(" · ")} → déplace les séances de qualité de ces jours-là tôt le matin, ou échange-les avec un jour plus frais de la semaine. Prévois-le MAINTENANT, pas la veille.` : ""}
@@ -2685,12 +2714,12 @@ CAPACITÉS (tests)
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
-${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${limiterDossier ? `- 🎯 SON FACTEUR LIMITANT, à ce stade, c'est ${limiterDossier.label}. ${limiterDossier.action} C'est LA priorité : une séance qui ne s'adresse pas à ce point précis est une séance de perdue. ${limitersDossier.length > 1 ? `Viennent ensuite : ${limitersDossier.slice(1, 3).map(l => l.label).join(" ; ")}.` : ""}\n` : ""}${noHistory ? `- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ${testVmaExclu ? "et ses éventuelles douleurs. Ne lui propose ni test ni effort maximal : ils sont écartés pour lui." : "ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne."} Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n` : ""}${(() => { const d = driftW; if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
+${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${limiterDossier ? `- 🎯 SON FACTEUR LIMITANT, à ce stade, c'est ${limiterDossier.label}. ${limiterDossier.action} C'est LA priorité : une séance qui ne s'adresse pas à ce point précis est une séance de perdue. ${limitersDossier.length > 1 ? `Viennent ensuite : ${limitersDossier.slice(1, 3).map(l => l.label).join(" ; ")}.` : ""}\n` : ""}${noHistory ? `- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ${testVmaExclu ? "et ses éventuelles douleurs. Ne lui propose ni test ni effort maximal : ils sont écartés pour lui." : "ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne."} Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n` : ""}${(() => { const d = driftW; if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? (sousPlafond ? "ENDURANCE AÉROBIE SOLIDE — elle ne change rien au cadre de santé" : "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique") : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues " + (sousPlafond ? "progressives, dans le cadre de santé" : "AVANT toute recherche de vitesse"); return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
   const lines: string[] = [];
   // Cadence : sous 170 pas/min, l'appui est long et la foulée « aérienne » — surcoût
   // d'impact et de temps de contact. On ne juge pas dans l'absolu (elle dépend de la
   // taille et de l'allure), mais un franc déficit se corrige et se corrige vite.
-  if (cadence != null && cadence < 170) lines.push(`cadence ${cadence} pas/min (basse) → prescris des GAMMES et 6-8 lignes droites en fin de footing avec consigne de cadence +5 %, 2×/sem. Gain d'économie rapide, et moins d'impact au sol`);
+  if (cadence != null && cadence < 170) lines.push(sousPlafond ? `cadence ${cadence} pas/min (basse) → consigne de cadence +5 % pendant ses footings faciles, sans gammes ni lignes droites (cadre de santé)` : `cadence ${cadence} pas/min (basse) → prescris des GAMMES et 6-8 lignes droites en fin de footing avec consigne de cadence +5 %, 2×/sem. Gain d'économie rapide, et moins d'impact au sol`);
   else if (cadence != null && cadence >= 178) lines.push(`cadence ${cadence} pas/min (bonne) — rien à corriger de ce côté`);
   if (vr != null) {
     lines.push(vr.now >= 9 ? `ratio vertical ${vr.now} % (élevé) → trop d'énergie part vers le HAUT : renforcement excentrique mollets/ischios + éducatifs de projection vers l'avant`
@@ -2717,7 +2746,7 @@ ${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${lim
     + `Départ en négative split : c'est ce qui produit le plus de records, et ça se RÉPÈTE à l'entraînement — `
     + `${daysToRace > 14 ? "programme une SIMULATION à J-10/J-14 : 60-70 % de la distance à l'allure cible, mêmes chaussures, même petit-déjeuner, même heure." : "la simulation est passée : plus rien de nouveau d'ici le départ, on ne teste plus, on répète."} `
     + `Échauffement le jour J : ${objective.distanceKm <= 10 ? "20 min footing + gammes + 4-5 lignes droites, fini 10 min avant le départ" : "15 min footing léger + 3 lignes droites, on garde le carburant"}.\n`;
-})()}${nutrition ? `- 🍫 NUTRITION DE SA SORTIE LONGUE (${Math.round(nutrition.longRunMin / 60)} h ~${longRunKm} km${nutrition.tempC != null ? `, ${Math.round(nutrition.tempC)} °C prévus` : ""}) : ${nutrition.preRun ? `${nutrition.preRun} g de glucides 2-3 h avant, ` : ""}puis ${nutrition.carbsPerH} g/h À PARTIR DE LA 1re HEURE (soit ~${nutrition.carbsTotal} g sur la sortie, ~${Math.max(1, Math.round(nutrition.carbsTotal / 25))} gels ou équivalent), et ${nutrition.mlPerH} ml/h de boisson à ~${nutrition.sodium} mg/L de sodium. Donne-lui CES chiffres, pas une fourchette — et rappelle-lui de les TESTER à l'entraînement, jamais le jour J.\n` : ""}${shoeLines.length ? `- 👟 USURE DES CHAUSSURES : ${shoeLines.join(" · ")}\n` : ""}${plateau ? `- 🛑 PLATEAU DÉTECTÉ : sa capacité stagne (${vmaSlopePerWeek} km/h/sem sur ${Math.round((curvePts[curvePts.length - 1].t - curvePts[0].t) / 86400000)} j) ALORS QUE sa charge monte. N'AJOUTE PAS de volume ni de séances : c'est le réflexe qui blesse. CHANGE le stimulus — format de séance inédit, côtes, force, technique de foulée — ou impose une vraie semaine de décharge. Explique-lui pourquoi.\n` : vmaSlopePerWeek != null ? `- 📈 TRAJECTOIRE DE CAPACITÉ : ${vmaSlopePerWeek > 0 ? "+" : ""}${vmaSlopePerWeek} km/h de VMA par semaine sur ses efforts mesurés.\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${thresholdPace ? `- 🧊 ALLURE SOUS-SEUIL : ${subPace}/km — c'est ICI que se fait le VOLUME au seuil (méthode norvégienne, Bakken : 0,4 à 0,8 mmol sous le seuil). Une allure qu'il doit pouvoir répéter le lendemain. Les blocs LONGS s'y tiennent ; seules les fractions COURTES touchent le seuil réel. Beaucoup de volume sous-seuil DÉPLACE le seuil ; peu de volume AU seuil ne fait que fatiguer.\n` : ""}${lactate ? `- 🧪 TEST DE LACTATE du ${lactate.date} : seuil 1 (aérobie) ${fmtAllure(lactate.lt1.allureSec)}/km${lactate.lt1.fc ? ` à ${lactate.lt1.fc} bpm` : ""}, seuil 2 ${fmtAllure(lactate.lt2.allureSec)}/km${lactate.lt2.fc ? ` à ${lactate.lt2.fc} bpm` : ""}. Ce sont des seuils MESURÉS : les allures de seuil et de footing en découlent, ne les recalcule pas depuis la VMA.\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (${lactate ? `seuil 2 du test de lactate du ${lactate.date}` : `vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels`})${!lactate && pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée.\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux)." : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
+})()}${nutrition ? `- 🍫 NUTRITION DE SA SORTIE LONGUE (${Math.round(nutrition.longRunMin / 60)} h ~${longRunKm} km${nutrition.tempC != null ? `, ${Math.round(nutrition.tempC)} °C prévus` : ""}) : ${nutrition.preRun ? `${nutrition.preRun} g de glucides 2-3 h avant, ` : ""}puis ${nutrition.carbsPerH} g/h À PARTIR DE LA 1re HEURE (soit ~${nutrition.carbsTotal} g sur la sortie, ~${Math.max(1, Math.round(nutrition.carbsTotal / 25))} gels ou équivalent), et ${nutrition.mlPerH} ml/h de boisson à ~${nutrition.sodium} mg/L de sodium. Donne-lui CES chiffres, pas une fourchette — et rappelle-lui de les TESTER à l'entraînement, jamais le jour J.\n` : ""}${shoeLines.length ? `- 👟 USURE DES CHAUSSURES : ${shoeLines.join(" · ")}\n` : ""}${plateau ? `- 🛑 PLATEAU DÉTECTÉ : sa capacité stagne (${vmaSlopePerWeek} km/h/sem sur ${Math.round((curvePts[curvePts.length - 1].t - curvePts[0].t) / 86400000)} j) ALORS QUE sa charge monte. N'AJOUTE PAS de volume ni de séances : c'est le réflexe qui blesse. ${sousPlafond ? "Cadre de santé : ne cherche pas à relancer la progression par l'intensité (ni côtes, ni format plus dur) — garde la régularité, ou impose une vraie semaine de décharge." : "CHANGE le stimulus — format de séance inédit, côtes, force, technique de foulée — ou impose une vraie semaine de décharge."} Explique-lui pourquoi.\n` : vmaSlopePerWeek != null ? `- 📈 TRAJECTOIRE DE CAPACITÉ : ${vmaSlopePerWeek > 0 ? "+" : ""}${vmaSlopePerWeek} km/h de VMA par semaine sur ses efforts mesurés.\n` : ""}${vrLine ? `- 🦵 ÉCONOMIE DE COURSE (ratio vertical, ${vr!.n} séances) : ${vrLine}\n` : ""}${thresholdPace && plafondIntensite !== "aucune" ? `- 🧊 ALLURE SOUS-SEUIL : ${sousPlafond ? `${seuilBasPace}/km — la LIMITE HAUTE de ses séances de seuil bas (cadre de santé) : jamais plus vite, et aucune fraction au seuil réel.` : `${subPace}/km — c'est ICI que se fait le VOLUME au seuil (méthode norvégienne, Bakken : 0,4 à 0,8 mmol sous le seuil). Une allure qu'il doit pouvoir répéter le lendemain. Les blocs LONGS s'y tiennent ; seules les fractions COURTES touchent le seuil réel. Beaucoup de volume sous-seuil DÉPLACE le seuil ; peu de volume AU seuil ne fait que fatiguer.`}\n` : ""}${lactate ? `- 🧪 TEST DE LACTATE du ${lactate.date} : seuil 1 (aérobie) ${fmtAllure(lactate.lt1.allureSec)}/km${lactate.lt1.fc ? ` à ${lactate.lt1.fc} bpm` : ""}, seuil 2 ${fmtAllure(lactate.lt2.allureSec)}/km${lactate.lt2.fc ? ` à ${lactate.lt2.fc} bpm` : ""}. Ce sont des seuils MESURÉS : les allures de seuil et de footing en découlent, ne les recalcule pas depuis la VMA.\n` : ""}${thresholdPace ? `- 🎯 ALLURE SEUIL **MESURÉE** : ${thresholdPace}/km (${lactate ? `seuil 2 du test de lactate du ${lactate.date}` : `vitesse critique ${(csMs! * 3.6).toFixed(2)} km/h, ajustée sur ses efforts réels`})${!lactate && pc?.dPrime ? ` · réserve anaérobie D' ${pc.dPrime} m` : ""}. ${sousPlafond ? "Repère seulement : cadre de santé, aucune séance à cette allure." : "UTILISE CETTE VALEUR pour les séances au seuil plutôt qu'un pourcentage de VMA estimée."}\n` : ""}${qeLine ? `- 🔍 EXÉCUTION DE SA DERNIÈRE QUALITÉ : ${qeLine}${faded ? " → il a DÉCROCHÉ : la prochaine série doit être plus courte ou plus lente, pas plus dure. Ne répète pas la même erreur." : fade != null && fade <= -6 ? (sousPlafond ? " → il a fini plus vite qu'il n'a commencé : la série était dans ses cordes, sans rien durcir pour autant (cadre de santé)." : " → il a ACCÉLÉRÉ en fin de série : il en avait sous le pied, tu peux durcir (allure ou volume, pas les deux).") : ""}\n` : ""}- Repères physio : seuil lactique ~${thresholdPace ?? (vma ? paceAt(86) : "?")}/km · vitesse critique ~${vma ? r1(vma * 0.90) : "?"} km/h (${vma ? paceAt(90) : "?"}/km) · VO2max estimé ~${vo2 ?? "?"} ml/kg/min
 
 FORME & RÉCUPÉRATION (aujourd'hui)
 - État physiologique (dernière VFC face à SA base, zone normale ± 6 %) : ${state}
@@ -2732,31 +2761,31 @@ ${lacune ? `- ⚠️ TROU DE DONNÉES : ${lacune.jours} jours SANS AUCUNE trace 
 - ⏱️ Dernière séance DURE réellement effectuée : ${lastHardDaysAgo == null ? "aucune trace récente" : lastHardDaysAgo === 0 ? "AUJOURD'HUI ⚠️ → pas de deuxième séance dure aujourd'hui ni demain" : `il y a ${lastHardDaysAgo} j`}${lastHardDaysAgo != null && lastHardDaysAgo * 24 < hardGapH ? ` ⚠️ moins de ${hardGapH} h se sont écoulées : la prochaine qualité doit attendre.` : ""}${qualiteRecente.manquees.length ? `\n- ⏭️ QUALITÉ PRESCRITE ET NON FAITE (7 derniers jours) : ${qualiteRecente.manquees.join(", ")} — elle compte dans la semaine et NE SE RATTRAPE PAS : ne la re-propose pas le lendemain.` : ""}${skippedWeekdays.length ? `\n- 🚫 JOURS SYSTÉMATIQUEMENT RATÉS : ${skippedWeekdays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")} — prescrits plusieurs fois, jamais courus. Ne t'obstine pas : place-y du repos ou rien, et redistribue ailleurs.` : ""}
 - Repos : dernière séance il y a ${daysSinceLast ?? "?"} j · ${restDays7} j sans courir sur les 7 derniers${daysSinceLast != null && daysSinceLast >= 3 ? " ⚠️ reprise après coupure : redémarre en douceur, pas de grosse séance d'emblée" : ""}
 - CTL ${Math.round(load.ctl)} (forme) · ATL ${Math.round(load.atl)} (fatigue) · TSB ${Math.round(load.tsb)} (fraîcheur) · ratio aigu:chronique ${r1(load.acr)}${load.acr > 1.5 ? " ⚠️ élevé (risque)" : ""}
-- Répartition d'intensité 14j : ${hardTimePct != null ? `**${hardTimePct} % du TEMPS passé en Z3+** (mesure réelle par zone FC — c'est CE chiffre qui compte, cible ≤ 20 %)${hardTimePct > 25 ? " ⚠️ trop d'intensité : il court ses footings trop vite ou empile les séances dures" : hardTimePct < 8 ? " ⚠️ presque aucune intensité : il ne progressera pas sans qualité" : " ✅ polarisation correcte"}` : `${hardShare ?? "?"} % de SÉANCES qualité (approximation : le temps par zone n'est pas encore remonté par sa montre)`}
+- Répartition d'intensité 14j : ${hardTimePct != null ? `**${hardTimePct} % du TEMPS passé en Z3+** (mesure réelle par zone FC — c'est CE chiffre qui compte, cible ≤ 20 %)${hardTimePct > 25 ? " ⚠️ trop d'intensité : il court ses footings trop vite ou empile les séances dures" : hardTimePct < 8 ? (sousPlafond ? " (peu d'intensité : c'est le cadre de santé qui le veut)" : " ⚠️ presque aucune intensité : il ne progressera pas sans qualité") : " ✅ polarisation correcte"}` : `${hardShare ?? "?"} % de SÉANCES qualité (approximation : le temps par zone n'est pas encore remonté par sa montre)`}
 - 5 dernières séances : ${last5.join(" | ") || "aucune"}${(() => { const g = workouts.slice(0, 10).filter(w => w.gap_min_km != null && (w.elevation_gain_m ?? 0) > 150); return g.length ? `\n- ⛰️ ALLURE AJUSTÉE AU DÉNIVELÉ (GAP) sur ses sorties vallonnées : ${g.slice(0, 3).map(w => `${String(w.date).slice(5, 10)} ${w.gap_min_km}/km (D+${w.elevation_gain_m})`).join(" · ")} — juge sa performance là-dessus, PAS sur l'allure brute qui ne veut rien dire en montée.` : ""; })()}
 ${pains.length ? `- ⚠️ DOULEUR(S) SIGNALÉE(S) par l'athlète (zone précise) : ${pains.join(", ")} → ADAPTE les prochaines séances à CETTE zone (voir consigne sécurité).` : ""}${fbNotes.length ? `\n- 🗣️ Notes récentes de l'athlète (ressenti/douleur — LIS-LES et tiens-en compte) : ${fbNotes.map(n => `« ${n} »`).join(" ; ")}` : ""}${lastRpe != null ? `\n- Dernier ressenti d'effort (RPE) : ${lastRpe}/10${rpeAvg != null ? ` · moyenne des 3 derniers : ${rpeAvg}/10${rpeHigh ? " ⚠️ il trouve ses séances dures de façon RÉPÉTÉE — le ressenti précède souvent la VFC, allège avant que ça ne casse" : ""}` : ""}` : ""}
 
 ANALYSE APPROFONDIE (croise tous ces facteurs)
 - VO2max estimé : ${vo2 ?? "?"} ml/kg/min${efTrend ? ` · efficacité aérobie ${efTrend}` : ""}
 - Tendance VFC (7j vs 7j) : ${hrvWeekTrend ?? "n/c"}
-- Monotonie de charge : ${monotony}${monotony > 2 ? " ⚠️ trop uniforme → varie l'intensité (risque surcharge/maladie)" : " (ok)"}
+- Monotonie de charge : ${monotony}${monotony > 2 ? (sousPlafond ? " ⚠️ trop uniforme → varie les DURÉES et place un vrai jour de repos, pas l'intensité (cadre de santé)" : " ⚠️ trop uniforme → varie l'intensité (risque surcharge/maladie)") : " (ok)"}
 - Forme de course : ${[cadence ? `cadence ${cadence} spm` : null, stride ? `foulée ${stride} m` : null, vosc ? `oscillation ${vosc} cm` : null, gct ? `contact sol ${gct} ms` : null, power ? `puissance ${power} W` : null, decoupling != null ? `dérive cardiaque ${decoupling}%${decoupling > 5 ? " (>5 % → endurance à renforcer)" : ""}` : null].filter(Boolean).join(" · ") || "n/c"}
 - Sommeil détaillé : ${[deepPct != null ? `profond ${deepPct}%` : null, remPct != null ? `REM ${remPct}%` : null, sl?.body_battery_end != null ? `énergie ${sl.body_battery_end}/100` : null, sl?.respiration_rate != null ? `respiration ${sl.respiration_rate}/min` : null].filter(Boolean).join(" · ") || "n/c"}
-${altLoss > 0 ? `- ⛰️ ALTITUDE : il s'entraîne à ~${Math.round(elevationM!)} m. À cette altitude, la performance aérobie d'un athlète non acclimaté baisse d'environ ${altLoss} % — soit ~${Math.round(altLoss * 2.8)} s/km sur ses allures habituelles. NE CONCLUS PAS à une perte de forme : ses chronos SONT censés être plus lents ici. Juge-le à la FC et au ressenti, et sache que le retour au niveau de la mer lui donnera un gain mécanique de quelques jours.\n` : ""}- Terrain & environnement : ${elevWeek} m D+ cette semaine${avgTemp != null ? ` · ~${avgTemp}°C récemment${avgTemp >= 25 ? " (chaleur → ralentir l'allure, hydrater)" : ""}` : ""}${cycle ? `\n- Cycle menstruel : phase ${cycle} → adapte l'intensité (pousser en folliculaire, prudence en lutéale/prémenstruel)` : ""}
+${altLoss > 0 ? `- ⛰️ ALTITUDE : il s'entraîne à ~${Math.round(elevationM!)} m. À cette altitude, la performance aérobie d'un athlète non acclimaté baisse d'environ ${altLoss} % — soit ~${Math.round(altLoss * 2.8)} s/km sur ses allures habituelles. NE CONCLUS PAS à une perte de forme : ses chronos SONT censés être plus lents ici. Juge-le à la FC et au ressenti, et sache que le retour au niveau de la mer lui donnera un gain mécanique de quelques jours.\n` : ""}- Terrain & environnement : ${elevWeek} m D+ cette semaine${avgTemp != null ? ` · ~${avgTemp}°C récemment${avgTemp >= 25 ? " (chaleur → ralentir l'allure, hydrater)" : ""}` : ""}${cycle ? `\n- Cycle menstruel : phase ${cycle} → ${sousPlafond ? "adapte la charge (prudence en lutéale/prémenstruel), sans intensité de plus en folliculaire (cadre de santé)" : "adapte l'intensité (pousser en folliculaire, prudence en lutéale/prémenstruel)"}` : ""}
 
 EXÉCUTION & ADHÉRENCE (boucle adaptative — fais ÉVOLUER la suite selon ce qu'il fait VRAIMENT)
 - Discipline des footings : ${easyDiscipline}
 - Adhérence au plan prescrit : ${adherence}
 
 OBJECTIF DE COURSE
-${objLines.length ? objLines.join("\n") : (plafondIntensite === "normal" ? "• Aucun objectif de course → vise une PROGRESSION GLOBALE selon son profil/niveau, ses dernières séances et sa récupération (sommeil/VFC) : base aérobie, développement progressif de la VMA et du seuil, régularité, polarisé 80/20. Ne réclame pas d'objectif." : "• Aucun objectif de course → cadre de santé : régularité et endurance facile, sa récupération (sommeil/VFC) d'abord. Ne réclame pas d'objectif.")}
+${objLines.length ? [...objLines, ...(sousPlafond ? (objLinesPerf.length ? ["• Cadre de santé : cette course se court à effort contrôlé — ni chrono, ni allure cible, ni travail de VMA pour la préparer ; le temps qu'il vise ne fixe aucune séance."] : []) : objLinesPerf)].join("\n") : (plafondIntensite === "normal" ? "• Aucun objectif de course → vise une PROGRESSION GLOBALE selon son profil/niveau, ses dernières séances et sa récupération (sommeil/VFC) : base aérobie, développement progressif de la VMA et du seuil, régularité, polarisé 80/20. Ne réclame pas d'objectif." : "• Aucun objectif de course → cadre de santé : régularité et endurance facile, sa récupération (sommeil/VFC) d'abord. Ne réclame pas d'objectif.")}
 • Phase d'entraînement recommandée : ${plafondIntensite === "aucune" ? "AUCUNE QUALITÉ — cadre de santé : endurance facile seulement (Z1-Z2), à la conversation ; la périodisation habituelle ne s'applique pas" : plafondIntensite === "seuilBas" ? "SEUIL BAS AU PLUS — cadre de santé : au maximum une séance sous le seuil par semaine, ni VMA, ni côtes courtes, ni allure de course ; le reste en endurance facile" : phase}
 
 STRUCTURE CIBLE DE LA SEMAINE (squelette à RESPECTER — calculé pour CE coureur ; tu ajustes l'ordre des jours et les allures à sa fraîcheur, mais tu tiens le nombre de séances de qualité indiqué, ni moins par excès de prudence, ni plus)
 ${weekTarget}
 
 GARDE-FOUS ANTI-BLESSURE (à respecter ABSOLUMENT — la santé prime sur la performance)
-- Progressivité : +10 % de charge/volume maximum par semaine.${load.acr > 1.4 ? " ⚠️ Ratio aigu:chronique élevé → prévoir une semaine ALLÉGÉE." : ""}${monotony > 2 ? " ⚠️ Monotonie élevée → varier l'intensité, garantir un vrai jour facile/repos." : ""}
+- Progressivité : +10 % de charge/volume maximum par semaine.${load.acr > 1.4 ? " ⚠️ Ratio aigu:chronique élevé → prévoir une semaine ALLÉGÉE." : ""}${monotony > 2 ? (sousPlafond ? " ⚠️ Monotonie élevée → varier les durées (pas l'intensité : cadre de santé), garantir un vrai jour facile/repos." : " ⚠️ Monotonie élevée → varier l'intensité, garantir un vrai jour facile/repos.") : ""}
 - Jamais 2 séances de qualité d'affilée ; **≥ ${hardGapH} h entre deux séances dures pour CET athlète** (valeur calculée sur son âge) ; ≥ 1 jour de repos/semaine.
 - ${pains.length ? `⚠️ DOULEUR SIGNALÉE (${pains.join(", ")}) → ADAPTE la/les prochaine(s) séance(s) à CETTE zone, ne JAMAIS forcer sur une douleur : tendon d'Achille/mollet → supprime vitesse, côtes et pliométrie, footing plat très court ; genou/ITB → évite descentes, longues sorties et fractionné, réduis le volume ; tibia/périoste → coupe le volume et les surfaces dures, privilégie le croisé ; ischio/cuisse → pas de sprint ni d'allure spécifique, allure douce ; hanche/psoas → pas de fractionné court ; pied/cheville → repos ou croisé SANS impact (vélo/natation/aqua-jogging). Si la douleur est vive/persistante (≥ plusieurs jours) → REPOS de course + conseille une consultation (kiné/médecin). La santé prime sur le plan.` : "Au moindre signal de douleur → adapter immédiatement, pas de stoïcisme."}
 - ${daysSinceLast != null && daysSinceLast >= 4 ? "Reprise après coupure → repartir un cran en dessous, remonter progressivement." : "Si VFC sous la base ou sommeil dégradé → alléger la séance du jour."}

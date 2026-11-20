@@ -81,11 +81,11 @@ const aptitude = (oui: string[]) => ({ user_id: "u", type: "aptitude", created_a
 const consignesKine = (o: Ligne) => ({ user_id: "u", type: "consignes_kine", created_at: "2026-11-10T10:00:00Z",
   data: { dureeMaxMin: null, sansIntensite: false, seancesMaxSemaine: null, jusquAu: "2026-12-31", majA: "2026-11-10", ...o } });
 
-type Situation = { profil?: Ligne; notifications?: Ligne[]; baselines?: Ligne[]; sansSeance?: boolean };
+type Situation = { profil?: Ligne; notifications?: Ligne[]; baselines?: Ligne[]; sansSeance?: boolean; seances?: Ligne[] };
 async function dossier(o: Situation = {}) {
   return aLInstant(MATIN, async () => {
     const ctx = await buildAthleteContext(fauxClient({ profiles: [profil(o.profil)], performance_baselines: o.baselines ?? [],
-      workouts: o.sansSeance ? [] : footings, notifications: o.notifications ?? [] }), "u");
+      workouts: o.sansSeance ? [] : o.seances ?? footings, notifications: o.notifications ?? [] }), "u");
     const ligne = (debut: string) => ctx.text.split("\n").find((l) => l.startsWith(debut)) ?? "";
     return { ctx, text: ctx.text, ligneVma: ligne("- VMA : "), ligneNeuf: ligne("- 🆕 ATHLÈTE SANS HISTORIQUE") };
   });
@@ -194,14 +194,36 @@ async function main() {
     }
   });
 
-  await test("horsPlafond : « aucune » écarte tout ce qui monte en Z3 ; « seuil bas » écarte en plus l'allure de course et l'over-under ; « normal » ne touche à rien", () => {
+  await test("horsPlafond lit la ZONE ET LA STRUCTURE : « aucune » écarte tout ce qui monte en Z3 ; « seuil bas » écarte la Z4, le travail au seuil, l'allure de course et l'over-under ; « normal » ne touche à rien", () => {
     const seance = (id: string) => { const w = WORKOUT_LIBRARY.find((x) => x.id === id); assert.ok(w, `séance ${id} absente`); return w!; };
     for (const id of ["tempo-cont", "seuil-long", "hill-long", "hill-tempo", "env-incline", "rs-marathon-blocks"])
       assert.equal(horsPlafond(seance(id), "aucune"), true, `« aucune » garde ${seance(id).name} (${seance(id).zone})`);
-    assert.equal(horsPlafond(seance("end-fond"), "aucune"), false, "« aucune » retire l'endurance fondamentale");
-    for (const w of WORKOUT_LIBRARY.filter((x) => /Z[3-5]/.test(x.zone))) assert.equal(horsPlafond(w, "aucune"), true, `« aucune » garde ${w.name} (${w.zone})`);
-    for (const id of ["rs-5k", "thr-overunder", "rs-marathon-blocks"]) assert.equal(horsPlafond(seance(id), "seuilBas"), true, `« seuil bas » garde ${seance(id).name}`);
-    for (const id of ["seuil-long", "tempo-cont", "hill-long", "end-fond"]) assert.equal(horsPlafond(seance(id), "seuilBas"), false, `« seuil bas » retire ${seance(id).name}`);
+    for (const id of ["end-fond", "long-classic", "rec-easy", "beg-walkrun", "beg-continu", "cr-swim"])
+      assert.equal(horsPlafond(seance(id), "aucune"), false, `« aucune » retire ${seance(id).name} (${seance(id).zone})`);
+    // La zone dit « Z2 », la STRUCTURE monte en Z3 ou se court à l'allure marathon (relecteurs, tour 5).
+    for (const id of ["end-prog", "end-bialure", "long-trail", "long-mp"]) {
+      assert.doesNotMatch(seance(id).zone, /Z[3-5]/, `précondition : la zone de ${id} ne dit rien de l'intensité`);
+      assert.equal(horsPlafond(seance(id), "aucune"), true, `« aucune » garde ${seance(id).name} (${seance(id).structure})`);
+    }
+    // Une préparation spécifique « à l'effort cible », zone Z2 : écartée sous les deux plafonds.
+    assert.equal(seance("rs-ultra-effort").zone, "Z2", "précondition : la zone de rs-ultra-effort est Z2");
+    for (const p of ["aucune", "seuilBas"] as const) assert.equal(horsPlafond(seance("rs-ultra-effort"), p), true, `« ${p} » garde la préparation à l'effort cible`);
+    for (const w of WORKOUT_LIBRARY.filter((x) => /Z[3-5]/.test(`${x.zone} ${x.structure}`))) assert.equal(horsPlafond(w, "aucune"), true, `« aucune » garde ${w.name} (${w.zone} · ${w.structure.slice(0, 60)})`);
+    for (const id of ["rs-5k", "thr-overunder", "rs-marathon-blocks", "long-mp", "thr-2x20", "seuil-long", "thr-broken", "seuil-ladder", "tempo-surges", "long-seuil", "hill-long", "tr-vertical", "cr-aqua-quality", "hill-downhill", "tempo-cont"])
+      assert.equal(horsPlafond(seance(id), "seuilBas"), true, `« seuil bas » garde ${seance(id).name} (${seance(id).zone})`);
+    // Du seuil, du tempo, du VO2max ou de la vitesse sans zone écrite : écartés par leur catégorie sans intensité permise.
+    for (const category of ["tempo", "threshold", "vo2max", "speed"] as const)
+      assert.equal(horsPlafond({ id: "x", category, zone: "Z2", structure: "20 min régulier" }, "aucune"), true, `« aucune » garde une séance « ${category} » sans zone écrite`);
+    // Une préparation spécifique sans zone ni allure écrites : écartée par sa catégorie.
+    for (const p of ["aucune", "seuilBas"] as const) assert.equal(horsPlafond({ id: "x", category: "race_specific", zone: "Z2", structure: "60 min à l'aise sur le parcours" }, p), true, `« ${p} » garde une préparation spécifique`);
+    // « Au seuil » sans zone écrite : écarté aussi.
+    assert.equal(horsPlafond({ id: "x", category: "endurance", zone: "Z2", structure: "45 min dont 3 × 5 min au seuil" }, "seuilBas"), true, "« seuil bas » garde du travail « au seuil » sans zone écrite");
+    for (const w of WORKOUT_LIBRARY.filter((x) => /Z[45]/.test(`${x.zone} ${x.structure}`))) assert.equal(horsPlafond(w, "seuilBas"), true, `« seuil bas » garde ${w.name} (${w.zone} · ${w.structure.slice(0, 60)})`);
+    // Le seuil bas garde ce qui reste SOUS le seuil : la Z3 pure, les progressions, l'endurance.
+    assert.match(seance("env-incline").structure, /Z3-Z4/, "précondition : le tapis incliné monte en Z4 dans sa structure");
+    assert.equal(horsPlafond(seance("env-incline"), "seuilBas"), true, "« seuil bas » garde le tapis incliné (Z4 dans sa structure)");
+    for (const id of ["end-fond", "long-prog", "end-prog", "end-bialure", "long-trail", "spd-cadence"])
+      assert.equal(horsPlafond(seance(id), "seuilBas"), false, `« seuil bas » retire ${seance(id).name} (${seance(id).zone})`);
     for (const w of WORKOUT_LIBRARY) assert.equal(horsPlafond(w, "normal"), false, `« normal » retire ${w.name}`);
   });
 
@@ -240,6 +262,77 @@ async function main() {
       }
     }
     assert.ok(Object.values(plafondDe).includes("aucune") && Object.values(plafondDe).includes("seuilBas"), "précondition : les deux plafonds sont éprouvés");
+  });
+
+  await test("UN DOSSIER QUI DÉCLENCHE TOUT (tour 5) : fraîcheur, âge, passif, objectif ambitieux, affûtage, seuil mesuré, dernière série accélérée, dérive, cadence, répartition, cycle, perte de poids, monotonie, plateau — rien ne pousse un exempté à l'intensité ; le témoin a chacune de ces lignes", async () => {
+    // Le vocabulaire qui pousse à l'intensité, cherché ligne par ligne — sauf dans les lignes qui l'interdisent.
+    const PRESCRIT = new RegExp([
+      "VMA courte", "développement progressif de la VMA", "VMA, seuil, côtes", "qualités/sem", "refuse-le", "enchaîne la qualité", "côtes courtes", "lignes droites", "explosiv", "avec un bloc à", "30/30",
+      "tu peux durcir", "durcir le spécifique", "Ne sous-dose pas", "garde la qualité", "\\boser\\b", "blocs denses", "doubles séances", "travail de VMA", "bloc (?:de )?VMA", "séances VMA",
+      "on garde l'intensité", "VOLUME au seuil", "UTILISE CETTE VALEUR", "CHANGE le stimulus", "GAMMES", "ne progressera pas sans qualité", "varier? l'intensité", "folliculaire",
+      "adapte l'intensité", "un peu soutenue", "Entraînement classique", "qualité maximum", "allure de course", "(?<!jamais d'|AUCUNE )allure cible", "recherche de vitesse", "périodisation classique",
+      "\\d séances de qualité(?! d'affilée)", "qualité en pâtit", "qualité chiffrée", "travail calibré", "Travaille la montée", "chercher des côtes", "Privilégie le seuil", "plus ambitieux", "spécificité", "Temps visé",
+    ].join("|"), "i");
+    const INTERDIT = /⛔|ne lui propose|ni VMA|INTERDIT|AUCUNE séance de qualité ni test|ni côtes courtes|cadre de santé/i;
+    const prescrit = (text: string) => text.split("\n").filter((l) => !INTERDIT.test(l) && PRESCRIT.test(l));
+    // Ce qui ne s'écrit JAMAIS pour un exempté, pas même dans une ligne qui parle par ailleurs du cadre de santé
+    // (la ligne de la dernière série porte deux phrases : l'une pouvait masquer l'autre).
+    const JAMAIS = /tu peux durcir|Ne sous-dose pas|garde la qualité|\boser\b|VOLUME au seuil|UTILISE CETTE VALEUR|CHANGE le stimulus|pousser en folliculaire|on garde l'intensité|recherche de vitesse|GROS travail de VMA|bloc de VMA/i;
+    const objectifCourse = (km: number, date: string) => ({ user_id: "u", type: "race_objective", created_at: "2026-11-01T10:00:00Z",
+      data: { race: `Course de test ${km} km`, raceDate: date, distanceKm: km, targetTime: "36:00", targetSeconds: 2160, targetPace: "3'36/km" } });
+    // Des footings qui portent leur cadence (basse), leur dérive (faible) et leur temps en zone (tout en Z1-Z2).
+    const footingsMesures = footings.map((w) => ({ ...w, avg_cadence_spm: 160, cardiac_decoupling: 2, hr_zone_seconds: [1500, 1200, 0, 0, 0] }));
+    // Une charge identique chaque jour de la semaine (monotonie) qui monte (plateau, avec une VMA plate sur 33 jours).
+    const quotidiens = [0, 1, 2, 4, 5].map((n) => ({ user_id: "u", date: jourMoins(J, n), type: "easy", sport: "run", distance_km: 8, duration_seconds: 2700, avg_hr: 124, max_hr: 140, tss: 40 }));
+    const tousLesJours = Array.from({ length: 60 }, (_, n) => ({ user_id: "u", date: jourMoins(J, n), type: "easy", sport: "run", distance_km: 8, duration_seconds: 2700, avg_hr: 124, max_hr: 140, tss: 40 }));
+    const plateVma = [35, 20, 2].map((n, i) => ({ at: `${jourMoins(J, n)}T10:00:00Z`, vma: 14 + i * 0.01 }));
+    const scenarios: [string, Situation, RegExp[]][] = [
+      ["10 km à J+30", { seances: footingsMesures, notifications: [objectifCourse(10, "2026-12-18")] },
+        [/Ne sous-dose pas/, /\boser le volume et la densité/, /oser des blocs denses/, /GROS travail de VMA/, /gros bloc de VMA/, /Temps visé/, /VOLUME au seuil/, /UTILISE CETTE VALEUR/,
+          /tu peux durcir la prochaine/, /tu peux durcir \(allure ou volume/, /tu peux durcir le spécifique/, /6-8 lignes droites/, /ne progressera pas sans qualité/, /pousser en folliculaire/,
+          /^ENTRAÎNEMENT — /m, /idéale pour la qualité chiffrée/, /pratique pour le travail calibré/, /Travaille la montée \(côtes longues/, /aller chercher des côtes/]],
+      // La nutrition du jour de course ne se pose que sur une course longue (un 10 km n'en a pas).
+      ["marathon à J+30", { seances: footingsMesures, notifications: [objectifCourse(42.2, "2026-12-18")] }, [/testé en sortie longue, à l'allure de course/]],
+      ["10 km à J+5 (affûtage)", { seances: footingsMesures, notifications: [objectifCourse(10, "2026-11-23")] }, [/on garde l'intensité pour arriver frais/]],
+      // Sans suivi du cycle, et une dérive cardiaque forte sur ses footings.
+      ["sans objectif, charge monotone, VMA en plateau, 45 ans", { seances: [...footings.map((w) => ({ ...w, cardiac_decoupling: 9 })), ...quotidiens], profil: { age: 45, is_female_cycle_sync: false } },
+        [/trop uniforme → varie l'intensité/, /Monotonie élevée → varier l'intensité/, /CHANGE le stimulus/, /2 séances de qualité bien récupérées/,
+          /si elle synchronise son cycle, adapte l'intensité selon la phase/, /AVANT toute recherche de vitesse/]],
+      // Des footings courus à 44 % du temps en Z3+ : le facteur limitant « discipline ».
+      ["footings courus trop vite", { seances: footings.map((w) => ({ ...w, hr_zone_seconds: [600, 900, 900, 300, 0] })) }, [/sa qualité en pâtit/]],
+      // Deux signaux orange (charge identique chaque jour depuis deux mois, dernier ressenti à 9/10) sans signal rouge.
+      ["verdict orange (charge monotone, ressenti 9/10)", { seances: tousLesJours, notifications: [{ user_id: "u", type: "session_feedback", created_at: `${jourMoins(J, 1)}T18:00:00Z`, data: { rpe: 9, date: jourMoins(J, 1) } }] },
+        [/🟠 ORANGE — Séance allégée : garde la qualité SI elle était prévue/]],
+    ];
+    const commun: Ligne = { main_terrains: ["piste", "montagne", "tapis", "plat"], running_years: 10, gender: "female", is_female_cycle_sync: true, current_phase: "folliculaire", elevation_pref: "specialiste",
+      last_quality_exec: { date: jourMoins(J, 3), repsSec: [250, 248, 245, 240], avgHr: 165, fadeSec: -10 },
+      weight_mode_enabled: true, height_cm: 165, weight_kg: 85 };
+    for (const [quand, s, attendus] of scenarios) {
+      const lire = (o: Situation) => dossier({ ...s, ...o, profil: { ...commun, ...(s.profil ?? {}), ...(o.profil ?? {}),
+        pace_curve: { criticalSpeed: 4.0, ...(quand.includes("plateau") ? { history: plateVma } : {}) } },
+        notifications: [...(s.notifications ?? []), ...(o.notifications ?? [])] });
+      const temoin = await lire({});
+      for (const r of attendus) assert.match(temoin.text, r, `précondition (${quand}) : le témoin n'a pas la ligne ${r}`);
+      assert.match(temoin.text, /^PROFIL\n/, `précondition (${quand}) : le dossier du témoin ne commence plus par son profil`);
+      assert.doesNotMatch(temoin.text, /CADRE DE SANTÉ — PRIME/, `${quand} : le témoin reçoit l'en-tête du cadre de santé`);
+      for (const [nom, o] of exemptes) {
+        const { text } = await lire(o);
+        const vues = prescrit(text);
+        assert.deepEqual(vues.map((l) => l.slice(0, 140)), [], `${nom} (${quand}) : le dossier pousse encore à l'intensité : ${vues.map((l) => l.slice(0, 200)).join(" | ")}`);
+        const jamais = text.match(JAMAIS)?.[0];
+        assert.equal(jamais, undefined, `${nom} (${quand}) : « ${jamais} » est écrit pour un exempté`);
+        const plafond = /cardiaque|grossesse/.test(nom) ? "seuilBas" : "aucune";
+        assert.match(text, /^⛔ CADRE DE SANTÉ — PRIME SUR TOUT LE RESTE DE CE DOSSIER\n- Plafond d'intensité : /, `${nom} (${quand}) : l'en-tête du cadre de santé manque`);
+        assert.match(text, /^- ⛔ Cadre de santé : le terrain ne relève jamais le plafond d'intensité de ce dossier/m, `${nom} (${quand}) : la ligne du terrain manque`);
+        assert.match(text.split("\n")[1], plafond === "seuilBas" ? /SEUIL BAS au plus/ : /AUCUNE intensité/, `${nom} (${quand}) : l'en-tête ne dit pas le plafond « ${plafond} »`);
+        // Le seuil mesuré reste un repère ; le sous-seuil est la limite haute du seuil bas, et disparaît sans intensité.
+        if (/ALLURE SEUIL \*\*MESURÉE\*\*/.test(temoin.text)) {
+          assert.match(text, /ALLURE SEUIL \*\*MESURÉE\*\*.*Repère seulement : cadre de santé, aucune séance à cette allure\./, `${nom} (${quand}) : le seuil mesuré n'est pas un simple repère`);
+          if (plafond === "seuilBas") assert.match(text, /ALLURE SOUS-SEUIL : \d+'\d{2}\/km — la LIMITE HAUTE de ses séances de seuil bas/, `${nom} (${quand}) : le sous-seuil n'est pas la limite du seuil bas`);
+          else assert.doesNotMatch(text, /ALLURE SOUS-SEUIL/, `${nom} (${quand}) : une allure sous-seuil est donnée sans intensité permise`);
+        }
+      }
+    }
   });
 
   await test("consignes du kiné ÉCHUES : l'exemption tombe", async () => {
