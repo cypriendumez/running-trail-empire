@@ -17,10 +17,21 @@ const AU_RESSENTI: Record<Lang, string> = {
   pt: " pela sensação (ritmo a definir com um teste de VAM)",
 };
 
+/** Au ressenti, SANS renvoyer au test : pour un coureur dont l'effort maximal est interdit
+ *  (`lib/health/effortMaximal`), le test VMA (6 min à fond) n'est pas une option (19/11/2026). */
+const AU_RESSENTI_SANS_TEST: Record<Lang, string> = {
+  fr: " au ressenti (tu peux encore parler par phrases courtes)",
+  en: " by feel (you can still talk in short sentences)",
+  de: " nach Gefühl (du kannst noch in kurzen Sätzen sprechen)",
+  es: " por sensaciones (aún puedes hablar con frases cortas)",
+  pt: " pela sensação (ainda consegues falar em frases curtas)",
+};
+
 /** Les prépositions des gabarits devant une allure (« à ~4'10/km », « at », « zu », « bei », « a », « bis »). */
 // Il faut « ~? » ou « ?/km » : une vraie question (« tu le sens ? ») n'est pas une allure.
 const ALLURE_INCONNUE = /\s(?:à|at|zu|bei|bis|a|em)?\s*(?:~\?(?:\/km)?|\?\/km)/g;
 
-export function sansAllureInconnue(texte: string, l: Lang = "fr"): string {
-  return String(texte ?? "").replace(ALLURE_INCONNUE, AU_RESSENTI[l] ?? AU_RESSENTI.fr);
+export function sansAllureInconnue(texte: string, l: Lang = "fr", sansTest = false): string {
+  const t = sansTest ? AU_RESSENTI_SANS_TEST : AU_RESSENTI;
+  return String(texte ?? "").replace(ALLURE_INCONNUE, t[l] ?? t.fr);
 }

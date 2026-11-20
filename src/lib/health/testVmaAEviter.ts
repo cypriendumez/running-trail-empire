@@ -3,13 +3,15 @@
  * du test (`TestVmaBanner`, tableau de bord), le Profil et la fiche vitesse (17/11/2026).
  *
  * À éviter : l'avis d'un médecin est attendu (questionnaire d'aptitude), le coureur suit le programme
- * marche-course (le coach ne prescrit pas le test tant qu'il ne court pas 30 minutes d'affilée), ou
- * l'une des deux lectures est en panne — dans le doute, on ne pousse pas un effort maximal.
+ * marche-course (le coach ne prescrit pas le test tant qu'il ne court pas 30 minutes d'affilée), un
+ * antécédent lui interdit l'effort maximal (cardiaque, covid long, grossesse : `lib/health/effortMaximal`,
+ * 19/11/2026), ou l'une des lectures est en panne — dans le doute, on ne pousse pas un effort maximal.
  * ⚠️ La VMA estimée, désormais affichée partout, ne doit pas emporter avec elle une invitation au test
  * vers ces coureurs-là (@HeadCoach, 17/11/2026). Le tableau de bord recopiait la règle et ignorait la
  * panne de l'état du coach : il appelle désormais `testVmaAEviterDe` avec ses propres lectures.
  */
 import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
+import { effortMaximalInterdit } from "@/lib/health/effortMaximal";
 
 type Lecteur = { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Lecture = { data?: unknown; error?: unknown };
@@ -27,20 +29,23 @@ export function avisMedicalEnAttenteDe(aptitude: Lecture): boolean {
 }
 
 /**
- * La règle, sur deux lectures déjà faites : la dernière ligne d'aptitude (`notifications`, type
- * `aptitude`, liste) et l'état du coach (`notifications`, type `auto_coach_state`, une ligne).
+ * La règle, sur des lectures déjà faites : la dernière ligne d'aptitude (`notifications`, type
+ * `aptitude`, liste), l'état du coach (`notifications`, type `auto_coach_state`, une ligne) et le
+ * profil (`health_conditions`). Sans profil passé, les antécédents ne sont pas lus.
  */
-export function testVmaAEviterDe(aptitude: Lecture, etatCoach: Lecture): boolean {
-  if (avisMedicalEnAttenteDe(aptitude) || etatCoach.error) return true;
+export function testVmaAEviterDe(aptitude: Lecture, etatCoach: Lecture, profil?: Lecture): boolean {
+  if (avisMedicalEnAttenteDe(aptitude) || etatCoach.error || profil?.error) return true;
+  if (effortMaximalInterdit((profil?.data as { health_conditions?: unknown } | null)?.health_conditions)) return true;
   const marche = ((etatCoach.data as { data?: { marcheCourse?: { etape?: unknown } | null } } | null)?.data)?.marcheCourse;
   return typeof marche?.etape === "number";
 }
 
 /** La même règle, lectures comprises. */
 export async function testVmaAEviter(sb: Lecteur, userId: string): Promise<boolean> {
-  const [apt, etat] = await Promise.all([
+  const [apt, etat, profil] = await Promise.all([
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", TYPE_APTITUDE).order("created_at", { ascending: false }).limit(1),
     sb.from("notifications").select("data").eq("user_id", userId).eq("type", "auto_coach_state").maybeSingle(),
+    sb.from("profiles").select("health_conditions").eq("id", userId).maybeSingle(),
   ]);
-  return testVmaAEviterDe(apt, etat);
+  return testVmaAEviterDe(apt, etat, profil);
 }

@@ -213,6 +213,11 @@ export function consignesSurPlan(ctx: AthleteContext, plan: PlanDay[], today = n
 }
 
 function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
+  // ⚠️ LA VEILLE DE COURSE SANS LIGNES DROITES pour un antécédent qui interdit l'effort maximal (19/11/2026) :
+  // « 3 lignes droites à l'allure de course » échappaient au budget de qualité comme aux gardes des footings.
+  const veilleDetail = (l: Lang) => ctx.effortMaximalInterdit ? PLAN_T[l].veilleDetailSansLignes : PLAN_T[l].veilleDetail;
+  // Ni l'avant-veille « 4×30 s à l'allure de course » (100 % de la VMA pour un 5 km ambitieux, @HeadCoach).
+  const avantVeilleDetail = (l: Lang) => ctx.effortMaximalInterdit ? PLAN_T[l].avantVeilleDetailSansAllure : PLAN_T[l].avantVeilleDetail;
   const start = new Date(today); start.setHours(0, 0, 0, 0);
   const dates = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const gapDays = Math.max(2, Math.ceil(ctx.hardGapHours / 24));
@@ -485,11 +490,11 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
       if (runBudget <= 0) continue;
       if (put(i, d === 1
         ? { type: "Récup", title: (l) => PLAN_T[l].veilleTitre,
-            detail: (l) => PLAN_T[l].veilleDetail,
+            detail: veilleDetail,
             why: (l) => PLAN_T[l].veilleWhy,
             tags: tags("Récup", "Veille de course") }
         : { type: "Récup", title: (l) => PLAN_T[l].avantVeilleTitre,
-            detail: (l) => PLAN_T[l].avantVeilleDetail,
+            detail: avantVeilleDetail,
             why: (l) => PLAN_T[l].avantVeilleWhy, tags: tags("Récup", "Affûtage") })) spend();
     }
     // Les jours qui suivent : récupération obligatoire.
@@ -520,9 +525,9 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
       const i = courseApres - d;
       if (i > 6 || runBudget <= 0 || !praticable(i)) continue;
       if (put(i, d === 1
-        ? { type: "Récup", title: (l) => PLAN_T[l].veilleTitre, detail: (l) => PLAN_T[l].veilleDetail,
+        ? { type: "Récup", title: (l) => PLAN_T[l].veilleTitre, detail: veilleDetail,
             why: (l) => PLAN_T[l].veilleWhy, tags: tags("Récup", "Veille de course") }
-        : { type: "Récup", title: (l) => PLAN_T[l].avantVeilleTitre, detail: (l) => PLAN_T[l].avantVeilleDetail,
+        : { type: "Récup", title: (l) => PLAN_T[l].avantVeilleTitre, detail: avantVeilleDetail,
             why: (l) => PLAN_T[l].avantVeilleWhy, tags: tags("Récup", "Affûtage") })) spend();
     }
   }
@@ -541,7 +546,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     // Un jour praticable seulement, comme tout le protocole de course (visa @HeadCoach, 2e tour) ; et pas
     // de veille pour une course C écartée.
     if (poseeC && veille >= 0 && praticable(veille) && runBudget > 0 && put(veille, {
-      type: "Récup", title: (l) => PLAN_T[l].veilleTitre, detail: (l) => PLAN_T[l].veilleDetail,
+      type: "Récup", title: (l) => PLAN_T[l].veilleTitre, detail: veilleDetail,
       why: (l) => PLAN_T[l].veilleWhy, tags: tags("Récup", "Veille de course"),
     })) spend();
   }
@@ -624,8 +629,11 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
           // ou 1, mais un bloc à allure course ou un finish progressif dans la sortie longue est
           // une séance dure de plus, que ce budget ne compte pas. Constaté sur un coureur à gros
           // volume : « Sortie longue progressive » posée avant la moindre sortie facile.
+          // ⚠️ NI AVEC UN ANTÉCÉDENT QUI INTERDIT L'EFFORT MAXIMAL (19/11/2026) : pour un 5 km ambitieux, le
+          // bloc à allure course tombait à 100 % de la VMA (« 4 km à 4'00/km sur jambes fatiguées »), en plus
+          // du seuil bas de la semaine (@HeadCoach).
           const canSpice = longRunKm >= 12 && ctx.readiness.level !== "rouge" && !ctx.cycle.taper && !ctx.weekPlan.eased && !doubleSeuil
-            && !ctx.weekPlan.repriseArret;
+            && !ctx.weekPlan.repriseArret && !ctx.effortMaximalInterdit;
           const phase = ctx.macroPlan[0]?.phase ?? "Développement";
           const tagLong = (cat: "Spécifique" | "Progressif" | "Z2") => (l: Lang) =>
             [PLAN_T[l].tags["Long"], PLAN_T[l].tags[cat], PLAN_T[l].tagKm(nRaw(longRunKm, l))];
@@ -796,7 +804,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     put(idx, {
       type: q.type,
       title: (l) => (ds ? PLAN_T[l].dsTitreSoir : reprise ? `${title(l)}${PLAN_T[l].suffixeReprise}` : rescued ? `${title(l)}${PLAN_T[l].suffixeAllegee}` : title(l)),
-      detail: (l) => PLAN_T[l].qualiteDetail(warmQ, corps(l), cool, ctx.cycle.taper, rescued),
+      detail: (l) => PLAN_T[l].qualiteDetail(warmQ, corps(l), cool, ctx.cycle.taper, rescued, !!ctx.effortMaximalInterdit),
       why: (l) => (ds ? PLAN_T[l].dsWhy : reprise ? PLAN_T[l].qualiteWhyReprise(course) : rescued ? PLAN_T[l].qualiteWhySauvee(crossNote(l)) : PLAN_T[l].qualiteWhy),
       tags: (l) => [
         PLAN_T[l].tags[q.type as keyof (typeof PLAN_T)["fr"]["tags"]] ?? q.type,
@@ -868,7 +876,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // des lignes droites (coût en fatigue quasi nul, entretien de la vitesse), ce qui
   // compte double une semaine sans aucune séance de qualité.
   const distances = repartirFootings(easySlots.length, easyKm, rawEasy >= 3 ? kmMinFooting : 3, easyCap);
-  const gardes = { taper: ctx.cycle.taper, semaineCourse: raceIdx >= 0, sansHistorique: ctx.noHistory, douleur };
+  const gardes = { taper: ctx.cycle.taper, semaineCourse: raceIdx >= 0, sansHistorique: ctx.noHistory, douleur, effortMax: !!ctx.effortMaximalInterdit };
   // ⚠️ PAR JOUR, pas par semaine (troisième double relecture, 17/11/2026) : pendant une reprise après
   // un arrêt, un footing posé AVANT le premier jour où une séance dure est permise (`debutQualite`)
   // reste simple. Lire l'état de la semaine (« sans-qualite ») laissait des lignes droites et un
@@ -1029,7 +1037,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     week[i] = { ...j, moment: "soir" };
     const matin = (l: Lang): PlanDayText => ({
       title: PLAN_T[l].dsTitreMatin,
-      detail: PLAN_T[l].qualiteDetail(warmQ, q.matin![l] ?? q.matin!.fr, cool, ctx.cycle.taper, false),
+      detail: PLAN_T[l].qualiteDetail(warmQ, q.matin![l] ?? q.matin!.fr, cool, ctx.cycle.taper, false, !!ctx.effortMaximalInterdit),
       why: PLAN_T[l].dsWhy,
       tags: [PLAN_T[l].tags["Seuil"], PLAN_T[l].tags["Qualité"], PLAN_T[l].tags["Matin"]],
     });

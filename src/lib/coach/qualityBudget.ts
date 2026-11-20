@@ -75,6 +75,8 @@ export type QualityBudgetInput = {
   plateau: boolean;
   /** Pathologie interdisant l'effort maximal. */
   noMaxEffort: boolean;
+  /** Antécédent qui interdit toute intensité (covid long, `lib/health/effortMaximal`) : zéro qualité. */
+  sansIntensite?: boolean;
   /** Années de pratique — plafonne la qualité quel que soit le cardio. */
   runYears: number | null;
   /** Plafond du mode perte de poids, s'il est actif. */
@@ -223,8 +225,6 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   // PLATEAU : stagner pendant que la charge monte ne se soigne pas avec plus de charge.
   if (i.plateau) easeReasons.push("plateau de progression malgré une charge en hausse");
   if (i.badNight) { qBudget -= 1; easeReasons.push(`nuit dégradée (${i.badNightLabel ?? "?"})`); }
-  // Pathologies interdisant l'effort maximal : on retire d'office la marche la plus haute.
-  if (i.noMaxEffort) qBudget = Math.min(qBudget, 1);
 
   // Le PASSIF plafonne la qualité : un cardio de confirmé sur des tendons de 8 mois = blessure.
   const expCap = i.runYears == null ? null : i.runYears < 1 ? 1 : i.runYears < 3 ? 2 : null;
@@ -244,6 +244,13 @@ export function computeQualityBudget(i: QualityBudgetInput): QualityBudget {
   const alarm = i.pains.length > 0 || (i.hrvDown && i.badNight) || i.noMaxEffort;
   const inPrep = i.hasObjective && i.daysToRace != null && i.daysToRace >= 0 && i.daysToRace <= OBJECTIVE_FLOOR_DAYS;
   if (inPrep && !i.noHistory && !alarm && i.level !== "debutant") floor(1);
+
+  // Pathologies interdisant l'effort maximal (cardiaque, covid long, grossesse) : une séance de qualité
+  // au plus — APRÈS les planchers (19/11/2026). Placé avant eux, il était écrasé par le plancher
+  // « objectif court » : deux séances, dont la VMA, pour un coureur cardiaque qui vise un 10 km.
+  if (i.noMaxEffort) qBudget = Math.min(qBudget, 1);
+  // Et aucune pour un antécédent qui interdit toute intensité (covid long ; décision de Cyprien, 19/11/2026).
+  if (i.sansIntensite) qBudget = 0;
 
   // Plafond « perte de poids » — appliqué APRÈS les planchers, donc jamais contournable.
   // Un athlète en obésité de classe II avec un objectif chrono déclencherait sinon le
