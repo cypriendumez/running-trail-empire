@@ -415,12 +415,19 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // ailleurs. Ni qualité, ni sortie longue, ni allure : la séance se mesure en minutes.
   const mc = ctx.marcheCourse;
   if (mc) {
+    // Le malaise d'un covid long (bilan du matin après une sortie) : repos aujourd'hui, ici aussi — ce chemin
+    // s'arrête avant la règle du jour 0 (@HeadCoach, 20/11/2026).
+    if (ctx.malaiseApresEffort) put(0, {
+      type: "Repos", title: (l) => PLAN_T[l].reposTitre, tags: tags("Repos"),
+      detail: (l) => PLAN_T[l].reposFinalDetail, why: (l) => MALAISE_T[l].why,
+    });
     const voulues = Math.max(2, Math.min(3, ctx.availability.daysPerWeek || 3));
     const dispo = (i: number) => ctx.availability.days.includes(dates[i].getDay());
     const poses: number[] = [];
-    for (let i = 0; i <= 6 && poses.length < voulues; i++) if (dispo(i) && !poses.includes(i - 1)) poses.push(i);
+    const libre = (i: number) => !(ctx.malaiseApresEffort && i === 0);
+    for (let i = 0; i <= 6 && poses.length < voulues; i++) if (dispo(i) && libre(i) && !poses.includes(i - 1)) poses.push(i);
     // Trop peu de jours espacés : les jours disponibles restants, plutôt qu'une séance de moins.
-    for (let i = 0; i <= 6 && poses.length < voulues; i++) if (dispo(i) && !poses.includes(i)) poses.push(i);
+    for (let i = 0; i <= 6 && poses.length < voulues; i++) if (dispo(i) && libre(i) && !poses.includes(i)) poses.push(i);
     const seance = mc.seance;
     const { totalMin } = dureesMarcheCourse(seance);
     for (const i of poses) put(i, {
@@ -1015,8 +1022,17 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // Le DÉTAIL (lu par la montre) ne change pas.
   // Course DÉJÀ COURUE ce jour-là (synchronisée le matin) : « ne prends pas le départ » n'aurait
   // plus de sens — on n'ajoute rien (relecture du 09/11/2026).
-  if (week[0].type === "Course" && lvl === "rouge" && !hardToday) {
-    week[0] = reecrire(week[0], (l, avant) => ({ ...avant, why: `${avant.why}${PLAN_T[l].courseFeuRouge(motifs(l, 2))}` }));
+  // COVID LONG, plus mal après une séance (catalogue santé, décision de Cyprien du 20/11/2026) : la règle passe
+  // AVANT la récupération du feu rouge (elle la court-circuitait), et le jour d'une course, que le plan garde,
+  // elle se dit dans son « pourquoi » (@HeadCoach, relecteurs, 20/11/2026).
+  if (week[0].type === "Course" && (lvl === "rouge" || ctx.malaiseApresEffort) && !hardToday) {
+    week[0] = reecrire(week[0], (l, avant) => ({ ...avant,
+      why: `${avant.why}${lvl === "rouge" ? PLAN_T[l].courseFeuRouge(motifs(l, 2)) : ""}${ctx.malaiseApresEffort ? MALAISE_T[l].course : ""}` }));
+  } else if (ctx.malaiseApresEffort && week[0].type !== "Repos" && week[0].type !== "Course") {
+    // On réduit IMMÉDIATEMENT : la séance du jour devient un repos, et le motif oriente vers son médecin.
+    week[0] = reecrire({ ...week[0], type: "Repos" }, (l) => ({
+      title: PLAN_T[l].reposTitre, detail: PLAN_T[l].reposFinalDetail, why: MALAISE_T[l].why, tags: [PLAN_T[l].tags["Repos"]],
+    }));
   } else if ((lvl === "rouge" || hardToday || (bilanAllege && isHardToday)) && week[0].type !== "Repos" && week[0].type !== "Course") {
     week[0] = reecrire({ ...week[0], type: "Récup" }, (l) => ({
       title: PLAN_T[l].recupTitre,
@@ -1028,12 +1044,6 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
         : lvl === "rouge" || !bilan ? PLAN_T[l].recupWhyRouge(motifs(l, 2))
         : BILAN_T[l].recupWhy(bilan.fatigue, bilan.jambes),
       tags: [PLAN_T[l].tags["Récup"], PLAN_T[l].tags["Z1"]],
-    }));
-  } else if (ctx.malaiseApresEffort && week[0].type !== "Repos" && week[0].type !== "Course") {
-    // COVID LONG, plus mal après une séance (catalogue santé, décision de Cyprien du 20/11/2026) : on réduit
-    // IMMÉDIATEMENT — la séance du jour devient un repos, et le motif oriente vers son médecin.
-    week[0] = reecrire({ ...week[0], type: "Repos" }, (l) => ({
-      title: PLAN_T[l].reposTitre, detail: PLAN_T[l].reposFinalDetail, why: MALAISE_T[l].why, tags: [PLAN_T[l].tags["Repos"]],
     }));
   } else if (lvl === "orange" && isHardToday) {
     // Le suffixe n'est ajouté QUE s'il n'y est pas déjà : la séance sauvée par le plancher

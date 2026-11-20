@@ -264,7 +264,9 @@ Le plan "week" couvre 7 jours (la séance d'AUJOURD'HUI = nextSession est le 1er
     // Coureur sous cadre de santé (lib/coach/cadreSante, 20/11/2026) : cette invite prescrit de la qualité (« un
     // objectif chrono EXIGE de la qualité », « ne propose JAMAIS une semaine quasi 100 % footing »). Pas de plan
     // rédigé par l'IA : le plan du coach, qui applique le cadre, s'applique.
-    if (ctx?.cadreSante) return NextResponse.json({ error: "Coureur sous cadre de santé : pas de plan rédigé par l'IA, le plan du coach s'applique." }, { status: 409 });
+    // Contexte illisible : on ne sait pas s'il a un cadre — dans le doute, rien (@HeadCoach, 20/11/2026).
+    if (!ctx) return NextResponse.json({ error: "Contexte du coureur illisible : pas de plan rédigé par l'IA, réessaie dans un instant." }, { status: 503 });
+    if (ctx.cadreSante) return NextResponse.json({ error: "Coureur sous cadre de santé : pas de plan rédigé par l'IA, le plan du coach s'applique." }, { status: 409 });
     const planInput = summary + (ctx ? `\n\n═══ CONTEXTE APPROFONDI DE L'ATHLÈTE ═══\n${ctx.text}` : "");
 
     const settled = await Promise.allSettled([

@@ -87,7 +87,8 @@ test("l'API des réglages accepte la clé, bornée", () => {
 test("l'objectif enregistré renvoie le verdict de réalisme, calculé sur le contexte coach", () => {
   const src = codeNu("src/app/api/objective/route.ts");
   assert.match(src, /buildAthleteContext\(admin, user\.id\)/, "le verdict n'est plus calculé sur le contexte coach réel");
-  assert.match(src, /ok: ctx\.objectiveWarnings\.length === 0/, "« tout va bien » n'est plus déduit de l'absence d'avertissement");
+  // Sous cadre de santé (lib/coach/cadreSante, 20/11/2026), le chrono n'est pas jugé : null, jamais « tout va bien ».
+  assert.match(src, /ok: ctx\.cadreSante \? null : ctx\.objectiveWarnings\.length === 0/, "« tout va bien » n'est plus déduit de l'absence d'avertissement (ou l'est aussi sous cadre)");
   // Les avertissements d'âge, déjà renvoyés structurés, ne sont pas dupliqués en texte.
   assert.match(src, /filter\(\(w\) => !\[\.\.\.textesAge\]\.some/, "les avertissements d'âge seraient affichés deux fois");
   // Et en cas d'échec du contexte : null, pas « ok ».

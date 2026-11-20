@@ -93,7 +93,7 @@ export const CADRE_FR = {
   marcheCourseBloquee: (etape: number, total: number, totalMin: number, max: number, fin: string) => `Programme marche-course, étape ${etape} sur ${total} : AUCUNE séance cette semaine — celle de son étape (${totalMin} min) dépasse la durée fixée par son kinésithérapeute (${max} min, jusqu'au ${jjmm(fin)}) ; il doit lui demander comment l'adapter.`,
   sensation: "À la sensation : aucune allure chiffrée, aucune cible de fréquence cardiaque — il doit pouvoir parler.",
   // Une course A ou B n'est pas raccourcie par le plan : elle reste, avec l'accord du kiné (lib/coach/consignesPlan).
-  dureeMax: (min: number, fin: string) => `Chaque sortie dure ${min} min au plus, sortie longue comprise — une course A ou B à part, avec son accord (consignes de son kinésithérapeute jusqu'au ${jjmm(fin)}).`,
+  dureeMax: (min: number, fin: string) => `Chaque sortie de course dure ${min} min au plus, sortie longue comprise — une course A ou B à part, avec son accord (consignes de son kinésithérapeute jusqu'au ${jjmm(fin)}).`,
   seancesMax: (n: number, fin: string) => `${n} sortie(s) de course au plus sur 7 jours glissants (consignes de son kinésithérapeute jusqu'au ${jjmm(fin)}).`,
   courseRetiree: "Course au calendrier : retirée de son plan tant qu'un médecin ne l'a pas vu.",
   courseMarcheCourse: "Course au calendrier : aucune n'est posée pendant le programme marche-course.",

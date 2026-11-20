@@ -2452,8 +2452,10 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       const plannedPeak = Math.max(longestRecentKm, ...macroPlan.map(w => w.longRunKm));
       const besoin = longRunPeakKm(libGoal as RaceGoal, objective.distanceKm);
       const gap = longRunGap(plannedPeak, besoin, objective.distanceKm);
-      if (gap) out.push(cadre
-        ? `⚠️ DISTANCE : sa préparation ne l'amènera qu'à une sortie longue de ~${Math.round(plannedPeak)} km${besoin != null ? `, quand une course de ${frNum(objective.distanceKm, 1)} km en demande ~${Math.round(besoin)}` : ` pour une course de ${frNum(objective.distanceKm, 1)} km`}. Sous son cadre de santé, cette distance se discute avec son médecin avant d'être visée.`
+      // Sous cadre, un FAIT, et seulement si le plan garde la course (pas sous avis médical, qui la retire, ni en
+      // marche-course, qui n'en pose pas).
+      if (gap && !(cadre && (cadre.niveau === "sansSeance" || cadre.marcheCourse))) out.push(cadre
+        ? `⚠️ DISTANCE : sous son cadre de santé, sa préparation ne l'amènera qu'à une sortie longue de ~${Math.round(plannedPeak)} km${besoin != null ? `, quand une course de ${frNum(objective.distanceKm, 1)} km en demande ~${Math.round(besoin)}` : ` pour une course de ${frNum(objective.distanceKm, 1)} km`}.`
         : gap);
     }
     // 3. L'ÂGE autorise-t-il cette distance ? Un athlète de 18 ans qui vise un marathon
@@ -2643,8 +2645,13 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const mc = cadre.marcheCourse;
     // La fraîcheur, ÉCRITE pour le cadre : un malaise après la dernière séance (covid long) donne le repos du
     // plan ; la marche-course n'a jamais de « footing » (@HeadCoach, relecteurs, 20/11/2026).
+    const courseAujourdhui = daysToRace === 0 || secondaireActive?.idx === 0;
     const regle = sansSeance
       ? "Aucune séance d'endurance n'est prévue tant qu'un médecin ne l'a pas vu : ces signaux ne disent que sa récupération."
+      : mc?.bloquee
+      ? "Aucune séance de marche-course n'est prévue cette semaine (durée fixée par son kinésithérapeute) : ces signaux ne disent que sa récupération."
+      : malaiseApresEffort && courseAujourdhui
+      ? "Il s'est senti nettement plus mal après sa dernière séance (bilan du matin), et sa course est aujourd'hui : son plan la garde — s'il prend le départ, sans jamais forcer, et il renonce au moindre malaise ; si cela se répète, oriente-le vers son médecin."
       : malaiseApresEffort
       ? "Repos aujourd'hui, comme son plan le pose : il s'est senti nettement plus mal après sa dernière séance (bilan du matin) ; si cela se répète, oriente-le vers son médecin."
       : {
@@ -2690,6 +2697,15 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const dispoPlan = maxKine != null ? Math.min(availDaysPerWeek, maxKine) : availDaysPerWeek;
     const seancesMc = Math.min(Math.max(2, Math.min(3, dispoPlan || 3)), maxKine ?? Infinity);
     const sorties = mc ? (mc.bloquee ? 0 : seancesMc) : dispoPlan;
+    // LE MODE PERTE DE POIDS, tel que le plan le pose (lib/ai/autoPlan `menagerArticulations`) : une part des sorties
+    // faciles en vélo, les autres en alternance 2 min de course / 1 min de marche. Pas en marche-course (ce chemin
+    // s'arrête avant) ni sans séance (relecteurs, 2e tour).
+    const reglesPoids = weightLoss && !sansSeance && !mc ? weightLoss.rules : null;
+    const velo = !!reglesPoids && reglesPoids.lowImpactSharePct > 0;
+    const alterne = !!reglesPoids && reglesPoids.walkRunAdvised;
+    const modePoids = velo || alterne
+      ? `• Mode perte de poids : ${velo ? "une partie des sorties faciles en vélo (sans impact)" : ""}${velo && alterne ? ", les autres" : alterne ? "les sorties faciles" : ""}${alterne ? " en alternance course/marche (2 min de course / 1 min de marche)" : ""}, comme son plan les pose.`
+      : null;
     // La structure que pose son plan : la séance sous le seuil est CELLE du plan (`chosen`, le budget de qualité).
     // Aucune sortie longue n'est annoncée : le plan n'en pose pas en semaine de course, de reprise ou sous durée
     // maximale, et le dossier ne promet rien qu'il ne pose pas (@HeadCoach).
@@ -2709,17 +2725,18 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
               : `• Au plus une séance sous le seuil cette semaine : ${chosen[0].desc}`]
             : []),
           `• ${cadre.niveau === "seuilBas" ? "Tout le reste en endurance facile" : "Endurance facile seulement"}, ${facile}${duree}.`,
+          ...(modePoids ? [modePoids] : []),
           "• Au moins un jour de repos complet.",
         ];
     const courseSemaine = secondaireActive && !sansSeance && !mc
-      ? `\n• Course ${secondaireActive.course.priorite} au calendrier cette semaine : ${secondaireActive.course.nom}, le ${secondaireActive.course.date} — comme le cadre le dit.` : "";
+      ? `\n• Course ${secondaireActive.course.priorite} au calendrier cette semaine : ${secondaireActive.course.nom}, le ${secondaireActive.course.date}.` : "";
     // À la sensation (grossesse) : ses séances passées sans allure ni fréquence cardiaque, que le modèle pourrait citer.
     const seancesPassees = cadre.sensation
       ? runs.slice(0, 5).map((w) => `${String(w.date).slice(5, 10)} ${classifyRun(w, fcMaxEst)} ${r1(w.distance_km ?? 0)}km`)
       : last5;
     const garde = sansSeance
       ? "- Douleur dans la poitrine, malaise ou essoufflement anormal → un médecin sans attendre (15 ou 112 en urgence)."
-      : `- ${mc ? "Progression : celle des étapes du programme, rien de plus." : `Progressivité : +10 % de volume par semaine au plus${cadre.intensiteInterdite ? ", plus lentement encore pour une fatigue post-virale" : ""}.`}
+      : `- ${mc ? "Progression : celle des étapes du programme, rien de plus." : `Progressivité : +${Math.min(10, reglesPoids?.maxWeeklyProgressPct ?? 10)} % de volume par semaine au plus${cadre.intensiteInterdite ? ", plus lentement encore pour une fatigue post-virale" : ""}.`}
 - Au moindre signal de douleur → adapter immédiatement, pas de stoïcisme.
 - Si VFC sous la base ou sommeil dégradé → alléger la séance du jour.`;
     return `${CADRE_FR.titre}
@@ -2735,7 +2752,7 @@ ${readiness} — ${regle}${rougesCadre.length ? `\n  • Signaux rouges : ${roug
 
 SANTÉ & ANTÉCÉDENTS
 - Ces consignes règlent la CHARGE d'entraînement, rien d'autre : tu ne poses aucun diagnostic, tu ne prescris ni exercice de soin, ni traitement, ni examen. Toute question médicale → un médecin ou un masseur-kinésithérapeute.
-${cadre.avisMedical ? "- Questionnaire d'aptitude : une situation cochée demande l'avis d'un médecin avant toute reprise de l'effort.\n" : ""}${precautions.map((r) => `- ${r}\n`).join("")}${healthNotes ? `- 🗣️ Note santé écrite par l'athlète (LIS-LA et tiens-en compte) : « ${healthNotes} »\n` : ""}${weightLoss && !sansSeance ? `${weightCoachBlock(weightLoss.plan, true)}\n` : ""}
+${cadre.avisMedical ? "- Questionnaire d'aptitude : une situation cochée demande l'avis d'un médecin avant toute reprise de l'effort.\n" : ""}${precautions.map((r) => `- ${r}\n`).join("")}${healthNotes ? `- 🗣️ Note santé écrite par l'athlète (LIS-LA et tiens-en compte) : « ${healthNotes} »\n` : ""}${weightLoss && !sansSeance ? `${weightCoachBlock(weightLoss.plan, true, !mc)}\n` : ""}
 FORME & RÉCUPÉRATION (aujourd'hui)
 - État physiologique (dernière VFC face à SA base, zone normale ± 6 %) : ${state}
 - VFC (${precisionMetrique(metriqueVfc)}) : ${hrvLatest ?? "?"} ms (base 14j ${hrvBase ?? "?"} ms → ${hrvTrend})
@@ -2743,7 +2760,7 @@ FORME & RÉCUPÉRATION (aujourd'hui)
 
 CHARGE (des faits, pas des objectifs)
 - Volume : ${Math.round(weekKm)} km COURUS cette semaine · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)${sansSeance || !sorties ? "" : `
-- 📆 DISPONIBILITÉS : au plus ${sorties} sortie(s) de course sur 7 jours${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""} — NE DÉPASSE PAS ce nombre.`}
+- 📆 DISPONIBILITÉS : au plus ${sorties} sortie(s) d'entraînement à pied sur 7 jours, une course au calendrier à part${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""} — NE DÉPASSE PAS ce nombre.`}
 - Repos : dernière séance il y a ${daysSinceLast ?? "?"} j · ${restDays7} j sans courir sur les 7 derniers
 - CTL ${Math.round(load.ctl)} (forme) · ATL ${Math.round(load.atl)} (fatigue) · TSB ${Math.round(load.tsb)} (fraîcheur) · ratio aigu:chronique ${r1(load.acr)}${load.acr > 1.5 ? " ⚠️ élevé (risque)" : ""}
 - 5 dernières séances : ${seancesPassees.join(" | ") || "aucune"}${pains.length ? `\n- ⚠️ DOULEUR(S) SIGNALÉE(S) par l'athlète (zone précise) : ${pains.join(", ")} → ${sansSeance ? "à montrer au médecin qu'il doit voir." : "ADAPTE les prochaines séances à CETTE zone."}` : ""}${fbNotes.length ? `\n- 🗣️ Notes récentes de l'athlète (ressenti/douleur — LIS-LES et tiens-en compte) : ${fbNotes.map(n => `« ${n} »`).join(" ; ")}` : ""}${lastRpe != null ? `\n- Dernier ressenti d'effort (RPE) : ${lastRpe}/10${rpeAvg != null ? ` · moyenne des 3 derniers : ${rpeAvg}/10` : ""}` : ""}

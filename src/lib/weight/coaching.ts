@@ -75,7 +75,8 @@ export function weightTrainingRules(plan: WeightPlan): WeightTrainingRules {
 // (« une séance un peu soutenue », « entraînement classique », « N séances de qualité maximum ») ne s'écrit
 // pas : c'est le cadre qui fixe l'intensité. La plus STRICTE des deux règles reste dite : « AUCUNE séance de
 // qualité » d'une obésité de classe 2 ou 3 garde sa place (@HeadCoach, relecteur, tour 6).
-export function weightCoachBlock(plan: WeightPlan, cadreSante = false): string {
+// `sansImpactAuPlan` : sous cadre, en marche-course, le plan ne pose aucun vélo — la part « sans impact » ne se dit pas.
+export function weightCoachBlock(plan: WeightPlan, cadreSante = false, sansImpactAuPlan = true): string {
   const rules = weightTrainingRules(plan);
   const v = trendVerdict(plan);
   const lines: string[] = [];
@@ -90,7 +91,7 @@ export function weightCoachBlock(plan: WeightPlan, cadreSante = false): string {
     : `ENTRAÎNEMENT — ${rules.rationale}`);
   const qualitePoids = rules.maxQualityPerWeek === 0 ? "AUCUNE séance de qualité pour l'instant, "
     : cadreSante ? "" : `${rules.maxQualityPerWeek} séance(s) de qualité maximum/semaine, `;
-  lines.push(`Contraintes chiffrées à RESPECTER : progression du volume ≤ +${rules.maxWeeklyProgressPct} %/semaine, ${qualitePoids}${rules.strengthPerWeek} séance(s) de renforcement/semaine (NON NÉGOCIABLE)${rules.lowImpactSharePct > 0 ? `, ~${rules.lowImpactSharePct} % du volume sans impact (vélo, elliptique, marche rapide, aqua-jogging)` : ""}.`);
+  lines.push(`Contraintes chiffrées à RESPECTER : progression du volume ≤ +${rules.maxWeeklyProgressPct} %/semaine, ${qualitePoids}${rules.strengthPerWeek} séance(s) de renforcement/semaine (NON NÉGOCIABLE)${rules.lowImpactSharePct > 0 && (!cadreSante || sansImpactAuPlan) ? `, ~${rules.lowImpactSharePct} % du volume sans impact (vélo, elliptique, marche rapide, aqua-jogging)` : ""}.`);
 
   // Sous cadre, le format des séances est celui que son plan pose (marche-course comprise) : « 1 min / 2 min »
   // contredisait la séance de son étape (relecture du 20/11/2026).

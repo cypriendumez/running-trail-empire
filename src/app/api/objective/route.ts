@@ -111,13 +111,15 @@ export async function POST(req: Request) {
   // ses avertissements SANS ceux de l'âge, déjà renvoyés structurés ci-dessus.
   // Best-effort : si le contexte échoue, l'objectif est enregistré quand même et la
   // carte ne dit simplement rien du réalisme (verdict null, pas « tout va bien »).
-  const realisme = await (async (): Promise<{ avertissements: string[]; ok: boolean } | null> => {
+  const realisme = await (async (): Promise<{ avertissements: string[]; ok: boolean | null } | null> => {
     try {
       const { buildAthleteContext } = await import("@/lib/ai/coachContext");
       const ctx = await buildAthleteContext(admin, user.id);
       const textesAge = new Set((alerteAge ?? []).map((a) => a.texte));
       const autres = ctx.objectiveWarnings.filter((w) => ![...textesAge].some((tA) => w.startsWith(tA)));
-      return { avertissements: autres, ok: ctx.objectiveWarnings.length === 0 };
+      // Sous cadre de santé (lib/coach/cadreSante), le chrono n'est pas jugé : verdict null, pas « objectif cohérent,
+      // rien à signaler » sur un chrono jamais évalué (relecteurs, 20/11/2026).
+      return { avertissements: autres, ok: ctx.cadreSante ? null : ctx.objectiveWarnings.length === 0 };
     } catch { return null; }
   })();
 

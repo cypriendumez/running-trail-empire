@@ -47,17 +47,23 @@ export function pilotageSensation(healthConditions: unknown): boolean {
  * vers son médecin » (catalogue santé). Signal : le bilan du matin à 4-5/5 (fatigue ou jambes) dans les deux
  * jours qui suivent une sortie — la séance du jour devient un repos (décision de Cyprien, 20/11/2026).
  */
-export const MALAISE_T: Record<Lang, { motif: string; why: string }> = {
+// `course` : le jour d'une course, que le plan garde (le départ appartient au coureur) — ajouté à son « pourquoi ».
+export const MALAISE_T: Record<Lang, { motif: string; why: string; course: string }> = {
   fr: { motif: "bilan du matin après une séance : fatigue marquée — repos aujourd'hui ; si cela se répète, parles-en à ton médecin",
-    why: "Ton bilan de ce matin montre une fatigue marquée après ta dernière séance : avec l'antécédent déclaré dans ta santé, on se repose aujourd'hui. Si cela se répète, parles-en à ton médecin." },
+    why: "Ton bilan de ce matin montre une fatigue marquée après ta dernière séance : avec l'antécédent déclaré dans ta santé, on se repose aujourd'hui. Si cela se répète, parles-en à ton médecin.",
+    course: " ⚠️ Ton bilan de ce matin montre une fatigue marquée après ta dernière séance : si tu prends le départ, cours sans jamais forcer et renonce au moindre malaise. Si cela se répète, parles-en à ton médecin." },
   en: { motif: "morning check-in after a session: marked fatigue — rest today; if it happens again, talk to your doctor",
-    why: "Your check-in this morning shows marked fatigue after your last session: with the health history you declared, today is a rest day. If it happens again, talk to your doctor." },
+    why: "Your check-in this morning shows marked fatigue after your last session: with the health history you declared, today is a rest day. If it happens again, talk to your doctor.",
+    course: " ⚠️ Your check-in this morning shows marked fatigue after your last session: if you start, never push, and stop at the slightest discomfort. If it happens again, talk to your doctor." },
   de: { motif: "Morgen-Check nach einer Einheit: deutliche Müdigkeit — heute Ruhe; wenn es wieder vorkommt, sprich mit deiner Ärztin oder deinem Arzt",
-    why: "Dein Morgen-Check zeigt deutliche Müdigkeit nach deiner letzten Einheit: Mit der angegebenen Vorgeschichte ist heute Ruhetag. Wenn es wieder vorkommt, sprich mit deiner Ärztin oder deinem Arzt." },
+    why: "Dein Morgen-Check zeigt deutliche Müdigkeit nach deiner letzten Einheit: Mit der angegebenen Vorgeschichte ist heute Ruhetag. Wenn es wieder vorkommt, sprich mit deiner Ärztin oder deinem Arzt.",
+    course: " ⚠️ Dein Morgen-Check zeigt deutliche Müdigkeit nach deiner letzten Einheit: Wenn du startest, lauf ohne dich zu verausgaben und hör beim geringsten Unwohlsein auf. Wenn es wieder vorkommt, sprich mit deiner Ärztin oder deinem Arzt." },
   es: { motif: "chequeo matinal tras una sesión: cansancio marcado — descanso hoy; si se repite, háblalo con tu médico",
-    why: "Tu chequeo de esta mañana muestra un cansancio marcado tras tu última sesión: con el antecedente declarado en tu salud, hoy toca descanso. Si se repite, háblalo con tu médico." },
+    why: "Tu chequeo de esta mañana muestra un cansancio marcado tras tu última sesión: con el antecedente declarado en tu salud, hoy toca descanso. Si se repite, háblalo con tu médico.",
+    course: " ⚠️ Tu chequeo de esta mañana muestra un cansancio marcado tras tu última sesión: si tomas la salida, corre sin forzar nunca y abandona ante el menor malestar. Si se repite, háblalo con tu médico." },
   pt: { motif: "balanço da manhã após uma sessão: cansaço marcado — descanso hoje; se se repetir, fala com o teu médico",
-    why: "O teu balanço desta manhã mostra um cansaço marcado após a tua última sessão: com o antecedente declarado na tua saúde, hoje é dia de descanso. Se se repetir, fala com o teu médico." },
+    why: "O teu balanço desta manhã mostra um cansaço marcado após a tua última sessão: com o antecedente declarado na tua saúde, hoje é dia de descanso. Se se repetir, fala com o teu médico.",
+    course: " ⚠️ O teu balanço desta manhã mostra um cansaço marcado após a tua última sessão: se partires, corre sem nunca forçar e desiste ao menor mal-estar. Se se repetir, fala com o teu médico." },
 };
 
 /**
