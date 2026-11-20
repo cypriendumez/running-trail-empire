@@ -20,7 +20,7 @@
 process.env.TZ = "UTC";
 import assert from "node:assert/strict";
 import { buildAthleteContext } from "../src/lib/ai/coachContext";
-import { WORKOUT_LIBRARY, estEffortMaximal } from "../src/data/workoutLibrary";
+import { WORKOUT_LIBRARY, estEffortMaximal, horsPlafond } from "../src/data/workoutLibrary";
 
 let passed = 0; const fails: string[] = [];
 async function test(nom: string, fn: () => void | Promise<void>) {
@@ -192,6 +192,54 @@ async function main() {
         assert.deepEqual(vues, [], `${nom} (VMA ${vma}, ${race}) : ${vues.join(", ")}`);
       }
     }
+  });
+
+  await test("horsPlafond : « aucune » écarte tout ce qui monte en Z3 ; « seuil bas » écarte en plus l'allure de course et l'over-under ; « normal » ne touche à rien", () => {
+    const seance = (id: string) => { const w = WORKOUT_LIBRARY.find((x) => x.id === id); assert.ok(w, `séance ${id} absente`); return w!; };
+    for (const id of ["tempo-cont", "seuil-long", "hill-long", "hill-tempo", "env-incline", "rs-marathon-blocks"])
+      assert.equal(horsPlafond(seance(id), "aucune"), true, `« aucune » garde ${seance(id).name} (${seance(id).zone})`);
+    assert.equal(horsPlafond(seance("end-fond"), "aucune"), false, "« aucune » retire l'endurance fondamentale");
+    for (const w of WORKOUT_LIBRARY.filter((x) => /Z[3-5]/.test(x.zone))) assert.equal(horsPlafond(w, "aucune"), true, `« aucune » garde ${w.name} (${w.zone})`);
+    for (const id of ["rs-5k", "thr-overunder", "rs-marathon-blocks"]) assert.equal(horsPlafond(seance(id), "seuilBas"), true, `« seuil bas » garde ${seance(id).name}`);
+    for (const id of ["seuil-long", "tempo-cont", "hill-long", "end-fond"]) assert.equal(horsPlafond(seance(id), "seuilBas"), false, `« seuil bas » retire ${seance(id).name}`);
+    for (const w of WORKOUT_LIBRARY) assert.equal(horsPlafond(w, "normal"), false, `« normal » retire ${w.name}`);
+  });
+
+  await test("TOUT LE DOSSIER, sans objectif et avec un objectif à J+88 et J+53, dénivelé « spécialiste » : aucune ligne n'invite un exempté à l'intensité ; le témoin, si", async () => {
+    // Le vocabulaire qui PRESCRIT de l'intensité, cherché ligne par ligne — sauf dans les lignes qui l'INTERDISENT.
+    const PRESCRIT = /VMA courte|développement progressif de la VMA|VMA, seuil, côtes|2 qualités\/sem|2-3 qualités|1-2 qualités|jamais 100 ?% facile|refuse-le|enchaîne la qualité|côtes courtes|lignes droites|explosiv|avec un bloc à|30\/30/i;
+    const INTERDIT = /⛔|ne lui propose|ni VMA|INTERDIT|AUCUNE séance de qualité ni test|ni côtes courtes|cadre de santé/i;
+    const prescrit = (text: string) => text.split("\n").filter((l) => !INTERDIT.test(l) && PRESCRIT.test(l));
+    const objectifCourse = (km: number, date: string) => ({ user_id: "u", type: "race_objective", created_at: "2026-11-01T10:00:00Z",
+      data: { race: `Course de test ${km} km`, raceDate: date, distanceKm: km, targetTime: "45:00", targetSeconds: 2700, targetPace: "4'30/km" } });
+    const objectifs: [string, Ligne[]][] = [["sans objectif", []], ["10 km à J+88", [objectifCourse(10, "2027-02-14")]], ["10 km à J+53", [objectifCourse(10, "2027-01-10")]], ["5 km à J+53", [objectifCourse(5, "2027-01-10")]], ["10 km à J+30 (phase spécifique)", [objectifCourse(10, "2026-12-18")]], ["marathon à J+30", [objectifCourse(42.2, "2026-12-18")]]];
+    const plafondDe: Record<string, "aucune" | "seuilBas"> = {};
+    for (const [quand, objectif] of objectifs) {
+      const lire = (o: Situation) => dossier({ ...o, profil: { ...(o.profil ?? {}), elevation_pref: "specialiste", pace_curve: { criticalSpeed: 4.0 } }, notifications: [...(o.notifications ?? []), ...objectif] });
+      const temoin = await lire({});
+      assert.ok(prescrit(temoin.text).length > 0, `précondition (${quand}) : le dossier du témoin ne prescrit aucune intensité`);
+      // Vitesse critique à plus de 93 % de la VMA : le facteur limitant « vitesse » (« VMA courte, 30/30 ») se déclenche.
+      assert.match(temoin.text, /VITESSE PURE/, `précondition (${quand}) : le facteur limitant « vitesse » ne se déclenche pas`);
+      for (const [nom, o] of exemptes) {
+        const { text } = await lire(o);
+        const vues = prescrit(text);
+        assert.deepEqual(vues.map((l) => l.slice(0, 140)), [], `${nom} (${quand}) : le dossier prescrit encore de l'intensité : ${vues.map((l) => l.slice(0, 160)).join(" | ")}`);
+        // La palette, selon le plafond : « aucune » n'a rien en Z3 ou au-delà, « seuil bas » pas d'allure de course.
+        // Covid long : « aucune intensité », plus « le développement passe par le seuil bas » (@HeadCoach).
+        if (/covid/.test(nom)) {
+          assert.match(text, /Aucune intensité : de l'endurance facile seulement/, `${nom} (${quand}) : la ligne d'effort maximal ne dit pas « aucune intensité »`);
+          assert.doesNotMatch(text, /passe par le volume et le seuil bas/, `${nom} (${quand}) : le seuil bas est proposé à un covid long`);
+        }
+        const plafond = /cardiaque|grossesse/.test(nom) ? "seuilBas" : "aucune";
+        // La phase dit le plafond du PLAN : un seuil bas pour cardiaque et grossesse, aucune qualité sinon.
+        assert.match(text, plafond === "seuilBas" ? /Phase d'entraînement recommandée : SEUIL BAS AU PLUS/ : /Phase d'entraînement recommandée : AUCUNE QUALITÉ/,
+          `${nom} (${quand}) : la phase ne dit pas le plafond « ${plafond} »`);
+        plafondDe[nom] = plafond;
+        const horsPalette = WORKOUT_LIBRARY.filter((w) => horsPlafond(w, plafond)).map((w) => w.name).filter((n) => text.includes(`${n} [`));
+        assert.deepEqual(horsPalette, [], `${nom} (${quand}) : la palette dépasse le plafond « ${plafond} »`);
+      }
+    }
+    assert.ok(Object.values(plafondDe).includes("aucune") && Object.values(plafondDe).includes("seuilBas"), "précondition : les deux plafonds sont éprouvés");
   });
 
   await test("consignes du kiné ÉCHUES : l'exemption tombe", async () => {

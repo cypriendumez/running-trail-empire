@@ -224,10 +224,32 @@ export function estEffortMaximal(w: Pick<WorkoutTemplate, "category" | "structur
   return w.category === "test" || /Z5/.test(w.zone) || /lignes droites/i.test(w.structure);
 }
 
+/**
+ * LE PLAFOND D'INTENSITÉ d'un coureur (`coachContext`, @HeadCoach 20/11/2026) :
+ *  · `aucune` — aucune qualité (covid long, consignes du kiné, avis médical attendu, marche-course) ;
+ *  · `seuilBas` — au plus un seuil bas (antécédent cardiaque, grossesse) ;
+ *  · `normal` — tous les autres.
+ */
+export type PlafondIntensite = "aucune" | "seuilBas" | "normal";
+
+/**
+ * La séance dépasse-t-elle ce plafond ? `aucune` : tout ce qui monte en Z3 ou au-delà, ou se court à
+ * l'allure de course. `seuilBas` : l'effort maximal et la zone 5 (`estEffortMaximal`), l'allure de course
+ * (5 et 10 km : ~90 % de la VMA et plus, au-delà des 86 % du seuil bas) et l'over-under (des passages
+ * AU-DESSUS du seuil). Le renforcement (zone « — », force max, pliométrie) n'est pas jugé ici : il attend
+ * sa propre décision (@SafeRun, Cyprien).
+ */
+export function horsPlafond(w: Pick<WorkoutTemplate, "id" | "category" | "structure" | "zone">, plafond: PlafondIntensite): boolean {
+  if (plafond === "normal") return false;
+  if (estEffortMaximal(w)) return true;
+  if (plafond === "aucune") return /Z[3-5]|course/i.test(w.zone);
+  return w.category === "race_specific" || w.id === "thr-overunder";
+}
+
 // Catalogue condensé (texte) à injecter dans le prompt : l'IA pioche et adapte.
-// `sansEffortMaximal` : sans les séances d'effort maximal (`estEffortMaximal`), pour un coureur exempté.
-export function buildSessionCatalog(opts: { level?: Level; goal?: Goal; sansEffortMaximal?: boolean } = {}): string {
-  const picked = pickWorkouts(opts).filter((w) => !(opts.sansEffortMaximal && estEffortMaximal(w)));
+// `plafond` : sans les séances qui dépassent le plafond d'intensité du coureur (`horsPlafond`).
+export function buildSessionCatalog(opts: { level?: Level; goal?: Goal; plafond?: PlafondIntensite } = {}): string {
+  const picked = pickWorkouts(opts).filter((w) => !horsPlafond(w, opts.plafond ?? "normal"));
   const byCat = new Map<WorkoutCategory, WorkoutTemplate[]>();
   for (const w of picked) { const a = byCat.get(w.category) ?? []; a.push(w); byCat.set(w.category, a); }
   const order: WorkoutCategory[] = ["recovery", "endurance", "long", "tempo", "threshold", "vo2max", "speed", "hills", "race_specific", "trail", "strength", "drills", "cross", "test"];

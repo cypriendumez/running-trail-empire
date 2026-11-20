@@ -5,7 +5,7 @@ import { fcMaxDeLAthlete } from "@/lib/coach/fcMaxServeur";
 import { vmaDesSeances, acclimatationDesSeances } from "@/lib/dashboard/vmaAffichee";
 import { referencesFc, ciblesFcAthlete, premierJourFootingsFc, estTypeDur, footingTropIntense, maxDeReference, fcMaxConnue, estSortieFacile, PART_FC_FACILE, PART_FC_DURE, fcMaxPourEfforts, airFroid, PIC_FC_JOURS, type CiblesFc, seuilMesure } from "@/lib/coach/fcCible";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildSessionCatalog, type Level, type Goal } from "@/data/workoutLibrary";
+import { buildSessionCatalog, type Level, type Goal, type PlafondIntensite } from "@/data/workoutLibrary";
 import { menuSelonDenivele, preferenceDenivele } from "@/lib/coach/denivele";
 import { volumeAvecCible, volumeCible } from "@/lib/coach/volumeCible";
 import { HEALTH_CONDITIONS, INJURY_ZONES, healthCoachLines } from "@/data/healthCatalog";
@@ -1478,6 +1478,19 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     joursCourus: runs.map((w) => String(w.date).slice(0, 10)),
     aujourdhui: todayStr,
   });
+  // ── LE PLAFOND D'INTENSITÉ DU DOSSIER (@HeadCoach, 20/11/2026) ───────────────
+  // UN seul plafond, celui du plan, dont dérivent TOUTES les lignes du dossier qui prescrivent de l'intensité
+  // (phase, sans objectif, 80/20, reprise, effort maximal, facteur limitant, sortie longue, dénivelé, palette).
+  // Corrigée ligne par ligne, chaque relecture en trouvait une nouvelle qui contredisait l'exemption.
+  //  · aucune qualité : avis médical attendu, marche-course, covid long, consignes du kiné en vigueur
+  //    (« sans intensité » ou « durée maximale » : le plan est sans qualité) ;
+  //  · seuil bas au plus : antécédent cardiaque, grossesse (`noMaxEffort` hors covid long) ;
+  //  · normal : tous les autres. Une panne du questionnaire ou des consignes arrête déjà le contexte.
+  const plafondIntensite: PlafondIntensite =
+    aptitudeAttente || !!marcheCourse || sansIntensite || !!consignes?.sansIntensite || consignes?.dureeMaxMin != null ? "aucune"
+    : noMaxEffort ? "seuilBas" : "normal";
+  // L'IA ne propose ni test VMA ni effort maximal à un coureur dont le plafond n'est pas « normal ».
+  const testVmaExclu = plafondIntensite !== "normal";
   const marcheCourseMotif = marcheCourse
     ? tr((l) => MOTIF_T[l].marcheCourse(nRaw(marcheCourse.etape, l), nRaw(marcheCourse.total, l)))
     : null;
@@ -1803,6 +1816,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   }
   limiters.sort((a, b) => b.severity - a.severity);
   const limiter = limiters[0] ?? null;
+  // Dans le DOSSIER, un coureur sous plafond ne lit pas les facteurs qui prescrivent de l'intensité : « VMA courte,
+  // 30/30 », « lignes droites », « over-under » contrediraient son cadre de santé. Le menu, lui, est déjà borné.
+  const limitersDossier = plafondIntensite === "normal" ? limiters : limiters.filter((l) => !["vitesse", "seuil", "economie", "execution"].includes(l.key));
+  const limiterDossier = limitersDossier[0] ?? null;
 
 
   /**
@@ -2115,15 +2132,15 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const bikeLong = String((p as Record<string, unknown> | null)?.long_run_mode ?? "run") === "bike";
   const longRunNote = bikeLong
     ? `1 SORTIE LONGUE EN VÉLO (cross-training) À LA PLACE de la sortie longue en course — même durée/volume aérobie (FC Z2, allure conversationnelle), SANS impact pour limiter le risque blessure (choix de l'athlète, comme beaucoup de pros). Pas d'allure /km (pilotée à la FC). ${(libGoal === "marathon" || libGoal === "trail" || libGoal === "ultra") ? "Garde au moins 1 sortie longue EN COURSE par mois pour la spécificité (impact, terrain)." : ""}`.trim()
-    : `1 sortie longue facile en Z2${(phase.startsWith("SPÉ") || phase.startsWith("AFFÛ") || libGoal === "marathon") && goalPace ? ` avec un bloc à ${goalPace}/km` : ""}`;
+    : `1 sortie longue facile en Z2${plafondIntensite === "normal" && (phase.startsWith("SPÉ") || phase.startsWith("AFFÛ") || libGoal === "marathon") && goalPace ? ` avec un bloc à ${goalPace}/km` : ""}`;
 
   const weekTarget = `${chosen.length ? chosen.map((s, i) => `• Qualité ${i + 1} : ${s.matin ? `DOUBLE SEUIL — matin : ${s.matin.fr} / soir : ` : ""}${s.desc}`).join("\n") : "• Aucune séance dure ce cycle (récupération) : que du facile + mobilité/renfo léger."}
 • ${longRunNote}.
 • 1 renforcement musculaire (peut se greffer après un footing facile, pas un jour à part obligatoire).
 • ≥ 1 jour de repos complet.
 • Tout le reste = footing FACILE Z2 (~${paceAt(70)}/km), allure conversationnelle.
-RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total), PAS du nombre de séances. ${chosen.length} séance(s) de qualité COURTE(S) (20–40 min d'effort réel) dans une semaine de plusieurs heures = toujours ~80 % facile. Le piège « presque tout en EF + renfo » SOUS-ENTRAÎNE un coureur qui vise un chrono : refuse-le.${expCapped ? `
-⛔ PLAFOND LIÉ AU PASSIF : ${runYears != null && runYears < 1 ? "moins d'un an" : `${runYears} ans`} de course → maximum ${expCap} séance(s) de qualité/semaine, quel que soit l'objectif. Le cardio encaisse déjà, les tendons NON. Ce plafond n'est pas négociable, même si l'athlète se sent bien.` : ""}${easeReasons.length ? `\n⚠️ ALLÈGEMENT ce cycle (${easeReasons.join(" ; ")}) → qualité réduite, priorité récupération. La santé d'abord.` : ""}${daysSinceLast != null && daysSinceLast >= 3 && daysSinceLast <= 8 && !easeReasons.length ? `\nREPRISE : ${daysSinceLast} j de repos SANS perte de forme (3–8 j d'arrêt ne déconditionnent PAS). UN footing de remise en route suffit, PUIS on enchaîne la qualité normalement — ne transforme pas ça en semaine molle entière.` : ""}`;
+${plafondIntensite === "normal" ? `RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total), PAS du nombre de séances. ${chosen.length} séance(s) de qualité COURTE(S) (20–40 min d'effort réel) dans une semaine de plusieurs heures = toujours ~80 % facile. Le piège « presque tout en EF + renfo » SOUS-ENTRAÎNE un coureur qui vise un chrono : refuse-le.` : `CADRE DE SANTÉ : presque tout en endurance facile est ICI voulu — n'ajoute aucune intensité que la structure ci-dessus ne pose pas.`}${expCapped ? `
+⛔ PLAFOND LIÉ AU PASSIF : ${runYears != null && runYears < 1 ? "moins d'un an" : `${runYears} ans`} de course → maximum ${expCap} séance(s) de qualité/semaine, quel que soit l'objectif. Le cardio encaisse déjà, les tendons NON. Ce plafond n'est pas négociable, même si l'athlète se sent bien.` : ""}${easeReasons.length ? `\n⚠️ ALLÈGEMENT ce cycle (${easeReasons.join(" ; ")}) → qualité réduite, priorité récupération. La santé d'abord.` : ""}${daysSinceLast != null && daysSinceLast >= 3 && daysSinceLast <= 8 && !easeReasons.length && plafondIntensite === "normal" ? `\nREPRISE : ${daysSinceLast} j de repos SANS perte de forme (3–8 j d'arrêt ne déconditionnent PAS). UN footing de remise en route suffit, PUIS on enchaîne la qualité normalement — ne transforme pas ça en semaine molle entière.` : ""}`;
 
   // ── PLAN MACRO PÉRIODISÉ — bloc complet jusqu'au jour J (base → dév → spécifique → affûtage) ──
   const macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = (() => {
@@ -2594,10 +2611,9 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // ⚠️ PAS TOUT À FAIT LA RÈGLE DE TOUS : l'interface (`testVmaAEviterDe`) et le verrou du plan (`autoCoach`)
   //  lisent les antécédents depuis la PR 63 (`lib/health/effortMaximal`), mais pas les consignes du kiné
   //  (l'interface écarte en plus le test quand l'état du coach est illisible ; ici, la marche-course se déduit
-  //  des lectures du contexte). Le facteur limitant « vitesse » propose encore « VMA courte, 30/30 » (plus
-  //  haut) : de l'intensité, que les autres lignes du dossier interdisent à ces coureurs.
-  const testVmaExclu = aptitudeAttente || !!marcheCourse || noMaxEffort || !!consignes?.sansIntensite || consignes?.dureeMaxMin != null;
-  const catalog = buildSessionCatalog({ level: libLevel, goal: libGoal, sansEffortMaximal: testVmaExclu });
+  //  des lectures du contexte). Le reste du dossier dérive du plafond (`plafondIntensite`, plus haut).
+  // (`testVmaExclu` et `plafondIntensite` sont calculés plus haut, juste après la marche-course.)
+  const catalog = buildSessionCatalog({ level: libLevel, goal: libGoal, plafond: plafondIntensite });
   const text = `PROFIL
 - ${prenomSeul} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · mode ${p?.mode ?? "?"}
 - NIVEAU estimé : ${level}${vma ? ` (VMA ${vma} km/h${vmaIsEst ? " estimée" : ""})` : ""}
@@ -2650,7 +2666,7 @@ ${cond.rules.length ? cond.rules.map((r) => `- ${r}`).join("\n")
   : p?.health_declared ? "- Aucune pathologie — l'athlète l'a CONFIRMÉ explicitement, tu peux t'y fier."
   : "- ⚠️ Section santé JAMAIS renseignée (ce n'est pas « rien à signaler », c'est « on ne sait pas ») : reste un cran prudent sur l'intensité et invite-le à la remplir."}
 ${inj.rules.length ? inj.rules.map((r) => `- ${r}`).join("\n") : p?.health_declared ? "- Aucune zone de blessure récurrente." : ""}
-${healthNotes ? `- 🗣️ Note santé écrite par l'athlète (LIS-LA et tiens-en compte) : « ${healthNotes} »` : ""}${noMaxEffort ? "\n- ⛔ EFFORT MAXIMAL INTERDIT au vu de ses antécédents : pas de VMA à 100 %+, pas de test d'effort, pas de sprint all-out. Le développement passe par le volume et le seuil bas." : ""}
+${healthNotes ? `- 🗣️ Note santé écrite par l'athlète (LIS-LA et tiens-en compte) : « ${healthNotes} »` : ""}${noMaxEffort ? `\n- ⛔ EFFORT MAXIMAL INTERDIT au vu de ses antécédents : pas de VMA à 100 %+, pas de test d'effort, pas de sprint all-out. ${sansIntensite ? "Aucune intensité : de l'endurance facile seulement." : "Le développement passe par le volume et le seuil bas."}` : ""}
 ${weightLoss ? weightCoachBlock(weightLoss.plan) : ""}
 
 ÂGE & RÉCUPÉRATION
@@ -2661,7 +2677,7 @@ PASSIF, TERRAIN & DÉNIVELÉ (leviers d'individualisation — à respecter dans 
 - ${expRule ?? "Ancienneté inconnue : demande-la, et en attendant reste sur une progression prudente (+10 %/sem max)."}
 ${terr.rules.length ? terr.rules.map((r) => `- ${r}`).join("\n") : "- Terrain habituel inconnu : privilégie des consignes en durée + FC tant que tu ne sais pas sur quelle surface il court."}
 ${terr.rules.length > 1 ? `- ⚖️ Il alterne PLUSIEURS terrains (${terr.labels.join(", ")}) : c'est un atout anti-blessure, exploite-le. Attribue chaque séance à la surface qui lui convient — les séances CHIFFRÉES à l'allure sur surface dure (route/piste), l'endurance et le long sur terrain souple.` : ""}${terr.paceMeaningless ? `- ⚠️ Au moins un de ses terrains rend l'allure /km NON PERTINENTE (sable, montagne ou neige). Sur ces surfaces : consignes en DURÉE + FRÉQUENCE CARDIAQUE uniquement, jamais d'allure cible. Précise explicitement dans chaque séance sur quelle surface elle doit se faire.` : ""}
-${elev ? `- ${elev.rule}` : ""}
+${elev ? `- ${plafondIntensite === "normal" ? elev.rule : `Dénivelé (${elev.label}) : des montées en endurance seulement, longues et faciles (Z1-Z2) — ni côtes courtes, ni explosivité, ni séance de côtes à la place d'une VMA (cadre de santé).`}` : ""}
 ${tempRule ? `- MÉTÉO AUJOURD'HUI : ${tempRule}` : ""}${hotDays.length ? `\n- 🔥 CHALEUR ANNONCÉE : ${hotDays.slice(0, 4).map(f => `${f.date.slice(8)}/${f.date.slice(5, 7)} ${Math.round(f.tempMax)}°C`).join(" · ")} → déplace les séances de qualité de ces jours-là tôt le matin, ou échange-les avec un jour plus frais de la semaine. Prévois-le MAINTENANT, pas la veille.` : ""}
 
 CAPACITÉS (tests)
@@ -2669,7 +2685,7 @@ CAPACITÉS (tests)
 - Zones FC : Z2 facile ${hrZone(0.6, 0.7) ?? "?"} · Z4 seuil ${hrZone(0.8, 0.9) ?? "?"}
 - Zones allure : ${paceZones ?? (computedPaces ? `(calculées depuis la VMA) ${computedPaces}` : "non renseignées")}
 - Chronos théoriques au potentiel actuel (depuis la VMA) : ${predictions ?? "?"}
-${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${limiter ? `- 🎯 SON FACTEUR LIMITANT, à ce stade, c'est ${limiter.label}. ${limiter.action} C'est LA priorité : une séance qui ne s'adresse pas à ce point précis est une séance de perdue. ${limiters.length > 1 ? `Viennent ensuite : ${limiters.slice(1, 3).map(l => l.label).join(" ; ")}.` : ""}\n` : ""}${noHistory ? `- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ${testVmaExclu ? "et ses éventuelles douleurs. Ne lui propose ni test ni effort maximal : ils sont écartés pour lui." : "ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne."} Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n` : ""}${(() => { const d = driftW; if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
+${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${limiterDossier ? `- 🎯 SON FACTEUR LIMITANT, à ce stade, c'est ${limiterDossier.label}. ${limiterDossier.action} C'est LA priorité : une séance qui ne s'adresse pas à ce point précis est une séance de perdue. ${limitersDossier.length > 1 ? `Viennent ensuite : ${limitersDossier.slice(1, 3).map(l => l.label).join(" ; ")}.` : ""}\n` : ""}${noHistory ? `- 🆕 ATHLÈTE SANS HISTORIQUE : aucune séance enregistrée, aucune allure de référence. Cette semaine sert à OBSERVER, pas à performer : footings faciles pilotés à la sensation et à la conversation, aucune intensité, aucun chrono. Demande-lui son passé de coureur, ${testVmaExclu ? "et ses éventuelles douleurs. Ne lui propose ni test ni effort maximal : ils sont écartés pour lui." : "ses éventuelles douleurs, et propose-lui un test simple (par exemple 6 min à effort maximal régulier) une fois qu'il aura couru trois ou quatre fois sans gêne."} Prescrire du fractionné à quelqu'un dont on ignore tout, c'est le blesser.\n` : ""}${(() => { const d = driftW; if (!d) return ""; const v = Number(d.cardiac_decoupling); const verdict = v < 3 ? "ENDURANCE AÉROBIE SOLIDE — il tiendra son allure jusqu'au bout, tu peux durcir le spécifique" : v < 5 ? "correcte" : v < 8 ? "PERFECTIBLE — il commence à décrocher sur la durée : plus de volume facile et des sorties longues progressives" : "ENDURANCE LIMITANTE — à ce niveau de dérive il explosera en fin de course. C'est SA priorité n°1 : volume facile et sorties longues AVANT toute recherche de vitesse"; return `- 💓 DÉRIVE CARDIAQUE (${String(d.date).slice(5, 10)}) : ${v > 0 ? "+" : ""}${v} % — ${verdict}. C'est le marqueur qui distingue un coureur qui TIENT son allure d'un qui la subit.\n`; })()}${(() => {
   const lines: string[] = [];
   // Cadence : sous 170 pas/min, l'appui est long et la foulée « aérienne » — surcoût
   // d'impact et de temps de contact. On ne juge pas dans l'absolu (elle dépend de la
@@ -2686,6 +2702,9 @@ ${bestLine ? `- 🏅 MEILLEURS EFFORTS RÉELS (42 j) : ${bestLine}\n` : ""}${lim
   // Sans chrono visé (course A du calendrier : `targetSeconds` à 0), aucun découpage : il
   // s'écrivait « premier km à 0'00 », une allure inventée (@Sparring, 09/11/2026).
   if (!objective || daysToRace == null || daysToRace < 0 || daysToRace > 35 || !(objective.targetSeconds > 0) || !(objective.distanceKm > 0)) return "";
+  // Sous plafond, la course se court à EFFORT CONTRÔLÉ (décision de Cyprien, 20/11/2026) : ni découpage chiffré,
+  // ni simulation à l'allure cible, ni lignes droites à l'échauffement.
+  if (plafondIntensite !== "normal") return `- 🏁 COURSE (J-${daysToRace}) : à effort contrôlé, cadre de santé — aucun chrono ni allure à lui donner, aucune simulation à l'allure cible ; échauffement de 10 à 15 min en footing facile ; il doit pouvoir parler du début à la fin.\n`;
   const goalSec = objective.targetSeconds / objective.distanceKm;      // s/km visés
   const fmt = (sc: number) => `${Math.floor(sc / 60)}'${String(Math.round(sc % 60)).padStart(2, "0")}`;
   // Négative split : partir 2-3 % au-dessus de l'allure cible et finir en dessous. C'est
@@ -2730,8 +2749,8 @@ EXÉCUTION & ADHÉRENCE (boucle adaptative — fais ÉVOLUER la suite selon ce q
 - Adhérence au plan prescrit : ${adherence}
 
 OBJECTIF DE COURSE
-${objLines.length ? objLines.join("\n") : "• Aucun objectif de course → vise une PROGRESSION GLOBALE selon son profil/niveau, ses dernières séances et sa récupération (sommeil/VFC) : base aérobie, développement progressif de la VMA et du seuil, régularité, polarisé 80/20. Ne réclame pas d'objectif."}
-• Phase d'entraînement recommandée : ${phase}
+${objLines.length ? objLines.join("\n") : (plafondIntensite === "normal" ? "• Aucun objectif de course → vise une PROGRESSION GLOBALE selon son profil/niveau, ses dernières séances et sa récupération (sommeil/VFC) : base aérobie, développement progressif de la VMA et du seuil, régularité, polarisé 80/20. Ne réclame pas d'objectif." : "• Aucun objectif de course → cadre de santé : régularité et endurance facile, sa récupération (sommeil/VFC) d'abord. Ne réclame pas d'objectif.")}
+• Phase d'entraînement recommandée : ${plafondIntensite === "aucune" ? "AUCUNE QUALITÉ — cadre de santé : endurance facile seulement (Z1-Z2), à la conversation ; la périodisation habituelle ne s'applique pas" : plafondIntensite === "seuilBas" ? "SEUIL BAS AU PLUS — cadre de santé : au maximum une séance sous le seuil par semaine, ni VMA, ni côtes courtes, ni allure de course ; le reste en endurance facile" : phase}
 
 STRUCTURE CIBLE DE LA SEMAINE (squelette à RESPECTER — calculé pour CE coureur ; tu ajustes l'ordre des jours et les allures à sa fraîcheur, mais tu tiens le nombre de séances de qualité indiqué, ni moins par excès de prudence, ni plus)
 ${weekTarget}
