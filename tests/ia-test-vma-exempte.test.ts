@@ -99,7 +99,7 @@ const MOTIF = /médecin|aptitude|cardiaque|covid|grossesse|marche-course|kiné/i
 async function main() {
   console.log("\nLE DOSSIER DE L'IA NE RECOMMANDE PAS LE TEST VMA À UN EXEMPTÉ");
 
-  await test("estEffortMaximal : chaque test, chaque VO2max, chaque séance « à fond » ; ni les lignes droites, ni la cadence, ni le footing", () => {
+  await test("estEffortMaximal : chaque test, chaque VO2max, toute zone 5, l'allure de course, « à fond », les lignes droites ; ni la cadence, ni le seuil, ni le tempo, ni les côtes longues, ni le footing", () => {
     const seance = (id: string) => { const w = WORKOUT_LIBRARY.find((x) => x.id === id); assert.ok(w, `séance ${id} absente de la bibliothèque`); return w!; };
     // Chaque partie de la règle, seule : un test SANS « à fond » (seuil 30 min), un « à fond » HORS test (sprints).
     assert.equal(estEffortMaximal(seance("test-seuil")), true, "le test de seuil (30 min contre la montre) n'est plus un effort maximal");
@@ -109,8 +109,16 @@ async function main() {
     assert.notEqual(seance("spd-flying").category, "test", "précondition : les sprints ne sont pas un test");
     for (const w of WORKOUT_LIBRARY.filter((x) => x.category === "test" || x.category === "vo2max"))
       assert.equal(estEffortMaximal(w), true, `${w.name} (${w.category}) n'est plus un effort maximal`);
-    for (const id of ["spd-strides", "spd-cadence", "end-fond", "end-strides"])
-      assert.equal(estEffortMaximal(seance(id)), false, `${seance(id).name} est compté comme un effort maximal`);
+    // Juger sur l'INTENSITÉ (la zone), pas sur l'étiquette : le même travail vit sous d'autres catégories (@HeadCoach).
+    for (const id of ["hill-short", "hill-mid", "rs-5k", "spd-fartlek", "spd-fartlek-struct", "thr-mona", "rs-10k-cutdown", "tr-kv", "hill-fartlek", "spd-inout", "test-5k"]) {
+      assert.notEqual(seance(id).category, "vo2max", `précondition : ${id} n'est pas rangée en VO2max`);
+      assert.equal(estEffortMaximal(seance(id)), true, `${seance(id).name} (${seance(id).zone}) n'est plus écartée`);
+    }
+    // Les lignes droites (Z5+) aussi, seules ou dans un footing : le plan de ces coureurs les retire (PR 63).
+    for (const id of ["spd-strides", "end-strides"]) assert.equal(estEffortMaximal(seance(id)), true, `${seance(id).name} n'est plus écartée`);
+    for (const w of WORKOUT_LIBRARY.filter((x) => /Z5/.test(x.zone))) assert.equal(estEffortMaximal(w), true, `${w.name} (${w.zone}) n'est plus écartée`);
+    for (const id of ["spd-cadence", "end-fond", "seuil-long", "tempo-cont", "hill-long", "hill-tempo", "env-incline"])
+      assert.equal(estEffortMaximal(seance(id)), false, `${seance(id).name} (${seance(id).zone}) est comptée comme un effort maximal`);
   });
 
   await test("coureur ordinaire, VMA estimée : le test VMA lui est recommandé, comme avant", async () => {
@@ -166,6 +174,25 @@ async function main() {
       assert.doesNotMatch(ligneNeuf, MOTIF, `la ligne « sans historique » dévoile le motif de l'exemption (« ${ligneNeuf} »)`);
     });
   }
+
+  await test("palette avec un OBJECTIF (10 km, trail), niveaux intermédiaire et confirmé : aucune séance d'effort maximal ou de zone 5 nommée ; le témoin en a", async () => {
+    // Sans objectif, la palette « générale » ne contient pas ces séances : le test d'avant ne les voyait pas (@HeadCoach).
+    const interdites = WORKOUT_LIBRARY.filter(estEffortMaximal).map((w) => w.name);
+    const objectifCourse = (km: number, race: string) => ({ user_id: "u", type: "race_objective", created_at: "2026-11-01T10:00:00Z",
+      data: { race, raceDate: "2027-02-14", distanceKm: km, targetTime: "45:00", targetSeconds: 2700, targetPace: "4'30/km" } });
+    const cas: [number, number, string][] = [[15, 10, "10 km de test"], [18, 10, "10 km de test"], [15, 55, "Trail de test 55 km"], [18, 55, "Trail de test 55 km"]];
+    for (const [vma, km, race] of cas) {
+      const lire = (o: Situation) => dossier({ ...o, baselines: [{ user_id: "u", vma_kmh: vma, tested_at: "2026-10-01T10:00:00Z", max_hr: 188, resting_hr: 50 }],
+        notifications: [...(o.notifications ?? []), objectifCourse(km, race)] });
+      const temoin = await lire({});
+      assert.ok(interdites.some((n) => temoin.text.includes(n)), `précondition (VMA ${vma}, ${race}) : le témoin n'a aucune séance de zone 5 dans sa palette`);
+      for (const [nom, o] of exemptes) {
+        const { text } = await lire(o);
+        const vues = interdites.filter((n) => text.includes(n));
+        assert.deepEqual(vues, [], `${nom} (VMA ${vma}, ${race}) : ${vues.join(", ")}`);
+      }
+    }
+  });
 
   await test("consignes du kiné ÉCHUES : l'exemption tombe", async () => {
     const { ligneVma } = await dossier({ notifications: [consignesKine({ sansIntensite: true, jusquAu: "2026-11-10" })] });

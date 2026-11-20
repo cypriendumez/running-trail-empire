@@ -210,13 +210,18 @@ export function pickWorkouts(opts: { level?: Level; goal?: Goal; categories?: Wo
 }
 
 /**
- * Une séance d'EFFORT MAXIMAL : un test ou une évaluation (6 min, 12 min, 3 km, 5 km… à fond), une
- * séance VO2max (100-105 % de la VMA), ou toute séance dont la structure dit « à fond » (sprints).
- * Écartée de la palette d'un coureur exempté du test VMA (19/11/2026) : sinon le dossier de l'IA
- * disait « ne lui propose pas de test » et lui donnait le protocole du test quelques lignes plus bas.
+ * Une séance d'EFFORT MAXIMAL OU DE ZONE 5, jugée sur son INTENSITÉ et pas sur son étiquette (@HeadCoach,
+ * 19/11/2026) :
+ *  · toute séance dont une zone atteint Z5 (95-105 % de la VMA) : les VO2max, mais aussi côtes courtes et
+ *    moyennes, allure 5 km, fartleks, Mona, 10 km dégressif, kilomètre vertical, sprints « à fond » (Z5+) ;
+ *  · tout test ou évaluation, même noté Z4 ou « course » (seuil 30 min contre la montre, chrono 5 km) ;
+ *  · toute structure avec des lignes droites (Z5+, même dans un footing) : le plan de ces coureurs les
+ *    retire aussi (PR 63).
+ * Écartée de la palette d'un coureur exempté du test VMA : sinon le dossier de l'IA disait « ne lui
+ * propose pas de test » et lui donnait le protocole du test, ou le même travail sous un autre nom.
  */
-export function estEffortMaximal(w: Pick<WorkoutTemplate, "category" | "structure">): boolean {
-  return w.category === "test" || w.category === "vo2max" || /à fond/i.test(w.structure);
+export function estEffortMaximal(w: Pick<WorkoutTemplate, "category" | "structure" | "zone">): boolean {
+  return w.category === "test" || /Z5/.test(w.zone) || /lignes droites/i.test(w.structure);
 }
 
 // Catalogue condensé (texte) à injecter dans le prompt : l'IA pioche et adapte.

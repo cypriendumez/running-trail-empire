@@ -2591,12 +2591,11 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // Des consignes contraires, et l'IA (séance-clé du jour, analyse de séance…) pouvait conseiller un
   // effort maximal à qui le plan l'écarte (@HeadCoach, relecteurs, 19/11/2026). Une panne du questionnaire
   // ou des consignes arrête déjà le contexte, plus haut.
-  // ⚠️ PAS ENCORE LA RÈGLE DE TOUS :
-  //  · l'interface (`testVmaAEviterDe`) et le verrou du plan (`autoCoach`) ignorent les antécédents et les
-  //    consignes du kiné (l'interface écarte en plus le test quand l'état du coach est illisible ; ici, la
-  //    marche-course se déduit des lectures du contexte) ;
-  //  · le facteur limitant « vitesse » propose encore « VMA courte, 30/30 » (plus haut) : ni test ni
-  //    séance « à fond », mais de l'intensité, que les autres lignes du dossier interdisent à ces coureurs.
+  // ⚠️ PAS TOUT À FAIT LA RÈGLE DE TOUS : l'interface (`testVmaAEviterDe`) et le verrou du plan (`autoCoach`)
+  //  lisent les antécédents depuis la PR 63 (`lib/health/effortMaximal`), mais pas les consignes du kiné
+  //  (l'interface écarte en plus le test quand l'état du coach est illisible ; ici, la marche-course se déduit
+  //  des lectures du contexte). Le facteur limitant « vitesse » propose encore « VMA courte, 30/30 » (plus
+  //  haut) : de l'intensité, que les autres lignes du dossier interdisent à ces coureurs.
   const testVmaExclu = aptitudeAttente || !!marcheCourse || noMaxEffort || !!consignes?.sansIntensite || consignes?.dureeMaxMin != null;
   const catalog = buildSessionCatalog({ level: libLevel, goal: libGoal, sansEffortMaximal: testVmaExclu });
   const text = `PROFIL
