@@ -190,7 +190,7 @@ async function main() {
     assert.match(dash, /const avisMedicalAttendu = avisMedicalEnAttenteDe\(\{ data: lignesApt, error: eApt \}\);/, "la carte « pas de course » ne lit plus le seul questionnaire");
     assert.match(dash, /sansCourse=\{avisMedicalAttendu\}/, "la carte « Avis médical attendu » suit la règle du test (marche-course, panne de l'état du coach)");
     // Le bandeau du tableau de bord applique LA règle, avec ses propres lectures.
-    assert.match(code("src/app/dashboard/page.tsx"), /const sansTestVma = testVmaAEviterDe\(\{ data: lignesApt, error: eApt \}, etatCoachRes\);/,
+    assert.match(code("src/app/dashboard/page.tsx"), /const sansTestVma = testVmaAEviterDe\(\{ data: lignesApt, error: eApt \}, etatCoachRes, profileRes\);/,
       "le bandeau du tableau de bord ne passe plus par la règle partagée");
   });
 

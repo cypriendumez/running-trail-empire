@@ -59,6 +59,7 @@ import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { TYPE_CONSIGNES, consignesEnVigueur, kmPourDuree, type ConsignesKine } from "@/lib/health/consignesKine";
 import { TYPE_BILAN, BILAN_T, bilanDuJour, effetBilan, type BilanMatin } from "@/lib/health/bilanMatin";
 import { TYPE_APTITUDE, APTITUDE_T, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
+import { effortMaximalInterdit, intensiteInterdite, EFFORT_MAX_T } from "@/lib/health/effortMaximal";
 import { recupAllongee, verdictExecution } from "@/lib/coach/arretsQualite";
 import { arretsMemorises, memoriserArrets } from "@/lib/activities/cacheArrets";
 import { estUnePanne } from "@/lib/dashboard/lectures";
@@ -296,6 +297,10 @@ export type AthleteContext = {
   bilanMatin?: (BilanMatin & { allege: boolean; stressHaut: boolean }) | null;
   /** Le questionnaire d'aptitude (lib/health/aptitude) : `attente` = situation cochée, avis médical pas encore donné. */
   aptitude?: { attente: boolean } | null;
+  /** Antécédent qui interdit l'effort maximal (`lib/health/effortMaximal`) : le plan n'ajoute aucune
+   *  intensité hors du budget de qualité (sortie longue, footings, échauffement). Optionnel : un contexte
+   *  bâti à la main (tests) sans ce champ n'a pas d'antécédent. */
+  effortMaximalInterdit?: boolean;
   /** Disponibilités déclarées : nb de séances de course/semaine et jours praticables (0 = dim). */
   availability: { daysPerWeek: number; days: number[] };
   /** Prévisions RÉELLES à 7 jours (Open-Meteo) — vide si la position est inconnue. */
@@ -1175,7 +1180,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const inj = healthCoachLines(p?.injury_zones, INJURY_ZONES);
   const healthNotes = typeof p?.health_notes === "string" ? p.health_notes.trim().slice(0, 500) : "";
   // Certaines pathologies interdisent purement et simplement l'effort maximal.
-  const noMaxEffort = ["cardiaque", "covid_long", "grossesse"].some((s) => (Array.isArray(p?.health_conditions) ? (p.health_conditions as unknown[]).map(String) : []).includes(s));
+  // La liste partagée avec le verrou du test VMA et l'interface (lib/health/effortMaximal).
+  const noMaxEffort = effortMaximalInterdit(p?.health_conditions);
+  // Et toute intensité (covid long) : zéro qualité, ni lignes droites, ni sortie longue accélérée.
+  const sansIntensite = intensiteInterdite(p?.health_conditions);
 
   // ── MODE PERTE DE POIDS ──
   // Ne s'active QUE si l'athlète l'a demandé ET que son profil y est éligible (les
@@ -1580,7 +1588,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     badNightLabel: `${freshSleep?.sleep_score ?? "?"}/100${lastSleepMin ? `, ${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")}` : ""}`,
     acr: load.acr, tsb: load.tsb,
     rpeHigh, rpeAvg,
-    hardTimePct, fadeSec: fade, plateau, noMaxEffort, runYears,
+    hardTimePct, fadeSec: fade, plateau, noMaxEffort, sansIntensite, runYears,
     weightLossMaxQuality: weightLoss ? weightLoss.rules.maxQualityPerWeek : null,
     hasObjective: !!objective, daysToRace, isShortGoal,
     apresCourse: recupMotif ? { motif: recupMotif.fr, reprise: repriseCetteSemaine } : null,
@@ -1639,6 +1647,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   //    Le bilan ne parle que d'aujourd'hui : seule la séance dure du jour change (autoPlan).
   if (bilan && effetDuBilan.allege) infoFlags.push(tr((l) => BILAN_T[l].motif(bilan.fatigue, bilan.jambes)));
   if (aptitudeAttente) infoFlags.push(tr((l) => APTITUDE_T[l].motif));
+  // L'antécédent qui écarte l'effort maximal se DIT (catalogue santé : « Dis-le-lui clairement »), sans le nommer.
+  if (noMaxEffort) infoFlags.push(tr((l) => EFFORT_MAX_T[l].motif(sansIntensite)));
   if (bilan && effetDuBilan.stressHaut) infoFlags.push(tr((l) => BILAN_T[l].stress(bilan.stress)));
   if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.map((x) => traduireDouleur(x, l)).join(", "))));
   // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
@@ -1858,8 +1868,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const pickT = <T,>(arr: T[]): T => arr[isoWeek % arr.length];
   /** Une séance de qualité + sa description dans les 5 langues (le français est canonique). */
   const quali = (type: string, gabarit: (l: Lang) => string): QualitySession => {
-    // Sans VMA, une allure s'écrivait « ~?/km » : on écrit « au ressenti » (lib/coach/allureInconnue).
-    const descAll = tr((l) => sansAllureInconnue(gabarit(l), l));
+    // Sans VMA, une allure s'écrivait « ~?/km » : on écrit « au ressenti » (lib/coach/allureInconnue),
+    // sans renvoyer au test VMA quand l'effort maximal lui est interdit.
+    const descAll = tr((l) => sansAllureInconnue(gabarit(l), l, noMaxEffort));
     return { type, desc: descAll.fr, descAll };
   };
 
@@ -1966,6 +1977,20 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     const sec = Number(m[1]) * 60 + Number(m[2]) + 8;
     return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`;
   })();
+  // LE SEUIL BAS, seul permis quand l'effort maximal est interdit (catalogue santé : « le volume facile
+  // et le seuil bas ») : les seules variantes SOUS le seuil, en blocs longs à allure tenue.
+  // Son allure ne passe jamais devant l'allure seuil de l'appli (86 % de la VMA) : quand la référence est
+  // une vitesse critique mesurée, « 8 s/km dessous » pouvait tomber en zone 4 (@HeadCoach, 19/11/2026).
+  const seuilBasPace = (() => {
+    const sec = (x: string) => { const m = x.match(/(\d+)['’](\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+    const a = sec(subPace), b = sec(paceAt(86));
+    return a != null && b != null && b > a ? paceAt(86) : subPace;
+  })();
+  const qSeuilBas = quali("Seuil", pickT<(l: Lang) => string>([
+    (l) => QUALITE_T[l].seuilLongSous(progMin(13, 2), seuilBasPace),
+    (l) => QUALITE_T[l].seuilContinuSous(progMin(21, 1), seuilBasPace),
+    (l) => QUALITE_T[l].tempoLongSous(progMin(24, 1), seuilBasPace),
+  ]));
   const qSeuil = quali("Seuil", pickT<(l: Lang) => string>([
     (l) => QUALITE_T[l].seuilFractionne(prog(3), progMin(8, 3), sPace),
     (l) => QUALITE_T[l].seuilLongSous(progMin(13, 2), subPace),
@@ -2036,6 +2061,12 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // Même règle pendant la reprise après un ARRÊT (17/11/2026) : sa seule séance de la semaine est
   // le seuil, écrit court. Sans elle, une VMA pouvait être la première séance dure du retour.
   if (repriseCetteSemaine || qualiteReprise != null) menu = [qSeuil, ...menu.filter((m) => m !== qSeuil)];
+  // ⚠️ ANTÉCÉDENT QUI INTERDIT L'EFFORT MAXIMAL (cardiaque, covid long, grossesse ; 19/11/2026) : ni VMA
+  // (100-105 % de la VMA), ni côtes courtes, ni allure 5 km — le seuil BAS seul, en dernier, comme la
+  // reprise : aucun facteur limitant ni aucune phase ne remet la VMA en tête. Le menu d'un 5 ou 10 km
+  // commençait par la VMA, et le plancher « objectif court » donnait deux séances : 7 semaines sur 8,
+  // un coureur cardiaque recevait de la VMA à 100-105 % sur sa montre (@HeadCoach).
+  if (noMaxEffort) menu = [qSeuilBas];
   // ── DOUBLE SEUIL (méthode norvégienne, lib/coach/doubleSessions) ─────────────
   // ⚠️ IL N'ÉTAIT JAMAIS POSÉ. L'éligibilité se calculait et s'affichait dans le profil
   // (« le double seuil reste hors de portée : … »), le texte des séances existait, et le
@@ -2057,12 +2088,14 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const allureSeuilConnue = /\d+['’]\d{2}/.test(sPace);
   // La récupération d'après-course n'a pas besoin d'être exclue ici : `etatDouble` refuse
   // tout double tant qu'elle dure (phase de reprise comprise) — vérifié par mutation.
+  // Ni le double seuil (deux séances au seuil le même jour) quand l'effort maximal est interdit : c'est le
+  // seuil BAS, une fois par semaine, qu'autorise le catalogue santé.
   const doubleSeuilActif = !consignes && !aptitudeAttente && etatDoubles.seuilActif && allureSeuilConnue && qBudget >= 1
-    && !repriseIntensite && !marcheCourse;
+    && !repriseIntensite && !marcheCourse && !noMaxEffort;
   const doseDS = doseDoubleSeuil(habitudeKm);
   const qDoubleSeuil: QualitySession = {
     ...quali("Seuil", (l) => seanceDoubleSeuil("soir", sPace, l, doseDS.soir)),
-    matin: tr((l) => sansAllureInconnue(seanceDoubleSeuil("matin", sPace, l, doseDS.matin), l)),
+    matin: tr((l) => sansAllureInconnue(seanceDoubleSeuil("matin", sPace, l, doseDS.matin), l, noMaxEffort)),
   };
   const chosen = doubleSeuilActif
     ? [...Array.from({ length: Math.min(2, qBudget) }, () => qDoubleSeuil), ...(qBudget >= 3 ? [qCote] : [])]
@@ -2219,7 +2252,9 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       const debutSemaine = decaleJour(todayStr, 7 * i);
       const sansQualite = recup != null && decaleJour(debutSemaine, 6) < recup.reprise;
       const enReprise = recup != null && !sansQualite && debutSemaine < recup.fin;
-      const quality = sansQualite ? [] : enReprise ? ["Seuil"] : priority.slice(0, Math.max(1, qn));
+      // L'effort maximal interdit : un seuil, chaque semaine, comme le plan (le menu ne garde que le seuil bas).
+      // Aucune intensité (covid long) : aucune qualité annoncée, comme le plan.
+      const quality = sansQualite || sansIntensite ? [] : enReprise || noMaxEffort ? ["Seuil"] : priority.slice(0, Math.max(1, qn));
       const focus = sansQualite ? `Récupération après ${recup.nom} : footings seulement`
         : enReprise ? `Reprise après ${recup.nom} : une séance courte au seuil`
         : ph === "Base" ? "Volume aérobie + pose de vitesse"
@@ -2817,6 +2852,7 @@ ${catalog}`;
     consignes: consignes ? { ...consignes, kmMax: kmConsigne } : null,
     bilanMatin: bilan ? { ...bilan, ...effetDuBilan } : null,
     aptitude: { attente: aptitudeAttente },
+    effortMaximalInterdit: noMaxEffort,
     sortiesRecentes: (() => {
       const jour = aujourdhui(FUSEAU_DEFAUT);
       const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 7);

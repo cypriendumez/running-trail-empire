@@ -518,8 +518,12 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
   // Durée explicitement annoncée pour le CORPS de séance : sans ça, « 25 min d'un bloc »
   // se retrouvait amputé de l'échauffement et arrivait à 10 min sur la montre.
 
-  const quality = /spéci|specif|allure|objectif|seuil|tempo/.test(s) ? 4
+  const quality0 = /spéci|specif|allure|objectif|seuil|tempo/.test(s) ? 4
     : /vma|fractionn|interval|piste|côte|cote|fartlek|30\/30/.test(s) ? 5 : 0;
+  // ⚠️ UN SEUIL BAS (« SOUS-seuil ») SANS ALLURE CONNUE se pilotait en Z4 de FC — le seuil. C'est le cas
+  // d'un coureur dont l'effort maximal est interdit et dont la VMA manque (« au ressenti ») : son catalogue
+  // santé dit « reste en Z1-Z3 » (@HeadCoach, 19/11/2026). Zone 3, sans chrono. Avec une allure, rien ne change.
+  const quality = quality0 === 4 && !p && /sous-seuil/i.test(rawDetail || "") ? 3 : quality0;
   if (quality) {
     // Vraies répétitions quand le libellé en contient ; sinon bloc continu (seuil continu…).
     // Le mot « côte » est dans le LIBELLÉ de la séance, pas dans son type (« VMA »).
@@ -531,7 +535,7 @@ export function stepsForType(type: string, durationMin: number, vmaKmh?: number 
       // Bloc continu : en CÔTE on pilote à la fréquence cardiaque, jamais à l'allure —
       // une allure au km ne veut rien dire en montée. Les répétitions le faisaient déjà,
       // le bloc continu, non : le drapeau `hill` ne lui était pas transmis.
-      block ?? zoneStep(bodyMin ?? main, quality, v, quality === 5 ? "VMA" : "Seuil", hill ? null : p, hill),
+      block ?? zoneStep(bodyMin ?? main, quality, v, quality === 5 ? "VMA" : quality === 3 ? "Seuil bas" : "Seuil", hill ? null : p, hill),
       echauffement("Retour au calme", cool),
     ].join("\n");
   }

@@ -262,7 +262,8 @@ export default async function DashboardPage() {
   if (eApt) console.error("[tableau de bord] questionnaire d'aptitude illisible :", eApt.message);
   // LA règle partagée (`testVmaAEviterDe`) : elle protège aussi quand l'état du coach est illisible,
   // ce que la copie d'ici ignorait (un coureur en marche-course aurait vu « 6 min À FOND »).
-  const sansTestVma = testVmaAEviterDe({ data: lignesApt, error: eApt }, etatCoachRes);
+  // Le profil (déjà lu, `select("*")`) porte les antécédents qui interdisent l'effort maximal (19/11/2026).
+  const sansTestVma = testVmaAEviterDe({ data: lignesApt, error: eApt }, etatCoachRes, profileRes);
   // ⚠️ « PAS DE COURSE » N'EST PAS « PAS DE TEST » : la carte « Avis médical attendu » ne vaut que pour
   // l'avis d'un médecin (ou un questionnaire illisible). Un coureur en marche-course court, en alternance.
   const avisMedicalAttendu = avisMedicalEnAttenteDe({ data: lignesApt, error: eApt });

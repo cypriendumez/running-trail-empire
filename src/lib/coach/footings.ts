@@ -92,7 +92,7 @@ export type Variante = "base" | "lignes" | "progressif";
  * hors athlète sans historique (relecture du 10/11/2026 : l'écran l'affirmait toujours), et hors
  * reprise sans séance dure (17/11/2026 : la reprise les avait déjà retirées).
  */
-export function lignesRetireesParDouleur(nbFootings: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean; reprise?: boolean }): boolean {
+export function lignesRetireesParDouleur(nbFootings: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean; reprise?: boolean; effortMax?: boolean }): boolean {
   return varianteFooting(1, nbFootings, { ...o, douleur: false }) === "lignes";
 }
 
@@ -106,10 +106,12 @@ export function lignesRetireesParReprise(o: { reprise: boolean; deuxiemeFootingJ
   return o.reprise && (o.deuxiemeFootingJour == null || o.deuxiemeFootingJour < o.qualiteDes);
 }
 
-export function varianteFooting(rang: number, total: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean; douleur?: boolean; reprise?: boolean }): Variante {
+export function varianteFooting(rang: number, total: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean; douleur?: boolean; reprise?: boolean; effortMax?: boolean }): Variante {
   // `reprise` (17/11/2026) : après un arrêt, tant qu'aucune séance dure n'est permise, le plan
   // annonce « sans séance dure » — ni accélérations ni fin de footing plus rapide non plus.
-  if (o.taper || o.semaineCourse || o.sansHistorique || o.douleur || o.reprise) return "base";
+  // `effortMax` (19/11/2026) : un antécédent qui interdit l'effort maximal (cardiaque : « reste en Z1-Z3 »,
+  // covid long : « aucune intensité ») — des accélérations au-dessus de la vitesse de la VMA n'y ont pas leur place.
+  if (o.taper || o.semaineCourse || o.sansHistorique || o.douleur || o.reprise || o.effortMax) return "base";
   if (!Number.isFinite(rang) || !Number.isFinite(total) || total < 2 || rang < 0) return "base";
   // Le PREMIER footing reste neutre : il suit souvent une séance dure ou une sortie
   // longue, et des accélérations sur des jambes chargées n'apportent rien de bon.
