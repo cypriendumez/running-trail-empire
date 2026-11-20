@@ -21,34 +21,49 @@ export type HealthItem = {
   label: Record<string, string>;
   /** Consigne d'entraînement injectée dans le prompt du coach. */
   coach: string;
+  /** La consigne pour un coureur SOUS CADRE DE SANTÉ (lib/coach/cadreSante, refonte du 20/11/2026), quand
+   *  `coach` parle d'intensité (« fractionné », « séances dures », « lignes droites avant une séance
+   *  rapide ») : son dossier n'en a pas, et une précaution conditionnelle y suggérait ce que le plan retire.
+   *  Absente : `coach` convient tel quel (le test le vérifie, mot à mot). */
+  coachCadre?: string;
 };
 
 // ── Pathologies déclarées ────────────────────────────────────────────────────
 export const HEALTH_CONDITIONS: HealthItem[] = [
   { slug: "asthme", label: { fr: "Asthme / asthme d'effort", en: "Asthma / exercise-induced", de: "Asthma / Belastungsasthma", es: "Asma / asma de esfuerzo", pt: "Asma / asma de esforço" },
-    coach: "ASTHME D'EFFORT : échauffement RALLONGÉ et très progressif (20 min minimum), fractionné court évité par temps froid et sec ou fait en intérieur. Une gêne respiratoire pendant ou après l'effort = on arrête la séance, pas on la finit. Le suivi de l'asthme relève de son médecin." },
+    coach: "ASTHME D'EFFORT : échauffement RALLONGÉ et très progressif (20 min minimum), fractionné court évité par temps froid et sec ou fait en intérieur. Une gêne respiratoire pendant ou après l'effort = on arrête la séance, pas on la finit. Le suivi de l'asthme relève de son médecin.",
+    coachCadre: "ASTHME D'EFFORT : échauffement RALLONGÉ et très progressif ; par temps froid et sec, plutôt en intérieur. Une gêne respiratoire pendant ou après l'effort = on arrête la séance, pas on la finit. Le suivi de l'asthme relève de son médecin." },
   { slug: "cardiaque", label: { fr: "Antécédent cardiaque", en: "Heart condition history", de: "Herz-Vorgeschichte", es: "Antecedente cardíaco", pt: "Antecedente cardíaco" },
-    coach: "⚠️ ANTÉCÉDENT CARDIAQUE : AUCUNE séance maximale (VMA à 100 % et au-delà, test d'effort, sprints all-out) sans accord explicite de son médecin. Reste en Z1-Z3, privilégie le volume facile et le seuil bas. Douleur thoracique, palpitations, essoufflement anormal ou malaise → arrêt immédiat et avis médical (15 ou 112 en urgence). Dis-le-lui clairement plutôt que de contourner." },
+    coach: "⚠️ ANTÉCÉDENT CARDIAQUE : AUCUNE séance maximale (VMA à 100 % et au-delà, test d'effort, sprints all-out) sans accord explicite de son médecin. Reste en Z1-Z3, privilégie le volume facile et le seuil bas. Douleur thoracique, palpitations, essoufflement anormal ou malaise → arrêt immédiat et avis médical (15 ou 112 en urgence). Dis-le-lui clairement plutôt que de contourner.",
+    coachCadre: "⚠️ ANTÉCÉDENT CARDIAQUE : douleur dans la poitrine, palpitations, essoufflement anormal ou malaise → arrêt immédiat et avis médical (15 ou 112 en urgence). Seul son médecin peut lever le cadre ci-dessus. Dis-le-lui clairement plutôt que de contourner." },
   { slug: "hypertension", label: { fr: "Hypertension", en: "High blood pressure", de: "Bluthochdruck", es: "Hipertensión", pt: "Hipertensão" },
-    coach: "HYPERTENSION : l'endurance en Z2 sert de base. Évite les efforts en blocage respiratoire (charges très lourdes, côtes en force maximale). Si un médicament modifie sa FC, les zones cardiaques deviennent fausses : pilote alors à la sensation (RPE) et à l'allure. Le reste relève de son médecin." },
+    coach: "HYPERTENSION : l'endurance en Z2 sert de base. Évite les efforts en blocage respiratoire (charges très lourdes, côtes en force maximale). Si un médicament modifie sa FC, les zones cardiaques deviennent fausses : pilote alors à la sensation (RPE) et à l'allure. Le reste relève de son médecin.",
+    coachCadre: "HYPERTENSION : l'endurance facile sert de base ; ni blocage respiratoire ni charge lourde. Si un médicament modifie sa FC, ses zones cardiaques deviennent fausses : pilote alors à la sensation. Le reste relève de son médecin." },
   { slug: "diabete", label: { fr: "Diabète", en: "Diabetes", de: "Diabetes", es: "Diabetes", pt: "Diabetes" },
     coach: "DIABÈTE : privilégie la régularité et des horaires stables plutôt que des séances imprévisibles, et un ravitaillement prévu sur les sorties longues. La gestion du diabète autour de l'effort (traitement, apports) relève de son médecin : tu n'en donnes aucune consigne." },
   { slug: "anemie", label: { fr: "Anémie / carence en fer", en: "Anaemia / iron deficiency", de: "Anämie / Eisenmangel", es: "Anemia / falta de hierro", pt: "Anemia / falta de ferro" },
     coach: "CARENCE EN FER déclarée : allège, privilégie le volume facile, et ne mets pas sa fatigue sur le compte d'un manque de motivation. Le bilan et sa correction relèvent de son médecin." },
   { slug: "thyroide", label: { fr: "Trouble thyroïdien", en: "Thyroid disorder", de: "Schilddrüsenstörung", es: "Trastorno tiroideo", pt: "Distúrbio da tiroide" },
-    coach: "THYROÏDE : les repères habituels (VFC, FC repos) sont moins fiables. Fie-toi davantage au ressenti (RPE) et aux allures tenues. Progression plus lente à assumer, sans culpabiliser l'athlète." },
+    coach: "THYROÏDE : les repères habituels (VFC, FC repos) sont moins fiables. Fie-toi davantage au ressenti (RPE) et aux allures tenues. Progression plus lente à assumer, sans culpabiliser l'athlète.",
+    coachCadre: "THYROÏDE : les repères habituels (VFC, FC repos) sont moins fiables : fie-toi davantage au ressenti. Progression plus lente à assumer, sans culpabiliser l'athlète." },
   { slug: "apnee", label: { fr: "Apnée du sommeil", en: "Sleep apnoea", de: "Schlafapnoe", es: "Apnea del sueño", pt: "Apneia do sono" },
-    coach: "APNÉE DU SOMMEIL : un score de sommeil « correct » n'est PAS un repère fiable ici. Espace davantage les séances dures (72 h plutôt que 48 h) et limite l'accumulation de charge." },
+    coach: "APNÉE DU SOMMEIL : un score de sommeil « correct » n'est PAS un repère fiable ici. Espace davantage les séances dures (72 h plutôt que 48 h) et limite l'accumulation de charge.",
+    coachCadre: "APNÉE DU SOMMEIL : un score de sommeil « correct » n'est PAS un repère fiable ici. Espace davantage les sorties et limite l'accumulation de charge." },
   { slug: "migraines", label: { fr: "Migraines", en: "Migraines", de: "Migräne", es: "Migrañas", pt: "Enxaquecas" },
-    coach: "MIGRAINES : hydratation et ravitaillement stricts sur les sorties longues, pas de fractionné en pleine chaleur. Une séance annulée lors d'une crise n'est pas un échec du plan." },
+    coach: "MIGRAINES : hydratation et ravitaillement stricts sur les sorties longues, pas de fractionné en pleine chaleur. Une séance annulée lors d'une crise n'est pas un échec du plan.",
+    coachCadre: "MIGRAINES : hydratation et ravitaillement stricts sur les sorties longues, rien en pleine chaleur. Une séance annulée lors d'une crise n'est pas un échec du plan." },
   { slug: "digestif", label: { fr: "Troubles digestifs", en: "Digestive issues", de: "Verdauungsprobleme", es: "Problemas digestivos", pt: "Problemas digestivos" },
-    coach: "TROUBLES DIGESTIFS : la nutrition de course doit être TESTÉE à l'entraînement, jamais découverte le jour J ; les glucides s'introduisent progressivement, et les séances qualité se placent à distance des repas." },
+    coach: "TROUBLES DIGESTIFS : la nutrition de course doit être TESTÉE à l'entraînement, jamais découverte le jour J ; les glucides s'introduisent progressivement, et les séances qualité se placent à distance des repas.",
+    coachCadre: "TROUBLES DIGESTIFS : la nutrition se TESTE à l'entraînement, jamais le jour d'une course ; les glucides s'introduisent progressivement, et les sorties se placent à distance des repas." },
   { slug: "allergies", label: { fr: "Allergies / rhinite", en: "Allergies / rhinitis", de: "Allergien / Rhinitis", es: "Alergias / rinitis", pt: "Alergias / rinite" },
-    coach: "ALLERGIES : en saison pollinique, les grosses séances peuvent se décaler en fin de journée ou en intérieur. Une performance dégradée en avril-juin peut venir de là, pas d'un manque de forme." },
+    coach: "ALLERGIES : en saison pollinique, les grosses séances peuvent se décaler en fin de journée ou en intérieur. Une performance dégradée en avril-juin peut venir de là, pas d'un manque de forme.",
+    coachCadre: "ALLERGIES : en saison pollinique, les sorties peuvent se décaler en fin de journée ou en intérieur. Une forme moins bonne en avril-juin peut venir de là." },
   { slug: "covid_long", label: { fr: "Covid long / fatigue post-virale", en: "Long Covid / post-viral fatigue", de: "Long Covid / postvirale Fatigue", es: "Covid persistente / fatiga posviral", pt: "Covid longa / fadiga pós-viral" },
-    coach: "⚠️ FATIGUE POST-VIRALE : reprise TRÈS progressive, uniquement en Z1-Z2, aucune intensité tant que la VFC n'est pas remontée à sa base. Si l'athlète se sent plus mal 24-48 h APRÈS une séance, réduis immédiatement et oriente-le vers son médecin." },
+    coach: "⚠️ FATIGUE POST-VIRALE : reprise TRÈS progressive, uniquement en Z1-Z2, aucune intensité tant que la VFC n'est pas remontée à sa base. Si l'athlète se sent plus mal 24-48 h APRÈS une séance, réduis immédiatement et oriente-le vers son médecin.",
+    coachCadre: "⚠️ FATIGUE POST-VIRALE : reprise TRÈS progressive, en endurance facile seulement. S'il se sent plus mal dans les 24 à 48 h APRÈS une séance : repos, et oriente-le vers son médecin. Seul son médecin lève le cadre : une VFC revenue à sa base ne suffit pas." },
   { slug: "grossesse", label: { fr: "Grossesse / post-partum", en: "Pregnancy / postpartum", de: "Schwangerschaft / postpartal", es: "Embarazo / posparto", pt: "Gravidez / pós-parto" },
-    coach: "GROSSESSE / POST-PARTUM : le suivi médical décide, tu ne remplaces pas un avis obstétrical. Pilote à la sensation et à la conversation, PAS à la FC (elle est faussée). Pas d'effort maximal, pas de surchauffe. En post-partum : retour à la course seulement avec l'accord de sa sage-femme ou de son médecin, puis reprise très progressive." },
+    coach: "GROSSESSE / POST-PARTUM : le suivi médical décide, tu ne remplaces pas un avis obstétrical. Pilote à la sensation et à la conversation, PAS à la FC (elle est faussée). Pas d'effort maximal, pas de surchauffe. En post-partum : retour à la course seulement avec l'accord de sa sage-femme ou de son médecin, puis reprise très progressive.",
+    coachCadre: "GROSSESSE / POST-PARTUM : le suivi médical décide, tu ne remplaces pas un avis obstétrical. À la sensation et à la conversation, PAS à la FC (elle est faussée) ; pas de surchauffe. En post-partum : retour à la course seulement avec l'accord de sa sage-femme ou de son médecin, puis reprise très progressive." },
   { slug: "surpoids", label: { fr: "Surpoids", en: "Overweight", de: "Übergewicht", es: "Sobrepeso", pt: "Excesso de peso" },
     coach: "SURPOIDS : au début, privilégie le volume en marche rapide, vélo ou elliptique, la fréquence plutôt que la durée, et une progression lente. Ne parle JAMAIS de poids en termes de performance ou d'esthétique : parle régularité et plaisir." },
 ];
@@ -58,15 +73,18 @@ export const HEALTH_CONDITIONS: HealthItem[] = [
 // signalées au jour le jour arrivent séparément via le feedback de séance.
 export const INJURY_ZONES: HealthItem[] = [
   { slug: "achille", label: { fr: "Tendon d'Achille / mollet", en: "Achilles / calf", de: "Achillessehne / Wade", es: "Tendón de Aquiles / gemelo", pt: "Tendão de Aquiles / gémeo" },
-    coach: "ACHILLE/MOLLET (antécédent) : progression du VOLUME avant tout ajout d'intensité, pas de côtes ni de pliométrie sur une semaine chargée, pas de changement brusque de chaussures, prudence sur le sable." },
+    coach: "ACHILLE/MOLLET (antécédent) : progression du VOLUME avant tout ajout d'intensité, pas de côtes ni de pliométrie sur une semaine chargée, pas de changement brusque de chaussures, prudence sur le sable.",
+    coachCadre: "ACHILLE/MOLLET (antécédent) : progression du volume très prudente, pas de changement brusque de chaussures, prudence sur le sable." },
   { slug: "genou", label: { fr: "Genou / syndrome de l'essuie-glace", en: "Knee / IT band", de: "Knie / Tractus iliotibialis", es: "Rodilla / cintilla iliotibial", pt: "Joelho / banda iliotibial" },
     coach: "GENOU/ITB (antécédent) : limite les longues descentes et les dévers, pas d'augmentation brutale de la sortie longue." },
   { slug: "tibia", label: { fr: "Tibia / périostite", en: "Shin / shin splints", de: "Schienbein / Shin Splints", es: "Tibia / periostitis", pt: "Tíbia / periostite" },
     coach: "TIBIA (antécédent de périostite) : progression plafonnée à +5 %/semaine, alterne les surfaces (sentier, piste), vérifie l'usure des chaussures, et bascule sur du croisé (vélo, aqua-jogging) au moindre signal plutôt que d'attendre." },
   { slug: "ischio", label: { fr: "Ischio-jambiers", en: "Hamstrings", de: "Oberschenkelrückseite", es: "Isquiotibiales", pt: "Isquiotibiais" },
-    coach: "ISCHIOS (antécédent) : jamais de sprint ni d'allure spécifique sur un échauffement écourté, lignes droites progressives avant toute séance rapide, prudence sur le fractionné en fin de séance quand la fatigue dégrade la foulée." },
+    coach: "ISCHIOS (antécédent) : jamais de sprint ni d'allure spécifique sur un échauffement écourté, lignes droites progressives avant toute séance rapide, prudence sur le fractionné en fin de séance quand la fatigue dégrade la foulée.",
+    coachCadre: "ISCHIOS (antécédent) : échauffement complet avant chaque sortie, et prudence quand la fatigue dégrade la foulée." },
   { slug: "hanche", label: { fr: "Hanche / psoas", en: "Hip / psoas", de: "Hüfte / Psoas", es: "Cadera / psoas", pt: "Anca / psoas" },
-    coach: "HANCHE/PSOAS (antécédent) : prudence sur le fractionné court et les changements de rythme brusques." },
+    coach: "HANCHE/PSOAS (antécédent) : prudence sur le fractionné court et les changements de rythme brusques.",
+    coachCadre: "HANCHE/PSOAS (antécédent) : pas de changement de rythme brusque." },
   { slug: "pied", label: { fr: "Pied / fasciite plantaire", en: "Foot / plantar fasciitis", de: "Fuß / Plantarfasziitis", es: "Pie / fascitis plantar", pt: "Pé / fascite plantar" },
     coach: "PIED (antécédent de fasciite plantaire) : évite les surfaces très dures, le sable sec, et la course pieds nus ou en minimaliste." },
   { slug: "dos", label: { fr: "Dos / lombaires", en: "Back / lower back", de: "Rücken / Lendenwirbel", es: "Espalda / lumbares", pt: "Costas / lombares" },
@@ -83,8 +101,9 @@ export const healthLabel = (item: HealthItem, lang: string) => item.label[lang] 
  * ignorées). Les `labels` renvoyés sont en français SANS emoji : ils partent dans le prompt
  * de l'IA, qui raisonne en français — l'UI, elle, passe par `healthLabel`.
  */
-export function healthCoachLines(slugs: unknown, catalog: HealthItem[]): { labels: string[]; rules: string[] } {
+export function healthCoachLines(slugs: unknown, catalog: HealthItem[], cadreSante = false): { labels: string[]; rules: string[] } {
   const set = new Set(Array.isArray(slugs) ? slugs.map(String) : []);
   const hits = catalog.filter((c) => set.has(c.slug));
-  return { labels: hits.map((h) => h.label.fr.replace(/^\S+\s/, "")), rules: hits.map((h) => h.coach) };
+  // Sous cadre de santé, la consigne écrite pour lui (`coachCadre`) quand elle existe.
+  return { labels: hits.map((h) => h.label.fr.replace(/^\S+\s/, "")), rules: hits.map((h) => (cadreSante && h.coachCadre) || h.coach) };
 }

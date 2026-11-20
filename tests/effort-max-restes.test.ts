@@ -8,9 +8,9 @@
  *    étape sans cible n'est pas un format éprouvé chez intervals.icu) ;
  *  · COVID LONG, PLUS MAL APRÈS UNE SÉANCE — bilan du matin à 4-5/5 dans les deux jours qui suivent une
  *    sortie : la séance du jour devient un repos, et le motif oriente vers le médecin.
- * Et ce que la PR 63 laissait : la séance du jour par l'IA (« fais converger vers l'objectif »), les deux
- * chemins de veille de course que son test n'atteignait pas (course à J+7/J+8, course C), le « pourquoi »
- * de l'avant-veille et le focus de la feuille de route vu par l'admin.
+ * Et ce que la PR 63 laissait : les deux chemins de veille de course que son test n'atteignait pas (course à
+ * J+7/J+8, course C), le « pourquoi » de l'avant-veille et le focus de la feuille de route vu par l'admin. La
+ * séance du jour par l'IA (« fais converger vers l'objectif ») suit le cadre de santé : tests/cadre-sante.test.ts.
  *
  *   npx tsx tests/effort-max-restes.test.ts
  */
@@ -21,7 +21,6 @@ import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachCon
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
 import { packJourJ } from "../src/lib/coach/jourJ";
 import { JOURJ_T } from "../src/lib/coach/jourJI18n";
-import { missionSeanceDuJour } from "../src/lib/ai/missionSeance";
 import { aLaSensation } from "../src/lib/coach/sensation";
 import { pilotageSensation } from "../src/lib/health/effortMaximal";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
@@ -221,23 +220,6 @@ async function main() {
     const ancien = SEANCES.filter((w) => String(w.date) <= ilYa(3));
     assert.equal((await contexte(["covid_long"], [bilan(4, 2)], ancien)).malaiseApresEffort, false, "un bilan trois jours après la sortie déclenche le repos");
     assert.equal((await contexte(["covid_long"], [bilan(3, 3)])).malaiseApresEffort, false, "un bilan à 3/5 déclenche le repos");
-  });
-
-  await test("séance du jour par l'IA : la mission d'un coureur ordinaire est inchangée ; sous cadre de santé, ni allure spécifique ni rappel d'allure, motif tu", () => {
-    assert.equal(missionSeanceDuJour({}), `- Si fatigué (VFC sous la base, sommeil bas, ou TSB très négatif) → récupération / facile.
-- Si la course est proche → affûtage (fraîcheur, volume réduit, quelques rappels d'allure).
-- Sinon, fais converger vers l'objectif : intègre par moments l'allure spécifique et la distance cible, en respectant le modèle polarisé et le niveau de l'athlète.
-- Dose le volume sur le volume hebdomadaire réel et reste prudent si une douleur est signalée.`, "la mission d'un coureur ordinaire a changé");
-    const seuilBas = missionSeanceDuJour({ effortMaximalInterdit: true });
-    const covid = missionSeanceDuJour({ effortMaximalInterdit: true, intensiteInterdite: true });
-    const grossesse = missionSeanceDuJour({ effortMaximalInterdit: true, pilotageSensation: true });
-    for (const m of [seuilBas, covid, grossesse]) {
-      assert.doesNotMatch(m, /allure spécifique|rappels d'allure|converger/, `la mission pousse vers l'allure : « ${m} »`);
-      assert.match(m, /CADRE DE SANTÉ \(n'en cite pas le motif\)/);
-      assert.doesNotMatch(m, /antécédent cardiaque|maladie cardiaque|grossesse|enceinte|covid/i, "la mission nomme l'antécédent");
-    }
-    assert.match(seuilBas, /seuil bas/); assert.match(covid, /AUCUNE intensité/); assert.match(grossesse, /à la sensation/);
-    assert.match(codeNu("src/app/api/ai/session/route.ts"), /\$\{missionSeanceDuJour\(ctx\)\}/, "la route ne passe plus par la mission");
   });
 
   await test("feuille de route vue par l'admin : le focus dit le cadre de santé, pas « VMA & seuil »", async () => {

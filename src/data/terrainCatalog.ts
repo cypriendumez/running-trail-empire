@@ -13,9 +13,6 @@ export type TerrainItem = {
   coach: string;
   /** true = une allure au km n'a pas de sens sur cette surface (sable, montagne). */
   paceMeaningless?: boolean;
-  /** La consigne quand un antécédent plafonne l'intensité (lib/ai/coachContext, tour 5, 20/11/2026) : ni
-   *  « qualité chiffrée », ni « travail calibré », ni côtes à travailler. Absente : `coach` convient tel quel. */
-  coachCadre?: string;
 };
 
 export const TERRAINS: TerrainItem[] = [
@@ -23,7 +20,6 @@ export const TERRAINS: TerrainItem[] = [
     slug: "plat",
     label: { fr: "Plat / route", en: "Flat / road", de: "Flach / Straße", es: "Llano / asfalto", pt: "Plano / estrada" },
     coach: "PLAT (route) : les allures /km sont parfaitement pertinentes — chiffre-les précisément. En revanche l'impact est répétitif et identique à chaque foulée → impose du renforcement et varie les surfaces quand c'est possible. Si l'objectif comporte du dénivelé, il DOIT aller chercher des côtes (même une bosse répétée en boucle).",
-    coachCadre: "PLAT (route) : les allures /km sont parfaitement pertinentes — chiffre-les précisément. En revanche l'impact est répétitif et identique à chaque foulée → impose du renforcement et varie les surfaces quand c'est possible. Si l'objectif comporte du dénivelé, il DOIT aller chercher des montées, courues en endurance facile (même une bosse répétée en boucle).",
   },
   {
     slug: "vallonne",
@@ -34,7 +30,6 @@ export const TERRAINS: TerrainItem[] = [
     slug: "montagne",
     label: { fr: "Montagne", en: "Mountain", de: "Berge", es: "Montaña", pt: "Montanha" },
     coach: "MONTAGNE (sentier technique) : ne prescris PAS d'allure /km sur ce terrain (elle n'a aucun sens) — pilote en DURÉE, en FC et en D+ (mètres de dénivelé). Travaille la montée (côtes longues, marche rapide efficace au-delà de 15 %) ET la DESCENTE (excentrique = première cause de destruction musculaire en trail, à doser très progressivement).",
-    coachCadre: "MONTAGNE (sentier technique) : ne prescris PAS d'allure /km sur ce terrain (elle n'a aucun sens) — pilote en DURÉE, en FC et en D+ (mètres de dénivelé). Les montées se font en endurance facile (marche rapide dès que la pente l'exige) ; la DESCENTE se dose très progressivement (excentrique = première cause de destruction musculaire en trail).",
     paceMeaningless: true,
   },
   {
@@ -47,7 +42,6 @@ export const TERRAINS: TerrainItem[] = [
     slug: "piste",
     label: { fr: "Piste", en: "Track", de: "Bahn", es: "Pista", pt: "Pista" },
     coach: "PISTE : idéale pour la qualité chiffrée (fractionné calibré au mètre). Alterne les sens de rotation pour ne pas surcharger une jambe, et sors de la piste pour l'endurance (le volume facile se fait ailleurs, sur surface variée).",
-    coachCadre: "PISTE : surface régulière et mesurée, utile pour des repères de durée et de distance. Alterne les sens de rotation pour ne pas surcharger une jambe, et sors de la piste pour l'endurance (le volume facile se fait ailleurs, sur surface variée).",
   },
   {
     slug: "sentier",
@@ -58,7 +52,6 @@ export const TERRAINS: TerrainItem[] = [
     slug: "tapis",
     label: { fr: "Tapis de course", en: "Treadmill", de: "Laufband", es: "Cinta de correr", pt: "Passadeira" },
     coach: "TAPIS DE COURSE : allure imposée et régulière, pratique pour le travail calibré. Mets 1 % de pente pour compenser l'absence de résistance de l'air, et attends-toi à une FC plus haute en intérieur (chaleur). La foulée y est moins variée : compense par du renforcement et des surfaces variées ailleurs.",
-    coachCadre: "TAPIS DE COURSE : allure imposée et régulière, pratique pour tenir une endurance bien dosée. Mets 1 % de pente pour compenser l'absence de résistance de l'air, et attends-toi à une FC plus haute en intérieur (chaleur). La foulée y est moins variée : compense par du renforcement et des surfaces variées ailleurs.",
   },
   {
     slug: "neige",
@@ -76,7 +69,7 @@ export const terrainLabel = (item: TerrainItem, lang: string) => item.label[lang
  * Accepte le tableau `main_terrains` ET l'ancienne colonne `main_terrain` (chaîne unique),
  * afin que le code fonctionne avant comme après la migration 009.
  */
-export function terrainCoachBlock(terrains: unknown, legacySingle?: unknown, cadreSante = false): { labels: string[]; rules: string[]; paceMeaningless: boolean } {
+export function terrainCoachBlock(terrains: unknown, legacySingle?: unknown): { labels: string[]; rules: string[]; paceMeaningless: boolean } {
   const raw = Array.isArray(terrains) ? terrains.map(String)
     : typeof legacySingle === "string" && legacySingle ? [legacySingle]
     : [];
@@ -86,7 +79,7 @@ export function terrainCoachBlock(terrains: unknown, legacySingle?: unknown, cad
   const hits = TERRAINS.filter((t) => set.has(t.slug));
   return {
     labels: hits.map((t) => t.label.fr.replace(/^[^\p{L}\p{N}]+/u, "")),
-    rules: hits.map((t) => (cadreSante && t.coachCadre) || t.coach),
+    rules: hits.map((t) => t.coach),
     paceMeaningless: hits.some((t) => t.paceMeaningless),
   };
 }

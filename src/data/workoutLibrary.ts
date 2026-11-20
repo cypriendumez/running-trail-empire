@@ -209,58 +209,9 @@ export function pickWorkouts(opts: { level?: Level; goal?: Goal; categories?: Wo
   );
 }
 
-/**
- * Une séance d'EFFORT MAXIMAL OU DE ZONE 5, jugée sur son INTENSITÉ et pas sur son étiquette (@HeadCoach,
- * 19/11/2026) :
- *  · toute séance dont une zone atteint Z5 (95-105 % de la VMA) : les VO2max, mais aussi côtes courtes et
- *    moyennes, allure 5 km, fartleks, Mona, 10 km dégressif, kilomètre vertical, sprints « à fond » (Z5+) ;
- *  · tout test ou évaluation, même noté Z4 ou « course » (seuil 30 min contre la montre, chrono 5 km) ;
- *  · toute structure avec des lignes droites (Z5+, même dans un footing) : le plan de ces coureurs les
- *    retire aussi (PR 63).
- * Écartée de la palette d'un coureur exempté du test VMA : sinon le dossier de l'IA disait « ne lui
- * propose pas de test » et lui donnait le protocole du test, ou le même travail sous un autre nom.
- */
-export function estEffortMaximal(w: Pick<WorkoutTemplate, "category" | "structure" | "zone">): boolean {
-  return w.category === "test" || /Z5/.test(w.zone) || /lignes droites/i.test(w.structure);
-}
-
-/**
- * LE PLAFOND D'INTENSITÉ d'un coureur (`coachContext`, @HeadCoach 20/11/2026) :
- *  · `aucune` — aucune qualité (covid long, consignes du kiné, avis médical attendu, marche-course) ;
- *  · `seuilBas` — au plus un seuil bas (antécédent cardiaque, grossesse) ;
- *  · `normal` — tous les autres.
- */
-export type PlafondIntensite = "aucune" | "seuilBas" | "normal";
-
-/**
- * La séance dépasse-t-elle ce plafond ? La ZONE ET LA STRUCTURE sont lues : « Z2 » en zone cachait
- * « 10 dernières min Z3 », « 5 min Z2 / 3 min Z3 » ou « montées en Z2-Z3 » dans la structure (relecteurs,
- * tour 5, 20/11/2026).
- *  · les deux plafonds : l'effort maximal et la zone 5 (`estEffortMaximal`), la préparation spécifique et
- *    toute allure ou tout effort « de course » (allure marathon, semi, cible : la course se court à effort
- *    contrôlé, décision de Cyprien du 20/11/2026) ;
- *  · `aucune` : en plus, tout ce qui monte en Z3 ou au-delà, le tempo, le seuil, le soutenu, la vitesse ;
- *  · `seuilBas` : en plus, la zone 4 et le travail « au seuil » (le seuil bas reste SOUS le seuil), et
- *    l'over-under (des passages AU-DESSUS du seuil).
- * Le renforcement (zone « — », force max, pliométrie) n'est pas jugé ici : il attend sa propre décision
- * (@SafeRun, Cyprien).
- */
-export function horsPlafond(w: Pick<WorkoutTemplate, "id" | "category" | "structure" | "zone">, plafond: PlafondIntensite): boolean {
-  if (plafond === "normal") return false;
-  if (estEffortMaximal(w)) return true;
-  const texte = `${w.zone} ${w.structure}`;
-  if (w.category === "race_specific" || /\bAM\b|allure (?:marathon|semi|de course|cible)|effort cible/i.test(texte)) return true;
-  if (plafond === "aucune") {
-    return ["tempo", "threshold", "vo2max", "speed"].includes(w.category)
-      || /course/i.test(w.zone) || /Z[3-5]|soutenu|seuil|tempo/i.test(texte);
-  }
-  return w.id === "thr-overunder" || /Z[45]|\bau seuil\b/i.test(texte);
-}
-
 // Catalogue condensé (texte) à injecter dans le prompt : l'IA pioche et adapte.
-// `plafond` : sans les séances qui dépassent le plafond d'intensité du coureur (`horsPlafond`).
-export function buildSessionCatalog(opts: { level?: Level; goal?: Goal; plafond?: PlafondIntensite } = {}): string {
-  const picked = pickWorkouts(opts).filter((w) => !horsPlafond(w, opts.plafond ?? "normal"));
+export function buildSessionCatalog(opts: { level?: Level; goal?: Goal } = {}): string {
+  const picked = pickWorkouts(opts);
   const byCat = new Map<WorkoutCategory, WorkoutTemplate[]>();
   for (const w of picked) { const a = byCat.get(w.category) ?? []; a.push(w); byCat.set(w.category, a); }
   const order: WorkoutCategory[] = ["recovery", "endurance", "long", "tempo", "threshold", "vo2max", "speed", "hills", "race_specific", "trail", "strength", "drills", "cross", "test"];
