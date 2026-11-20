@@ -738,7 +738,9 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     const minutes = warm + cool + 25;
     return Math.max(5, Math.round((minutes * 60 / secPerKm) * 10) / 10);
   })();
-  const maxByVolume = Math.max(1, Math.floor((targetKm - longRunKm) / QUALITY_KM));
+  // `longRunReserveKm` : ce que le plafond d'un long arrêt a retiré à la sortie longue ne fait pas de
+  // place à une séance de qualité de plus (voir `coachContext`).
+  const maxByVolume = Math.max(1, Math.floor((targetKm - longRunKm - (ctx.volume.longRunReserveKm ?? 0)) / QUALITY_KM));
   // La FRÉQUENCE plafonne aussi : à 3 sorties par semaine, deux séances de qualité plus
   // la sortie longue ne laissent AUCUN footing facile — soit 100 % d'intensité, l'inverse
   // du modèle polarisé. Une qualité pour trois sorties, deux à partir de cinq.

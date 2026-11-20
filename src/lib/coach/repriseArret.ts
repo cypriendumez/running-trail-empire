@@ -11,7 +11,7 @@
 //  LA RÈGLE (Daniels' Running Formula) : de 6 à 28 jours sans courir, la reprise dure
 //  autant que l'arrêt — la première moitié à 50 % du volume habituel, la seconde à 75 %.
 //  En deçà de 6 jours, rien n'est perdu : on reprend où l'on en était. Au-delà de 28, la
-//  règle change d'échelle ; ce module ne s'en mêle pas et le plafond ordinaire s'applique.
+//  règle change d'échelle : voir plus bas « LE VOLUME AU-DELÀ DE 28 JOURS D'ARRÊT ».
 //
 //  ⚠️ LE SILENCE N'EST PAS FORCÉMENT UN ARRÊT : une montre qui ne synchronise plus produit
 //  le même vide. Ce module ne tranche pas ; c'est le texte affiché qui le dit à l'athlète.
@@ -20,7 +20,7 @@ import { ecartJours } from "@/lib/coach/recuperation";
 
 /** En deçà, rien n'est perdu (Daniels : VDOT intact jusqu'à 5 jours d'arrêt). */
 export const ARRET_MIN_JOURS = 6;
-/** Au-delà, la reprise suit une autre échelle, que ce module n'applique pas. */
+/** Au-delà, le volume suit une autre échelle (`partApresLongArret`) et l'intensité celle de `arretHorsEchelle`. */
 export const ARRET_MAX_JOURS = 28;
 /** Part du volume habituel pendant la première, puis la seconde moitié de la reprise. */
 export const PARTS_REPRISE = [0.5, 0.75] as const;
@@ -85,8 +85,8 @@ export const REPRISE_HORS_ECHELLE_JOURS = ARRET_MAX_JOURS;
  * `null` : la règle d'intensité s'arrêtait donc là où elle compte le plus. Rejoué : après 34
  * jours sans courir, un seuil de 4×10 min le jour même du retour, et une sortie longue de 22 km
  * dans une semaine visée à 20 km — alors qu'à 27 jours, rien de dur avant la seconde moitié.
- * Le volume au-delà de 28 jours garde son plafond ordinaire ; l'intensité, elle, reçoit AU MOINS
- * la règle de l'arrêt le plus long de l'échelle (voir `qualitePendantReprise`).
+ * Le volume au-delà de 28 jours a son propre plafond (`partApresLongArret`, 19/11/2026) ; l'intensité
+ * reçoit AU MOINS la règle de l'arrêt le plus long de l'échelle (voir `qualitePendantReprise`).
  */
 export function arretHorsEchelle(joursCourus: readonly string[], aujourdhui: string): ArretVu | null {
   const a = dernierArret(joursCourus, aujourdhui);
@@ -95,14 +95,162 @@ export function arretHorsEchelle(joursCourus: readonly string[], aujourdhui: str
   return a;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  LE VOLUME AU-DELÀ DE 28 JOURS D'ARRÊT — un PLAFOND, jamais une cible.
+//
+//  ⚠️ CONSTAT (relectures du 19/11/2026, puis rejoué) : au-delà de 28 jours, ce module ne bornait
+//  que l'intensité. Un coureur à 60 km par semaine qui reprend d'emblée à son rythme après 90
+//  jours sans courir recevait 48 km visés au 15ᵉ jour de reprise (80 % de son volume d'avant), et
+//  48 km encore au 30ᵉ, avec une VMA et un seuil : le plan suivait ce qu'il venait de courir.
+//
+//  LA RÈGLE (Daniels' Running Formula, table de reprise après une interruption ; relevée le
+//  19/11/2026 dans des sources secondaires concordantes, le livre n'étant pas lisible en ligne) :
+//   · de 4 à 8 semaines d'arrêt (29 à 56 jours) : la reprise dure autant que l'arrêt, un tiers à
+//     33 % du volume d'avant, un tiers à 50 %, un tiers à 75 % ;
+//   · au-delà de 8 semaines : trois semaines à 33 %, trois à 50 %, trois à 70 %, trois à 85 %,
+//     puis le volume d'avant. ⚠️ Trois sources donnent 85 % pour le dernier palier, une donne
+//     80 % : 85 % est retenu, l'écart est signalé.
+//  Les plafonds en miles que le livre joint à ces paliers n'ont pas pu être relus : ils ne sont
+//  pas appliqués (on ne code pas un chiffre non vérifié).
+//
+//  ⚠️ UN PLAFOND, PAS UNE CIBLE : ces parts sont des maximums. Le plan garde sa progression
+//  ordinaire (jamais un bond par rapport à ce qui vient d'être couru) et ne retient le plafond
+//  que s'il est plus bas. Cette règle ne peut donc que BAISSER un volume.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Jusqu'à cette durée d'arrêt (8 semaines), la reprise de volume dure autant que l'arrêt, par tiers. */
+export const ARRET_TRES_LONG_JOURS = 56;
+/** Parts du volume d'avant l'arrêt, par tiers de la reprise, après 29 à 56 jours d'arrêt. */
+export const PARTS_REPRISE_LONGUE = [0.33, 0.5, 0.75] as const;
+/** Parts du volume d'avant l'arrêt, par paliers de trois semaines, après plus de 56 jours d'arrêt. */
+export const PARTS_REPRISE_TRES_LONGUE = [0.33, 0.5, 0.7, 0.85] as const;
+/** Durée d'un palier après plus de 56 jours d'arrêt : trois semaines. */
+export const PALIER_REPRISE_TRES_LONGUE_JOURS = 21;
+
+/** Durée, en jours, de la reprise de VOLUME après un arrêt de plus de 28 jours. */
+export function dureeRepriseLongue(arretJours: number): number {
+  return arretJours > ARRET_TRES_LONG_JOURS
+    ? PARTS_REPRISE_TRES_LONGUE.length * PALIER_REPRISE_TRES_LONGUE_JOURS
+    : arretJours;
+}
+
+/**
+ * La part du volume d'AVANT l'arrêt à ne pas dépasser la semaine qui commence dans `dansJours`
+ * jours, après un arrêt de PLUS de 28 jours ; 1 hors de cette règle (pas d'arrêt, arrêt de 28
+ * jours au plus : c'est `partApresArret`, ou reprise terminée).
+ * ⚠️ JAMAIS CROISSANTE quand l'arrêt s'allonge, `partApresArret` comprise (un test le vérifie
+ * de 6 à 200 jours d'arrêt, pour chaque jour de reprise).
+ */
+export function partApresLongArret(r: Pick<RepriseArret, "arretJours" | "joursRepris"> | null, dansJours = 0): number {
+  if (!r || r.arretJours <= ARRET_MAX_JOURS) return 1;
+  const jour = r.joursRepris + dansJours;
+  if (r.arretJours > ARRET_TRES_LONG_JOURS) {
+    const palier = Math.floor(jour / PALIER_REPRISE_TRES_LONGUE_JOURS);
+    return palier < PARTS_REPRISE_TRES_LONGUE.length ? PARTS_REPRISE_TRES_LONGUE[palier] : 1;
+  }
+  if (jour >= r.arretJours) return 1;
+  return jour < r.arretJours / 3 ? PARTS_REPRISE_LONGUE[0] : jour < (2 * r.arretJours) / 3 ? PARTS_REPRISE_LONGUE[1] : PARTS_REPRISE_LONGUE[2];
+}
+
+/**
+ * Sous ce plafond, une semaine ne porte plus deux footings : un footing dure au moins 25 minutes,
+ * soit 4 à 6 km selon l'allure facile (`kmMinFooting`, autoPlan : 6 km jusqu'à 4'10 au km), et le
+ * plan ne pose pas de sortie plus courte.
+ */
+export const PLAFOND_MIN_REPRISE_LONGUE_KM = 12;
+
+/**
+ * La part du volume d'avant l'arrêt (`volumeAvantKm`, en km par semaine) qui PLAFONNE la semaine :
+ * la part de Daniels (`partApresLongArret`), sauf pour un petit volume.
+ * ⚠️ UN POURCENTAGE D'UN PETIT VOLUME VIDE LA SEMAINE (tirage du 20/11/2026) : 33 % de 15 km font
+ * 5 km, moins qu'un footing, et le plan ne posait plus AUCUNE sortie pendant le premier tiers de
+ * la reprise (11 coureurs sur 3 200 tirés au hasard, tous à moins de 20 km par semaine avant
+ * l'arrêt), sous un motif qui disait « on reprend par des footings » ; à 10 km, il n'en posait
+ * qu'une, plus longue que la sortie habituelle du coureur. Le plafond passe alors au premier
+ * palier SUIVANT de la même échelle qui laisse au moins `PLAFOND_MIN_REPRISE_LONGUE_KM` : le
+ * pourcentage annoncé reste un palier de la règle, et il ne fait que monter avec les semaines.
+ * Aucun palier n'y suffit : pas de plafond (1). C'est le cas sous 16 km par semaine environ avant
+ * un arrêt de 29 à 56 jours (dernier palier à 75 %), sous 14 km environ au-delà (dernier palier à
+ * 85 %), et quand le volume est inconnu (0). Exemples : 30 km par semaine donnent 50 % d'emblée
+ * dans les deux cas ; 20 km donnent 75 % après 40 jours d'arrêt, 70 % puis 85 % après 90 jours.
+ * C'est un choix de Pacevo, pas un chiffre de Daniels.
+ * Cette fonction ne rend JAMAIS une part plus basse que `partApresLongArret`.
+ */
+export function partPlafondLongArret(r: Pick<RepriseArret, "arretJours" | "joursRepris"> | null, volumeAvantKm: number, dansJours = 0): number {
+  const part = partApresLongArret(r, dansJours);
+  if (!r || part >= 1) return 1;
+  const echelle: readonly number[] = r.arretJours > ARRET_TRES_LONG_JOURS ? PARTS_REPRISE_TRES_LONGUE : PARTS_REPRISE_LONGUE;
+  return echelle.find((p) => p >= part && Math.round(volumeAvantKm * p) >= PLAFOND_MIN_REPRISE_LONGUE_KM) ?? 1;
+}
+
+/**
+ * L'ARRÊT DE PLUS DE 28 JOURS dont la reprise de VOLUME est en cours, ou `null`. Elle dure plus
+ * longtemps que la reprise d'intensité (`arretHorsEchelle`, quatre semaines) : autant que
+ * l'arrêt, ou douze semaines au-delà de 56 jours.
+ *
+ * ⚠️ UN ARRÊT COURT SURVENU DEPUIS NE L'EFFACE PAS : on ne lit pas « le dernier arrêt » mais le
+ * plus récent arrêt LONG dont la reprise court encore. Dix jours de pause au milieu d'une
+ * reprise de douze semaines ne rendent pas son volume d'avant à un coureur. Le décompte de la
+ * reprise part de la première sortie qui a suivi l'arrêt long, pause comprise.
+ */
+export function repriseVolumeLongArret(joursCourus: readonly string[], aujourdhui: string): ArretVu | null {
+  const jours = joursDistincts(joursCourus, aujourdhui);
+  if (!jours.length) return null;
+  const depuis = ecartJours(aujourdhui, jours[jours.length - 1]);
+  if (depuis == null) return null;
+  // Toujours à l'arrêt, depuis plus de 28 jours.
+  if (depuis - 1 > ARRET_MAX_JOURS) return { arretJours: depuis - 1, enCours: true, joursRepris: 0, depuisJours: depuis };
+  for (let i = jours.length - 1; i > 0; i--) {
+    const ecart = ecartJours(jours[i], jours[i - 1]);
+    if (ecart == null || ecart - 1 <= ARRET_MAX_JOURS) continue;
+    const joursRepris = ecartJours(aujourdhui, jours[i]) ?? Infinity;
+    if (joursRepris < dureeRepriseLongue(ecart - 1)) return { arretJours: ecart - 1, enCours: false, joursRepris };
+  }
+  return null;
+}
+
+/** Les jours courus, distincts, triés, jusqu'à aujourd'hui compris. */
+function joursDistincts(joursCourus: readonly string[], aujourdhui: string): string[] {
+  return [...new Set(joursCourus.map((d) => String(d).slice(0, 10)))]
+    .filter((d) => d.length === 10 && d <= aujourdhui)
+    .sort();
+}
+
+/**
+ * Depuis combien de jours l'athlète a couru pour la dernière fois AVANT l'arrêt : c'est sur ce
+ * jour-là que s'ancre son volume d'avant l'arrêt. `arretJours` jours sans courir le séparent de
+ * la première sortie de reprise (ou d'aujourd'hui, tant qu'il n'a pas repris).
+ */
+export function joursDepuisLAvantArret(r: Pick<RepriseArret, "arretJours" | "joursRepris">): number {
+  return r.joursRepris + r.arretJours + 1;
+}
+
+/**
+ * LES JOURS COURUS OÙ SE LIT L'ARRÊT : la RÉUNION de l'historique long et des séances récentes.
+ *
+ * ⚠️ NI L'UN NI L'AUTRE NE SUFFIT SEUL (réserve du directeur scientifique, 17/11/2026) :
+ *  · les séances récentes sont plafonnées à 60, TOUS SPORTS CONFONDUS. Un coureur blessé qui
+ *    pédale chaque jour en fait sortir toutes ses courses d'avant l'arrêt : plus d'arrêt visible,
+ *    plus de garde. Rejoué : 40 jours sans courir et deux sorties à vélo par jour, un seuil posé
+ *    le jour même au 4ᵉ jour de reprise, un seuil et une VMA au 8ᵉ ;
+ *  · l'historique long s'arrête à 190 jours. Après une coupure plus longue, la dernière course
+ *    d'avant l'arrêt n'y est plus, alors que les 60 dernières séances d'un coureur peu assidu
+ *    la portent encore.
+ * Les doublons ne gênent pas : la détection travaille sur des jours distincts.
+ */
+export function joursCourusPourArret(
+  historique: readonly { date: string | null | undefined }[],
+  recentes: readonly { date: string | null | undefined }[],
+): string[] {
+  return [...historique, ...recentes].map((w) => String(w.date ?? "").slice(0, 10));
+}
+
 /**
  * Le DERNIER arrêt d'au moins 6 jours, quelle que soit sa longueur, et où en est ce qui l'a suivi.
  * `arretJours` compte les jours SANS COURIR dans les deux états.
  */
 function dernierArret(joursCourus: readonly string[], aujourdhui: string): ArretVu | null {
-  const jours = [...new Set(joursCourus.map((d) => String(d).slice(0, 10)))]
-    .filter((d) => d.length === 10 && d <= aujourdhui)
-    .sort();
+  const jours = joursDistincts(joursCourus, aujourdhui);
   if (!jours.length) return null;
   // Toujours à l'arrêt : les jours écoulés depuis la dernière sortie, aujourd'hui compris.
   const depuis = ecartJours(aujourdhui, jours[jours.length - 1]);
@@ -136,7 +284,7 @@ function dernierArret(joursCourus: readonly string[], aujourdhui: string): Arret
 //   · le jour de la première sortie de reprise, pas de qualité non plus ; après dix jours
 //     d'arrêt ou plus, pas avant 48 h ;
 //   · après un arrêt de plus de 14 jours, la qualité attend la seconde moitié de la reprise ;
-//   · après un arrêt de plus de 28 jours, où la règle de volume ne s'applique plus, l'intensité
+//   · après un arrêt de plus de 28 jours (le volume y a son propre plafond, plus bas), l'intensité
 //     garde AU MOINS cette protection : pas avant le 14ᵉ jour d'une reprise de quatre semaines ;
 //   · jusqu'à la fin de la reprise, UNE séance de qualité PAR SEMAINE au plus, écrite courte
 //     et au seuil (le volume est à 50 puis 75 %) : la même borne que la reprise d'après-course.
@@ -219,6 +367,33 @@ export function distancesAvantArret(
     const n = ecartJours(aujourdhui, String(w.date ?? ""));
     return n != null && n >= borne && n <= borne + HABITUDE_JOURS;
   }).map((w) => w.distance_km);
+}
+
+/**
+ * LES SORTIES OÙ SE LIT LA SORTIE HABITUELLE : la même réunion que pour l'arrêt (voir
+ * `joursCourusPourArret`). Une même sortie figure dans les deux sources : la compter deux fois
+ * fausserait la médiane, donc seul ce RECOUVREMENT est retiré.
+ *
+ * ⚠️ DE VRAIES DOUBLES SÉANCES NE SONT PAS DES DOUBLONS (sixième relecture, 19/11/2026). Fusionner
+ * toutes les sorties de même jour et de même distance retirait la seconde sortie d'un coureur qui
+ * court 6 km matin et soir : sa sortie habituelle passait de 8 à 10 km, et la sortie longue de
+ * reprise (9 km) n'était plus posée. L'historique long est donc gardé EN ENTIER ; une sortie
+ * récente n'est écartée que si l'historique en porte déjà une, non encore appariée, du même jour
+ * et de même distance.
+ */
+export function sortiesPourArret<T extends { date: string | null | undefined; distance_km?: number | null }>(
+  historique: readonly T[], recentes: readonly T[],
+): T[] {
+  const cle = (w: T) => `${String(w.date ?? "").slice(0, 10)}|${w.distance_km ?? ""}`;
+  // Combien de sorties de l'historique long restent à apparier, par jour et par distance.
+  const restant = new Map<string, number>();
+  for (const w of historique) restant.set(cle(w), (restant.get(cle(w)) ?? 0) + 1);
+  const enPlus = recentes.filter((w) => {
+    const n = restant.get(cle(w)) ?? 0;
+    if (n > 0) { restant.set(cle(w), n - 1); return false; }
+    return true;
+  });
+  return [...historique, ...enPlus];
 }
 
 /**

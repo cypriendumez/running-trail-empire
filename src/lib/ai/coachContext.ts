@@ -44,7 +44,7 @@ const dureeLoc = (min: number, l: Lang) => {
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile, finDuJourCoureur } from "@/lib/time/fuseau";
 import { apresCourse, facteurVolumeApresCourse, type PhaseApresCourse } from "@/lib/coach/apresCourse";
-import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle } from "@/lib/coach/repriseArret";
+import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle, joursCourusPourArret, sortiesPourArret, repriseVolumeLongArret, partPlafondLongArret, partApresLongArret, joursDepuisLAvantArret, PLAFOND_MIN_REPRISE_LONGUE_KM } from "@/lib/coach/repriseArret";
 import { programmeMarcheCourse, dureesMarcheCourse, type SeanceMarcheCourse } from "@/lib/coach/marcheCourse";
 import { testEnVigueur, allureFacileMaxSec, fmtAllure, TYPE_TEST_LACTATE, type TestLactate } from "@/lib/coach/lactate";
 import { courseCEcarteeDe, type CourseCEcartee } from "@/lib/coach/courseCEcartee";
@@ -271,7 +271,12 @@ export type AthleteContext = {
   /** Volumes cibles de la semaine, en km. `longRunPlanned` = ce que la périodisation
    *  prévoyait AVANT réduction pour fatigue ; `longRunEased` dit si la coupe a eu lieu,
    *  pour que la séance puisse l'expliquer au lieu d'afficher un chiffre inexpliqué. */
-  volume: { weekKm: number; avg4wkKm: number; targetKm: number; longRunKm: number; longRunPlanned: number; longRunEased: boolean };
+  volume: {
+    weekKm: number; avg4wkKm: number; targetKm: number; longRunKm: number; longRunPlanned: number; longRunEased: boolean;
+    /** Kilomètres retirés à la sortie longue par le plafond de volume d'un long arrêt (`plafondLongArretKm`),
+     *  absent sinon. Ils ne redeviennent pas de la place pour une séance de qualité (`maxByVolume`, autoPlan). */
+    longRunReserveKm?: number;
+  };
   /** Où l'on se situe dans le cycle : semaine allégée, affûtage, ou montée en charge. */
   cycle: { deload: boolean; taper: boolean; label: string; /** Semaine qui précède l'affûtage : pas d'allègement du bloc (09/11/2026). */ veilleAffutage?: boolean };
   /** Jours de la semaine (0 = dimanche) systématiquement prescrits ET jamais réalisés. */
@@ -352,6 +357,9 @@ export type AthleteContext = {
    *  dans le plan déterministe, il ne se contente pas d'informer l'IA. */
   weightLoss: { plan: WeightPlan; rules: WeightTrainingRules } | null;
 };
+
+/** Profondeur, en jours, de l'historique long des séances (la requête `histRes` de `buildAthleteContext`). */
+const HISTORIQUE_LONG_JOURS = 190;
 
 // Rassemble et ANALYSE toutes les données de l'athlète → briefing pour l'IA coach.
 /**
@@ -504,7 +512,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // coureur habitué à 80 km/semaine était traité comme un débutant à 31 km après une
     // coupure. Trois colonnes sur 180 jours coûtent moins qu'un plan sous-dimensionné.
     sb.from("workouts").select("date, sport, distance_km").eq("user_id", userId)
-      .gte("date", new Date(now - 190 * 86400000).toISOString().slice(0, 10))
+      .gte("date", new Date(now - HISTORIQUE_LONG_JOURS * 86400000).toISOString().slice(0, 10))
       .order("date", { ascending: false }).limit(400),
     objectifSeul ? nonLu() : sb.from("sleep_data").select("date").eq("user_id", userId)
       .gte("date", new Date(now - 190 * 86400000).toISOString().slice(0, 10))
@@ -1484,19 +1492,100 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // De 6 à 28 jours sans courir : 50 % puis 75 % du volume habituel pendant une reprise
   // aussi longue que l'arrêt (Daniels). Sans elle, la semaine vide plafonnait tout à
   // 15 km — 14 km visés pour un coureur à 70 km par semaine (Cyprien, 05/11/2026).
-  const repriseArret = repriseApresArret(runs.map((w) => String(w.date).slice(0, 10)), todayStr);
+  // ⚠️ L'ARRÊT SE LIT SUR L'HISTORIQUE LONG ET SUR LES SÉANCES RÉCENTES RÉUNIS (réserve du directeur
+  // scientifique, 17/11/2026) : `runs` vient des 60 dernières séances tous sports confondus, où
+  // soixante sorties à vélo effacent l'arrêt. Voir `joursCourusPourArret`.
+  const joursArret = joursCourusPourArret(histRuns, runs);
+  const repriseArret = repriseApresArret(joursArret, todayStr);
   // ⚠️ ET L'INTENSITÉ (16/11/2026) : la reprise ne bornait que le volume ; le plan posait un
   // seuil le jour même du retour. `null` hors reprise. Voir `qualitePendantReprise`.
-  // ⚠️ AU-DELÀ DE 28 JOURS AUSSI (visa du directeur scientifique, 17/11/2026) : la règle de volume
-  // ne s'y applique plus, mais l'intensité n'a pas de borne haute. `repriseIntensite` est la reprise
-  // en cours, quelle que soit la longueur de l'arrêt ; `repriseArret` reste la règle de VOLUME.
-  const repriseIntensite = repriseArret ?? arretHorsEchelle(runs.map((w) => String(w.date).slice(0, 10)), todayStr);
+  // ⚠️ AU-DELÀ DE 28 JOURS AUSSI (visa du directeur scientifique, 17/11/2026) : la règle d'intensité
+  // n'a pas de borne haute. `repriseIntensite` est la reprise en cours, quelle que soit la longueur de
+  // l'arrêt ; `repriseArret` reste la règle de VOLUME des arrêts de 6 à 28 jours (au-delà : voir plus
+  // bas `repriseVolumeLongue` et `plafondLongArretKm`).
+  const repriseIntensite = repriseArret ?? arretHorsEchelle(joursArret, todayStr);
   const qualiteReprise = qualitePendantReprise(repriseIntensite);
   const habitudeKm = robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm);
+  // ⚠️ L'HABITUDE DE LA REPRISE SE LIT LÀ OÙ L'ARRÊT S'EST LU (19/11/2026). L'arrêt se lit désormais
+  // aussi sur l'historique long ; `habitudeKm`, elle, vient des 60 dernières séances. Quand le vélo
+  // en a chassé les courses d'avant l'arrêt, elle vaut 0 ou quelques kilomètres : « 50 % de
+  // l'habitude » donnait alors 0 à 7 km visés et une semaine entière de repos pour un coureur à
+  // 60 km (rejoué). L'habitude de la reprise se lit donc sur l'HISTORIQUE LONG dès qu'il existe,
+  // et sur les séances récentes seulement s'il est vide (requête en échec) : c'est alors l'ancien
+  // comportement. Les deux lectures sont égales tant que les 60 dernières séances couvrent les
+  // huit semaines.
+  // ⚠️ PAS « LA PLUS HAUTE DES DEUX » (quatrième relecture, 19/11/2026) : quand le vélo réduit les
+  // 60 séances à quatre semaines, leur médiane ne porte plus que sur les semaines les plus récentes
+  // et peut dépasser celle des huit semaines. Rejoué : 50 km visés au lieu de 42 pendant une
+  // reprise, sous le même « 75 % de ton volume habituel » que le jumeau sans vélo.
+  // ⚠️ LA MÊME CHAÎNE DE REPLI que `habitudeKm` (médiane robuste, sinon moyenne des 4 dernières
+  // semaines), lue sur l'historique long : sans elle, un coureur irrégulier masqué par le vélo
+  // était dit « volume habituel inconnu » alors que ses distances sont dans l'historique, et
+  // recevait un autre plan que son jumeau sans vélo (double relecture du 19/11/2026). Le troisième
+  // maillon de `habitudeKm` (la semaine écoulée) n'est pas repris : il vaut toujours 0 quand les
+  // 28 jours valent 0.
+  /** L'arrêt de plus de 28 jours dont la reprise de VOLUME court encore, ou `null` (voir `plafondLongArretKm`). */
+  const repriseVolumeLongue = repriseVolumeLongArret(joursArret, todayStr);
+  const km28Hist = histRuns.filter((w) => now - new Date(w.date).getTime() <= 28 * 86400000).reduce((t, w) => t + (w.distance_km ?? 0), 0);
+  const habitudeHistKm = robustWeeklyKm(histRuns, now, 8)?.km ?? km28Hist / 4;
+  const habitudeArretKm = histRuns.length ? habitudeHistKm : habitudeKm;
+  // ⚠️ HABITUDE INCONNUE (aucune distance connue, ni récente ni dans l'historique) : la moitié de
+  // rien n'est pas un plafond. Aucun plafond de Daniels ne s'applique alors : la semaine vise ce
+  // qui vient d'être couru, avec la progression habituelle et au moins le plancher (`targetFrom`,
+  // qui pendant une reprise n'applique pas non plus le plafond « 1,4 fois la semaine écoulée »).
+  // NI le motif NI le bandeau n'annoncent de pourcentage (visa du directeur scientifique,
+  // 19/11/2026 : le texte disait « 50 % de ton volume habituel » au-dessus d'un plan au plancher).
+  // La garde d'intensité, elle, reste.
+  const habitudeArretInconnue = repriseArret != null && habitudeArretKm <= 0;
+  /** Part du volume habituel visée la semaine qui commence dans `dansJours` jours (1 = aucune réduction). */
+  const partArret = (dansJours = 0) => habitudeArretInconnue ? 1 : partApresArret(repriseArret, dansJours);
   /** Plafond de volume de la semaine qui commence dans `dansJours` jours (Infinity hors reprise). */
+  // ⚠️ PENDANT LA REPRISE D'UN ARRÊT DE PLUS DE 28 JOURS, CE PLAFOND NE DESCEND PAS SOUS DEUX FOOTINGS (tirage du
+  // 20/11/2026). Les huit dernières semaines sont alors presque vides, et l'habitude qu'on y lit n'en est pas une
+  // (trois sorties en 28 jours donnaient 7 km « habituels ») : une pause courte survenue pendant cette reprise
+  // plafonnait la semaine à 3-5 km, moins qu'un footing, où le plan posait un seuil pour unique sortie, puis, avec
+  // la règle « footings seulement », plus rien. Le plancher est celui du plafond du long arrêt, sans dépasser le
+  // volume d'avant cet arrêt quand il est connu. Hors de ce cas, la règle de 6 à 28 jours n'est pas touchée.
+  const plancherPauseKm = () => repriseVolumeLongue
+    ? Math.min(PLAFOND_MIN_REPRISE_LONGUE_KM, volumeAvantLongArretKm > 0 ? Math.round(volumeAvantLongArretKm) : PLAFOND_MIN_REPRISE_LONGUE_KM) : 0;
   const plafondArretKm = (dansJours = 0) => {
-    const part = partApresArret(repriseArret, dansJours);
-    return part < 1 ? Math.round(habitudeKm * part) : Infinity;
+    const part = partArret(dansJours);
+    return part < 1 ? Math.max(Math.round(habitudeArretKm * part), plancherPauseKm()) : Infinity;
+  };
+  /** Le plancher l'emporte cette semaine : le motif n'annonce pas un pourcentage d'une habitude lue sur des semaines
+   *  presque vides, qui ne serait pas ce que le plan applique. */
+  const pauseAuPlancher = () => repriseArret != null && !habitudeArretInconnue && Math.round(habitudeArretKm * repriseArret.part) < plancherPauseKm();
+  // ── AU-DELÀ DE 28 JOURS D'ARRÊT : UN PLAFOND DE VOLUME (lib/coach/repriseArret) ─────────────
+  // De 29 à 56 jours d'arrêt, un tiers de la reprise à 33 %, un tiers à 50 %, un tiers à 75 % ;
+  // au-delà, trois semaines à 33, 50, 70 puis 85 % (Daniels). Sans lui, le plan suivait ce que le
+  // coureur venait de courir : 48 km visés au 15ᵉ jour de reprise après 90 jours d'arrêt, pour un
+  // coureur à 60 km par semaine (rejoué le 19/11/2026).
+  // ⚠️ UN PLAFOND, PAS UNE CIBLE : il ne remplace ni `targetFrom` ni sa progression ; il entre en
+  // dernier dans un `Math.min`, là où la cible, la feuille de route et les doses de qualité se
+  // calculent. Il ne peut donc que BAISSER un volume par rapport à avant ce changement (`repriseVolumeLongue`
+  // est lu plus haut, où il sert aussi à l'habitude d'une pause courte).
+  // ⚠️ LE VOLUME D'AVANT L'ARRÊT, pas celui d'aujourd'hui : huit semaines ancrées sur le dernier
+  // jour couru avant l'arrêt. Après deux mois sans courir, les huit dernières semaines ne
+  // contiennent plus que la reprise. Lu sur la réunion des deux sources (`sortiesPourArret`), comme
+  // l'arrêt. Inconnu (0) : aucun plafond et aucun pourcentage annoncé ; la règle d'intensité reste.
+  // ⚠️ LA MÉDIANE ROBUSTE SEULE, sans repli sur une moyenne de quatre semaines (double relecture du
+  // 19/11/2026). La moyenne suppose quatre semaines de matière. Or l'historique long s'arrête à 190
+  // jours : il ne montre parfois que dix jours d'avant l'arrêt, ou une seule sortie. Une sortie de
+  // 10 km divisée par quatre donnait 2,5 km « d'avant l'arrêt », et un plafond de 1 km pour un
+  // coureur qui en courait 50 (rejoué). La médiane, elle, exige au moins trois semaines courues :
+  // en dessous, le volume d'avant l'arrêt est inconnu, et on le dit en n'annonçant rien.
+  const volumeAvantLongArretKm = (() => {
+    if (!repriseVolumeLongue) return 0;
+    const dernierJour = decaleJour(todayStr, -joursDepuisLAvantArret(repriseVolumeLongue));
+    const avant = sortiesPourArret(histRuns, runs).filter((w) => String(w.date ?? "").slice(0, 10) <= dernierJour);
+    return robustWeeklyKm(avant, finDuJourCoureur(dernierJour), 8)?.km ?? 0;
+  })();
+  /** Plafond de volume, après un arrêt de plus de 28 jours, de la semaine qui commence dans `dansJours` jours (Infinity sinon). */
+  const plafondLongArretKm = (dansJours = 0) => {
+    // Volume d'avant l'arrêt inconnu (0) : la part vaut 1, il n'y a pas de plafond. Petit volume : la part
+    // monte au premier palier qui laisse deux footings dans la semaine (`partPlafondLongArret`).
+    const part = partPlafondLongArret(repriseVolumeLongue, volumeAvantLongArretKm, dansJours);
+    return part < 1 ? Math.round(volumeAvantLongArretKm * part) : Infinity;
   };
   // ── APRÈS LA COURSE ─────────────────────────────────────────────────────────
   // L'objectif passé n'est plus l'objectif, mais il n'est pas oublié : s'il a été couru
@@ -1551,7 +1640,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const partVolumeRecup = recup ? facteurVolumeApresCourse(recup) : 1;
   // Ce que le bandeau annonce est ce que le plan vise : la plus basse des deux réductions,
   // jamais leur produit (un arrêt pendant la récupération ne divise pas deux fois).
-  const partVolumeAnnoncee = Math.min(partVolumeRecup, partApresArret(repriseArret));
+  const partVolumeAnnoncee = Math.min(partVolumeRecup, partArret());
   // LA REPRISE PEUT TOMBER DANS LES SEPT JOURS DU PLAN (0 = aujourd'hui). Le plan accueille
   // alors sa séance ce jour-là, pas avant : sinon, le plan étant reconstruit chaque matin,
   // la première qualité n'apparaissait au calendrier qu'une fois la reprise arrivée.
@@ -1566,12 +1655,36 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     : null;
   // L'arrêt se DIT, et sa cause possible aussi : une montre qui ne synchronise plus produit
   // le même silence qu'un vrai repos.
-  const arretMotif = repriseArret
-    ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.depuisJours ?? repriseArret.arretJours, l), nRaw(Math.round(repriseArret.part * 100), l), repriseArret.enCours, qualiteReprise?.max ?? 1, arretLong(repriseArret)))
-    // Au-delà de 28 jours : pas de pourcentage de volume à annoncer, mais l'intensité se dit.
+  /** La part du plafond de long arrêt, en pourcentage, ou `null` quand aucun plafond ne s'applique. */
+  const partLongArretDite = (l: Lang) => plafondLongArretKm() < Infinity ? nRaw(Math.round(partPlafondLongArret(repriseVolumeLongue, volumeAvantLongArretKm) * 100), l) : null;
+  // ⚠️ UNE PAUSE COURTE PENDANT LA REPRISE D'UN LONG ARRÊT : les deux plafonds s'appliquent, le plan
+  // vise le plus bas. Si c'est celui du long arrêt, c'est LUI que le bandeau annonce : dire « 75 % de
+  // ton volume habituel » au-dessus d'une semaine plafonnée à 33 % du volume d'avant l'arrêt serait
+  // faux. La borne d'intensité de la pause courte continue de s'appliquer au plan ; le texte, lui,
+  // ne dit alors que le volume.
+  /** Le volume d'avant un long arrêt n'est pas CONNU (moins de trois semaines courues visibles) : le motif le dit,
+   *  plutôt que de laisser croire qu'aucun plafond ne s'applique (avis du directeur scientifique, 20/11/2026). Un
+   *  petit volume connu (moins de 14 à 16 km par semaine selon la durée de l'arrêt) n'est pas un volume inconnu : il n'a simplement pas de plafond. */
+  const volumeAvantInconnu = repriseVolumeLongue != null && !(volumeAvantLongArretKm > 0);
+  /** Le palier annoncé n'est pas celui de Daniels : un petit volume l'a fait monter (`partPlafondLongArret`). Le
+   *  motif ne cite alors pas Daniels à côté d'un pourcentage qui n'est pas le sien (double relecture, 20/11/2026). */
+  const palierRemonte = plafondLongArretKm() < Infinity
+    && partPlafondLongArret(repriseVolumeLongue, volumeAvantLongArretKm) !== partApresLongArret(repriseVolumeLongue);
+  const longArretPlusBas = repriseArret != null && repriseVolumeLongue != null && plafondLongArretKm() < plafondArretKm();
+  const arretMotif = longArretPlusBas
+    // Pause encore EN COURS : le motif garde « si tu as couru, ta montre ne synchronise plus » (une panne de
+    // synchronisation est l'autre explication du silence), compté depuis la dernière sortie.
+    ? tr((l) => MOTIF_T[l].repriseLongArret(nRaw(repriseArret.enCours ? repriseArret.depuisJours ?? repriseArret.arretJours : repriseVolumeLongue.arretJours, l), repriseArret.enCours, null, partLongArretDite(l), false, palierRemonte))
+    : repriseArret
+    ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.depuisJours ?? repriseArret.arretJours, l), habitudeArretInconnue || pauseAuPlancher() ? null : nRaw(Math.round(repriseArret.part * 100), l), repriseArret.enCours, qualiteReprise?.max ?? 1, arretLong(repriseArret)))
+    // Au-delà de 28 jours : l'intensité se dit, et le plafond de volume aussi quand le volume d'avant
+    // l'arrêt est connu (« X % au plus » : c'est un maximum, le plan peut viser moins).
     : repriseIntensite
-      ? tr((l) => MOTIF_T[l].repriseLongArret(nRaw(repriseIntensite.depuisJours ?? repriseIntensite.arretJours, l), repriseIntensite.enCours, qualiteReprise?.max ?? 1))
-      : null;
+      ? tr((l) => MOTIF_T[l].repriseLongArret(nRaw(repriseIntensite.depuisJours ?? repriseIntensite.arretJours, l), repriseIntensite.enCours, qualiteReprise?.max ?? 1, partLongArretDite(l), volumeAvantInconnu, palierRemonte))
+      // La reprise d'intensité est finie (quatre semaines), le plafond de volume court encore.
+      : repriseVolumeLongue && plafondLongArretKm() < Infinity
+        ? tr((l) => MOTIF_T[l].repriseLongArret(nRaw(repriseVolumeLongue.arretJours, l), false, null, partLongArretDite(l), false, palierRemonte))
+        : null;
   // ── ARBITRAGE DU BUDGET DE QUALITÉ ───────────────────────────────────────────
   // Extrait dans `lib/coach/qualityBudget` : c'est la décision la plus lourde du coach
   // et elle était intestable au milieu des requêtes. Deux défauts y ont été corrigés —
@@ -1823,7 +1936,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     // ses semaines, et qui dimensionnait pourtant tout son plan marathon.
     // Repli sur l'ancien calcul si moins de 3 semaines courues : on ne déduit pas un
     // niveau de deux points.
-    const chronic = robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm);
+    // Pendant une reprise après arrêt, la référence est l'habitude lue là où l'arrêt s'est lu
+    // (`habitudeArretKm`) : sinon le bandeau annonce « 50 % de ton volume habituel » au-dessus
+    // d'un plan dimensionné sur des séances récentes qui ne voient plus les courses.
+    const chronic = repriseArret ? habitudeArretKm : robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm);
     // Part de la semaine écoulée que l'on considère acquise. Plus le ratio est haut,
     // moins on entérine le pic — sans pour autant retomber sur la seule moyenne, qu'une
     // période creuse (voyage, coupure) tire artificiellement vers le bas : prescrire
@@ -1911,7 +2027,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
    * C'est la règle la plus simple qui existe pour ne pas blesser un coureur : elle
    * empêche mécaniquement de prescrire un volume dur que son kilométrage ne supporte pas.
    */
-  const weeklyRef = Math.min(targetFrom(15), plafondArretKm(0));
+  const weeklyRef = Math.min(targetFrom(15), plafondArretKm(0), plafondLongArretKm(0));
   const capIntervalKm = Math.min(10, weeklyRef * 0.08);
   const capThresholdKm = weeklyRef * 0.10;
   const thrSecPerKm = (() => {
@@ -2116,15 +2232,21 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     ? `1 SORTIE LONGUE EN VÉLO (cross-training) À LA PLACE de la sortie longue en course — même durée/volume aérobie (FC Z2, allure conversationnelle), SANS impact pour limiter le risque blessure (choix de l'athlète, comme beaucoup de pros). Pas d'allure /km (pilotée à la FC). ${(libGoal === "marathon" || libGoal === "trail" || libGoal === "ultra") ? "Garde au moins 1 sortie longue EN COURSE par mois pour la spécificité (impact, terrain)." : ""}`.trim()
     : `1 sortie longue facile en Z2${(phase.startsWith("SPÉ") || phase.startsWith("AFFÛ") || libGoal === "marathon") && goalPace ? ` avec un bloc à ${goalPace}/km` : ""}`;
 
-  const weekTarget = `${chosen.length ? chosen.map((s, i) => `• Qualité ${i + 1} : ${s.matin ? `DOUBLE SEUIL — matin : ${s.matin.fr} / soir : ` : ""}${s.desc}`).join("\n") : "• Aucune séance dure ce cycle (récupération) : que du facile + mobilité/renfo léger."}
-• ${longRunNote}.
+  // Une FONCTION des séances retenues, pas un texte figé ici : le plan peut encore retirer la séance dure plus
+  // bas (reprise d'un long arrêt sans sortie longue, `footingsSeuls`) ; dans ce cas seulement, l'invite dit aussi que la semaine est sans sortie longue (la règle de 6 à 28 jours hors long arrêt n'est pas touchée), et l'invite
+  // de l'IA doit alors annoncer la même semaine que le plan, pas une séance au seuil qu'il ne pose pas.
+  const structureSemaine = (seances: readonly QualitySession[], sansLongue: boolean) => `${seances.length ? seances.map((s, i) => `• Qualité ${i + 1} : ${s.matin ? `DOUBLE SEUIL — matin : ${s.matin.fr} / soir : ` : ""}${s.desc}`).join("\n") : "• Aucune séance dure ce cycle (récupération) : que du facile + mobilité/renfo léger."}
+• ${sansLongue ? "PAS de sortie longue cette semaine (reprise après un arrêt) : uniquement des footings" : longRunNote}.
 • 1 renforcement musculaire (peut se greffer après un footing facile, pas un jour à part obligatoire).
 • ≥ 1 jour de repos complet.
 • Tout le reste = footing FACILE Z2 (~${paceAt(70)}/km), allure conversationnelle.
-RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total), PAS du nombre de séances. ${chosen.length} séance(s) de qualité COURTE(S) (20–40 min d'effort réel) dans une semaine de plusieurs heures = toujours ~80 % facile. Le piège « presque tout en EF + renfo » SOUS-ENTRAÎNE un coureur qui vise un chrono : refuse-le.${expCapped ? `
+RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total), PAS du nombre de séances. ${seances.length} séance(s) de qualité COURTE(S) (20–40 min d'effort réel) dans une semaine de plusieurs heures = toujours ~80 % facile. Le piège « presque tout en EF + renfo » SOUS-ENTRAÎNE un coureur qui vise un chrono : refuse-le.${expCapped ? `
 ⛔ PLAFOND LIÉ AU PASSIF : ${runYears != null && runYears < 1 ? "moins d'un an" : `${runYears} ans`} de course → maximum ${expCap} séance(s) de qualité/semaine, quel que soit l'objectif. Le cardio encaisse déjà, les tendons NON. Ce plafond n'est pas négociable, même si l'athlète se sent bien.` : ""}${easeReasons.length ? `\n⚠️ ALLÈGEMENT ce cycle (${easeReasons.join(" ; ")}) → qualité réduite, priorité récupération. La santé d'abord.` : ""}${daysSinceLast != null && daysSinceLast >= 3 && daysSinceLast <= 8 && !easeReasons.length ? `\nREPRISE : ${daysSinceLast} j de repos SANS perte de forme (3–8 j d'arrêt ne déconditionnent PAS). UN footing de remise en route suffit, PUIS on enchaîne la qualité normalement — ne transforme pas ça en semaine molle entière.` : ""}`;
 
   // ── PLAN MACRO PÉRIODISÉ — bloc complet jusqu'au jour J (base → dév → spécifique → affûtage) ──
+  /** La sortie longue que la feuille de route prévoyait pour la semaine en cours AVANT la borne du
+   *  plafond d'un long arrêt, ou `null` si cette borne ne s'y applique pas (voir `longRunReserveKm`). */
+  let longuePrevueAvantBorne: number | null = null;
   const macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = (() => {
     // ⚠️ LA SEMAINE DE COURSE N'EXISTAIT PAS. `weeksToRace` arrondit vers le bas : à 27 jours
     // du marathon de Lille (Cyprien, 28/09/2026), il vaut 3, et la feuille de route
@@ -2161,6 +2283,8 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const lrShare = longRunShare(libGoal as RaceGoal, objective?.distanceKm ?? null);
     const out: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = [];
     let longueDuBloc = 0;   // plus longue sortie planifiée avant l'affûtage
+    // La même, telle qu'elle serait SANS le plafond d'un long arrêt (voir `placeSansPlafond`).
+    let longueDuBlocSansPlafond = 0;
     // Semaines qui commencent pendant la récupération d'après-course : la montée en charge
     // (+6 %/semaine) ne repart qu'APRÈS elles. Sinon elle les comptait comme des semaines de
     // progression, et la feuille de route sautait de 65 à 87 km à la sortie de récupération.
@@ -2204,7 +2328,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       const volumeKm = Math.round(Math.min(baseKm * factor
         * (recup ? facteurVolumeApresCourse({ joursDepuis: recup.joursDepuis + 7 * i, joursTotal: recup.joursTotal }) : 1)
         * partCourseB(i),
-        plafondArretKm(7 * i)));
+        plafondArretKm(7 * i), plafondLongArretKm(7 * i)));
       // La sortie longue se déduit de la DISTANCE VISÉE, plus seulement d'un pourcentage
       // du volume. Le plafond de Daniels (25 %) empêche la sortie longue d'écraser la
       // semaine ; il ne dit pas ce qu'il faut courir pour préparer un marathon. Employé
@@ -2222,8 +2346,34 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       // Semaine de récupération ou de reprise après un arrêt : la MÊME borne que le plan de la
       // semaine, 30 % du volume réduit. Sans elle, la feuille de route annonçait 16 km de
       // sortie longue dans une semaine de 32 km — la moitié du volume (relevé le 05/11/2026).
-      const longRunKm = semaineBornee ? Math.min(longRunPrevuSemaine, Math.round(volumeKm * 0.3)) : longRunPrevuSemaine;
+      // ⚠️ Et toute semaine sous le plafond d'un long arrêt (visa du directeur scientifique, 19/11/2026) :
+      // ce plafond baissait le volume de la semaine sans toucher à sa sortie longue — 15 km annoncés
+      // dans une semaine de 30 km, alors que le plan de la même semaine en prévoyait 9. Seule la sortie
+      // longue est bornée ici : `semaineBornee`, qui retire aussi l'allègement d'une semaine sur quatre,
+      // n'est pas élargie — le plafond du long arrêt ne doit que BAISSER un volume.
+      // Seulement dans une semaine que ce plafond abaisse : sous le plafond, la feuille de route reste
+      // celle d'avant (voir `plafondLongArretMord`).
+      const borneeParLeLongArretSeul = !semaineBornee && volumeKm >= plafondLongArretKm(7 * i);
+      const longRunKm = semaineBornee || borneeParLeLongArretSeul ? Math.min(longRunPrevuSemaine, Math.round(volumeKm * 0.3)) : longRunPrevuSemaine;
+      if (i === 0 && borneeParLeLongArretSeul) longuePrevueAvantBorne = longRunPrevuSemaine;
       if (ph !== "Affûtage") longueDuBloc = Math.max(longueDuBloc, longRunKm);
+      // ⚠️ LA FEUILLE DE ROUTE SANS LE PLAFOND DU LONG ARRÊT, tenue en parallèle pour une seule chose : la place
+      // des séances de qualité (double relecture du 20/11/2026). Des semaines plafonnées ont une sortie longue plus
+      // courte ; l'affûtage, qui descend depuis la plus longue sortie du bloc, héritait d'une sortie longue plus
+      // courte elle aussi, et une semaine d'affûtage NON plafonnée gagnait ainsi une séance de qualité (un ultra à
+      // 37 km d'affûtage : 2 qualités au lieu de 1). La place ne dépasse jamais celle de cette feuille de route-là.
+      const volumeSansPlafond = Math.round(Math.min(baseKm * factor
+        * (recup ? facteurVolumeApresCourse({ joursDepuis: recup.joursDepuis + 7 * i, joursTotal: recup.joursTotal }) : 1)
+        * partCourseB(i),
+        plafondArretKm(7 * i)));
+      const longuePrevueSansPlafond = wkUntil <= 0 ? 0 : longRunForWeek({
+        weekIndex: i, weeksToPeak: Math.max(1, W - 3), current: lrCurrent, peak: lrPeak,
+        weeklyKm: volumeSansPlafond, share: lrShare, taper: ph === "Affûtage",
+        semainesAvantCourse: wkUntil, reference: Math.max(lrCurrent, longueDuBlocSansPlafond),
+      });
+      const longueSansPlafond = semaineBornee ? Math.min(longuePrevueSansPlafond, Math.round(volumeSansPlafond * 0.3)) : longuePrevueSansPlafond;
+      if (ph !== "Affûtage") longueDuBlocSansPlafond = Math.max(longueDuBlocSansPlafond, longueSansPlafond);
+      const placeSansPlafond = Math.floor((volumeSansPlafond - longueSansPlafond) / 11);
       // Semaine en cours : l'état de forme du jour compte. Semaines suivantes : on planifie
       // sur le budget structurel, sinon un ratio aigu:chronique élevé aujourd'hui viderait
       // toute la feuille de route de sa qualité jusqu'au jour J.
@@ -2232,7 +2382,11 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       // qualités que le planificateur, lui, ramène à deux faute de volume : deux
       // documents contradictoires sous les yeux du même athlète.
       // (~11 km par séance de qualité, échauffement et retour au calme compris.)
-      const roomForQuality = Math.max(1, Math.floor((volumeKm - longRunKm) / 11));
+      // Les kilomètres que la borne du long arrêt retire à la sortie longue ne font pas de place à une
+      // séance de qualité de plus : la place se compte sur la sortie longue d'avant cette borne. Sans
+      // cela, un marathonien à 36 km par semaine gagnait une seconde séance de qualité dans une semaine
+      // plafonnée (rejoué). Le plan de la semaine fait de même : voir `longRunReserveKm`.
+      const roomForQuality = Math.max(1, Math.min(placeSansPlafond, Math.floor((volumeKm - (borneeParLeLongArretSeul ? longRunPrevuSemaine : longRunKm)) / 11)));
       const byFrequency = availDaysPerWeek <= 3 ? 1 : availDaysPerWeek <= 5 ? 2 : 3;
       const qn = Math.min(
         ph === "Affûtage" ? (wkUntil <= 1 ? 1 : 2) : ph === "Base" ? Math.min(qBase, 2) : qBase,
@@ -2447,8 +2601,10 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // cette réduction, la récupération ne retirait que l'intensité, et le plan conseillait
   // de doubler les footings pour loger 70 km à J+5 d'un marathon. Le macro-plan porte déjà
   // la réduction semaine par semaine ; sans macro-plan, on l'applique ici.
-  const targetKm = volumeAvecCible(macroPlan.length ? macroPlan[0].volumeKm
-    : Math.round(Math.min(baseKm * (taper ? 0.65 : deload ? 0.8 : growth) * partVolumeRecup * partCourseB(0), plafondArretKm(0))),
+  /** Le volume de la semaine AVANT le volume cible déclaré par le coureur : c'est lui que les plafonds bornent. */
+  const volumeAvantCibleDeclaree = macroPlan.length ? macroPlan[0].volumeKm
+    : Math.round(Math.min(baseKm * (taper ? 0.65 : deload ? 0.8 : growth) * partVolumeRecup * partCourseB(0), plafondArretKm(0), plafondLongArretKm(0)));
+  const targetKm = volumeAvecCible(volumeAvantCibleDeclaree,
     volumeCible((p as Record<string, unknown> | null)?.target_weekly_km),
     habitudeKm);
   const longRunPrevu = macroPlan.length ? macroPlan[0].longRunKm : Math.round(targetKm * (taper ? 0.20 : 0.25));
@@ -2456,7 +2612,27 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // un marathon) ne dépasse pas 30 % du volume réduit.
   // Pendant TOUTE reprise après un arrêt, y compris de plus de 28 jours (17/11/2026) : sans cela, le
   // plan posait une sortie longue de 22 km dans une semaine visée à 20 km, après 34 jours sans courir.
-  const longRunPlanned = recup || repriseIntensite ? Math.min(longRunPrevu, Math.round(targetKm * 0.3)) : longRunPrevu;
+  // Et quand le plafond de volume d'un long arrêt ABAISSE la semaine (jusqu'à douze semaines) : la
+  // sortie longue d'un objectif ne dépasse pas 30 % de cette semaine plafonnée.
+  // ⚠️ SEULEMENT S'IL MORD (tirage de contrôle du 20/11/2026). Un coureur dont la semaine reste SOUS
+  // le plafond n'est pas touché par lui : il garde le plan qu'il avait. Bornée dès que le plafond
+  // existait, sa sortie longue passait de 16 à 10 km dans une semaine de 32 km que rien n'avait
+  // réduite, et le volume ainsi libéré lui ajoutait une séance dure (3 coureurs sur 700).
+  // ⚠️ LU SUR LE VOLUME D'AVANT LE VOLUME CIBLE DÉCLARÉ, là où la feuille de route applique la même borne
+  // (visa du directeur scientifique, 20/11/2026). Lu sur la cible finale, il valait faux chez un coureur
+  // dont le volume cible déclaré tenait la semaine sous le plafond, alors que la feuille de route avait
+  // déjà raccourci sa sortie longue : aucune réserve, et la place d'une séance dure de plus.
+  const plafondLongArretMord = volumeAvantCibleDeclaree >= plafondLongArretKm();
+  const longRunPlanned = recup || repriseIntensite || plafondLongArretMord ? Math.min(longRunPrevu, Math.round(targetKm * 0.3)) : longRunPrevu;
+  // ⚠️ CE QUE CETTE BORNE RETIRE À LA SORTIE LONGUE N'EST PAS RENDU AUX SÉANCES DURES. Le plan compte ses
+  // séances de qualité sur le volume qui reste une fois la sortie longue posée (`maxByVolume`,
+  // autoPlan) : quand le plafond mord de peu (32 km ramenés à 31) et raccourcit beaucoup la sortie
+  // longue (16 km ramenés à 9), il restait plus de volume qu'avant, donc la place d'une séance dure
+  // de plus. Ces kilomètres restent réservés tant que la borne ne vient QUE du plafond du long arrêt
+  // (la règle d'intensité, elle, borne déjà les séances dures) : ce plafond ne doit jamais en ajouter.
+  // ⚠️ Mesurés depuis la sortie longue d'AVANT la borne : avec un objectif, la feuille de route a déjà
+  // borné la sienne (`longRunPrevu` en vient), et la différence vaudrait toujours zéro.
+  const longRunReserveKm = !recup && !repriseIntensite && plafondLongArretMord ? Math.max(0, (longuePrevueAvantBorne ?? longRunPrevu) - longRunPlanned) : 0;
 
   /**
    * LA SORTIE LONGUE RÉPOND AU VERDICT DE FRAÎCHEUR, comme la qualité.
@@ -2489,11 +2665,45 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // La sortie habituelle = la médiane des sorties des huit semaines d'AVANT l'arrêt (les footings
   // courts de la reprise tireraient la médiane vers le bas, et la « sortie longue » reviendrait
   // en cours de reprise) ; inconnue, on ne tranche pas.
-  // ⚠️ Sur l'historique LONG quand il existe (190 jours) : `runs` ne porte que les 60 dernières séances,
-  // tous sports confondus, et les huit semaines d'avant un arrêt d'un mois en sortaient en partie.
-  const habituelleKm = repriseIntensite ? sortieHabituelleKm(distancesAvantArret(histRuns.length ? histRuns : runs, repriseIntensite, todayStr)) : null;
+  // ⚠️ Sur la RÉUNION de l'historique long et des séances récentes, là où l'arrêt lui-même se lit
+  // (`sortiesPourArret`) : `runs` ne porte que les 60 dernières séances, tous sports confondus, et
+  // l'historique long s'arrête à 190 jours.
+  // ⚠️ SEULEMENT PENDANT LA RÈGLE D'INTENSITÉ, pas pendant tout le plafond d'un long arrêt (double
+  // relecture du 19/11/2026) : une sortie longue retirée libère son volume, que le plan offre à une
+  // séance dure (`maxByVolume`, autoPlan). Tant que l'intensité est bornée, rien n'en sort ; une
+  // fois cette borne passée, retirer la sortie longue ajoutait une séance dure (95 plans sur 2 800
+  // tirés au hasard).
+  const habituelleKm = repriseIntensite ? sortieHabituelleKm(distancesAvantArret(sortiesPourArret(histRuns, runs), repriseIntensite, todayStr)) : null;
   const longueRetiree = repriseIntensite != null && !sortieLongueTient(longRunKmBorne, habituelleKm);
   const longRunKm = longueRetiree ? 0 : longRunKmBorne;
+  // ⚠️ PENDANT LA REPRISE D'UN ARRÊT DE PLUS DE 28 JOURS, UNE SEMAINE SANS SORTIE LONGUE NE PORTE QUE DES
+  // FOOTINGS (double relecture, tirages et visas du directeur scientifique du 20/11/2026). La sortie longue
+  // retirée libère son jour, et le plan y posait la séance au seuil que la règle d'intensité permet à partir
+  // du 14ᵉ jour : une séance dure là où il n'y en avait pas (26 plans sur 1 500 ciblés), et, pour un coureur
+  // à 15-30 km par semaine, des semaines réduites à UNE sortie, au seuil. Une semaine trop petite pour porter
+  // une vraie sortie longue ne porte pas non plus de séance dure : elle revient avec la sortie longue (quand
+  // celle-ci tient, ou à la fin des quatre semaines de la règle d'intensité).
+  // ⚠️ LA CONDITION EST CELLE QUE LA RAISON NOMME, pas « le plafond abaisse la semaine » : le coureur qui
+  // reprend prudemment reste juste SOUS son plafond (12 km visés pour 13 km de plafond) et recevait encore
+  // un seuil pour unique sortie, là où son jumeau qui force recevait deux footings (visa RENVOYÉ, 20/11/2026).
+  // Elle vaut donc à tous les paliers et sans plafond (petit volume), et pendant une pause courte survenue
+  // depuis. C'est un choix de Pacevo ; les sources secondaires prêtent à Daniels « allure facile seulement »
+  // pendant les paliers réduits. Cette règle ne peut que RETIRER une séance dure.
+  const footingsSeuls = repriseVolumeLongue != null && longueRetiree;
+  // LE MOTIF DIT LA MÊME CHOSE QUE LE PLAN : « une seule séance de qualité par semaine au plus » au-dessus d'une
+  // semaine sans séance dure se contredisait. Avant la première séance permise (« aucune séance dure pendant… »),
+  // le motif d'origine est déjà juste. Le motif garde sa forme (pause courte ou long arrêt) et son pourcentage ;
+  // seule sa fin change.
+  const arretMotifDuPlan = arretMotif && repriseVolumeLongue && footingsSeuls && qualiteReprise?.max === 1
+    ? repriseArret && !longArretPlusBas
+      ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.depuisJours ?? repriseArret.arretJours, l), habitudeArretInconnue || pauseAuPlancher() ? null : nRaw(Math.round(repriseArret.part * 100), l), false, "footings", arretLong(repriseArret)))
+      : tr((l) => MOTIF_T[l].repriseLongArret(nRaw(repriseVolumeLongue.arretJours, l), false, "footings", partLongArretDite(l), volumeAvantInconnu, palierRemonte))
+    : arretMotif;
+  const motifsInfo = infoFlags.map((f) => (f === arretMotif && arretMotifDuPlan ? arretMotifDuPlan : f));
+  const readinessBlockDuPlan = arretMotif && arretMotifDuPlan && arretMotifDuPlan !== arretMotif
+    ? readinessBlock.split(arretMotif.fr).join(arretMotifDuPlan.fr) : readinessBlock;
+  /** Le budget de qualité que le plan applique : celui de l'arbitrage, sauf dans une semaine de footings seulement. */
+  const qBudgetDuPlan = footingsSeuls ? 0 : qBudget;
   const longRunEased = !longueRetiree && longRunKm < longRunPlanned;
   // CE QUE LA DOULEUR A CHANGÉ, pour l'écran Santé (« ton coach a retiré… ») : comparé au même
   // athlète SANS douleur, jamais déduit du texte du plan. Relecture du 10/11 : la sortie longue
@@ -2586,7 +2796,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
 ${p?.gender === "female" ? `- SEXE : femme → besoins en FER et disponibilité énergétique à surveiller (RED-S : une charge élevée + apport insuffisant coupe la progression et fragilise l'os) ; densité osseuse à protéger (renforcement + impacts dosés) ; ${cycle ? "cycle suivi (voir plus bas)" : "si elle synchronise son cycle, adapte l'intensité selon la phase"}. Ne calque pas mécaniquement des repères masculins.` : p?.gender === "male" ? "- SEXE : homme → tendance fréquente à partir trop vite en facile et à sur-doser l'intensité ; verrouille la discipline des footings." : ""}
 
 ⚡ VERDICT DE FRAÎCHEUR DU JOUR (calculé à partir de la VFC, du sommeil, de la charge et du ressenti — CETTE CONCLUSION S'IMPOSE À TOI, ne la ré-arbitre pas)
-${readinessBlock}
+${readinessBlockDuPlan}
 ${nutriCourse ? `
 NUTRITION DU JOUR DE COURSE (${nRaw(Math.round(nutriCourse.dureeMin), "fr")} min prévues)
 - Glucides : ${nRaw(nutriCourse.glucidesParH, "fr")} g par heure à partir de la ${nRaw(nutriCourse.premierApportMin, "fr")}ᵉ minute — rien avant, les réserves y suffisent. Soit environ ${nRaw(nutriCourse.glucidesTotalG, "fr")} g au total, l'équivalent de ${nRaw(nutriCourse.gels, "fr")} gel(s) de 25 g.${nutriCourse.dureeMin >= 150 ? " Au-delà de 2 h 30, il faut des glucides MULTI-TRANSPORTABLES (glucose + fructose) : au-delà de 60 g/h, l'intestin ne suit pas avec du glucose seul." : ""}
@@ -2714,7 +2924,7 @@ ${objLines.length ? objLines.join("\n") : "• Aucun objectif de course → vise
 • Phase d'entraînement recommandée : ${phase}
 
 STRUCTURE CIBLE DE LA SEMAINE (squelette à RESPECTER — calculé pour CE coureur ; tu ajustes l'ordre des jours et les allures à sa fraîcheur, mais tu tiens le nombre de séances de qualité indiqué, ni moins par excès de prudence, ni plus)
-${weekTarget}
+${structureSemaine(footingsSeuls ? [] : chosen, footingsSeuls)}
 
 GARDE-FOUS ANTI-BLESSURE (à respecter ABSOLUMENT — la santé prime sur la performance)
 - Progressivité : +10 % de charge/volume maximum par semaine.${load.acr > 1.4 ? " ⚠️ Ratio aigu:chronique élevé → prévoir une semaine ALLÉGÉE." : ""}${monotony > 2 ? " ⚠️ Monotonie élevée → varier l'intensité, garantir un vrai jour facile/repos." : ""}
@@ -2791,9 +3001,9 @@ ${catalog}`;
       // « 1 séance(s) » se lit comme une chaîne de débogage. Ce texte part dans un
       // e-mail et s'affiche sur le calendrier : il s'accorde.
       effect: `Fraîcheur ${readyLevel} (TSB ${frNum(Math.round(load.tsb))}, ratio ${frNum(r1(load.acr), 1)}) → ${
-        qBudget === 0 ? "aucune séance de qualité cette semaine"
-        : qb.floored ? `${qBudget} séance de qualité, raccourcie`
-        : `${qBudget} séance${qBudget > 1 ? "s" : ""} de qualité cette semaine`}.`,
+        qBudgetDuPlan === 0 ? "aucune séance de qualité cette semaine"
+        : qb.floored ? `${qBudgetDuPlan} séance de qualité, raccourcie`
+        : `${qBudgetDuPlan} séance${qBudgetDuPlan > 1 ? "s" : ""} de qualité cette semaine`}.`,
     };
   })();
 
@@ -2804,14 +3014,14 @@ ${catalog}`;
     weekPlan: {
       // Pendant une reprise après un arrêt, la séance est DÉJÀ écrite courte (`doseReduite`) : la dire
       // « sauvée par le plancher » la couperait une seconde fois, sous un texte qui parle de charge.
-      qBudget, quality: chosen, easyPace: easyPaceCorrige, eased: easeReasons.length > 0, floored: qb.floored && qualiteReprise == null,
+      qBudget: qBudgetDuPlan, quality: footingsSeuls ? [] : chosen, easyPace: easyPaceCorrige, eased: easeReasons.length > 0, floored: qb.floored && qualiteReprise == null,
       // La reprise après une course : séance marquée comme telle, et jamais avant son jour.
       // Et jamais avant le jour que fixe la reprise après un arrêt (`qualitePendantReprise`).
       reprise: repriseCetteSemaine && qBudget > 0,
-      qualiteDes: Math.max(repriseCetteSemaine ? joursAvantReprise : 0, qualiteReprise?.des ?? 0),
+      qualiteDes: footingsSeuls ? 7 : Math.max(repriseCetteSemaine ? joursAvantReprise : 0, qualiteReprise?.des ?? 0),
       // ⚠️ Le budget ne suffit pas (double relecture du 17/11/2026) : la sortie longue « épicée »
       // et les footings variés ne le lisent pas. Le plan reçoit donc l'état de la reprise.
-      ...(qualiteReprise ? { repriseArret: qualiteReprise.max === 0 ? "sans-qualite" as const : "une-qualite" as const } : {}),
+      ...(qualiteReprise ? { repriseArret: qualiteReprise.max === 0 || footingsSeuls ? "sans-qualite" as const : "une-qualite" as const } : {}),
     },
     // Doubles séances : on tranche ICI, avec le volume REPRÉSENTATIF (médiane des
     // semaines courues) et non le pic — une semaine à 90 km ne fait pas un athlète
@@ -2822,16 +3032,16 @@ ${catalog}`;
     readiness: {
       level: readyLevel,
       // Français canonique — inchangé pour tous les consommateurs existants.
-      reasons: [...redFr, ...orangeFr, ...infoFr, ...(doubleSeuilSuspendu ? [DOUBLE_T.fr.seuilSuspendu] : [])],
+      reasons: [...redFr, ...orangeFr, ...motifsInfo.map((f) => f.fr), ...(doubleSeuilSuspendu ? [DOUBLE_T.fr.seuilSuspendu] : [])],
       // Les mêmes motifs dans les 5 langues, pour le « pourquoi » des séances.
-      reasonsAll: [...redFlags, ...orangeFlags, ...infoFlags, ...(doubleSeuilSuspendu ? [tr((l) => DOUBLE_T[l].seuilSuspendu)] : [])],
+      reasonsAll: [...redFlags, ...orangeFlags, ...motifsInfo, ...(doubleSeuilSuspendu ? [tr((l) => DOUBLE_T[l].seuilSuspendu)] : [])],
       advice: readinessRule,
     },
     hardGapHours: hardGapH,
     easyPace: easyPaceCorrige,
     lastHardDaysAgo,
     qualiteRecente,
-    volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm, longRunPlanned, longRunEased },
+    volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm, longRunPlanned, longRunEased, ...(longRunReserveKm > 0 ? { longRunReserveKm } : {}) },
     cycle: { deload, taper, label: cycleLabel, veilleAffutage },
     skippedWeekdays,
     noHistory,
