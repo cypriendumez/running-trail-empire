@@ -1078,7 +1078,7 @@ async function profilChaotique() {
     const varies = (plan: PlanDay[]) => plan.filter((d) => d.type === "Endurance" && FOOTING_VARIE.test(d.title));
     const liste = (j: PlanDay[]) => j.map((d) => `${d.date} ${d.title}`).join(", ");
     let epiceeSansArret = 0, varieSansArret = 0, longueGardee = 0, deuxDuresSansArret = 0, autreQueSeuilSansArret = 0, revenueApresHuitJours = 0;
-    let footingsAvantQualite = 0, varieUneFoisPermise = 0, horsEchelleVu = 0;
+    let footingsAvantQualite = 0, varieUneFoisPermise = 0, horsEchelleVu = 0, unePermiseAu24 = 0, seuilPoseAu24 = 0, footingsSeulsAu10 = 0, sousPlafondAu10 = 0;
     for (const jour of HORLOGES) {
       // Le contre-poids : sans arrêt, ce coureur a bien une sortie longue épicée et des footings variés.
       const regulier = await contexte(jour, tablesGros(jour, historiqueGros(jour)));
@@ -1131,21 +1131,44 @@ async function profilChaotique() {
 
       // (b ter) AU-DELÀ DE 28 JOURS — arrêt de 34 jours (visa du directeur scientifique, 17/11/2026 : la règle
       // s'arrêtait à 28 jours ; le plan posait un seuil de 4×10 min le jour du retour et une sortie longue de
-      // 22 km dans une semaine visée à 20 km). Pas encore repris, puis repris depuis 3 et 10 jours.
-      for (const repris of [-1, 3, 10]) {
-        const apres = repris < 0 ? [] : Array.from({ length: Math.ceil(repris / 2) }, (_, k) => facile(jour, repris - 2 * k)).filter((w) => String(w.date) < jour);
+      // 22 km dans une semaine visée à 20 km). Pas encore repris, puis repris depuis 3, 10 et 24 jours.
+      // ⚠️ DEPUIS LE PLAFOND DE VOLUME (20/11/2026, visas du directeur scientifique) : pendant la reprise d'un arrêt de
+      // plus de 28 jours, une semaine dont la sortie longue n'est pas posée (plus courte que la sortie habituelle,
+      // 10 km ici) ne porte que des footings, et le motif le dit. C'est le cas au 10ᵉ jour, que la semaine atteigne
+      // son plafond (30 km, le tiers de 90) ou reste dessous (semaine allégée) ; la séance au seuil permise au 14ᵉ jour
+      // n'y est donc pas posée. La règle « une séance au seuil par semaine à partir du 14ᵉ jour » reste tenue là où la
+      // sortie longue tient : au 24ᵉ jour d'une reprise FORTE (10 km par jour, palier de 75 %).
+      for (const [repris, fort] of [[-1, false], [3, false], [10, false], [24, false], [24, true]] as const) {
+        const apres = repris < 0 ? []
+          : fort ? Array.from({ length: repris }, (_, k) => ({ ...facile(jour, k + 1), distance_km: 10, duration_seconds: 10 * 320, tss: 48 }))
+          : Array.from({ length: Math.ceil(repris / 2) }, (_, k) => facile(jour, repris - 2 * k)).filter((w) => String(w.date) < jour);
         const r = await contexte(jour, tablesGros(jour, [...historiqueGros(jour, 34 + Math.max(0, repris)), ...apres]));
-        const ctxt = `${jour}, 34 j d'arrêt, ${repris < 0 ? "pas encore repris" : `repris depuis ${repris} j`}`;
+        const ctxt = `${jour}, 34 j d'arrêt, ${repris < 0 ? "pas encore repris" : `repris depuis ${repris} j${fort ? " (reprise forte)" : ""}`}`;
         const des = repris < 0 ? 7 : Math.max(0, 14 - repris), permis = plusJours(jour, des);
-        assert.equal(r.ctx.weekPlan.repriseArret, des > 6 ? "sans-qualite" : "une-qualite", `${ctxt} : précondition, l'état de la reprise transmis au plan est « ${r.ctx.weekPlan.repriseArret} »`);
+        // La CAUSE que la règle nomme : la sortie longue n'est pas posée. Elle se lit sur le volume, pas sur l'état.
+        if (repris === 10) assert.equal(r.ctx.volume.longRunKm, 0, `${ctxt} : précondition, la sortie longue (${r.ctx.volume.longRunPlanned} km prévus pour 10 km habituels) est posée`);
+        // Au 24ᵉ jour d'une reprise à un jour sur deux (8 km), la sortie longue reste plus courte que les 10 km habituels.
+        if (repris === 24 && !fort) assert.equal(r.ctx.volume.longRunKm, 0, `${ctxt} : précondition, la sortie longue (${r.ctx.volume.longRunPlanned} km prévus) est posée`);
+        if (fort) assert.ok(r.ctx.volume.longRunKm >= 10, `${ctxt} : précondition, la sortie longue (${r.ctx.volume.longRunKm} km dans ${r.ctx.volume.targetKm} km) ne tient pas`);
+        const footingsSeuls = des <= 6 && r.ctx.volume.longRunKm === 0;
+        assert.equal(r.ctx.weekPlan.repriseArret, des > 6 || footingsSeuls ? "sans-qualite" : "une-qualite", `${ctxt} : précondition, l'état de la reprise transmis au plan est « ${r.ctx.weekPlan.repriseArret} »`);
+        if (footingsSeuls) assert.deepEqual(liste(dures(r.plan)), "", `${ctxt} : séance dure dans une semaine de reprise sans sortie longue`);
+        if (repris === 10) { footingsSeulsAu10++; if (r.ctx.volume.targetKm < 30) sousPlafondAu10++; }
+        if (fort) { unePermiseAu24++; if (dures(r.plan).length === 1 && /Seuil/i.test(dures(r.plan)[0].type)) seuilPoseAu24++; }
         assert.deepEqual(liste(dures(r.plan).filter((d) => d.date < permis)), "", `${ctxt} : séance dure avant le 14ᵉ jour de reprise (${permis})`);
         assert.ok(dures(r.plan).length <= 1, `${ctxt} : ${dures(r.plan).length} séances dures (${liste(dures(r.plan))})`);
         assert.deepEqual(liste(varies(r.plan).filter((d) => d.date < permis)), "", `${ctxt} : footing varié avant le premier jour permis (${permis})`);
         // La sortie longue ne dépasse pas 30 % de la semaine visée (ou n'est pas posée).
         const plafond = Math.max(4, Math.round(r.ctx.volume.targetKm * 0.3));
         assert.ok(r.ctx.volume.longRunKm <= plafond, `${ctxt} : sortie longue de ${r.ctx.volume.longRunKm} km dans une semaine visée à ${r.ctx.volume.targetKm} km`);
-        // Le motif le dit, sans pourcentage de volume (la règle de Daniels ne s'applique plus au-delà de 28 jours).
-        const attendu = repris < 0 ? /sans séance dure pendant les deux premières semaines de reprise/ : des > 6 ? /aucune séance dure pendant les deux premières semaines/ : /une seule séance de qualité par semaine au plus, courte/;
+        // Le motif dit l'intensité (et, depuis le plafond de volume, « N % au plus » quand le volume d'avant est connu).
+        const attendu = repris < 0 ? /sans séance dure pendant les deux premières semaines de reprise/ : des > 6 ? /aucune séance dure pendant les deux premières semaines/
+          // Au 10ᵉ jour, le plafond se dit avec ; au 24ᵉ jour d'une reprise à un jour sur deux, l'historique de dix
+          // semaines ne montre plus trois semaines d'avant l'arrêt : le volume d'avant est dit inconnu, sans plafond.
+          : footingsSeuls ? (repris === 10
+            ? /33 % au plus de ton volume d'avant l'arrêt cette semaine \(règle de Daniels\) ; footings seulement cette semaine : ta sortie longue serait plus courte que ta sortie habituelle, elle n'est pas posée, et la séance dure attend son retour$/
+            : / ; footings seulement cette semaine : ta sortie longue serait plus courte que ta sortie habituelle, elle n'est pas posée, et la séance dure attend son retour$/)
+          : /une seule séance de qualité par semaine au plus, courte/;
         assert.ok(r.ctx.readiness.reasons.some((m) => attendu.test(m)), `${ctxt} : le motif ne dit pas l'intensité (${r.ctx.readiness.reasons.join(" | ")})`);
         if (repris < 0) horsEchelleVu++;
       }
@@ -1183,6 +1206,15 @@ async function profilChaotique() {
     assert.ok(footingsAvantQualite >= 1, "précondition : aucun plan n'a trois footings avant le jour permis, les footings variés (2ᵉ et 3ᵉ) ne sont pas éprouvés");
     assert.ok(varieUneFoisPermise >= 1, "une fois la séance dure permise, les footings ne varient plus sur aucun départ : la garde vaut pour toute la reprise");
     assert.equal(horsEchelleVu, HORLOGES.length, "précondition : l'arrêt de 34 jours n'a pas tourné sur tous les départs");
+    // La règle « une séance au seuil par semaine à partir du 14ᵉ jour » reste tenue là où le plafond ne retire pas la
+    // sortie longue : l'état « une-qualite » est transmis sur tous les départs, et la séance est réellement posée.
+    // Au 10ᵉ jour, « footings seulement » sur TOUS les départs, semaines restées sous le plafond comprises (le coureur
+    // prudent n'est pas moins protégé que celui qui force) ; au 24ᵉ jour d'une reprise forte, la règle « une séance au
+    // seuil par semaine » reste transmise sur tous les départs, et la séance est réellement posée.
+    assert.equal(footingsSeulsAu10, HORLOGES.length, "précondition : le 10ᵉ jour de reprise n'a pas tourné sur tous les départs");
+    assert.equal(unePermiseAu24, HORLOGES.length, "précondition : le 24ᵉ jour d'une reprise forte n'a pas tourné sur tous les départs");
+    assert.equal(seuilPoseAu24, HORLOGES.length, `au 24ᵉ jour d'une reprise forte après 34 jours d'arrêt, la séance au seuil n'est posée que sur ${seuilPoseAu24} départ(s) sur ${HORLOGES.length}`);
+    console.log(`      (10ᵉ jour : ${sousPlafondAu10} départ(s) sur ${HORLOGES.length} sous le plafond de 30 km ; 24ᵉ jour, reprise forte : seuil posé sur ${seuilPoseAu24})`);
   });
   await testA("les jours déclarés changent d'une semaine à l'autre : le plan suit ceux de CETTE semaine", async () => {
     // Semaine A : lundi, mercredi, samedi, dimanche. Semaine B : mardi, jeudi, vendredi. Même historique.

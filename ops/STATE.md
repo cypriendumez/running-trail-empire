@@ -184,8 +184,9 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    borne « une par semaine au seuil » et ce décompte ont été jugés conformes par `@HeadCoach` le 17/11 (visa RENVOYÉ
    pour un autre motif, corrigé depuis) : au-delà de 28 jours d'arrêt, où la règle de volume ne s'applique plus,
    l'intensité reste bornée (rien de dur avant le 14ᵉ jour d'une reprise de quatre semaines) ; et après dix jours
-   d'arrêt, pas de séance dure avant 48 h. Reste ouvert : le volume au-delà de 28 jours (plafond ordinaire inchangé)
-   et le retour d'un coup de la sortie longue à la fin de la reprise.
+   d'arrêt, pas de séance dure avant 48 h. Le volume au-delà de 28 jours a depuis reçu son plafond (branche
+   `fix/volume-long-arret`, 19 et 20/11, en local). Reste ouvert : le retour d'un coup du volume et de la sortie longue
+   à la fin de la reprise.
    **Fusionné (PR #57, le 17/11) et EN LIGNE** : pacevo.fr sert `24637bab` le 19/11, qui contient #57 à #61.
    Restent ouverts les deux points ci-dessus.
 
