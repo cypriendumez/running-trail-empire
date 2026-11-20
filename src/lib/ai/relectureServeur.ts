@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AthleteContext } from "@/lib/ai/coachContext";
-import { COACH_SYSTEM } from "@/lib/ai/coachContext";
+import { systemeCoach } from "@/lib/ai/coachContext";
 import { generateContent, budget } from "@/lib/ai/gemini";
 import type { Lang } from "@/lib/i18n/base";
 import {
@@ -35,7 +35,7 @@ export async function relireSemaine(
     if (decision === "plafond") return { jour: o.from, empreinte: emp, appels: appelsDuJour, conseils: [] };
 
     const appel = generateContent(
-      [{ role: "user", parts: [{ text: inviteRelecture({ systeme: COACH_SYSTEM, contexte: o.ctx.text, jours, lang: o.lang, aujourdhui: o.from }) }] }],
+      [{ role: "user", parts: [{ text: inviteRelecture({ systeme: systemeCoach(o.ctx), contexte: o.ctx.text, jours, lang: o.lang, aujourdhui: o.from }) }] }],
       { temperature: 0.4, responseMimeType: "application/json", ...budget(256, 700) },
     );
     const delai = new Promise<null>((ok) => setTimeout(() => ok(null), DELAI_MAX_MS));

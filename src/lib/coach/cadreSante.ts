@@ -32,7 +32,9 @@ export type CadreSante = {
   niveau: NiveauCadre;
   /** Questionnaire d'aptitude coché, avis d'un médecin pas encore déclaré. */
   avisMedical: boolean;
-  marcheCourse: { etape: number; total: number } | null;
+  /** `bloquee` : la séance de son étape dure plus longtemps que la durée maximale du kiné — le plan n'en pose
+   *  alors AUCUNE (lib/coach/consignesPlan : la séance devient un repos, « demande-lui comment l'adapter »). */
+  marcheCourse: { etape: number; total: number; totalMin: number; bloquee: boolean } | null;
   /** Consignes du kinésithérapeute en vigueur. */
   kine: { sansIntensite: boolean; dureeMaxMin: number | null; seancesMaxSemaine: number | null; jusquAu: string } | null;
   /** Antécédent qui interdit l'effort maximal (cardiaque, covid long, grossesse). */
@@ -45,7 +47,7 @@ export type CadreSante = {
 
 export function cadreDeSante(e: {
   avisMedical: boolean;
-  marcheCourse: { etape: number; total: number } | null;
+  marcheCourse: { etape: number; total: number; totalMin: number } | null;
   consignes: ConsignesKine | null;
   conditions: unknown;
 }): CadreSante | null {
@@ -60,7 +62,10 @@ export function cadreDeSante(e: {
   return {
     niveau,
     avisMedical: e.avisMedical,
-    marcheCourse: e.marcheCourse ? { etape: e.marcheCourse.etape, total: e.marcheCourse.total } : null,
+    marcheCourse: e.marcheCourse ? {
+      etape: e.marcheCourse.etape, total: e.marcheCourse.total, totalMin: e.marcheCourse.totalMin,
+      bloquee: e.consignes?.dureeMaxMin != null && e.marcheCourse.totalMin > e.consignes.dureeMaxMin,
+    } : null,
     kine: e.consignes ? {
       sansIntensite: e.consignes.sansIntensite, dureeMaxMin: e.consignes.dureeMaxMin,
       seancesMaxSemaine: e.consignes.seancesMaxSemaine, jusquAu: e.consignes.jusquAu,
@@ -83,9 +88,12 @@ export const CADRE_FR = {
   sansSeance: "AUCUNE séance d'endurance — ni course, ni vélo, ni natation — tant qu'un médecin ne l'a pas vu (questionnaire d'aptitude) : du repos, de la mobilité, de la marche tranquille et un renforcement doux sans saut, rien d'autre.",
   sansIntensite: "AUCUNE intensité : de l'endurance facile seulement, à la conversation — ni séance de qualité, ni accélération, ni ligne droite, ni test.",
   seuilBas: "Au plus UNE séance par semaine SOUS le seuil, en blocs longs à allure tenue ; jamais au seuil réel, ni VMA, ni zone 5, ni sprint, ni test, ni effort maximal ; tout le reste en endurance facile.",
-  marcheCourse: (etape: number, total: number) => `Programme marche-course, étape ${etape} sur ${total} : ses séances sont des alternances de marche et de course, jamais un footing continu plus long.`,
+  // Les étapes 9 à 11 sont de la course continue (20, 25, 30 min) : « des alternances » était faux (@HeadCoach).
+  marcheCourse: (etape: number, total: number) => `Programme marche-course, étape ${etape} sur ${total} : ses séances sont celles de son étape, rien d'autre — jamais plus longues ni plus rapides.`,
+  marcheCourseBloquee: (etape: number, total: number, totalMin: number, max: number, fin: string) => `Programme marche-course, étape ${etape} sur ${total} : AUCUNE séance cette semaine — celle de son étape (${totalMin} min) dépasse la durée fixée par son kinésithérapeute (${max} min, jusqu'au ${jjmm(fin)}) ; il doit lui demander comment l'adapter.`,
   sensation: "À la sensation : aucune allure chiffrée, aucune cible de fréquence cardiaque — il doit pouvoir parler.",
-  dureeMax: (min: number, fin: string) => `Chaque sortie dure ${min} min au plus, sortie longue comprise (consignes de son kinésithérapeute jusqu'au ${jjmm(fin)}).`,
+  // Une course A ou B n'est pas raccourcie par le plan : elle reste, avec l'accord du kiné (lib/coach/consignesPlan).
+  dureeMax: (min: number, fin: string) => `Chaque sortie dure ${min} min au plus, sortie longue comprise — une course A ou B à part, avec son accord (consignes de son kinésithérapeute jusqu'au ${jjmm(fin)}).`,
   seancesMax: (n: number, fin: string) => `${n} sortie(s) de course au plus sur 7 jours glissants (consignes de son kinésithérapeute jusqu'au ${jjmm(fin)}).`,
   courseRetiree: "Course au calendrier : retirée de son plan tant qu'un médecin ne l'a pas vu.",
   courseMarcheCourse: "Course au calendrier : aucune n'est posée pendant le programme marche-course.",
@@ -99,7 +107,9 @@ export function lignesCadre(c: CadreSante): string[] {
   const l: string[] = [];
   l.push(c.niveau === "sansSeance" ? CADRE_FR.sansSeance : c.niveau === "sansIntensite" ? CADRE_FR.sansIntensite : CADRE_FR.seuilBas);
   if (c.niveau !== "sansSeance") {
-    if (c.marcheCourse) l.push(CADRE_FR.marcheCourse(c.marcheCourse.etape, c.marcheCourse.total));
+    if (c.marcheCourse) l.push(c.marcheCourse.bloquee && c.kine?.dureeMaxMin != null
+      ? CADRE_FR.marcheCourseBloquee(c.marcheCourse.etape, c.marcheCourse.total, c.marcheCourse.totalMin, c.kine.dureeMaxMin, c.kine.jusquAu)
+      : CADRE_FR.marcheCourse(c.marcheCourse.etape, c.marcheCourse.total));
     if (c.sensation) l.push(CADRE_FR.sensation);
     if (c.kine?.dureeMaxMin != null) l.push(CADRE_FR.dureeMax(c.kine.dureeMaxMin, c.kine.jusquAu));
     if (c.kine?.seancesMaxSemaine != null) l.push(CADRE_FR.seancesMax(c.kine.seancesMaxSemaine, c.kine.jusquAu));

@@ -92,7 +92,9 @@ export function weightCoachBlock(plan: WeightPlan, cadreSante = false): string {
     : cadreSante ? "" : `${rules.maxQualityPerWeek} séance(s) de qualité maximum/semaine, `;
   lines.push(`Contraintes chiffrées à RESPECTER : progression du volume ≤ +${rules.maxWeeklyProgressPct} %/semaine, ${qualitePoids}${rules.strengthPerWeek} séance(s) de renforcement/semaine (NON NÉGOCIABLE)${rules.lowImpactSharePct > 0 ? `, ~${rules.lowImpactSharePct} % du volume sans impact (vélo, elliptique, marche rapide, aqua-jogging)` : ""}.`);
 
-  if (rules.walkRunAdvised) {
+  // Sous cadre, le format des séances est celui que son plan pose (marche-course comprise) : « 1 min / 2 min »
+  // contredisait la séance de son étape (relecture du 20/11/2026).
+  if (rules.walkRunAdvised && !cadreSante) {
     lines.push("FORMAT D'ENTRÉE : alterne course et marche (par exemple 1 min de course / 2 min de marche, répété). Présente-le comme la MÉTHODE des coureurs qui durent, jamais comme une version dégradée de la course. Allonger les blocs courus vient tout seul, semaine après semaine.");
   }
 

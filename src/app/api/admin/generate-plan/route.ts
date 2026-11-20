@@ -177,6 +177,11 @@ export async function POST(req: NextRequest) {
   // Cerveau coach complet (tendances, forme de course, sommeil, cycle, palette de séances).
   const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], user_id).catch(() => null);
 
+  // Coureur sous cadre de santé (lib/coach/cadreSante, 20/11/2026) : cette invite prescrit de la qualité (« un
+  // objectif chrono EXIGE de la qualité », « ne propose JAMAIS une semaine quasi 100 % footing »). Pas de plan
+  // rédigé par l'IA : le plan du coach, qui applique le cadre, s'applique.
+  if (ctx?.cadreSante) return NextResponse.json({ error: "Coureur sous cadre de santé : pas de plan rédigé par l'IA, le plan du coach s'applique." }, { status: 409 });
+
   // Step 2 — Gemini: coaching plan
   const planRes = await fetch(GEMINI_URL("gemini-2.5-flash"), {
     method: "POST",

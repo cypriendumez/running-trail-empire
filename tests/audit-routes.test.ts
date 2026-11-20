@@ -882,7 +882,7 @@ test("les consignes santé du coach règlent la charge : ni soin, ni cause, ni e
   assert.ok(sante > 0 && cadre > sante && cadre < src.indexOf("${cond.rules.length", sante), "l'invite ne dit plus au coach qu'il règle la charge et oriente pour le reste");
   const santeCadre = src.indexOf("SANTÉ & ANTÉCÉDENTS\n");
   const chargeCadre = src.indexOf(CHARGE, santeCadre);
-  assert.ok(santeCadre > 0 && chargeCadre > santeCadre && chargeCadre < src.indexOf("${[...sante, ...blessures]", santeCadre), "le dossier d'un coureur sous cadre ne dit plus au coach qu'il règle la charge et oriente pour le reste");
+  assert.ok(santeCadre > 0 && chargeCadre > santeCadre && chargeCadre < src.indexOf("${precautions.map", santeCadre), "le dossier d'un coureur sous cadre ne dit plus au coach qu'il règle la charge et oriente pour le reste");
   // La consigne de sécurité sur la douleur (même invite) : de la charge et une orientation, pas de soin.
   const securite = src.slice(src.indexOf("⚠️ DOULEUR SIGNALÉE ("), src.indexOf("La santé prime sur le plan."));
   assert.ok(securite.length > 200 && /médecin/.test(securite), "la consigne de sécurité sur la douleur a disparu, ou n'oriente plus vers un médecin");
