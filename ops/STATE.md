@@ -63,6 +63,9 @@ la fusion de la PR #54 (#48, #49, #50, #52, #53, #55 et #56 en ligne ; #47 et #5
 des tests). Plus de retard de code.
 **Production au 19/11** (relevé en session) : pacevo.fr sert `24637bab`, la tête de `main` (#57 à #61 en ligne).
 Plus de retard de code.
+**Production au 23/11** (relevé en session, `pacevo.fr/version.json`) : pacevo.fr sert `5a536813`, la tête de `main`
+depuis le 20/11 (#63, antécédents qui interdisent l'effort maximal, et #64, plafond de volume après plus de 28 jours
+d'arrêt, en ligne). Plus de retard de code.
 
 ## Vague 1 : 12 agents sur 12 en place
 
@@ -184,9 +187,16 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    borne « une par semaine au seuil » et ce décompte ont été jugés conformes par `@HeadCoach` le 17/11 (visa RENVOYÉ
    pour un autre motif, corrigé depuis) : au-delà de 28 jours d'arrêt, où la règle de volume ne s'applique plus,
    l'intensité reste bornée (rien de dur avant le 14ᵉ jour d'une reprise de quatre semaines) ; et après dix jours
-   d'arrêt, pas de séance dure avant 48 h. Le volume au-delà de 28 jours a depuis reçu son plafond (branche
-   `fix/volume-long-arret`, 19 et 20/11, en local). Reste ouvert : le retour d'un coup du volume et de la sortie longue
-   à la fin de la reprise.
+   d'arrêt, pas de séance dure avant 48 h. Le volume au-delà de 28 jours a depuis reçu son plafond (PR #64, fusionnée et
+   EN LIGNE le 20/11, `5a536813`). Suites décidées par `@HeadCoach` le 23/11, écrites en session sur la branche
+   `fix/suites-long-arret` (en local, ni poussée ni en ligne) : la règle d'intensité dure jusqu'au début du dernier
+   palier de volume puis une marche de sortie de sept jours la suit, pas de test VMA pendant la reprise, la feuille
+   de route connaît la reprise, le plancher de deux footings vaut pour toute reprise et la semaine au plancher ne porte que des footings, dernier
+   palier à 80 %, et le plafond d'un petit volume se replie sur 12 km au lieu de disparaître. Suite demandée par
+   `@HeadCoach`, en PR à part et en tête : toute semaine de reprise trop petite pour porter le seuil ET un footing ne
+   porte que des footings, et un volume d'avant de 12 km ou moins est plafonné à lui-même. Détail
+   et limites : `ops/sparring/PROFILS.md`, profil 4. Reste ouvert : le retour d'un coup du volume à la fin de la
+   reprise (la sortie longue et les séances reviennent désormais par la marche de sortie après un long arrêt).
    **Fusionné (PR #57, le 17/11) et EN LIGNE** : pacevo.fr sert `24637bab` le 19/11, qui contient #57 à #61.
    Restent ouverts les deux points ci-dessus.
 
