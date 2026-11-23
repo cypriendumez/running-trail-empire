@@ -30,7 +30,11 @@ process.env.TZ = "UTC";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext, COACH_SYSTEM, COACH_SYSTEM_CADRE, systemeCoach, type AthleteContext } from "../src/lib/ai/coachContext";
-import { buildWeekPlan, consignesSurPlan, sansCourseCEcartee, type PlanDay } from "../src/lib/ai/autoPlan";
+import { buildWeekPlan, consignesSurPlan, sansCourseCEcartee, avecCourseCEcartee, planALaSensation, type PlanDay } from "../src/lib/ai/autoPlan";
+import { appliquerAjustement } from "../src/lib/coach/ajustementApplique";
+import { validerAjustement } from "../src/lib/ai/ajustement";
+import { composerPourquoi, LONGUEUR_MAX } from "../src/lib/ai/relectureSemaine";
+import { appliquerMalaise } from "../src/lib/coach/consignesPlan";
 import type { Lang } from "../src/lib/i18n/translations";
 import { cadreDeSante, lignesCadre, CADRE_FR, type CadreSante } from "../src/lib/coach/cadreSante";
 import { missionSeanceDuJour, inviteSeanceDuJour } from "../src/lib/ai/missionSeance";
@@ -190,6 +194,8 @@ function sansPermis(text: string, ctx: AthleteContext): string {
   let t = text;
   const permis = [
     ...lignesCadre(cadre).map((l) => `- ${l}`),
+    // L'interdiction la plus stricte du mode perte de poids (obésité de classe 2), gardée sous cadre : elle INTERDIT.
+    "AUCUNE séance de qualité pour l'instant",
     // Au seuil bas seulement : la séance sous le seuil que le plan pose (budget de qualité), ou son absence.
     ...(cadre.niveau === "seuilBas" ? [
       "• Au plus une séance sous le seuil cette semaine, en blocs longs, à la sensation.",
@@ -251,6 +257,11 @@ function verifier(ctx: AthleteContext, p: ReturnType<typeof buildWeekPlan>, cas:
     assert.ok(dispo, `${quand} : les disponibilités manquent`);
     assert.equal(!!dispo![2], !cadre!.marcheCourse, `${quand} : « une course au calendrier à part » ${cadre!.marcheCourse ? "en marche-course, qui n'en pose aucune" : "manque"}`);
     const n = Number(dispo![1]);
+    // La valeur EXACTE (relecteur H, 4e tour) : celle du plan — ses jours par semaine, bornés par le kiné ; en
+    // marche-course, les séances de son étape (2 ou 3, `construireSemaine`), bornées par le kiné.
+    const maxKine = cadre!.kine?.seancesMaxSemaine ?? Infinity;
+    const attendu = cadre!.marcheCourse ? Math.min(Math.max(2, Math.min(3, ctx.availability.daysPerWeek || 3)), maxKine) : Math.min(ctx.availability.daysPerWeek, maxKine);
+    assert.equal(n, attendu, `${quand} : « au plus ${n} » sorties au dossier, ${attendu} au plan`);
     assert.ok(aPied.length <= n, `${quand} : le plan pose ${aPied.length} sorties à pied, le dossier « au plus ${n} »`);
     if (cadre!.kine?.seancesMaxSemaine != null) assert.ok(n <= cadre!.kine.seancesMaxSemaine, `${quand} : « au plus ${n} » au-delà des ${cadre!.kine.seancesMaxSemaine} sorties du kiné`);
   }
@@ -263,6 +274,7 @@ function verifier(ctx: AthleteContext, p: ReturnType<typeof buildWeekPlan>, cas:
       assert.ok(!text.includes("jamais deux jours de suite"), `${quand} : « jamais deux jours de suite », que le plan ne tient pas quand seuls des jours voisins sont libres`);
       const f = text.match(/au plus (\d+) fois sur 7 jours/);
       assert.ok(f, `${quand} : la fréquence de la marche-course manque`);
+      assert.equal(Number(f![1]), Math.min(Math.max(2, Math.min(3, ctx.availability.daysPerWeek || 3)), cadre!.kine?.seancesMaxSemaine ?? Infinity), `${quand} : « au plus ${f![1]} fois » au dossier, pas ce que pose son plan`);
       assert.ok(mcJours.length <= Number(f![1]), `${quand} : le plan pose ${mcJours.length} marches-courses, le dossier « au plus ${f![1]} »`);
       if (cadre!.kine?.seancesMaxSemaine != null) assert.ok(Number(f![1]) <= cadre!.kine.seancesMaxSemaine, `${quand} : la fréquence de marche-course dépasse le kiné`);
     }
@@ -272,7 +284,7 @@ function verifier(ctx: AthleteContext, p: ReturnType<typeof buildWeekPlan>, cas:
   const courseJour0 = jour0.some((d) => d.type === "Course");
   const fraicheur = cadre!.niveau === "sansSeance" ? "— Aucune séance d'endurance n'est prévue tant qu'un médecin ne l'a pas vu"
     : cadre!.marcheCourse?.bloquee ? "— Aucune séance de marche-course n'est prévue cette semaine (durée fixée par son kinésithérapeute)"
-    : ctx.malaiseApresEffort ? "— Aujourd'hui, repos : il s'est senti nettement plus mal après sa dernière séance (bilan du matin). Si une course tombe aujourd'hui, mieux vaut qu'il ne prenne pas le départ — la décision lui appartient ; qu'il en parle à son médecin avant la suivante"
+    : ctx.malaiseApresEffort ? "— Aujourd'hui, repos : il s'est senti nettement plus mal après sa dernière séance (bilan du matin). Si une course tombe aujourd'hui, mieux vaut qu'il ne prenne pas le départ — la décision lui appartient ; qu'il en parle à son médecin avant sa prochaine course, et sans attendre si cela se répète."
     : {
         rouge: cadre!.marcheCourse ? "🔴 ROUGE — Repos ou marche tranquille aujourd'hui" : "🔴 ROUGE — Repos, ou un footing très facile et court",
         orange: cadre!.marcheCourse ? "🟠 ORANGE — Séance de son étape raccourcie" : "🟠 ORANGE — Séance allégée : coupe son volume d'environ un tiers",
@@ -285,7 +297,13 @@ function verifier(ctx: AthleteContext, p: ReturnType<typeof buildWeekPlan>, cas:
   if (ctx.malaiseApresEffort && cadre!.niveau !== "sansSeance") {
     if (courseJour0) {
       assert.deepEqual(jour0.map((d) => d.type).filter((t) => t !== "Course"), [], `${quand} : malaise, et une séance s'ajoute à la course du jour`);
-      for (const d of jour0) for (const l of LANGUES) assert.ok(texteDe(d, l).why.includes(MALAISE_T[l].course), `${quand} : course du jour sans le conseil du malaise (${l})`);
+      for (const d of jour0) for (const l of LANGUES) {
+        const why = texteDe(d, l).why, conseil = MALAISE_T[l].course.trim();
+        assert.ok(why.startsWith(conseil), `${quand} : le conseil du malaise n'est pas EN TÊTE du « pourquoi » de la course (${l}) : « ${why.slice(0, 80)} »`);
+        // Ce que le coach ENREGISTRE : la coupe à 640, et le conseil Premium le plus long logé dans le « pourquoi ».
+        for (const enregistre of [why.slice(0, 640), composerPourquoi(why, "x".repeat(LONGUEUR_MAX)).slice(0, 640)])
+          assert.ok(enregistre.includes(conseil), `${quand} : le conseil du malaise disparaît du « pourquoi » enregistré (${l}, ${why.length} caractères)`);
+      }
     } else {
       assert.deepEqual(jour0.map((d) => d.type), ["Repos"], `${quand} : malaise, et le plan pose ${jour0.map((d) => d.type).join(", ")} aujourd'hui`);
       for (const l of LANGUES) assert.ok(texteDe(jour0[0], l).why.includes(MALAISE_T[l].why), `${quand} : le repos du jour n'est pas celui du malaise (${l})`);
@@ -302,6 +320,7 @@ function verifier(ctx: AthleteContext, p: ReturnType<typeof buildWeekPlan>, cas:
     assert.equal(vus, null, `${quand} : le dossier d'un coureur qui attend un médecin parle encore de courir : ${vus?.join(", ")}`);
   }
   if (cadre!.marcheCourse) assert.ok(!text.includes("au calendrier cette semaine"), `${quand} : une course de la semaine est annoncée pendant la marche-course`);
+  if (cadre!.marcheCourse) assert.ok(!text.includes("• Mode perte de poids :"), `${quand} : le mode poids (vélo, alternances 2/1) est annoncé à une marche-course, dont le plan n'en pose pas`);
   if (cadre!.kine?.dureeMaxMin != null && cadre!.niveau !== "sansSeance" && !cadre!.marcheCourse?.bloquee)
     assert.ok(text.includes(`${cadre!.kine.dureeMaxMin} min au plus par sortie`), `${quand} : la structure ne dit pas la durée maximale`);
   if (cadre!.sensation && cadre!.niveau === "seuilBas" && ctx.weekPlan.quality.length)
@@ -458,6 +477,8 @@ async function main() {
         // Une B aujourd'hui, la A trois jours plus tard ; une C aujourd'hui écartée par la A deux jours plus tard.
         ["covid long + course B aujourd'hui, A dans 3 jours", sit(["covid_long"], [bilan, objectif(10, k + 3), planifiee("Corrida du port", k, 10, "B")])],
         ["covid long + course C aujourd'hui écartée (A dans 2 jours)", sit(["covid_long"], [bilan, objectif(10, k + 2), planifiee("Foulées du canal", k, 10, "C")])],
+        // Le « pourquoi » le plus long d'une course : kiné, feu rouge — le conseil doit survivre à l'enregistrement.
+        ["covid long + kiné « 40 min au plus » + douleur + course A aujourd'hui", sit(["covid_long"], [bilan, douleur, kine({ dureeMaxMin: 40 }), objectif(10, k)])],
       ];
       for (const [nom, s] of variantes) {
         const ctx = await contexte({ ...s, seances: [sortieHier, ...FOOTINGS] }, k);
@@ -475,6 +496,21 @@ async function main() {
     }
     assert.ok(course >= 7 && repos > 0, `précondition : jours de course (${course}, au moins un par jour de départ) et de repos (${repos}) éprouvés tous deux`);
     assert.ok(ecartee > 0, "précondition : aucune course C écartée le jour même");
+    // L'avis médical attendu PRIME sur le malaise : le plan ne pose aucune séance, et son « pourquoi » est le sien.
+    for (let k = 0; k <= 6; k++) {
+      const jour = ilYa(-k);
+      const bilan = { user_id: "u", type: "bilan_matin", created_at: `${jour}T06:00:00Z`, data: { date: jour, fatigue: 5, jambes: 4, stress: 1 } };
+      const ctx = await contexte({ ...sit(["covid_long"], [bilan, aptitude]), seances: [footing(-k + 1), ...FOOTINGS] }, k);
+      assert.equal(ctx.malaiseApresEffort, true, `avis médical + malaise · J+${k} : précondition`);
+      assert.equal(ctx.cadreSante?.niveau, "sansSeance");
+      for (const d of plan(ctx, k).filter((x) => x.date === jour)) assert.ok(!d.why.includes(MALAISE_T.fr.why), `avis médical + malaise · J+${k} : le repos du malaise remplace celui de l'avis médical`);
+    }
+    // Un jour doublé (matin + soir) : UN repos, sans créneau ; une course et un footing du soir : la course seule.
+    const jourDouble = (type: string, moment: "matin" | "soir"): PlanDay => ({ date: "2026-12-01", type, title: type, detail: "", why: "", tags: [], confirmed: true, moment });
+    const doubleRepos = appliquerMalaise([jourDouble("Endurance", "matin"), jourDouble("Endurance", "soir")], "2026-12-01");
+    assert.deepEqual(doubleRepos.map((d) => [d.type, d.moment]), [["Repos", undefined]], "un jour doublé garde deux entrées ou son créneau sous le malaise");
+    const doubleCourse = appliquerMalaise([jourDouble("Course", "matin"), jourDouble("Endurance", "soir")], "2026-12-01");
+    assert.deepEqual(doubleCourse.map((d) => d.type), ["Course"], "le footing du soir reste à côté de la course d'un jour de malaise");
     // Le conseil du jour de course (décision de Cyprien, 20/11/2026) : ne pas prendre le départ, la décision au coureur,
     // le médecin avant la course suivante — dans les cinq langues, et plus « si tu prends le départ, cours sans forcer ».
     const conseil: Record<Lang, RegExp> = {
@@ -490,6 +526,57 @@ async function main() {
     }
   });
 
+  await test("LA SECONDE PASSE DU COACH avec de VRAIS ajustements (alléger, décaler, échanger) sur chaque jour : « alléger » ne touche pas une marche-course, et la semaine reste dans le cadre", async () => {
+    // Relecteur G, 4e tour : « alléger » une marche-course la remplaçait par un footing continu de 50 min.
+    const refus = validerAjustement({ date: "2026-12-01", action: "alleger", texte: "Tes jambes sont lourdes depuis deux jours. Allège la séance d'aujourd'hui pour récupérer avant la suivante." }, { qBudget: 0, typesQualite: [], dates: ["2026-12-01"], raisons: [], types: { "2026-12-01": "Marche/course" } });
+    assert.equal(refus.ok ? null : refus.motif, "rien à alléger ce jour-là", "la proposition d'alléger une marche-course est acceptée");
+    let mcAllegees = 0, appliques = 0;
+    const cas = EXEMPTES.filter((c) => c.niveau !== "sansSeance");
+    for (const c of cas) for (let k = 0; k <= 6; k++) {
+      const ctx = await contexte(fusion(SCENARIOS[0][1], c.s), k);
+      const p = plan(ctx, k), jour = ilYa(-k), t = new Date(`${jour}T12:00:00Z`);
+      const o = { from: jour, qBudget: ctx.weekPlan.qBudget, joursCourables: ctx.availability.days.filter((d) => !ctx.skippedWeekdays.includes(d)), warm: ctx.warmCool.warm, cool: ctx.warmCool.cool };
+      const dates = [...new Set(p.map((d) => d.date))];
+      const typesDe = (dt: string) => Object.fromEntries([[dt, p.find((d) => d.date === dt)?.type ?? ""]]);
+      for (const [i, dt] of dates.entries()) for (const a of [
+        { date: dt, action: "alleger" as const, types: typesDe(dt), appliqueLe: `${jour}T08:00:00Z` },
+        ...(dates[i + 1] ? [{ date: dt, action: "decaler" as const, vers: dates[i + 1], types: { ...typesDe(dt), ...typesDe(dates[i + 1]) }, appliqueLe: `${jour}T08:00:00Z` },
+          { date: dt, action: "echanger" as const, vers: dates[i + 1], types: { ...typesDe(dt), ...typesDe(dates[i + 1]) }, appliqueLe: `${jour}T08:00:00Z` }] : []),
+      ]) {
+        const r = appliquerAjustement(p, a, o);
+        if (a.action === "alleger" && /^marche/i.test(a.types[dt])) { mcAllegees++; assert.equal(r.ok, false, `${c.nom} · J+${k} · ${dt} : « alléger » change la marche-course en footing continu`); }
+        if (!r.ok) continue;
+        appliques++;
+        const w = planALaSensation(ctx, avecCourseCEcartee(ctx, consignesSurPlan(ctx, r.week, t), t));
+        const quand = `${c.nom} · J+${k} · ${a.action} ${dt}`;
+        const courus = w.filter((d) => !NON_COURUS.has(d.type));
+        if (c.niveau === "sansIntensite") assert.deepEqual(w.filter((d) => INTENSES.has(d.type)).map((d) => d.type), [], `${quand} : une séance intense`);
+        if (ctx.cadreSante!.marcheCourse) assert.deepEqual(courus.filter((d) => d.type !== "Marche/course").map((d) => `${d.type} « ${d.detail.slice(0, 60)} »`), [], `${quand} : une sortie hors de son étape de marche-course`);
+        if (ctx.cadreSante!.kine?.dureeMaxMin != null) for (const d of courus.filter((x) => x.type !== "Course" && x.type !== "Vélo")) {
+          const min = dureeSeance(d, ctx.allureCalcul ?? ctx.easyPace ?? null);
+          assert.ok(min != null && min <= ctx.cadreSante!.kine.dureeMaxMin, `${quand} : ${d.date} ${d.type} dure ${min} min, au-delà du kiné`);
+        }
+        if (ctx.pilotageSensation) for (const d of w) for (const l of LANGUES) assert.doesNotMatch(texteDe(d, l).detail, /\b(?:FC|HR|HF)\b|FRÉQUENCE CARDIAQUE|HEART RATE|HERZFREQUENZ|\d{1,2}['’]\d{2}/, `${quand} : FC ou allure à la sensation (${l})`);
+      }
+    }
+    assert.ok(mcAllegees > 0 && appliques > 50, `précondition : ${mcAllegees} marches-courses à alléger, ${appliques} ajustements appliqués`);
+  });
+
+  await test("marche-course avec un marathon et en obésité de classe 2 : ni avertissement de distance, ni mode poids — son plan ne pose ni sortie longue, ni course, ni vélo, ni alternance 2/1 ; le témoin covid long les a", async () => {
+    // Relecteur H, 4e tour : ces deux filtres n'étaient éprouvés par aucune situation.
+    const lourd = { weight_kg: 110, weight_mode_enabled: true };
+    const temoin = await contexte(sit(["covid_long"], [objectif(42.2, 30)], lourd));
+    assert.ok(temoin.objectiveWarnings.some((w) => /DISTANCE/.test(w)), "précondition : le témoin covid long n'a pas d'avertissement de distance pour un marathon à J+30");
+    assert.match(temoin.text, /• Mode perte de poids :/, "précondition : le témoin covid long en obésité de classe 2 n'a pas la ligne du mode poids");
+    for (const k of [0, 3, 6]) {
+      const ctx = await contexte(sit(["covid_long"], [objectif(42.2, 30 + k)], { ...lourd, peut_courir_30min: false }), k);
+      assert.ok(ctx.cadreSante?.marcheCourse, "précondition : pas de marche-course");
+      assert.deepEqual(ctx.objectiveWarnings.filter((w) => /DISTANCE/.test(w)), [], `J+${k} : avertissement de distance à une marche-course`);
+      assert.ok(!ctx.text.includes("• Mode perte de poids :"), `J+${k} : le mode poids est annoncé à une marche-course`);
+      verifier(ctx, plan(ctx, k), { nom: "marche-course lourde", s: {}, niveau: "sansIntensite" }, `marche-course, marathon, 110 kg · J+${k}`, ilYa(-k));
+    }
+  });
+
   await test("avertissements d'objectif (affichés au coureur) : ni verdict de chrono ni « augmente le volume » sous cadre ; le témoin les a", async () => {
     const s: Situation = { notifications: [objectif(10, 30)] };
     const temoin = await contexte(s);
@@ -500,6 +587,8 @@ async function main() {
       const ctx = await contexte(fusion(s, cas.s));
       const vus = ctx.objectiveWarnings.filter((w) => /CHRONO|PRÉPARATION INSUFFISANTE|VMA/.test(w));
       assert.deepEqual(vus, [], `${cas.nom} : ${vus.join(" | ")}`);
+      if (ctx.cadreSante?.marcheCourse || ctx.cadreSante?.niveau === "sansSeance")
+        assert.ok(!ctx.objectiveWarnings.some((w) => /DISTANCE/.test(w)), `${cas.nom} : un avertissement de distance alors que son plan ne pose ni sortie longue ni course`);
       if (ctx.objectiveWarnings.some((w) => /⚠️ DISTANCE : sous son cadre de santé, sa préparation ne l'amènera qu'à une sortie longue de ~\d+ km, quand une course de 10,0 km en demande ~\d+\.$/.test(w))) distance++;
     }
     assert.ok(distance > 0, "sous cadre, la distance hors de portée ne se dit plus du tout");
@@ -567,6 +656,9 @@ async function main() {
   });
 
   await test("l'enveloppe du dossier sous cadre : le système du coach, l'invite de la séance du jour, la relecture Premium et les routes admin", () => {
+    // Un jour de malaise, la course du jour n'est pas relue par le coach avancé (@HeadCoach, 4e tour) : son conseil
+    // (« COMMENT réussir CETTE séance ») contredirait celui de ne pas prendre le départ.
+    assert.match(codeNu("src/lib/ai/relectureServeur.ts"), /const jours = joursARelire\(o\.week, o\.from\)\.filter\(\(d\) => !\(o\.ctx\.malaiseApresEffort && d\.date === o\.from\)\);/, "la relecture Premium relit la course d'un jour de malaise");
     // Le système ordinaire, mot pour mot ; celui du cadre, sans un mot d'intensité.
     assert.equal(systemeCoach({ cadreSante: null }), COACH_SYSTEM);
     assert.match(COACH_SYSTEM, /ose la qualité/, "précondition : le système ordinaire pousse à la qualité");

@@ -359,14 +359,19 @@ export const LANGUES_CONSIGNES = LANGUES;
  * décisions de Cyprien du 20/11/2026), sur le plan FINI — après les consignes du kiné, qui réécrivaient le jour 0 en
  * footing quand la règle vivait dans la construction de la semaine (@HeadCoach, 3e tour). Le jour 0 devient UN repos
  * (son « pourquoi » oriente vers le médecin) ; une course posée ce jour-là reste (le départ appartient au coureur)
- * et son « pourquoi » conseille de ne pas le prendre. Idempotent.
+ * et son « pourquoi » conseille de ne pas le prendre — EN TÊTE : l'écriture coupe le « pourquoi » à 640 caractères
+ * et la relecture Premium en garde le début pour y loger son conseil ; posé en fin, il disparaissait (@HeadCoach,
+ * 4e tour, comme le message de la course C écartée le 16/11/2026). Idempotent.
  */
 export function appliquerMalaise(plan: readonly PlanDay[], jour: string): PlanDay[] {
   const ceJour = plan.filter((d) => d.date === jour);
   if (!ceJour.length) return [...plan];
   const courses = ceJour.filter((d) => d.type === "Course");
   const remplace: PlanDay[] = courses.length
-    ? courses.map((d) => reecrire(d, "Course", (l) => { const t = texteDe(d, l); return { ...t, why: t.why.includes(MALAISE_T[l].course) ? t.why : t.why + MALAISE_T[l].course }; }))
+    ? courses.map((d) => reecrire(d, "Course", (l) => {
+        const t = texteDe(d, l), conseil = MALAISE_T[l].course.trim();
+        return { ...t, why: t.why.startsWith(conseil) ? t.why : `${conseil} ${t.why.split(conseil).join("").trim()}`.trim() };
+      }))
     // UNE seule entrée (un jour doublé perd son créneau : il n'y a plus qu'un repos).
     : [reecrire({ ...ceJour[0], moment: undefined }, "Repos", (l) => ({ title: PLAN_T[l].reposTitre, detail: PLAN_T[l].reposFinalDetail, why: MALAISE_T[l].why, tags: [PLAN_T[l].tags["Repos"]] }))];
   const i = plan.findIndex((d) => d.date === jour);

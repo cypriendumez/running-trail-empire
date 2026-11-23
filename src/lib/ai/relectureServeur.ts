@@ -21,7 +21,9 @@ export async function relireSemaine(
   o: { userId: string; ctx: AthleteContext; week: readonly JourPlan[]; from: string; lang: Lang },
 ): Promise<EtatRelecture | null> {
   try {
-    const jours = joursARelire(o.week, o.from);
+    // Un jour de malaise (covid long), la course du jour n'est pas relue : « COMMENT réussir CETTE séance » contredirait
+    // le conseil de ne pas prendre le départ (@HeadCoach, 23/11/2026).
+    const jours = joursARelire(o.week, o.from).filter((d) => !(o.ctx.malaiseApresEffort && d.date === o.from));
     if (!jours.length) return null;
     const emp = empreinte(jours, o.lang);
     const { data: st, error } = await admin.from("notifications").select("data")

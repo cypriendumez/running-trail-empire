@@ -22,7 +22,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import type { PlanDay, PlanDayText } from "@/lib/ai/autoPlan";
 import { PLAN_T } from "@/lib/ai/planI18n";
-import { EST_QUALITE } from "@/lib/ai/ajustement";
+import { EST_QUALITE, NON_ALLEGEABLE } from "@/lib/ai/ajustement";
 import type { Lang } from "@/lib/i18n/translations";
 
 /** Type de la ligne `notifications` qui garde les ajustements appliqués de l'athlète. */
@@ -58,8 +58,6 @@ const NOTE: Record<Lang, { deplacee: string; allegee: string }> = {
 
 /** Un jour de repos (le seul où l'on peut DÉCALER une séance). */
 export const EST_REPOS = /^repos/i;
-/** Ce qui ne s'allège pas : déjà du repos, déjà de la récupération, du renfo ou du vélo. */
-const NON_ALLEGEABLE = /^(repos|r[ée]cup|renfo|v[ée]lo)/i;
 /** Les jours durs : deux d'affilée sont ce que le moteur s'interdit, l'ajustement aussi. */
 const EST_DUR = (type: string) => EST_QUALITE.test(type) || /sortie longue|^course$/i.test(type);
 

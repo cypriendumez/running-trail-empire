@@ -279,6 +279,8 @@ export type AthleteContext = {
   hardGapHours: number;
   /** Allure d'endurance facile (~70 % VMA), en min/km — null si VMA inconnue. */
   easyPace: string | null;
+  /** L'allure facile des CALCULS (durées, coûts) : `easyPace`, ou à la sensation celle qu'on n'affiche pas. Jamais écrite. */
+  allureCalcul?: string | null;
   /** Jours écoulés depuis la dernière séance DURE réellement effectuée (0 = aujourd'hui). */
   lastHardDaysAgo: number | null;
   /** Les jours de qualité des sept derniers jours — courus, ou prescrits et MANQUÉS. Le plan
@@ -1268,9 +1270,14 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     easyPaceMesure != null ? "mesurée" : vma ? "modèle" : null;
   // Le plafond d'un test de lactate (seuil 1) s'applique UNE fois, à la fin (`easyPaceCorrige`) :
   // posé ici, il faussait la relecture, qui « corrigeait » vers plus vite un écart fabriqué.
-  const easyPaceLisible = sensation ? null : easyPaceMesure != null
+  // À la sensation, l'allure n'est ni affichée ni prescrite — mais elle sert encore aux CALCULS (durée maximale du
+  // kiné, coût d'une séance, plancher des footings) : `allureCalcul`, jamais écrite (@HeadCoach, 23/11/2026 : masquer
+  // n'est pas effacer ; les sorties d'une grossesse sous « 40 min au plus » tombaient à 15 min).
+  const easyPaceSansMasque = easyPaceMesure != null
     ? `${Math.floor(easyPaceMesure / 60)}'${String(Math.round(easyPaceMesure % 60)).padStart(2, "0")}`
-    : vma ? paceAt(70) : null;
+    // Hors sensation, `paceAt(70)` tel quel ; à la sensation (où `paceAt` rend « ? »), le même calcul.
+    : vma ? (sensation ? (() => { const s = 3600 / (vma * 70 / 100); return `${Math.floor(s / 60)}'${String(Math.round(s % 60)).padStart(2, "0")}`; })() : paceAt(70)) : null;
+  const easyPaceLisible = sensation ? null : easyPaceSansMasque;
   /**
    * Allure d'une RÉPÉTITION, plafonnée par ce que l'athlète a réellement produit.
    *
@@ -2570,12 +2577,21 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // ⚠️ LA RELECTURE NE REPASSE PAS AU-DESSUS DU SEUIL 1 MESURÉ. Elle recale la cible sur ce
   // que l'athlète court vraiment : un coureur qui fait ses footings à 4'10 la tirait vers
   // 4'20 quand son test de lactate place le seuil aérobie à 4'20 (relevé par le test).
+  const corrigerFacile = (base: string | null) => {
+    const relue = relecture?.correctionSec ? corrigerAllure(base, relecture.correctionSec) ?? base : base;
+    if (!lactate || !relue) return relue;
+    const m = relue.match(/(\d+)['’](\d{2})/);
+    const sec = m ? Number(m[1]) * 60 + Number(m[2]) : null;
+    return sec != null && sec < allureFacileMaxSec(lactate) ? fmtAllure(allureFacileMaxSec(lactate)) : relue;
+  };
   const easyPaceCorrige = (() => {
     if (!lactate || !easyPaceRelu) return easyPaceRelu;
     const m = easyPaceRelu.match(/(\d+)['’](\d{2})/);
     const sec = m ? Number(m[1]) * 60 + Number(m[2]) : null;
     return sec != null && sec < allureFacileMaxSec(lactate) ? fmtAllure(allureFacileMaxSec(lactate)) : easyPaceRelu;
   })();
+  /** L'allure des CALCULS : celle qu'on affiche, ou, à la sensation, celle qu'on aurait affichée (jamais écrite). */
+  const allureCalcul = sensation ? corrigerFacile(easyPaceSansMasque) : easyPaceCorrige;
 
   const objectiveWarnings: string[] = (() => {
     const out: string[] = [];
@@ -2710,7 +2726,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   const longRunEase = readyLevel === "rouge" ? 0.6 : readyLevel === "orange" ? 0.8 : motifsAllegement ? 0.85 : 1;
   // Une durée maximale donnée par le kinésithérapeute plafonne la sortie longue (et donc les
   // footings, bornés à 85 % d'elle) : la distance que tient cette durée à l'allure facile.
-  const kmConsigne = consignes?.dureeMaxMin != null ? kmPourDuree(consignes.dureeMaxMin, easyPaceCorrige) : null;
+  const kmConsigne = consignes?.dureeMaxMin != null ? kmPourDuree(consignes.dureeMaxMin, allureCalcul) : null;
   const longRunKmBrut = Math.max(4, Math.round(longRunPlanned * longRunEase));
   const longRunKmBorne = kmConsigne != null ? Math.min(longRunKmBrut, kmConsigne) : longRunKmBrut;
   // ⚠️ PENDANT UNE REPRISE, UNE « SORTIE LONGUE » PLUS COURTE QUE LA SORTIE HABITUELLE N'EN EST
@@ -2862,7 +2878,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       // Le même conseil que le plan, qu'une course tombe aujourd'hui ou non (décision de Cyprien, 20/11/2026) : rien
       // n'est affirmé de ce que le plan fait de la course.
       : malaiseApresEffort
-      ? "Aujourd'hui, repos : il s'est senti nettement plus mal après sa dernière séance (bilan du matin). Si une course tombe aujourd'hui, mieux vaut qu'il ne prenne pas le départ — la décision lui appartient ; qu'il en parle à son médecin avant la suivante, et si cela se répète."
+      ? "Aujourd'hui, repos : il s'est senti nettement plus mal après sa dernière séance (bilan du matin). Si une course tombe aujourd'hui, mieux vaut qu'il ne prenne pas le départ — la décision lui appartient ; qu'il en parle à son médecin avant sa prochaine course, et sans attendre si cela se répète."
       : {
           rouge: mc ? "Repos ou marche tranquille aujourd'hui — dis-lui pourquoi, sans dramatiser."
             : "Repos, ou un footing très facile et court, aujourd'hui — dis-lui pourquoi, sans dramatiser.",
@@ -3234,6 +3250,7 @@ ${catalog}`;
     },
     hardGapHours: hardGapH,
     easyPace: easyPaceCorrige,
+    allureCalcul,
     lastHardDaysAgo,
     qualiteRecente,
     volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm, longRunPlanned, longRunEased, ...(longRunReserveKm > 0 ? { longRunReserveKm } : {}) },

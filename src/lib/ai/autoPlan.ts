@@ -227,7 +227,7 @@ export function consignesSurPlan(ctx: AthleteContext, plan: PlanDay[], today = n
   const cs = ctx.courseSecondaire ?? null;
   const objectifIdx = ctx.daysToRace != null && ctx.daysToRace >= 0 && ctx.daysToRace <= 6 ? ctx.daysToRace : -1;
   const commun = {
-    allureFacile: ctx.easyPace ?? null,
+    allureFacile: ctx.allureCalcul ?? ctx.easyPace ?? null,
     // Celles d'aujourd'hui comprises : une sortie non prévue courue ce matin compte.
     sortiesRecentes: (ctx.sortiesRecentes ?? []).filter((d) => d <= iso(debut)),
     courseC: cs?.priorite === "C" && cs.idx !== objectifIdx ? iso(addDays(debut, cs.idx)) : null,
@@ -766,7 +766,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // consommait plus de la moitié, et le plan dépassait sa cible de 45 %. On le calcule
   // sur SON allure : échauffement + retour au calme + ~25 min de corps.
   const QUALITY_KM = (() => {
-    const p2 = ctx.easyPace?.match(/(\d+)['’](\d{2})/);
+    const p2 = (ctx.allureCalcul ?? ctx.easyPace)?.match(/(\d+)['’](\d{2})/);
     if (!p2) return 11;
     const secPerKm = Number(p2[1]) * 60 + Number(p2[2]);
     const minutes = warm + cool + 25;
@@ -878,7 +878,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   //  trop courte »). Le plancher se dit donc en TEMPS : 25 min à l'allure facile, 4 km
   //  au moins, et 4 km tout court quand l'allure est inconnue.
   const kmMinFooting = (() => {
-    const m = ctx.easyPace?.match(/(\d+)['’:](\d{1,2})/);
+    const m = (ctx.allureCalcul ?? ctx.easyPace)?.match(/(\d+)['’:](\d{1,2})/);
     return m ? Math.max(4, Math.ceil((25 * 60) / (Number(m[1]) * 60 + Number(m[2])))) : 4;
   })();
   const affordable = Math.max(0, Math.floor(remaining / kmMinFooting));
@@ -1194,11 +1194,11 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
       (`${d.tags.join(" ")} ${d.detail}`.match(/(\d+(?:[.,]\d+)?)\s*km/)?.[1] ?? "").replace(",", "."));
     const dureeDe = (d: PlanDay): string => {
       const km = kmDe(d);
-      return (Number.isFinite(km) && km > 0 ? durationFor(km, ctx.easyPace) : null) ?? "40 min";
+      return (Number.isFinite(km) && km > 0 ? durationFor(km, ctx.allureCalcul ?? ctx.easyPace) : null) ?? "40 min";
     };
     const minutesDe = (d: PlanDay): number | null => {
       const km = kmDe(d);
-      const m = ctx.easyPace?.match(/(\d+)['’:](\d{1,2})/);
+      const m = (ctx.allureCalcul ?? ctx.easyPace)?.match(/(\d+)['’:](\d{1,2})/);
       return Number.isFinite(km) && km > 0 && m ? Math.round((km * (Number(m[1]) * 60 + Number(m[2]))) / 60) : null;
     };
 

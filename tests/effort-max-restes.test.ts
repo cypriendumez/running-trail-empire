@@ -19,6 +19,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan, consignesSurPlan, planALaSensation } from "../src/lib/ai/autoPlan";
+import { dureeSeance } from "../src/lib/coach/consignesPlan";
+import { PLAN_T } from "../src/lib/ai/planI18n";
 import { packJourJ } from "../src/lib/coach/jourJ";
 import { JOURJ_T } from "../src/lib/coach/jourJI18n";
 import { aLaSensation } from "../src/lib/coach/sensation";
@@ -195,7 +197,15 @@ async function main() {
 
   await test("grossesse : SEPT jours de départ, cinq langues — ni fréquence cardiaque, ni « fie-toi à la FC », ni étiquette de zone, ni « calée sur ta VMA », même après la seconde passe du coach ; le témoin cardiaque en a", async () => {
     // Ce que la sensation retire, dans les cinq langues (PLAN_T.recupDetail, noteGAP, qualiteWhy ; étiquettes Z1/Z2).
-    const FC = /FRÉQUENCE CARDIAQUE|HEART RATE|HERZFREQUENZ|FRECUENCIA CARDÍACA|FREQUÊNCIA CARDÍACA|\b(?:FC|HR|HF)\b|calée sur ta VMA|\bVMA\b|VO2/;
+    const FC = /FRÉQUENCE CARDIAQUE|HEART RATE|HERZFREQUENZ|FRECUENCIA CARDÍACA|FREQUÊNCIA CARDÍACA|\b(?:FC|HR|HF)\b|calée sur ta VMA|\bVMA\b|VO2/i;
+    // Les notes de chaleur et de vent (lib/weather) citent la FC : sans prévision, elles ne s'écrivent jamais
+    // (@HeadCoach, 4e tour). 32 °C humide, vent de 40 et de 50 km/h, sur les huit jours du plan.
+    const METEOS: [string, Record<string, number | null> | null][] = [["sans météo", null],
+      ["32 °C humide", { tempMax: 32, tempMin: 22, feelsMax: 36, humidity: 80, precipMm: 0, windMaxKmh: 10 }],
+      ["vent 40 km/h", { tempMax: 15, tempMin: 8, feelsMax: 15, humidity: 50, precipMm: 0, windMaxKmh: 40 }],
+      ["vent 50 km/h", { tempMax: 15, tempMin: 8, feelsMax: 15, humidity: 50, precipMm: 0, windMaxKmh: 50 }]];
+    const avecMeteo = (ctx: AthleteContext, m: Record<string, number | null> | null, k: number): AthleteContext =>
+      ({ ...ctx, forecast: m ? Array.from({ length: 9 }, (_, i) => ({ ...m, date: ilYa(-k - i) })) as AthleteContext["forecast"] : [] });
     const ZONE = /^(?:(?:FC|HR|HF)\s*)?Z\d/;
     const kine40 = { user_id: "u", type: "consignes_kine", created_at: `${ilYa(5)}T10:00:00Z`,
       data: { dureeMaxMin: 40, sansIntensite: false, seancesMaxSemaine: null, jusquAu: ilYa(-40), majA: ilYa(5) } };
@@ -211,36 +221,59 @@ async function main() {
     const tousLesTextes = (p: Jour[]) => p.flatMap((d) => [[d.title, d.detail, d.why], ...Object.values(d.i18n ?? {}).map((t) => (t ? [t.title, t.detail, t.why] : []))]
       .flat().map((x) => ({ d, x })));
     const toutesLesEtiquettes = (p: Jour[]) => p.flatMap((d) => [...d.tags, ...Object.values(d.i18n ?? {}).flatMap((t) => t?.tags ?? [])].map((x) => ({ d, x })));
-    const vu = { fc: 0, zone: 0, gap: 0, why: 0 };
+    const vu = { fc: 0, zone: 0, gap: 0, why: 0, meteo: 0 };
     for (const [nom, attente] of situations("cardiaque")) {
-      const ctx = await attente;
-      for (let k = 0; k <= 6; k++) {
+      const ctx0 = await attente;
+      for (const [, m] of METEOS) for (let k = 0; k <= 6; k++) {
+        const ctx = avecMeteo(ctx0, m, k);
         const p = buildWeekPlan(ctx, new Date(`${ilYa(-k)}T12:00:00Z`));
+        if (tousLesTextes(p).some(({ x }) => /juge à la FC|judge by heart rate|nach Herzfrequenz|por la FC|pela FC|juge-toi à la FC|sur la FC/.test(x))) vu.meteo++;
         if (tousLesTextes(p).some(({ x }) => FC.test(x))) vu.fc++;
         if (toutesLesEtiquettes(p).some(({ x }) => ZONE.test(x))) vu.zone++;
         if (tousLesTextes(p).some(({ x }) => /fie-toi à la FC/.test(x))) vu.gap++;
         if (tousLesTextes(p).some(({ x }) => /calée sur ta VMA/.test(x))) vu.why++;
       }
-      assert.equal(ctx.pilotageSensation, false, `${nom} : le témoin cardiaque est à la sensation`);
+      assert.equal(ctx0.pilotageSensation, false, `${nom} : le témoin cardiaque est à la sensation`);
     }
-    assert.ok(vu.fc && vu.zone && vu.gap && vu.why, `précondition : le témoin cardiaque n'a pas tout (${JSON.stringify(vu)})`);
+    assert.ok(vu.fc && vu.zone && vu.gap && vu.why && vu.meteo, `précondition : le témoin cardiaque n'a pas tout (${JSON.stringify(vu)})`);
     let semaines = 0;
     for (const [nom, attente] of situations("grossesse")) {
-      const ctx = await attente;
-      assert.equal(ctx.pilotageSensation, true, `${nom} : précondition, pas à la sensation`);
-      for (let k = 0; k <= 6; k++) {
+      const ctx0 = await attente;
+      assert.equal(ctx0.pilotageSensation, true, `${nom} : précondition, pas à la sensation`);
+      for (const [nomM, m] of METEOS) for (let k = 0; k <= 6; k++) {
+        const ctx = avecMeteo(ctx0, m, k);
         const jour = new Date(`${ilYa(-k)}T12:00:00Z`);
         const p = buildWeekPlan(ctx, jour);
         // La seconde passe du coach (consignes du kiné reprises après les ajustements), puis la sensation, comme autoCoach.
         const refait = planALaSensation(ctx, consignesSurPlan(ctx, p, jour));
         for (const [quelle, semaine] of [["plan", p], ["seconde passe du coach", refait]] as const) {
-          for (const { d, x } of tousLesTextes(semaine)) assert.doesNotMatch(x, FC, `${nom} · J+${k} · ${quelle} · ${d.date} ${d.type} : « ${x.slice(0, 160)} » [${x.match(FC)?.[0]}]`);
+          for (const { d, x } of tousLesTextes(semaine)) assert.doesNotMatch(x, FC, `${nom} · ${nomM} · J+${k} · ${quelle} · ${d.date} ${d.type} : « ${x.slice(0, 160)} » [${x.match(FC)?.[0]}]`);
+          // Ni « en à la sensation » ni « à la sensation » deux fois de suite (relecteur G).
+          for (const { d, x } of tousLesTextes(semaine)) assert.doesNotMatch(x, /\ben à la sensation|à la sensation[^.→]{0,30}, à la sensation/, `${nom} · ${nomM} · J+${k} · ${d.date} ${d.type} : « ${x.slice(0, 160)} »`);
           for (const { d, x } of toutesLesEtiquettes(semaine)) assert.doesNotMatch(x, ZONE, `${nom} · J+${k} · ${quelle} · ${d.date} ${d.type} : étiquette « ${x} »`);
         }
         semaines++;
       }
     }
-    assert.equal(semaines, 28);
+    assert.equal(semaines, 112);
+    // Le vélo « en FC Z2 » d'un seul tenant (relecteur G) : ni « en à la sensation », ni FC, dans les cinq langues.
+    for (const l of ["fr", "en", "de", "es", "pt"] as const) for (const brut of [PLAN_T[l].sansImpactDetail("45 min"), PLAN_T[l].veloLongDetail(10, "1h30", "")]) {
+      assert.match(brut, /\b(?:FC|HR|HF) Z\d/, `précondition (${l}) : le vélo n'est plus en zone de FC`);
+      const t = aLaSensation(brut, l);
+      assert.doesNotMatch(t, /\b(?:en|in|em|at|a)\s+(?:à la sensation|by feel|nach Gefühl|por sensaciones|pela sensação)/, `${l} : « ${t.slice(0, 120)} »`);
+      assert.doesNotMatch(t, FC, `${l} : la FC reste au vélo (« ${t.slice(0, 120)} »)`);
+    }
+    // À la sensation, l'allure est MASQUÉE, pas EFFACÉE (@HeadCoach, 4e tour) : sous « 40 min au plus », les sorties
+    // d'une grossesse durent ce que durent celles de sa jumelle cardiaque (elles tombaient à 15 min, dont 5 de corps).
+    const durees = async (c: string) => {
+      const ctx = await contexte([c], [objectif(10, 40), kine40]);
+      return { ctx, min: plan(ctx).filter((d) => d.type !== "Repos" && d.type !== "Renfo" && d.type !== "Course" && d.type !== "Vélo").map((d) => dureeSeance(d, ctx.allureCalcul ?? ctx.easyPace ?? null)) };
+    };
+    const g = await durees("grossesse"), cj = await durees("cardiaque");
+    assert.equal(g.ctx.easyPace, null, "précondition : l'allure d'une grossesse est affichée");
+    assert.ok(g.ctx.allureCalcul, "à la sensation, plus aucune allure pour les calculs");
+    assert.ok(cj.min.length > 0 && cj.min.every((m) => m != null && m >= 30 && m <= 40), `précondition : la jumelle cardiaque n'a pas des sorties de 30 à 40 min (${cj.min.join(", ")})`);
+    assert.deepEqual(g.min, cj.min, `grossesse sous « 40 min au plus » : ${g.min.join(", ")} min, sa jumelle cardiaque ${cj.min.join(", ")} min`);
     // Le coach refait la sensation après sa seconde passe de consignes et après les conseils du coach avancé.
     const coach = codeNu("src/lib/ai/autoCoach.ts");
     assert.match(coach, /const week = planALaSensation\(ctx, avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, jourPlan\), jourPlan\)\);/, "le coach ne refait plus la sensation après sa seconde passe de consignes");
