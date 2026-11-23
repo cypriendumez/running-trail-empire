@@ -21,6 +21,7 @@ import { buildWeekPlan, avecCourseCEcartee, type PlanDay } from "../src/lib/ai/a
 import { appliquerConseils } from "../src/lib/ai/relectureSemaine";
 import { readFileSync } from "node:fs";
 import { PLAN_T } from "../src/lib/ai/planI18n";
+import { manqueDeVolume } from "../src/lib/coach/ecartVolume";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 
@@ -564,6 +565,130 @@ async function profilCycliste() {
     const kmCourse = (plan: PlanDay[]) => plan.filter((d) => !/v[ée]lo|renfo|repos/i.test(`${d.type} ${d.title}`)).reduce((t, d) => t + kmDe(d), 0);
     assert.ok(kmCourse(avecVelo.plan) <= kmCourse(seul.plan) + 0.5, `km de course de la semaine : ${kmCourse(seul.plan)} → ${kmCourse(avecVelo.plan)} avec le vélo`);
   });
+}
+
+// ── PROFIL 5 bis — CYCLISTE SANS AUCUNE COURSE (23/11/2026) ─────────────────────────────────────────
+// Le « 0 historique course » de la matrice. Ce que le coach lit vraiment (vérifié dans le code) :
+// `runs` = les séances dont `isRun(sport)` est vrai ; `noHistory` = aucune ; le vélo n'entre ni dans
+// la VMA ni dans le volume de course. L'âge, le poids et la FC max déclarée (185) ne changent rien à
+// ces décisions-là (la FC max sert aux zones du texte, pas au volume). Un plan sensé : footings
+// courts pilotés à la sensation, aucune séance dure, aucune allure chiffrée (pas de VMA), le même
+// volume de course avec ou sans vélo, et un texte qui ne prête au coureur ni fatigue ni habitude.
+// Défaut trouvé ce jour, sur TOUT compte sans course (cycliste ou non) : « 12 km sur les 17
+// habituels […] la fatigue du moment a fait réduire la sortie longue », et « scinde en DEUX sorties
+// plutôt qu'un seul footing interminable » sur un footing de 4 km.
+/** 17 semaines de vélo : six sorties par semaine (deux le dimanche), 1 h 30, 40 km, FC 130. Aucune course. */
+function veloSeul(jour: string) {
+  return Array.from({ length: 119 }, (_, k) => k + 1).filter((n) => n % 7 !== 2)
+    .flatMap((n) => Array.from({ length: n % 7 === 0 ? 2 : 1 }, () => ({ user_id: "u", date: plusJours(jour, -n), type: "ride",
+      sport: "bike", distance_km: 40, duration_seconds: 5400, elevation_gain_m: 300, avg_hr: 130, max_hr: 150, tss: 70 })));
+}
+/** Le texte d'un jour dans une langue (le français est à la racine, les autres dans `i18n`). */
+const texteEn = (d: PlanDay, l: string, champ: "why" | "detail") =>
+  String(l === "fr" ? d[champ] ?? "" : (d.i18n as Record<string, Record<string, string>> | undefined)?.[l]?.[champ] ?? "");
+const LANGUES = ["fr", "en", "de", "es", "pt"] as const;
+async function profilCyclisteSansCourse() {
+  console.log("\nPROFIL 5 bis — CYCLISTE SANS AUCUNE COURSE (17 semaines de vélo, 0 sortie de course, 4 jours)");
+  const AUJ = aujourdhui(FUSEAU_DEFAUT);
+  const HORLOGES = DEPARTS.map((k) => plusJours(AUJ, k));
+  await testA("aucune course enregistrée : ni VMA, ni allure chiffrée, ni séance dure, sur 10 départs", async () => {
+    for (const jour of HORLOGES) {
+      const { ctx, plan } = await contexteCycliste(jour, veloSeul(jour));
+      assert.equal(ctx.noHistory, true, `${jour} : 17 semaines de vélo comptent comme un historique de course`);
+      assert.equal(ctx.vma, null, `${jour} : VMA ${ctx.vma} pour un coureur qui n'a jamais couru`);
+      const courses = plan.filter((d) => COURSE_A_PIED.test(d.type)); // toute course à pied, dure comprise
+      assert.ok(courses.length >= 2, `${jour} : précondition, ${courses.length} sortie(s) de course posée(s)`);
+      const durs = plan.filter((d) => DURS.test(d.type));
+      assert.equal(durs.length, 0, `${jour} : ${durs.map((d) => `${d.type} le ${d.date}`).join(", ")} sans aucune course connue`);
+      for (const d of plan) for (const l of LANGUES)
+        assert.doesNotMatch(texteEn(d, l, "detail"), /\d['’]\d{2}\s*\/\s*km|\d:\d{2}\s*\/\s*km/, `${jour} (${l}) : allure chiffrée sans VMA le ${d.date}`);
+    }
+  });
+  await testA("le vélo ne crée pas de volume de course : même cible, même sortie longue, mêmes km qu'un compte vide", async () => {
+    for (const jour of [AUJ, plusJours(AUJ, 3)]) {
+      const vide = await contexteCycliste(jour, []);
+      const velo = await contexteCycliste(jour, veloSeul(jour));
+      assert.equal(velo.ctx.volume.targetKm, vide.ctx.volume.targetKm, `${jour} : cible ${vide.ctx.volume.targetKm} → ${velo.ctx.volume.targetKm} km avec le vélo`);
+      assert.equal(velo.ctx.volume.longRunKm, vide.ctx.volume.longRunKm, `${jour} : sortie longue ${vide.ctx.volume.longRunKm} → ${velo.ctx.volume.longRunKm} km avec le vélo`);
+      const km = (p: PlanDay[]) => p.filter((d) => /Endurance|Sortie longue/.test(d.type)).reduce((t, d) => t + kmDe(d), 0);
+      assert.equal(km(velo.plan), km(vide.plan), `${jour} : ${km(vide.plan)} → ${km(velo.plan)} km de course avec le vélo`);
+    }
+  });
+  await testA("la semaine courte est dite pour ce qu'elle est, en 5 langues : ni fatigue, ni volume « habituel », ni « scinde en deux »", async () => {
+    // Fragments tirés du dictionnaire lui-même (le texte qui suit la cible), pas recopiés à la main.
+    const apres = (f: (p: string, c: string) => string) => f("§P", "§C").split("§C")[1].slice(0, 30);
+    const scinder = (l: (typeof LANGUES)[number]) => {
+      const avec = PLAN_T[l].enduranceDetail(1, "§", "", 1, "", true, ""), sans = PLAN_T[l].enduranceDetail(1, "§", "", 1, "", false, "");
+      return avec.slice(sans.length).trim().slice(0, 30);
+    };
+    let attendus = 0;
+    for (const jour of HORLOGES) {
+      const { ctx, plan } = await contexteCycliste(jour, veloSeul(jour));
+      // Le constat n'existe que si la semaine manque sa cible (même règle que le plan, `manqueDeVolume`).
+      const kmCourse = plan.filter((d) => /Endurance|Sortie longue/.test(d.type)).reduce((t, d) => t + kmDe(d), 0);
+      const manque = manqueDeVolume(kmCourse, ctx.volume.targetKm) != null;
+      if (manque) attendus++;
+      for (const l of LANGUES) {
+        const allege = apres(PLAN_T[l].manqueVolumeAllege), honnete = apres(PLAN_T[l].manqueVolumeSansHistorique), conseil = scinder(l);
+        assert.ok(allege.trim() && honnete.trim() && conseil, `précondition (${l}) : fragment vide`);
+        for (const d of plan) {
+          assert.ok(!texteEn(d, l, "why").includes(allege), `${jour} (${l}) : « ${allege}… » (fatigue, volume habituel) le ${d.date} pour un compte sans course`);
+          assert.ok(!texteEn(d, l, "detail").includes(conseil), `${jour} (${l}) : « ${conseil}… » le ${d.date} sur un footing de ${kmDe(d)} km`);
+        }
+        // La semaine qui ne tient pas sa cible (sortie longue de 4 km) garde son constat, avec la bonne cause.
+        if (manque) assert.ok(plan.some((d) => texteEn(d, l, "why").includes(honnete)),
+          `${jour} (${l}) : ${kmCourse} km sur ${ctx.volume.targetKm} visés, et le constat « ${honnete}… » manque`);
+      }
+    }
+    assert.ok(attendus >= 3, `précondition : ${attendus} départ(s) seulement où la semaine manque sa cible`);
+  });
+}
+
+/** Le cycliste sans course, avec d'autres tables (douleur, sommeil…) : même profil, même vélo. */
+async function contexteCyclisteAvec(jour: string, tables: Record<string, Ligne[]>) {
+  return aLaDate(jour, async () => {
+    const ctx = await buildAthleteContext(fauxClient({ profiles: [CYCLISTE], performance_baselines: [], workouts: veloSeul(jour), notifications: [], ...tables }), "u");
+    return { ctx, plan: buildWeekPlan(ctx) };
+  });
+}
+async function profilCyclisteSansCourseAutreCause() {
+  console.log("\nPROFIL 5 bis — LE MANQUE D'HISTORIQUE NE MASQUE PAS UNE AUTRE CAUSE (visa @HeadCoach, 23/11/2026)");
+  const AUJ = aujourdhui(FUSEAU_DEFAUT);
+  const HORLOGES = DEPARTS.map((k) => plusJours(AUJ, k));
+  const apres = (f: (p: string, c: string) => string) => f("§P", "§C").split("§C")[1].slice(0, 30);
+  // Deux causes RÉELLES lues par le vrai contexte : une douleur cochée hier dans un ressenti, et
+  // une nuit à 40 de score jointe à un ressenti de 9 sur 10 (deux signaux orange).
+  const ressenti = (jour: string, data: Record<string, unknown>) => ({ user_id: "u", type: "session_feedback", data: { date: plusJours(jour, -1), ...data } });
+  const VARIANTES: [string, (jour: string) => Record<string, Ligne[]>, (ctx: AthleteContext) => boolean][] = [
+    ["douleur déclarée", (jour) => ({ notifications: [ressenti(jour, { rpe: 4, pain: ["Genou gauche"] })] }), (ctx) => (ctx.douleursActives ?? []).length > 0],
+    ["feu orange (nuit courte + ressenti 9/10)", (jour) => ({
+      notifications: [ressenti(jour, { rpe: 9 })],
+      sleep_data: [{ user_id: "u", date: jour, sleep_score: 40, total_sleep_min: 300 }],
+    }), (ctx) => ctx.readiness.level !== "vert"],
+  ];
+  for (const [nom, tables, cause] of VARIANTES) {
+    await testA(`${nom} chez un compte sans course : le constat garde la cause d'allègement, pas « aucune sortie enregistrée »`, async () => {
+      let manques = 0; const allegeVu = new Set<string>();
+      for (const jour of HORLOGES) {
+        const { ctx, plan } = await contexteCyclisteAvec(jour, tables(jour));
+        assert.equal(ctx.noHistory, true, `${jour} : précondition, le compte a un historique de course`);
+        assert.ok(cause(ctx), `${jour} : précondition, la cause « ${nom} » n'est pas lue par le contexte`);
+        const kmCourse = plan.filter((d) => /Endurance|Sortie longue/.test(d.type)).reduce((t, d) => t + kmDe(d), 0);
+        if (manqueDeVolume(kmCourse, ctx.volume.targetKm) == null) continue;
+        manques++;
+        for (const l of LANGUES) {
+          const honnete = apres(PLAN_T[l].manqueVolumeSansHistorique), allege = apres(PLAN_T[l].manqueVolumeAllege);
+          assert.ok(!plan.some((d) => texteEn(d, l, "why").includes(honnete)), `${jour} (${l}) : « ${honnete}… » alors que la semaine est aussi allégée par : ${nom}`);
+          if (plan.some((d) => texteEn(d, l, "why").includes(allege))) allegeVu.add(l);
+        }
+      }
+      assert.ok(manques >= 3, `précondition : ${manques} départ(s) seulement où la semaine manque sa cible (${nom})`);
+      // Au feu rouge, la séance du jour est réécrite en récupération et emporte le constat posé sur
+      // elle (comportement antérieur, hors de ce changement) : le message allégé doit se lire au moins
+      // sur un départ dans chaque langue, pas forcément sur tous.
+      for (const l of LANGUES) assert.ok(allegeVu.has(l), `(${l}) : le constat de la semaine allégée n'apparaît sur aucun départ (${nom})`);
+    });
+  }
 }
 
 /** Historique de course régulier : `kmSem` km par semaine sur 10 semaines, les jours `jours` (0 = dimanche). */
@@ -1257,6 +1382,8 @@ async function profilChaotique() {
   await profilMarathonienSub3();
   await profilDouleur();
   await profilCycliste();
+  await profilCyclisteSansCourse();
+  await profilCyclisteSansCourseAutreCause();
   await profilSenior();
   await profilElite10();
   await profilChaotique();

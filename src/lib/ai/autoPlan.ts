@@ -868,7 +868,10 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   const easyKm = Math.min(easyCap, Math.max(rawEasy >= 3 ? kmMinFooting : 3, Math.round(rawEasy)));
   // Jamais pendant la récupération d'après-course : le volume y est volontairement réduit,
   // et « scinde en DEUX sorties » à J+5 d'un marathon disait l'inverse du bandeau.
-  const doubles = rawEasy > easyCap && raceIdx < 0 && !ctx.recuperation && !ctx.consignes && !ctx.aptitude?.attente;
+  // Ni pour un athlète SANS AUCUNE sortie de course (@Sparring, 23/11/2026) : sa sortie longue de
+  // 4 km plafonne le footing à 4 km, et le plan lui conseillait de scinder ce « footing interminable »
+  // en deux. Sa semaine est volontairement courte ; elle ne se rattrape pas en doublant.
+  const doubles = rawEasy > easyCap && raceIdx < 0 && !ctx.recuperation && !ctx.consignes && !ctx.aptitude?.attente && !ctx.noHistory;
   // ⚠️ TOUS les créneaux recevaient EXACTEMENT la même séance : même titre, même
   // distance, même texte. Trois footings de suite étaient donc trois fois le même
   // footing — l'athlète l'a signalé, et il avait raison. On fait varier la distance
@@ -1255,7 +1258,16 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     // (plafonnés à 85 % d'elle). Deux causes, deux messages — et dans le second cas
     // l'écart n'est pas un problème à corriger, c'est la décision d'entraînement.
     const allegee = ctx.volume.longRunEased || ctx.weekPlan.eased || ctx.cycle.taper || ctx.readiness.level !== "vert";
-    const note = (l: Lang) => (allegee
+    // SANS AUCUNE sortie de course (@Sparring, 23/11/2026) : la semaine est réduite parce qu'on observe,
+    // pas pour « la fatigue du moment », et il n'y a pas de volume « habituel » (le message allégé disait
+    // « 12 km sur les 17 habituels » à un compte neuf, `weekPlan.eased` étant vrai pour ce seul motif).
+    // SEULEMENT si c'est la seule cause (visa RENVOYÉ de @HeadCoach, 23/11/2026) : une fatigue, une
+    // douleur ou un affûtage chez un compte sans course restent nommés par le message allégé.
+    const sansHistoriqueSeul = !!ctx.noHistory && !!ctx.weekPlan.seulMotifSansHistorique
+      && !ctx.volume.longRunEased && !ctx.cycle.taper && ctx.readiness.level === "vert";
+    const note = (l: Lang) => (sansHistoriqueSeul
+      ? PLAN_T[l].manqueVolumeSansHistorique(nRaw(ecart.prescritKm, l), nRaw(ecart.cibleKm, l))
+      : allegee
       ? PLAN_T[l].manqueVolumeAllege(nRaw(ecart.prescritKm, l), nRaw(ecart.cibleKm, l))
       : PLAN_T[l].manqueVolume(nRaw(ecart.prescritKm, l), nRaw(ecart.cibleKm, l), nRaw(ctx.availability.days.length, l)));
     const i18n = { ...(jour.i18n ?? {}) } as Partial<Record<Lang, PlanDayText>>;
