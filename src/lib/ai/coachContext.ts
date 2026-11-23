@@ -215,6 +215,11 @@ export type AthleteContext = {
      *  elle doit être prescrite RACCOURCIE, et le plan doit dire pourquoi. Sans ce
      *  drapeau, le plan afficherait une séance normale au milieu d'une semaine allégée. */
     floored: boolean;
+    /** Le SEUL motif d'allègement est l'absence de toute sortie de course (@HeadCoach, 23/11/2026) :
+     *  le plan peut alors dire que la semaine est courte « parce qu'on observe ». Faux dès qu'une autre
+     *  cause s'y ajoute (douleur, fatigue, consigne…), qui doit rester nommée. Optionnel : un contexte
+     *  sérialisé avant cette version ne l'a pas. */
+    seulMotifSansHistorique?: boolean;
     /** Semaine de reprise après une course (`lib/coach/apresCourse`) : la qualité est la
      *  séance courte au seuil, annoncée comme telle. Optionnel : un contexte sérialisé
      *  avant cette version ne l'a pas. */
@@ -3014,7 +3019,8 @@ ${catalog}`;
     weekPlan: {
       // Pendant une reprise après un arrêt, la séance est DÉJÀ écrite courte (`doseReduite`) : la dire
       // « sauvée par le plancher » la couperait une seconde fois, sous un texte qui parle de charge.
-      qBudget: qBudgetDuPlan, quality: footingsSeuls ? [] : chosen, easyPace: easyPaceCorrige, eased: easeReasons.length > 0, floored: qb.floored && qualiteReprise == null,
+      qBudget: qBudgetDuPlan, quality: footingsSeuls ? [] : chosen, easyPace: easyPaceCorrige, eased: easeReasons.length > 0,
+      seulMotifSansHistorique: noHistory && easeReasons.length === 1, floored: qb.floored && qualiteReprise == null,
       // La reprise après une course : séance marquée comme telle, et jamais avant son jour.
       // Et jamais avant le jour que fixe la reprise après un arrêt (`qualitePendantReprise`).
       reprise: repriseCetteSemaine && qBudget > 0,
