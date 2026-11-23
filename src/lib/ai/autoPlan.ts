@@ -12,8 +12,7 @@
 //  cycle, dernière séance dure, jours systématiquement ratés. Ce module POSE ces
 //  séances dans la semaine sans violer les règles de récupération.
 // ─────────────────────────────────────────────────────────────────────────────
-import { aLaSensation } from "@/lib/coach/sensation";
-import { MALAISE_T } from "@/lib/health/effortMaximal";
+import { aLaSensation, etiquettesALaSensation, QUALITE_WHY_SENSATION } from "@/lib/coach/sensation";
 import type { AthleteContext, QualitySession } from "@/lib/ai/coachContext";
 import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
 import { dureesMarcheCourse, MARCHE_ENCADRANTE_MIN } from "@/lib/coach/marcheCourse";
@@ -26,7 +25,7 @@ import { axesRenforcement } from "@/lib/coach/renforcement";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
 import { courseCEcarteeDe, type CourseCEcartee } from "@/lib/coach/courseCEcartee";
-import { appliquerConsignes, appliquerAptitude } from "@/lib/coach/consignesPlan";
+import { appliquerConsignes, appliquerAptitude, appliquerMalaise } from "@/lib/coach/consignesPlan";
 import { BILAN_T } from "@/lib/health/bilanMatin";
 import { nRaw, type I18nText } from "@/lib/i18n/multi";
 import type { Lang } from "@/lib/i18n/translations";
@@ -122,13 +121,26 @@ function kmAndTime(km: number, pace: string | null, lang: Lang): string {
  * d'intensité, quoi qu'il ait été planifié.
  */
 export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[] {
-  const plan = buildWeekPlanBrut(ctx, today);
-  // À LA SENSATION (grossesse, 20/11/2026) : plus aucune zone de FC dans les textes, dans les cinq langues.
+  return planALaSensation(ctx, buildWeekPlanBrut(ctx, today));
+}
+
+/**
+ * À LA SENSATION (grossesse, 20/11/2026) : plus aucune zone de FC dans les textes, dans les cinq langues. Idempotente.
+ * Le coach la refait après ses ajustements et sa seconde passe de consignes, qui réécrivent des jours (le footing du
+ * kiné et la récupération d'« alléger » remettaient « piloté à la FRÉQUENCE CARDIAQUE » ; relecteur, 3e tour).
+ */
+export function planALaSensation(ctx: AthleteContext, plan: PlanDay[]): PlanDay[] {
   return ctx.pilotageSensation ? plan.map(jourALaSensation) : plan;
 }
 
 function jourALaSensation(d: PlanDay): PlanDay {
-  const s = (t: PlanDayText, l: Lang): PlanDayText => ({ ...t, title: aLaSensation(t.title, l), detail: aLaSensation(t.detail, l), why: aLaSensation(t.why, l) });
+  // La note « sur terrain vallonné… fie-toi à la FC » tombe ; le « pourquoi » calé sur la VMA devient celui de la
+  // sensation ; les étiquettes de zone aussi (relecteur, 3e tour).
+  const s = (t: PlanDayText, l: Lang): PlanDayText => ({ ...t,
+    title: aLaSensation(t.title, l),
+    detail: aLaSensation(t.detail.split(PLAN_T[l].noteGAP).join(""), l),
+    why: aLaSensation(t.why === PLAN_T[l].qualiteWhy ? QUALITE_WHY_SENSATION[l] : t.why.split(PLAN_T[l].qualiteWhy).join(QUALITE_WHY_SENSATION[l]), l),
+    tags: etiquettesALaSensation(t.tags ?? [], l) });
   const fr = s({ title: d.title, detail: d.detail, why: d.why, tags: d.tags }, "fr");
   return {
     ...d, ...fr,
@@ -210,7 +222,7 @@ export function sansCourseCEcartee<T extends { why: string; i18n?: Partial<Recor
  */
 export function consignesSurPlan(ctx: AthleteContext, plan: PlanDay[], today = new Date()): PlanDay[] {
   const aptitude = !!ctx.aptitude?.attente;
-  if (!ctx.consignes && !aptitude) return plan;
+  if (!ctx.consignes && !aptitude && !ctx.malaiseApresEffort) return plan;
   const debut = new Date(today); debut.setHours(0, 0, 0, 0);
   const cs = ctx.courseSecondaire ?? null;
   const objectifIdx = ctx.daysToRace != null && ctx.daysToRace >= 0 && ctx.daysToRace <= 6 ? ctx.daysToRace : -1;
@@ -226,6 +238,9 @@ export function consignesSurPlan(ctx: AthleteContext, plan: PlanDay[], today = n
   // LE QUESTIONNAIRE D'APTITUDE (lot 3, décision de Cyprien) : une situation cochée et pas encore
   // d'avis médical → AUCUNE séance d'endurance (lib/coach/consignesPlan, `appliquerAptitude`).
   if (aptitude) semaine = appliquerAptitude(semaine);
+  // LE MALAISE D'UN COVID LONG, en dernier, sur la semaine finie (lib/coach/consignesPlan `appliquerMalaise`) — sauf
+  // sous avis médical attendu, où aucune séance n'est posée et dont le « pourquoi » prime.
+  else if (ctx.malaiseApresEffort) semaine = appliquerMalaise(semaine, iso(debut));
   return semaine;
 }
 
@@ -415,19 +430,12 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // ailleurs. Ni qualité, ni sortie longue, ni allure : la séance se mesure en minutes.
   const mc = ctx.marcheCourse;
   if (mc) {
-    // Le malaise d'un covid long (bilan du matin après une sortie) : repos aujourd'hui, ici aussi — ce chemin
-    // s'arrête avant la règle du jour 0 (@HeadCoach, 20/11/2026).
-    if (ctx.malaiseApresEffort) put(0, {
-      type: "Repos", title: (l) => PLAN_T[l].reposTitre, tags: tags("Repos"),
-      detail: (l) => PLAN_T[l].reposFinalDetail, why: (l) => MALAISE_T[l].why,
-    });
     const voulues = Math.max(2, Math.min(3, ctx.availability.daysPerWeek || 3));
     const dispo = (i: number) => ctx.availability.days.includes(dates[i].getDay());
     const poses: number[] = [];
-    const libre = (i: number) => !(ctx.malaiseApresEffort && i === 0);
-    for (let i = 0; i <= 6 && poses.length < voulues; i++) if (dispo(i) && libre(i) && !poses.includes(i - 1)) poses.push(i);
+    for (let i = 0; i <= 6 && poses.length < voulues; i++) if (dispo(i) && !poses.includes(i - 1)) poses.push(i);
     // Trop peu de jours espacés : les jours disponibles restants, plutôt qu'une séance de moins.
-    for (let i = 0; i <= 6 && poses.length < voulues; i++) if (dispo(i) && libre(i) && !poses.includes(i)) poses.push(i);
+    for (let i = 0; i <= 6 && poses.length < voulues; i++) if (dispo(i) && !poses.includes(i)) poses.push(i);
     const seance = mc.seance;
     const { totalMin } = dureesMarcheCourse(seance);
     for (const i of poses) put(i, {
@@ -1022,17 +1030,8 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // Le DÉTAIL (lu par la montre) ne change pas.
   // Course DÉJÀ COURUE ce jour-là (synchronisée le matin) : « ne prends pas le départ » n'aurait
   // plus de sens — on n'ajoute rien (relecture du 09/11/2026).
-  // COVID LONG, plus mal après une séance (catalogue santé, décision de Cyprien du 20/11/2026) : la règle passe
-  // AVANT la récupération du feu rouge (elle la court-circuitait), et le jour d'une course, que le plan garde,
-  // elle se dit dans son « pourquoi » (@HeadCoach, relecteurs, 20/11/2026).
-  if (week[0].type === "Course" && (lvl === "rouge" || ctx.malaiseApresEffort) && !hardToday) {
-    week[0] = reecrire(week[0], (l, avant) => ({ ...avant,
-      why: `${avant.why}${lvl === "rouge" ? PLAN_T[l].courseFeuRouge(motifs(l, 2)) : ""}${ctx.malaiseApresEffort ? MALAISE_T[l].course : ""}` }));
-  } else if (ctx.malaiseApresEffort && week[0].type !== "Repos" && week[0].type !== "Course") {
-    // On réduit IMMÉDIATEMENT : la séance du jour devient un repos, et le motif oriente vers son médecin.
-    week[0] = reecrire({ ...week[0], type: "Repos" }, (l) => ({
-      title: PLAN_T[l].reposTitre, detail: PLAN_T[l].reposFinalDetail, why: MALAISE_T[l].why, tags: [PLAN_T[l].tags["Repos"]],
-    }));
+  if (week[0].type === "Course" && lvl === "rouge" && !hardToday) {
+    week[0] = reecrire(week[0], (l, avant) => ({ ...avant, why: `${avant.why}${PLAN_T[l].courseFeuRouge(motifs(l, 2))}` }));
   } else if ((lvl === "rouge" || hardToday || (bilanAllege && isHardToday)) && week[0].type !== "Repos" && week[0].type !== "Course") {
     week[0] = reecrire({ ...week[0], type: "Récup" }, (l) => ({
       title: PLAN_T[l].recupTitre,

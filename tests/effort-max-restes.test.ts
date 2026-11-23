@@ -18,7 +18,7 @@ process.env.TZ = "UTC";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
-import { buildWeekPlan } from "../src/lib/ai/autoPlan";
+import { buildWeekPlan, consignesSurPlan, planALaSensation } from "../src/lib/ai/autoPlan";
 import { packJourJ } from "../src/lib/coach/jourJ";
 import { JOURJ_T } from "../src/lib/coach/jourJI18n";
 import { aLaSensation } from "../src/lib/coach/sensation";
@@ -191,6 +191,60 @@ async function main() {
     assert.equal(aLaSensation("Warm-up HR Z1-Z2", "en"), "Warm-up by feel");
     // Un antécédent cardiaque garde ses zones (il n'est pas « à la sensation »).
     assert.equal((await contexte(["cardiaque"], [objectif(10, 40)])).pilotageSensation, false, "le cardiaque passe à la sensation");
+  });
+
+  await test("grossesse : SEPT jours de départ, cinq langues — ni fréquence cardiaque, ni « fie-toi à la FC », ni étiquette de zone, ni « calée sur ta VMA », même après la seconde passe du coach ; le témoin cardiaque en a", async () => {
+    // Ce que la sensation retire, dans les cinq langues (PLAN_T.recupDetail, noteGAP, qualiteWhy ; étiquettes Z1/Z2).
+    const FC = /FRÉQUENCE CARDIAQUE|HEART RATE|HERZFREQUENZ|FRECUENCIA CARDÍACA|FREQUÊNCIA CARDÍACA|\b(?:FC|HR|HF)\b|calée sur ta VMA|\bVMA\b|VO2/;
+    const ZONE = /^(?:(?:FC|HR|HF)\s*)?Z\d/;
+    const kine40 = { user_id: "u", type: "consignes_kine", created_at: `${ilYa(5)}T10:00:00Z`,
+      data: { dureeMaxMin: 40, sansIntensite: false, seancesMaxSemaine: null, jusquAu: ilYa(-40), majA: ilYa(5) } };
+    // Quatre situations : un 10 km ; les footings du kiné (récupération « pilotée à la FC ») ; un terrain vallonné
+    // (note « fie-toi à la FC ») ; un bilan du matin au rouge (récupération du jour).
+    const situations = (c: string): [string, Promise<AthleteContext>][] => [
+      ["10 km", contexte([c], [objectif(10, 40)])],
+      ["kiné « 40 min au plus »", contexte([c], [objectif(10, 40), kine40])],
+      ["terrain vallonné", buildAthleteContext(fauxClient({ profiles: [{ ...profil([c]), elevation_pref: "specialiste", main_terrains: ["montagne", "trail"] }],
+        performance_baselines: BASE, workouts: SEANCES, notifications: [objectif(10, 40)] }), "u")],
+      ["bilan du matin au rouge", contexte([c], [objectif(10, 40), bilan(5, 5)])],
+    ];
+    const tousLesTextes = (p: Jour[]) => p.flatMap((d) => [[d.title, d.detail, d.why], ...Object.values(d.i18n ?? {}).map((t) => (t ? [t.title, t.detail, t.why] : []))]
+      .flat().map((x) => ({ d, x })));
+    const toutesLesEtiquettes = (p: Jour[]) => p.flatMap((d) => [...d.tags, ...Object.values(d.i18n ?? {}).flatMap((t) => t?.tags ?? [])].map((x) => ({ d, x })));
+    const vu = { fc: 0, zone: 0, gap: 0, why: 0 };
+    for (const [nom, attente] of situations("cardiaque")) {
+      const ctx = await attente;
+      for (let k = 0; k <= 6; k++) {
+        const p = buildWeekPlan(ctx, new Date(`${ilYa(-k)}T12:00:00Z`));
+        if (tousLesTextes(p).some(({ x }) => FC.test(x))) vu.fc++;
+        if (toutesLesEtiquettes(p).some(({ x }) => ZONE.test(x))) vu.zone++;
+        if (tousLesTextes(p).some(({ x }) => /fie-toi à la FC/.test(x))) vu.gap++;
+        if (tousLesTextes(p).some(({ x }) => /calée sur ta VMA/.test(x))) vu.why++;
+      }
+      assert.equal(ctx.pilotageSensation, false, `${nom} : le témoin cardiaque est à la sensation`);
+    }
+    assert.ok(vu.fc && vu.zone && vu.gap && vu.why, `précondition : le témoin cardiaque n'a pas tout (${JSON.stringify(vu)})`);
+    let semaines = 0;
+    for (const [nom, attente] of situations("grossesse")) {
+      const ctx = await attente;
+      assert.equal(ctx.pilotageSensation, true, `${nom} : précondition, pas à la sensation`);
+      for (let k = 0; k <= 6; k++) {
+        const jour = new Date(`${ilYa(-k)}T12:00:00Z`);
+        const p = buildWeekPlan(ctx, jour);
+        // La seconde passe du coach (consignes du kiné reprises après les ajustements), puis la sensation, comme autoCoach.
+        const refait = planALaSensation(ctx, consignesSurPlan(ctx, p, jour));
+        for (const [quelle, semaine] of [["plan", p], ["seconde passe du coach", refait]] as const) {
+          for (const { d, x } of tousLesTextes(semaine)) assert.doesNotMatch(x, FC, `${nom} · J+${k} · ${quelle} · ${d.date} ${d.type} : « ${x.slice(0, 160)} » [${x.match(FC)?.[0]}]`);
+          for (const { d, x } of toutesLesEtiquettes(semaine)) assert.doesNotMatch(x, ZONE, `${nom} · J+${k} · ${quelle} · ${d.date} ${d.type} : étiquette « ${x} »`);
+        }
+        semaines++;
+      }
+    }
+    assert.equal(semaines, 28);
+    // Le coach refait la sensation après sa seconde passe de consignes et après les conseils du coach avancé.
+    const coach = codeNu("src/lib/ai/autoCoach.ts");
+    assert.match(coach, /const week = planALaSensation\(ctx, avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, jourPlan\), jourPlan\)\);/, "le coach ne refait plus la sensation après sa seconde passe de consignes");
+    assert.match(coach, /\? planALaSensation\(ctx, avecCourseCEcartee\(ctx, appliquerConseils\(week, relecture\.conseils\), jourPlan\)\)/, "le coach ne refait plus la sensation après les conseils");
   });
 
   await test("grossesse : RIEN sur la montre — le coach et les trois routes admin ne construisent aucune séance (le coach retire celle qu'il avait posée)", () => {

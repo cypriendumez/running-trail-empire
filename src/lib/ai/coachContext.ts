@@ -2645,15 +2645,14 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const mc = cadre.marcheCourse;
     // La fraîcheur, ÉCRITE pour le cadre : un malaise après la dernière séance (covid long) donne le repos du
     // plan ; la marche-course n'a jamais de « footing » (@HeadCoach, relecteurs, 20/11/2026).
-    const courseAujourdhui = daysToRace === 0 || secondaireActive?.idx === 0;
     const regle = sansSeance
       ? "Aucune séance d'endurance n'est prévue tant qu'un médecin ne l'a pas vu : ces signaux ne disent que sa récupération."
       : mc?.bloquee
       ? "Aucune séance de marche-course n'est prévue cette semaine (durée fixée par son kinésithérapeute) : ces signaux ne disent que sa récupération."
-      : malaiseApresEffort && courseAujourdhui
-      ? "Il s'est senti nettement plus mal après sa dernière séance (bilan du matin), et sa course est aujourd'hui : son plan la garde — s'il prend le départ, sans jamais forcer, et il renonce au moindre malaise ; si cela se répète, oriente-le vers son médecin."
+      // Le même conseil que le plan, qu'une course tombe aujourd'hui ou non (décision de Cyprien, 20/11/2026) : rien
+      // n'est affirmé de ce que le plan fait de la course.
       : malaiseApresEffort
-      ? "Repos aujourd'hui, comme son plan le pose : il s'est senti nettement plus mal après sa dernière séance (bilan du matin) ; si cela se répète, oriente-le vers son médecin."
+      ? "Aujourd'hui, repos : il s'est senti nettement plus mal après sa dernière séance (bilan du matin). Si une course tombe aujourd'hui, mieux vaut qu'il ne prenne pas le départ — la décision lui appartient ; qu'il en parle à son médecin avant la suivante, et si cela se répète."
       : {
           rouge: mc ? "Repos ou marche tranquille aujourd'hui — dis-lui pourquoi, sans dramatiser."
             : "Repos, ou un footing très facile et court, aujourd'hui — dis-lui pourquoi, sans dramatiser.",
@@ -2717,7 +2716,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
           // La séance EXACTE de son étape, au plus autant de fois que le plan peut la poser.
           : [`• PROGRAMME MARCHE-COURSE, étape ${marcheCourse.etape}/${marcheCourse.total} : ${"continuMin" in marcheCourse.seance
               ? `${marcheCourse.seance.continuMin} min de course continue`
-              : `${marcheCourse.seance.reps} × (${marcheCourse.seance.courseMin} min de course / ${marcheCourse.seance.marcheMin} min de marche)`}, au plus ${seancesMc} fois sur 7 jours, ${mc.totalMin} min marche comprise, jamais deux jours de suite${duree} ; un renforcement pour débuter ; du repos ailleurs. Il ne court pas encore 30 minutes d'affilée : ni allure, ni volume en kilomètres. Encourage la régularité ; la marche fait partie de la séance.`])
+              : `${marcheCourse.seance.reps} × (${marcheCourse.seance.courseMin} min de course / ${marcheCourse.seance.marcheMin} min de marche)`}, au plus ${seancesMc} fois sur 7 jours, ${mc.totalMin} min marche comprise, en évitant deux jours de suite quand ses disponibilités le permettent${duree} ; un renforcement pour débuter ; du repos ailleurs. Il ne court pas encore 30 minutes d'affilée : ni allure, ni volume en kilomètres. Encourage la régularité ; la marche fait partie de la séance.`])
       : [
           ...(cadre.niveau === "seuilBas"
             ? [!chosen.length ? "• Aucune séance sous le seuil ce cycle."
@@ -2760,7 +2759,7 @@ FORME & RÉCUPÉRATION (aujourd'hui)
 
 CHARGE (des faits, pas des objectifs)
 - Volume : ${Math.round(weekKm)} km COURUS cette semaine · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)${sansSeance || !sorties ? "" : `
-- 📆 DISPONIBILITÉS : au plus ${sorties} sortie(s) d'entraînement à pied sur 7 jours, une course au calendrier à part${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""} — NE DÉPASSE PAS ce nombre.`}
+- 📆 DISPONIBILITÉS : au plus ${sorties} sortie(s) d'entraînement à pied sur 7 jours${mc ? "" : ", une course au calendrier à part"}${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""} — NE DÉPASSE PAS ce nombre.`}
 - Repos : dernière séance il y a ${daysSinceLast ?? "?"} j · ${restDays7} j sans courir sur les 7 derniers
 - CTL ${Math.round(load.ctl)} (forme) · ATL ${Math.round(load.atl)} (fatigue) · TSB ${Math.round(load.tsb)} (fraîcheur) · ratio aigu:chronique ${r1(load.acr)}${load.acr > 1.5 ? " ⚠️ élevé (risque)" : ""}
 - 5 dernières séances : ${seancesPassees.join(" | ") || "aucune"}${pains.length ? `\n- ⚠️ DOULEUR(S) SIGNALÉE(S) par l'athlète (zone précise) : ${pains.join(", ")} → ${sansSeance ? "à montrer au médecin qu'il doit voir." : "ADAPTE les prochaines séances à CETTE zone."}` : ""}${fbNotes.length ? `\n- 🗣️ Notes récentes de l'athlète (ressenti/douleur — LIS-LES et tiens-en compte) : ${fbNotes.map(n => `« ${n} »`).join(" ; ")}` : ""}${lastRpe != null ? `\n- Dernier ressenti d'effort (RPE) : ${lastRpe}/10${rpeAvg != null ? ` · moyenne des 3 derniers : ${rpeAvg}/10` : ""}` : ""}

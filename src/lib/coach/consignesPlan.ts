@@ -25,6 +25,7 @@ import type { Lang } from "@/lib/i18n/translations";
 import { PLAN_T } from "@/lib/ai/planI18n";
 import type { PlanDay, PlanDayText } from "@/lib/ai/autoPlan";
 import type { ConsignesKine } from "@/lib/health/consignesKine";
+import { MALAISE_T } from "@/lib/health/effortMaximal";
 
 const LANGUES: Lang[] = ["fr", "en", "de", "es", "pt"];
 const AUTRES: Lang[] = ["en", "de", "es", "pt"];
@@ -331,3 +332,22 @@ export function appliquerAptitude(plan: readonly PlanDay[]): PlanDay[] {
 
 /** Pour les tests : les langues couvertes. */
 export const LANGUES_CONSIGNES = LANGUES;
+
+/**
+ * LE MALAISE D'UN COVID LONG (bilan du matin à 4-5/5 dans les deux jours qui suivent une sortie ; catalogue santé,
+ * décisions de Cyprien du 20/11/2026), sur le plan FINI — après les consignes du kiné, qui réécrivaient le jour 0 en
+ * footing quand la règle vivait dans la construction de la semaine (@HeadCoach, 3e tour). Le jour 0 devient UN repos
+ * (son « pourquoi » oriente vers le médecin) ; une course posée ce jour-là reste (le départ appartient au coureur)
+ * et son « pourquoi » conseille de ne pas le prendre. Idempotent.
+ */
+export function appliquerMalaise(plan: readonly PlanDay[], jour: string): PlanDay[] {
+  const ceJour = plan.filter((d) => d.date === jour);
+  if (!ceJour.length) return [...plan];
+  const courses = ceJour.filter((d) => d.type === "Course");
+  const remplace: PlanDay[] = courses.length
+    ? courses.map((d) => reecrire(d, "Course", (l) => { const t = texteDe(d, l); return { ...t, why: t.why.includes(MALAISE_T[l].course) ? t.why : t.why + MALAISE_T[l].course }; }))
+    // UNE seule entrée (un jour doublé perd son créneau : il n'y a plus qu'un repos).
+    : [reecrire({ ...ceJour[0], moment: undefined }, "Repos", (l) => ({ title: PLAN_T[l].reposTitre, detail: PLAN_T[l].reposFinalDetail, why: MALAISE_T[l].why, tags: [PLAN_T[l].tags["Repos"]] }))];
+  const i = plan.findIndex((d) => d.date === jour);
+  return [...plan.slice(0, i).filter((d) => d.date !== jour), ...remplace, ...plan.slice(i).filter((d) => d.date !== jour)];
+}

@@ -9,7 +9,7 @@
 import type { CadreSante } from "@/lib/coach/cadreSante";
 import { COACH_SYSTEM, COACH_SYSTEM_CADRE } from "@/lib/ai/coachContext";
 
-type CtxMission = { cadreSante?: CadreSante | null; malaiseApresEffort?: boolean; daysToRace?: number | null; courseSecondaire?: { idx: number } | null };
+type CtxMission = { cadreSante?: CadreSante | null; malaiseApresEffort?: boolean };
 
 export function missionSeanceDuJour(c: CtxMission): string {
   const cadre = c.cadreSante;
@@ -19,9 +19,8 @@ export function missionSeanceDuJour(c: CtxMission): string {
 - Dose le volume sur le volume hebdomadaire réel et reste prudent si une douleur est signalée.`;
   if (cadre.niveau === "sansSeance") return `- ⛔ CADRE DE SANTÉ (n'en cite pas le motif) : AUCUNE séance d'endurance aujourd'hui — ni course, ni vélo, ni natation. Propose du repos, de la mobilité, une marche tranquille ou un renforcement doux sans saut, et rappelle-lui qu'un médecin doit le voir avant toute reprise.`;
   // Covid long, plus mal après sa dernière séance (bilan du matin) : le plan pose un repos aujourd'hui.
-  // Le jour d'une course, le plan la garde (le départ appartient au coureur) et le dit dans son « pourquoi ».
-  if (c.malaiseApresEffort && (c.daysToRace === 0 || c.courseSecondaire?.idx === 0)) return `- ⛔ CADRE DE SANTÉ (n'en cite pas le motif) : sa course est aujourd'hui et son plan la garde, mais il s'est senti nettement plus mal après sa dernière séance — s'il prend le départ, sans jamais forcer, et il renonce au moindre malaise ; si cela se répète, qu'il en parle à son médecin. Aucune autre séance.`;
-  if (c.malaiseApresEffort) return `- ⛔ CADRE DE SANTÉ (n'en cite pas le motif) : REPOS aujourd'hui, comme son plan le pose — il s'est senti nettement plus mal après sa dernière séance. Propose une journée calme et, si cela se répète, d'en parler à son médecin.`;
+  // Le même conseil que le plan (décision de Cyprien, 20/11/2026), sans rien affirmer de ce qu'il fait de la course.
+  if (c.malaiseApresEffort) return `- ⛔ CADRE DE SANTÉ (n'en cite pas le motif) : REPOS aujourd'hui — il s'est senti nettement plus mal après sa dernière séance. Si une course tombe aujourd'hui, conseille-lui de ne pas prendre le départ (la décision lui appartient) et d'en parler à son médecin avant la suivante. Aucune autre séance.`;
   const duree = cadre.kine?.dureeMaxMin != null ? ` Une sortie dure ${cadre.kine.dureeMaxMin} min au plus.` : "";
   // Marche-course : la séance de son étape, SI le plan en pose une aujourd'hui (aucune quand la durée maximale
   // du kiné est plus courte qu'elle). Ni « alternances » (les dernières étapes sont de la course continue).

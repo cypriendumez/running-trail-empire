@@ -259,7 +259,7 @@ async function main() {
     const coach = code("src/lib/ai/autoCoach.ts");
     assert.match(coach, /const jourPlan = instantDuJour\(ctx\.jour0 \?\? aujourdhui\(FUSEAU_DEFAUT, maintenant\)\);/, "le coach ne calcule plus le jour du plan depuis le contexte");
     assert.match(coach, /const semaineMoteur = buildWeekPlan\(ctx, jourPlan\);/, "le coach construit le plan à l'heure du serveur");
-    assert.match(coach, /const week = avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, jourPlan\), jourPlan\);/, "les consignes ou le message de la course C suivent l'heure du serveur");
+    assert.match(coach, /const week = planALaSensation\(ctx, avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, jourPlan\), jourPlan\)\);/, "les consignes ou le message de la course C suivent l'heure du serveur");
     assert.match(coach, /avecCourseCEcartee\(ctx, appliquerConseils\(week, relecture\.conseils\), jourPlan\)/, "le message après la relecture Premium suit l'heure du serveur");
     assert.doesNotMatch(coach, /buildWeekPlan\(ctx, maintenant\)|consignesSurPlan\([^)]*maintenant\)|avecCourseCEcartee\([^;]*, maintenant\)/, "un appel du plan lit encore l'heure du serveur");
     const rappel = code("src/lib/ai/rappelPremiumServeur.ts");
