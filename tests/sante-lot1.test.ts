@@ -239,6 +239,40 @@ async function main() {
     assert.equal(plan[6].type, "Course", "la course objectif a été retirée pour tenir le nombre de sorties");
   });
 
+  await test("nombre de sorties : le seul jour encore permis porte le renforcement → la semaine garde une course", () => {
+    // Trois sorties ces trois derniers jours, trois au plus sur sept jours glissants : aucune sortie ne tient avant le
+    // 5ᵉ jour du plan. Le coureur est disponible les jours 0, 1, 2 et 4 ; le moteur a posé trois footings (jours 0 à 2)
+    // et le renforcement le jour 4. Les footings sont retirés ; sans autre jour de repos disponible, il ne restait
+    // aucune course de la semaine (relecture du 20/11/2026).
+    const dow = (n: number) => new Date(`${J(n)}T12:00:00Z`).getUTCDay();
+    const semaine = [0, 1, 2].map((n) => jour(n, "Endurance", PLAN_T.fr.enduranceTitre, ["Endurance", "6 km"]))
+      .concat([jour(3, "Repos", "Repos", ["Repos"]), jour(4, "Renfo", "Renfo", ["Renfo"], "Squats"), jour(5, "Repos", "Repos", ["Repos"]), jour(6, "Repos", "Repos", ["Repos"])]);
+    const entree = { consignes: consignes({ seancesMaxSemaine: 3 }), allureFacile: "5'30", sortiesRecentes: [ilYa(1), ilYa(2), ilYa(3)], courseC: null, joursDispo: [dow(0), dow(1), dow(2), dow(4)] };
+    const plan = appliquerConsignes(semaine, entree);
+    const courses = plan.filter((d) => !["Repos", "Renfo"].includes(d.type));
+    assert.deepEqual(plan.slice(0, 3).map((d) => d.type), ["Repos", "Repos", "Repos"], "précondition : les trois footings posés trop tôt ne sont pas retirés");
+    assert.deepEqual(courses.map((d) => d.date), [J(4)], `la semaine n'a pas exactement une course, le jour du renforcement (${plan.map((d) => d.type).join(", ")})`);
+    const courues = [...entree.sortiesRecentes, ...courses.map((d) => d.date)];
+    for (const d of plan) assert.ok(courues.filter((x) => x >= fenetre(d.date) && x <= d.date).length <= 3, `plus de trois sorties sur les sept jours finissant le ${d.date}`);
+    // CONTRE-POIDS 1 : quand une course reste dans la semaine, le renforcement n'est pas remplacé, même s'il tombe un
+    // jour où une sortie tiendrait. Deux sorties au plus, courues hier et il y a cinq jours : les footings des jours 0
+    // et 1 sont retirés, celui du jour 2 tient ; le renforcement est au jour 6, disponible, et une sortie y tiendrait.
+    const semaineB = [0, 1, 2].map((n) => jour(n, "Endurance", PLAN_T.fr.enduranceTitre, ["Endurance", "6 km"]))
+      .concat([jour(3, "Repos", "Repos", ["Repos"]), jour(4, "Repos", "Repos", ["Repos"]), jour(5, "Repos", "Repos", ["Repos"]), jour(6, "Renfo", "Renfo", ["Renfo"], "Squats")]);
+    const avecCourse = appliquerConsignes(semaineB, { ...entree, consignes: consignes({ seancesMaxSemaine: 2 }), sortiesRecentes: [ilYa(1), ilYa(5)], joursDispo: [dow(0), dow(1), dow(2), dow(6)] });
+    assert.deepEqual(avecCourse.slice(0, 3).map((d) => d.type === "Repos"), [true, true, false], `précondition : les jours 0 et 1 ne sont pas retirés, ou le jour 2 l'est (${avecCourse.map((d) => d.type).join(", ")})`);
+    assert.equal(avecCourse[6].type, "Renfo", "le renforcement est remplacé alors qu'une course reste dans la semaine");
+    // CONTRE-POIDS 2 : un jour de renforcement où la fenêtre ne tient pas n'est pas pris (trois sorties jusqu'à hier,
+    // renforcement dès le jour 3 : la fenêtre finissant le jour 3 en compte déjà trois avec le jour −3).
+    const tropTot = appliquerConsignes(semaine.map((d, n) => (n === 3 ? jour(3, "Renfo", "Renfo", ["Renfo"], "Squats") : n === 4 ? jour(4, "Repos", "Repos", ["Repos"]) : d)),
+      { ...entree, joursDispo: [dow(0), dow(1), dow(2), dow(3)] });
+    const couruesTot = [...entree.sortiesRecentes, ...tropTot.filter((d) => !["Repos", "Renfo"].includes(d.type)).map((d) => d.date)];
+    for (const d of tropTot) assert.ok(couruesTot.filter((x) => x >= fenetre(d.date) && x <= d.date).length <= 3, `renforcement remplacé hors fenêtre : plus de trois sorties sur les sept jours finissant le ${d.date}`);
+    // CONTRE-POIDS 3 : un jour de renforcement où le coureur n'est pas disponible n'est pas pris.
+    const indispo = appliquerConsignes(semaine, { ...entree, joursDispo: [dow(0), dow(1), dow(2)] });
+    assert.equal(indispo[4].type, "Renfo", "une course est posée un jour où le coureur n'est pas disponible");
+  });
+
   await test("une récupération sans distance n'est jamais rallongée (25 min sous une consigne de 120 min)", () => {
     const recup = jour(0, "Récup", PLAN_T.fr.recupTitre, ["Récup", "Z1"], PLAN_T.fr.recupDetail(10, 10, 5));
     const [r] = appliquerConsignes([recup], { consignes: consignes({ dureeMaxMin: 120 }), allureFacile: null, sortiesRecentes: [], courseC: null });

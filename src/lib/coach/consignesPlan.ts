@@ -267,6 +267,27 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
     // Son « pourquoi » dit qu'elle a été décalée pour tenir le nombre de sorties.
     sortie[cible] = reecrire(decalee, decalee.type, (l) => ({ ...texteDe(decalee, l), why: T[l].decale(max, fin) }));
   }
+  // ⚠️ UNE SEMAINE SANS AUCUNE COURSE ALORS QU'UN JOUR LA PERMET ENCORE (relecture du 20/11/2026). La seconde passe
+  // ne décale une sortie que sur un jour de REPOS. Quand le seul jour où une sortie tient porte le renforcement
+  // (quatre jours disponibles, trois sorties courues ces derniers jours, trois footings posés trop tôt puis retirés),
+  // il ne restait plus rien : une semaine entière sans course, sous un motif qui annonçait des footings. Si le plan
+  // n'a plus AUCUNE sortie, une sortie retirée prend la place du renforcement ce jour-là, aux mêmes conditions (jour
+  // disponible, ni repos protecteur, et la fenêtre de sept jours tient). Une semaine qui garde une course n'est pas
+  // touchée : le renforcement y reste.
+  if (retirees.length && !sortie.some((j) => !PAS_COURSE.has(j.type))) {
+    for (const i of retirees) {
+      const origine = apres[i];
+      if (origine.type === "Marche/course") continue;
+      const cible = sortie.findIndex((x, j) => j > i && x.type === "Renfo" && enVigueur(x) && typesLe(x.date).length === 1
+        && (!c.joursDispo || c.joursDispo.includes(new Date(`${x.date}T12:00:00Z`).getUTCDay()))
+        && !protecteur(x.date) && tient(x.date));
+      if (cible < 0) continue;
+      gardees.push(sortie[cible].date);
+      const decalee = footing({ ...origine, date: sortie[cible].date, confirmed: sortie[cible].confirmed });
+      sortie[cible] = reecrire(decalee, decalee.type, (l) => ({ ...texteDe(decalee, l), why: T[l].decale(max, fin) }));
+      break;
+    }
+  }
   return sortie;
 }
 
