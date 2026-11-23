@@ -2552,8 +2552,10 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // On compare ici l'allure facile PRESCRITE à celle réellement tenue sur 90 jours,
   // en GAP quand la montre le donne — sans quoi une semaine en côtes passerait pour
   // une baisse de forme.
+  // Sur l'allure NON masquée : à la sensation, la relecture recale encore l'allure de CALCUL (`allureCalcul`), jamais
+  // écrite (relecteurs K et L, @HeadCoach, 6e tour ; hors sensation, c'est la même allure).
   const cibleFacileSec = (() => {
-    const m = String(easyPaceLisible ?? "").match(/(\d+)['’:](\d{2})/);
+    const m = String(easyPaceSansMasque ?? "").match(/(\d+)['’:](\d{2})/);
     return m ? Number(m[1]) * 60 + Number(m[2]) : null;
   })();
   // ⚠️ SANS FC MAX, PAS DE RELECTURE (12/11/2026) : impossible de reconnaître les sorties faciles ;
@@ -2877,7 +2879,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     const regle = sansSeance
       ? "Aucune séance d'endurance n'est prévue tant qu'un médecin ne l'a pas vu : ces signaux ne disent que sa récupération."
       : mc?.bloquee
-      ? "Aucune séance de marche-course n'est prévue cette semaine (durée fixée par son kinésithérapeute) : ces signaux ne disent que sa récupération."
+      ? `Aucune séance de marche-course n'est prévue cette semaine (durée fixée par son kinésithérapeute) : ces signaux ne disent que sa récupération.${malaiseApresEffort ? " Aujourd'hui, repos : il s'est senti nettement plus mal après sa dernière séance (bilan du matin) ; qu'il en parle à son médecin, et sans attendre si cela se répète." : ""}`
       // Le même conseil que le plan, qu'une course tombe aujourd'hui ou non (décision de Cyprien, 20/11/2026) : rien
       // n'est affirmé de ce que le plan fait de la course.
       : malaiseApresEffort
@@ -2945,7 +2947,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
           // La séance EXACTE de son étape, au plus autant de fois que le plan peut la poser.
           : [`• PROGRAMME MARCHE-COURSE, étape ${marcheCourse.etape}/${marcheCourse.total} : ${"continuMin" in marcheCourse.seance
               ? `${marcheCourse.seance.continuMin} min de course continue`
-              : `${marcheCourse.seance.reps} × (${marcheCourse.seance.courseMin} min de course / ${marcheCourse.seance.marcheMin} min de marche)`}, au plus ${seancesMc} fois sur 7 jours, ${mc.totalMin} min marche comprise, en évitant deux jours de suite quand ses disponibilités le permettent${duree} ; un renforcement pour débuter ; du repos ailleurs. Il ne court pas encore 30 minutes d'affilée : ni allure, ni volume en kilomètres. Encourage la régularité ; la marche fait partie de la séance.`])
+              : `${marcheCourse.seance.reps} × (${marcheCourse.seance.courseMin} min de course / ${marcheCourse.seance.marcheMin} min de marche)`}, au plus ${seancesMc} fois sur 7 jours, ${mc.totalMin} min marche comprise, en évitant deux jours de suite quand ses disponibilités le permettent${duree} ; un renforcement pour débuter ; du repos ailleurs. ${"continuMin" in marcheCourse.seance ? "Ni allure, ni volume en kilomètres : la durée seulement. Encourage la régularité." : "Il ne court pas encore 30 minutes d'affilée : ni allure, ni volume en kilomètres. Encourage la régularité ; la marche fait partie de la séance."}`])
       : [
           ...(cadre.niveau === "seuilBas"
             ? [!chosen.length ? "• Aucune séance sous le seuil ce cycle."

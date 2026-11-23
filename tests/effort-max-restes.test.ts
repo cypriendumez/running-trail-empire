@@ -249,6 +249,8 @@ async function main() {
         const refait = planALaSensation(ctx, consignesSurPlan(ctx, p, jour));
         for (const [quelle, semaine] of [["plan", p], ["seconde passe du coach", refait]] as const) {
           for (const { d, x } of tousLesTextes(semaine)) assert.doesNotMatch(x, FC, `${nom} · ${nomM} · J+${k} · ${quelle} · ${d.date} ${d.type} : « ${x.slice(0, 160)} » [${x.match(FC)?.[0]}]`);
+          // Ni durée à côté des kilomètres (« ~8 km (environ 44 min) » : une allure implicite, @HeadCoach, 6e tour).
+          for (const { d, x } of tousLesTextes(semaine)) assert.doesNotMatch(x, /km \((?:environ|about|etwa|unos|cerca de) /, `${nom} · ${nomM} · J+${k} · ${d.date} ${d.type} : une durée à côté des kilomètres (« ${x.slice(0, 140)} »)`);
           // Ni « en à la sensation » ni « à la sensation » deux fois de suite (relecteur G).
           for (const { d, x } of tousLesTextes(semaine)) assert.doesNotMatch(x, /\ben à la sensation|à la sensation[^.→]{0,30}, à la sensation/, `${nom} · ${nomM} · J+${k} · ${d.date} ${d.type} : « ${x.slice(0, 160)} »`);
           for (const { d, x } of toutesLesEtiquettes(semaine)) assert.doesNotMatch(x, ZONE, `${nom} · J+${k} · ${quelle} · ${d.date} ${d.type} : étiquette « ${x} »`);
@@ -289,23 +291,39 @@ async function main() {
     // seuil, coût d'une séance, plancher des footings).
     const BAS = Array.from({ length: 70 }, (_, k) => k + 1).filter((n) => n % 7 === 1 || n % 7 === 3 || n % 7 === 5).map((n) => ({
       user_id: "u", date: ilYa(n), type: "easy", sport: "run", distance_km: 6, duration_seconds: 2100, elevation_gain_m: 20, avg_hr: 135, max_hr: 150, tss: 35, hr_zone_seconds: [400, 1700, 0, 0, 0] }));
+    // Des footings courus PLUS LENTS (6'30) ou PLUS RAPIDES (5'15) que le modèle : la relecture d'exécution recale
+    // l'allure — à la sensation, celle des calculs (relecteurs K et L, @HeadCoach, 6e tour).
+    // (Sans FC de repos, l'allure facile n'est pas MESURÉE par la FC : elle vient du modèle, et la relecture la recale sur
+    // les footings faciles — FC 125 — courus plus vite ou plus lentement : c'est là qu'elle agit.)
+    const SANS_REPOS = [{ ...BASE[0], resting_hr: null }];
+    const LENTS = SEANCES.map((w) => ({ ...w, duration_seconds: 3900, avg_hr: 125 })), RAPIDES = SEANCES.map((w) => ({ ...w, duration_seconds: 3100, avg_hr: 125 }));
     const BAS4 = Array.from({ length: 70 }, (_, k) => k + 1).filter((n) => n % 7 !== 0 && n % 7 !== 2 && n % 7 !== 4).map((n) => ({
       user_id: "u", date: ilYa(n), type: "easy", sport: "run", distance_km: 6, duration_seconds: 2100, elevation_gain_m: 20, avg_hr: 135, max_hr: 150, tss: 35, hr_zone_seconds: [400, 1700, 0, 0, 0] }));
     // …et le faible volume réparti sur six jours disponibles : le plancher des footings (25 min) décide combien en tiennent.
-    const jumelle = async (c: string, cs: boolean, obj: Ligne, seances: Ligne[], jours: number) => buildAthleteContext(fauxClient({
-      profiles: [{ ...profil([c]), days_per_week: jours, ...(cs ? { pace_curve: { criticalSpeed: 3.75 } } : {}) }], performance_baselines: BASE, workouts: seances, notifications: [obj] }), "u");
+    // Un test de lactate au seuil 1 lent : le plancher de l'allure facile joue (lib/coach/lactate).
+    const LACTATE = { user_id: "u", type: "test_lactate", created_at: `${ilYa(20)}T10:00:00Z`, data: { date: ilYa(20), lt1: { allureSec: 400, fc: 140 }, lt2: { allureSec: 330, fc: 165 } } };
+    const jumelle = async (c: string, cs: boolean, obj: Ligne, seances: Ligne[], jours: number, autres: Ligne[] = [], prof: Ligne = {}) => buildAthleteContext(fauxClient({
+      profiles: [{ ...profil([c]), days_per_week: jours, ...(cs ? { pace_curve: { criticalSpeed: 3.75 } } : {}), ...prof }],
+      performance_baselines: seances === LENTS || seances === RAPIDES ? SANS_REPOS : BASE, workouts: seances, notifications: [obj, ...autres] }), "u");
     // Les nombres d'un texte (« 5 km », « 28 min », « 2×5 min »), sans les allures (« 5'38/km »).
-    const dose = (t: string) => t.replace(/~?\d{1,2}['’]\d{2}(?:\/km)?/g, "").match(/\d+(?:[.,]\d+)?\s*(?:×\s*\d+(?:[.,]\d+)?\s*)?(?:km|min)\b/g) ?? [];
+    // (la durée affichée à côté des kilomètres — « (environ 28 min) » — est une allure implicite : la jumelle l'a, la
+    // grossesse non ; elle sort de la comparaison.)
+    const dose = (t: string) => t.replace(/\((?:environ|about|etwa|unos|cerca de) [^)]*\)/g, "").replace(/~?\d{1,2}['’]\d{2}(?:\/km)?/g, "").match(/\d+(?:[.,]\d+)?\s*(?:×\s*\d+(?:[.,]\d+)?\s*)?(?:km|min)\b|\b\d+h\d*/g) ?? [];
     const sousSeuil = (p: Jour[]) => p.filter((d) => d.type === "Seuil").map((d) => d.detail.match(/(\d+)\s*×\s*(\d+)\s*min/)).reduce((s, m) => s + (m ? Number(m[1]) * Number(m[2]) : 0), 0);
     let qualites = 0, allures = 0;
     let plafonne = 0;
-    for (const [seances, jours] of [[SEANCES, 6], [BAS, 3], [BAS, 6], [BAS4, 6], [BAS4, 5]] as const) for (const cs of [true, false]) for (const obj of [objectif(10, 40), objectif(21.1, 40), objectif(42.2, 60)]) {
-      const g = await jumelle("grossesse", cs, obj, seances, jours), cj = await jumelle("cardiaque", cs, obj, seances, jours);
+    const corrigees = new Set<string>();
+    for (const [seances, jours, autres, prof] of [[SEANCES, 6, [], {}], [BAS, 3, [], {}], [BAS, 6, [], {}], [BAS4, 6, [], {}], [BAS4, 5, [], {}],
+      [LENTS, 6, [], {}], [RAPIDES, 6, [], {}], [SEANCES, 6, [LACTATE], {}], [SEANCES, 6, [], { long_run_mode: "bike" }]] as [Ligne[], number, Ligne[], Ligne][])
+    for (const cs of [true, false]) for (const obj of [objectif(10, 40), objectif(21.1, 40), objectif(42.2, 60)]) {
+      const g = await jumelle("grossesse", cs, obj, seances, jours, autres, prof), cj = await jumelle("cardiaque", cs, obj, seances, jours, autres, prof);
+      assert.equal(g.allureCalcul, cj.easyPace, `l'allure des calculs d'une grossesse (${g.allureCalcul}) n'est pas l'allure de sa jumelle (${cj.easyPace})`);
+      corrigees.add(String(cj.easyPace));
       assert.equal(g.pilotageSensation, true); assert.equal(cj.pilotageSensation, false);
       for (let k = 0; k <= 6; k++) {
         const jour = new Date(`${ilYa(-k)}T12:00:00Z`);
         const pg = buildWeekPlan(g, jour), pc = buildWeekPlan(cj, jour);
-        const quand = `${seances === SEANCES ? "60 km" : `${seances === BAS ? 18 : 24} km sur ${jours} jours`} · ${obj.data.distanceKm} km${cs ? ", vitesse critique" : ""} · J+${k}`;
+        const quand = `${seances === SEANCES ? `60 km${autres.length ? " + lactate" : ""}${prof.long_run_mode ? " + sortie longue à vélo" : ""}` : seances === LENTS ? "footings lents" : seances === RAPIDES ? "footings rapides" : `${seances === BAS ? 18 : 24} km sur ${jours} jours`} · ${obj.data.distanceKm} km${cs ? ", vitesse critique" : ""} · J+${k}`;
         if (seances !== SEANCES && cs && sousSeuil(pc) > 0 && sousSeuil(pc) < 20) plafonne++;
         assert.deepEqual(pg.map((d) => `${d.date} ${d.type}`), pc.map((d) => `${d.date} ${d.type}`), `${quand} : pas les mêmes séances`);
         for (const [i, d] of pg.entries()) assert.deepEqual(dose(d.detail), dose(pc[i].detail), `${quand} · ${d.date} ${d.type} : « ${d.detail.slice(0, 140)} » contre « ${pc[i].detail.slice(0, 140)} »`);
@@ -316,6 +334,10 @@ async function main() {
     }
     assert.ok(qualites > 0 && allures > 0, `précondition : séances sous le seuil (${qualites}) et allures chez la jumelle (${allures})`);
     assert.ok(plafonne > 0, "précondition : à faible volume, le plafond de Daniels ne borne jamais la séance sous le seuil de la jumelle");
+    assert.ok(corrigees.size >= 4, `précondition : la relecture et le test de lactate ne déplacent pas l'allure de la jumelle (${[...corrigees].join(", ")})`);
+    // La relecture AGIT vraiment chez la jumelle (sinon ce test ne la verrait pas) : footings lents et rapides, deux allures.
+    const relue = async (seances: Ligne[]) => (await jumelle("cardiaque", false, objectif(10, 40), seances, 6)).easyPace;
+    assert.notEqual(await relue(LENTS), await relue(RAPIDES), "précondition : la relecture d'exécution ne recale pas l'allure de la jumelle");
     // Deux étiquettes de zone sur un même jour : UNE étiquette « Ressenti » (relecteur J).
     assert.deepEqual(etiquettesALaSensation(["Endurance", "Z1", "FC Z2"], "fr"), ["Endurance", "Ressenti"]);
   });

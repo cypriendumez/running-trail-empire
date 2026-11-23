@@ -65,7 +65,8 @@ export const HEALTH_CONDITIONS: HealthItem[] = [
     coach: "GROSSESSE / POST-PARTUM : le suivi médical décide, tu ne remplaces pas un avis obstétrical. Pilote à la sensation et à la conversation, PAS à la FC (elle est faussée). Pas d'effort maximal, pas de surchauffe. En post-partum : retour à la course seulement avec l'accord de sa sage-femme ou de son médecin, puis reprise très progressive.",
     coachCadre: "GROSSESSE / POST-PARTUM : le suivi médical décide, tu ne remplaces pas un avis obstétrical. À la sensation et à la conversation, PAS à la FC (elle est faussée) ; pas de surchauffe. En post-partum : retour à la course seulement avec l'accord de sa sage-femme ou de son médecin, puis reprise très progressive." },
   { slug: "surpoids", label: { fr: "Surpoids", en: "Overweight", de: "Übergewicht", es: "Sobrepeso", pt: "Excesso de peso" },
-    coach: "SURPOIDS : au début, privilégie le volume en marche rapide, vélo ou elliptique, la fréquence plutôt que la durée, et une progression lente. Ne parle JAMAIS de poids en termes de performance ou d'esthétique : parle régularité et plaisir." },
+    coach: "SURPOIDS : au début, privilégie le volume en marche rapide, vélo ou elliptique, la fréquence plutôt que la durée, et une progression lente. Ne parle JAMAIS de poids en termes de performance ou d'esthétique : parle régularité et plaisir.",
+    coachCadre: "SURPOIDS : une progression lente, les séances de son plan telles qu'elles sont. Ne parle JAMAIS de poids en termes de performance ou d'esthétique : parle régularité et plaisir." },
 ];
 
 // ── Zones de blessure récurrentes ────────────────────────────────────────────

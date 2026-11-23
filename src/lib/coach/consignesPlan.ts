@@ -360,14 +360,28 @@ export const phraseAccordKine = (l: Lang, jusquAu: string): string => T[l].cours
 /** Ce que l'écriture garde d'un « pourquoi » (lib/ai/autoCoach : `why.slice(0, 640)`). */
 export const POURQUOI_MAX = 640;
 const echapper = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Les motifs d'un feu rouge, séparés par les virgules HORS parenthèses : « douleur en cours (genou (7/10), en
+ *  aggravation selon l'athlète) » reste entier (relecteur K, @HeadCoach, 6e tour). */
+function motifsDe(s: string): string[] {
+  const out: string[] = [];
+  let prof = 0, debut = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === "(") prof++;
+    else if (s[i] === ")") prof = Math.max(0, prof - 1);
+    else if (s[i] === "," && s[i + 1] === " " && prof === 0) { out.push(s.slice(debut, i)); debut = i + 2; }
+  }
+  out.push(s.slice(debut));
+  return out.map((x) => x.trim()).filter(Boolean);
+}
 /** Un gabarit de texte à un trou (`f("§")`) devenu motif, le trou capturé : « … (jusqu'au §) … » → /… \(jusqu'au (.*?)\) …/. */
 const motifDe = (f: (x: string) => string) => new RegExp(echapper(f("§").trim()).replace("§", "(.*?)"));
 
 /**
  * Le « pourquoi » de la course d'un jour de malaise, COMPOSÉ par priorité pour que chaque phrase de sécurité tienne
  * dans ce que l'écriture garde (`POURQUOI_MAX`) : le conseil de ne pas prendre le départ, l'accord du kiné, l'effort
- * contrôlé (« seul ton médecin peut lever cette limite ») — ces trois-là tiennent toujours (554 caractères au plus,
- * en allemand) —, puis le feu rouge (entier, ou réduit à ses motifs, ou à son premier : le conseil dit déjà de ne pas
+ * contrôlé (« seul ton médecin peut lever cette limite »), l'orientation douleur (« … consulte un médecin ou un
+ * masseur-kinésithérapeute ») — ces quatre-là tiennent toujours, préambule du conseil raccourci (décision de Cyprien,
+ * 23/11/2026) —, puis le feu rouge (entier, ou réduit à ses motifs, ou à son premier : le conseil dit déjà de ne pas
  * prendre le départ),
  * puis le reste s'il y a la place (relecteur I et @HeadCoach, 5e tour : placé en tête, le conseil poussait l'accord du
  * kiné hors de la coupe). Idempotent.
@@ -382,11 +396,12 @@ export function pourquoiCourseMalaise(why: string, l: Lang): string {
   };
   const kine = prendre(motifDe(T[l].course));
   const controle = prendre(new RegExp(echapper(PLAN_T[l].courseWhyControle)));
+  const douleur = prendre(new RegExp(echapper(PLAN_T[l].douleurOrientation.trim())));
   const feu = prendre(motifDe(PLAN_T[l].courseFeuRouge));
   // Le feu rouge réduit à ses motifs, puis à son PREMIER motif (le second peut être long : une reprise après un arrêt).
   const avantMotif = PLAN_T[l].courseFeuRouge("§").split("§")[0].trim();
   const feuCourt = feu ? `${avantMotif} ${feu[1]}.` : null;
-  const feuPremier = feu ? `${avantMotif} ${feu[1].split(", ")[0]}.` : null;
+  const feuPremier = feu ? `${avantMotif} ${motifsDe(feu[1])[0]}.` : null;
   let out = conseil;
   // La première des formes proposées qui tient.
   const ajouter = (...formes: (string | null | undefined)[]) => {
@@ -394,6 +409,7 @@ export function pourquoiCourseMalaise(why: string, l: Lang): string {
   };
   ajouter(kine?.[0].trim());
   ajouter(controle?.[0]);
+  ajouter(douleur?.[0]);
   ajouter(feu?.[0].trim(), feuCourt, feuPremier);
   ajouter(reste.replace(/\s+/g, " ").trim());
   return out;

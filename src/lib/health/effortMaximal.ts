@@ -53,19 +53,19 @@ export function pilotageSensation(healthConditions: unknown): boolean {
 export const MALAISE_T: Record<Lang, { motif: string; why: string; course: string }> = {
   fr: { motif: "bilan du matin après une séance : fatigue marquée — repos aujourd'hui ; si cela se répète, parles-en à ton médecin",
     why: "Ton bilan de ce matin montre une fatigue marquée après ta dernière séance : avec l'antécédent déclaré dans ta santé, on se repose aujourd'hui. Si cela se répète, parles-en à ton médecin.",
-    course: " ⚠️ Ton bilan de ce matin montre une fatigue marquée après ta dernière séance : avec l'antécédent déclaré dans ta santé, mieux vaut ne pas prendre le départ aujourd'hui — la décision t'appartient. Parles-en à ton médecin avant ta prochaine course." },
+    course: " ⚠️ Bilan du matin : nettement plus mal après ta dernière séance. Mieux vaut ne pas prendre le départ aujourd'hui — la décision t'appartient. Parles-en à ton médecin avant ta prochaine course." },
   en: { motif: "morning check-in after a session: marked fatigue — rest today; if it happens again, talk to your doctor",
     why: "Your check-in this morning shows marked fatigue after your last session: with the health history you declared, today is a rest day. If it happens again, talk to your doctor.",
-    course: " ⚠️ Your check-in this morning shows marked fatigue after your last session: with the health history you declared, it is better not to start today — the decision is yours. Talk to your doctor before your next race." },
+    course: " ⚠️ Morning check-in: clearly worse after your last session. It is better not to start today — the decision is yours. Talk to your doctor before your next race." },
   de: { motif: "Morgen-Check nach einer Einheit: deutliche Müdigkeit — heute Ruhe; wenn es wieder vorkommt, sprich mit deiner Ärztin oder deinem Arzt",
     why: "Dein Morgen-Check zeigt deutliche Müdigkeit nach deiner letzten Einheit: Mit der angegebenen Vorgeschichte ist heute Ruhetag. Wenn es wieder vorkommt, sprich mit deiner Ärztin oder deinem Arzt.",
-    course: " ⚠️ Dein Morgen-Check zeigt deutliche Müdigkeit nach deiner letzten Einheit: Mit der angegebenen Vorgeschichte startest du heute besser nicht — die Entscheidung liegt bei dir. Sprich vor deinem nächsten Rennen mit deiner Ärztin oder deinem Arzt." },
+    course: " ⚠️ Morgen-Check: nach der letzten Einheit deutlich schlechter. Starte heute besser nicht — die Entscheidung liegt bei dir. Sprich vor deinem nächsten Rennen mit deiner Ärztin oder deinem Arzt." },
   es: { motif: "chequeo matinal tras una sesión: cansancio marcado — descanso hoy; si se repite, háblalo con tu médico",
     why: "Tu chequeo de esta mañana muestra un cansancio marcado tras tu última sesión: con el antecedente declarado en tu salud, hoy toca descanso. Si se repite, háblalo con tu médico.",
-    course: " ⚠️ Tu chequeo de esta mañana muestra un cansancio marcado tras tu última sesión: con el antecedente declarado en tu salud, mejor no tomar la salida hoy — la decisión es tuya. Háblalo con tu médico antes de tu próxima carrera." },
+    course: " ⚠️ Chequeo de la mañana: claramente peor tras tu última sesión. Mejor no tomar la salida hoy — la decisión es tuya. Háblalo con tu médico antes de tu próxima carrera." },
   pt: { motif: "balanço da manhã após uma sessão: cansaço marcado — descanso hoje; se se repetir, fala com o teu médico",
     why: "O teu balanço desta manhã mostra um cansaço marcado após a tua última sessão: com o antecedente declarado na tua saúde, hoje é dia de descanso. Se se repetir, fala com o teu médico.",
-    course: " ⚠️ O teu balanço desta manhã mostra um cansaço marcado após a tua última sessão: com o antecedente declarado na tua saúde, é melhor não partir hoje — a decisão é tua. Fala com o teu médico antes da tua próxima prova." },
+    course: " ⚠️ Balanço da manhã: claramente pior após a tua última sessão. É melhor não partir hoje — a decisão é tua. Fala com o teu médico antes da tua próxima prova." },
 };
 
 /**
