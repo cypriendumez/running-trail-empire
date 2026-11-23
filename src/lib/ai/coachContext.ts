@@ -1416,8 +1416,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const fmtPace = (secPerKm: number) => `${Math.floor(secPerKm / 60)}'${String(Math.round(secPerKm % 60)).padStart(2, "0")}`;
   // ⚠️ UN TEST DE LACTATE PASSE DEVANT (lib/coach/lactate) : il MESURE le seuil, la vitesse
   // critique l'ajuste sur des efforts. Six mois au plus ; sinon, la vitesse critique.
-  const thresholdPace = sensation ? null : lactate ? fmtAllure(lactate.lt2.allureSec)
+  // À la sensation, elle n'est ni affichée ni prescrite, mais elle borne encore la DOSE (plafond de Daniels, `progMin`) :
+  // masquer n'est pas effacer (@HeadCoach, 5e tour : sans elle, 26 min sous le seuil au lieu de 10).
+  const thresholdPaceCalcul = lactate ? fmtAllure(lactate.lt2.allureSec)
     : csMs && csMs > 1 ? fmtPace(1000 / csMs) : null;
+  const thresholdPace = sensation ? null : thresholdPaceCalcul;
   const bestLine = pc?.best?.length
     ? pc.best.map(b => {
         const t = b.sec, mm = Math.floor(t / 60), ss = Math.round(t % 60);
@@ -2081,7 +2084,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const capIntervalKm = Math.min(10, weeklyRef * 0.08);
   const capThresholdKm = weeklyRef * 0.10;
   const thrSecPerKm = (() => {
-    const m = (thresholdPace ?? "").match(/(\d+)['’](\d{2})/);
+    const m = (thresholdPaceCalcul ?? "").match(/(\d+)['’](\d{2})/);
     return m ? Number(m[1]) * 60 + Number(m[2]) : null;
   })();
 

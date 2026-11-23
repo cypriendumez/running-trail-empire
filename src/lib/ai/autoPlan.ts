@@ -322,8 +322,8 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
       + windAdvice(f.windMaxKmh).penaltySecPerKm;
   };
 
-  const paceFor = (i: number): string | null => {
-    const base = ctx.easyPace;
+  /** L'allure facile du jour i, pénalité météo comprise, à partir de `base`. */
+  const allureDuJour = (base: string | null | undefined, i: number): string | null => {
     if (!base) return null;
     const m = base.match(/(\d+)['’:](\d{2})/);
     const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
@@ -333,6 +333,10 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     const sec = Number(m[1]) * 60 + Number(m[2]) + penalty;
     return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`;
   };
+  /** L'allure AFFICHÉE (vide à la sensation). */
+  const paceFor = (i: number): string | null => allureDuJour(ctx.easyPace, i);
+  /** L'allure des CALCULS (découpe, durées) : à la sensation, celle qu'on n'affiche pas. Jamais écrite. */
+  const paceCalcFor = (i: number): string | null => allureDuJour(ctx.allureCalcul ?? ctx.easyPace, i);
 
   /**
    * UN FOOTING OU UNE SORTIE LONGUE DÉCOUPÉS : échauffement, corps, retour au calme.
@@ -351,7 +355,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
    * toute la distance et l'échauffement le réglage du profil, faute de mieux que d'inventer.
    */
   const decoupe = (totalKm: number, i: number): { e: number; k: number; corps: number } => {
-    const m = paceFor(i)?.match(/(\d+)['’:](\d{1,2})/);
+    const m = paceCalcFor(i)?.match(/(\d+)['’:](\d{1,2})/);
     if (!m) return { e: warm, k: cool, corps: totalKm };
     const secKm = Number(m[1]) * 60 + Number(m[2]);
     const totalMin = (totalKm * secKm) / 60;
@@ -642,7 +646,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   if (longIdx >= 0) {
     put(longIdx, bike
       ? { type: "Vélo", title: (l) => PLAN_T[l].veloLongTitre,
-          detail: (l) => PLAN_T[l].veloLongDetail(warm, durationFor(longRunKm, paceFor(longIdx)) ?? "1h30", cycleNote(l)),
+          detail: (l) => PLAN_T[l].veloLongDetail(warm, durationFor(longRunKm, paceCalcFor(longIdx)) ?? "1h30", cycleNote(l)),
           why: (l) => PLAN_T[l].veloLongWhy, tags: tags("Vélo", "Z2", "Long") }
       : (() => {
           // ── SORTIE LONGUE : PLUS UN SIMPLE BLOC DE Z2 ────────────────────────
@@ -654,7 +658,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
           //
           // Trois conditions pour oser : un athlète qui a de l'historique, une fraîcheur
           // qui le permet, et une distance suffisante pour que la fin ait un sens.
-          const p = paceFor(longIdx);
+          const p = paceFor(longIdx), pCalcul = paceCalcFor(longIdx);
           const easyTag = p ? ` (~${p}/km)` : "";
           // Méthode norvégienne : deux journées de double seuil portent TOUTE l'intensité de la
           // semaine ; la sortie longue reste facile, sans bloc ni finish progressif.
@@ -676,7 +680,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
             // déjà fatiguées, c'est ce qui se passe le jour J.
             const spec = Math.max(2, Math.round(longRunKm * 0.25));
             return { type: "Sortie longue", title: (l: Lang) => PLAN_T[l].longSpecTitre,
-              detail: (l: Lang) => PLAN_T[l].longSpecDetail(decoupe(longRunKm - spec, longIdx).e, kmAndTime(decoupe(longRunKm - spec, longIdx).corps, p, l), easyTag, nRaw(spec, l), goalPace, decoupe(longRunKm - spec, longIdx).k, `${gapNote(l)}${cycleNote(l)}`),
+              detail: (l: Lang) => PLAN_T[l].longSpecDetail(decoupe(longRunKm - spec, longIdx).e, kmAndTime(decoupe(longRunKm - spec, longIdx).corps, pCalcul, l), easyTag, nRaw(spec, l), goalPace, decoupe(longRunKm - spec, longIdx).k, `${gapNote(l)}${cycleNote(l)}`),
               why: (l: Lang) => PLAN_T[l].longSpecWhy,
               tags: tagLong("Spécifique") };
           }
@@ -687,12 +691,12 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
               const sec = Number(m[1]) * 60 + Number(m[2]) - 20; return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`; })() : null;
             const third = Math.max(2, Math.round(decoupe(longRunKm, longIdx).corps / 3));
             return { type: "Sortie longue", title: (l: Lang) => PLAN_T[l].longProgTitre,
-              detail: (l: Lang) => PLAN_T[l].longProgDetail(decoupe(longRunKm, longIdx).e, kmAndTime(decoupe(longRunKm, longIdx).corps, p, l), easyTag, nRaw(third, l), fast, decoupe(longRunKm, longIdx).k, `${gapNote(l)}${cycleNote(l)}`),
+              detail: (l: Lang) => PLAN_T[l].longProgDetail(decoupe(longRunKm, longIdx).e, kmAndTime(decoupe(longRunKm, longIdx).corps, pCalcul, l), easyTag, nRaw(third, l), fast, decoupe(longRunKm, longIdx).k, `${gapNote(l)}${cycleNote(l)}`),
               why: (l: Lang) => PLAN_T[l].longProgWhy,
               tags: tagLong("Progressif") };
           }
           return { type: "Sortie longue", title: (l: Lang) => PLAN_T[l].longTitre,
-            detail: (l: Lang) => PLAN_T[l].longDetail(decoupe(longRunKm, longIdx).e, kmAndTime(decoupe(longRunKm, longIdx).corps, p, l), easyTag, decoupe(longRunKm, longIdx).k, `${gapNote(l)}${cycleNote(l)}`),
+            detail: (l: Lang) => PLAN_T[l].longDetail(decoupe(longRunKm, longIdx).e, kmAndTime(decoupe(longRunKm, longIdx).corps, pCalcul, l), easyTag, decoupe(longRunKm, longIdx).k, `${gapNote(l)}${cycleNote(l)}`),
             why: (l: Lang) => (ctx.volume.longRunEased
               // Une sortie longue raccourcie sans explication passe pour une erreur du plan :
               // l'athlète voit un chiffre plus petit que la semaine d'avant et n'en sait rien.
@@ -921,7 +925,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     type: "Endurance",
     title: (l) => { const v = varianteFooting(rang, easySlots.length, gardesDu(i));
       return v === "lignes" ? PLAN_T[l].enduranceTitreLignes : v === "progressif" ? PLAN_T[l].enduranceTitreProg : PLAN_T[l].enduranceTitre; },
-    detail: (l) => PLAN_T[l].enduranceDetail(decoupe(distances[rang] ?? easyKm, i).e, kmAndTime(decoupe(distances[rang] ?? easyKm, i).corps, paceFor(i), l),
+    detail: (l) => PLAN_T[l].enduranceDetail(decoupe(distances[rang] ?? easyKm, i).e, kmAndTime(decoupe(distances[rang] ?? easyKm, i).corps, paceCalcFor(i), l),
       paceFor(i) ? ` (~${paceFor(i)}/km)` : "", decoupe(distances[rang] ?? easyKm, i).k, gapNote(l), doubles, cycleNote(l))
       + (() => { const v = varianteFooting(rang, easySlots.length, gardesDu(i));
         return v === "lignes" ? PLAN_T[l].lignesDroites : v === "progressif" ? PLAN_T[l].footingProgressif : ""; })(),
@@ -1194,11 +1198,11 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
       (`${d.tags.join(" ")} ${d.detail}`.match(/(\d+(?:[.,]\d+)?)\s*km/)?.[1] ?? "").replace(",", "."));
     const dureeDe = (d: PlanDay): string => {
       const km = kmDe(d);
-      return (Number.isFinite(km) && km > 0 ? durationFor(km, ctx.allureCalcul ?? ctx.easyPace) : null) ?? "40 min";
+      return (Number.isFinite(km) && km > 0 ? durationFor(km, ctx.easyPace) : null) ?? "40 min";
     };
     const minutesDe = (d: PlanDay): number | null => {
       const km = kmDe(d);
-      const m = (ctx.allureCalcul ?? ctx.easyPace)?.match(/(\d+)['’:](\d{1,2})/);
+      const m = ctx.easyPace?.match(/(\d+)['’:](\d{1,2})/);
       return Number.isFinite(km) && km > 0 && m ? Math.round((km * (Number(m[1]) * 60 + Number(m[2]))) / 60) : null;
     };
 

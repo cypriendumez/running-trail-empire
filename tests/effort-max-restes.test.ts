@@ -21,6 +21,7 @@ import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachCon
 import { buildWeekPlan, consignesSurPlan, planALaSensation } from "../src/lib/ai/autoPlan";
 import { dureeSeance } from "../src/lib/coach/consignesPlan";
 import { PLAN_T } from "../src/lib/ai/planI18n";
+import { etiquettesALaSensation } from "../src/lib/coach/sensation";
 import { packJourJ } from "../src/lib/coach/jourJ";
 import { JOURJ_T } from "../src/lib/coach/jourJI18n";
 import { aLaSensation } from "../src/lib/coach/sensation";
@@ -278,6 +279,45 @@ async function main() {
     const coach = codeNu("src/lib/ai/autoCoach.ts");
     assert.match(coach, /const week = planALaSensation\(ctx, avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, jourPlan\), jourPlan\)\);/, "le coach ne refait plus la sensation après sa seconde passe de consignes");
     assert.match(coach, /\? planALaSensation\(ctx, avecCourseCEcartee\(ctx, appliquerConseils\(week, relecture\.conseils\), jourPlan\)\)/, "le coach ne refait plus la sensation après les conseils");
+  });
+
+  await test("grossesse contre sa jumelle cardiaque : à la sensation, la MÊME dose — mêmes séances, mêmes kilomètres et minutes (minutes sous le seuil comprises), seule l'allure disparaît", async () => {
+    // @HeadCoach et relecteur J, 5e tour : masquer l'allure n'est pas l'effacer des calculs. Elle bornait encore le
+    // plafond de Daniels (2×13 min sous le seuil au lieu de 2×5), la découpe des sorties, le coût d'une séance sous le
+    // seuil et le plancher des footings.
+    // Deux volumes : six sorties de 10 km par semaine, et trois de 6 km (là où les plafonds JOUENT : 10 % du volume au
+    // seuil, coût d'une séance, plancher des footings).
+    const BAS = Array.from({ length: 70 }, (_, k) => k + 1).filter((n) => n % 7 === 1 || n % 7 === 3 || n % 7 === 5).map((n) => ({
+      user_id: "u", date: ilYa(n), type: "easy", sport: "run", distance_km: 6, duration_seconds: 2100, elevation_gain_m: 20, avg_hr: 135, max_hr: 150, tss: 35, hr_zone_seconds: [400, 1700, 0, 0, 0] }));
+    const BAS4 = Array.from({ length: 70 }, (_, k) => k + 1).filter((n) => n % 7 !== 0 && n % 7 !== 2 && n % 7 !== 4).map((n) => ({
+      user_id: "u", date: ilYa(n), type: "easy", sport: "run", distance_km: 6, duration_seconds: 2100, elevation_gain_m: 20, avg_hr: 135, max_hr: 150, tss: 35, hr_zone_seconds: [400, 1700, 0, 0, 0] }));
+    // …et le faible volume réparti sur six jours disponibles : le plancher des footings (25 min) décide combien en tiennent.
+    const jumelle = async (c: string, cs: boolean, obj: Ligne, seances: Ligne[], jours: number) => buildAthleteContext(fauxClient({
+      profiles: [{ ...profil([c]), days_per_week: jours, ...(cs ? { pace_curve: { criticalSpeed: 3.75 } } : {}) }], performance_baselines: BASE, workouts: seances, notifications: [obj] }), "u");
+    // Les nombres d'un texte (« 5 km », « 28 min », « 2×5 min »), sans les allures (« 5'38/km »).
+    const dose = (t: string) => t.replace(/~?\d{1,2}['’]\d{2}(?:\/km)?/g, "").match(/\d+(?:[.,]\d+)?\s*(?:×\s*\d+(?:[.,]\d+)?\s*)?(?:km|min)\b/g) ?? [];
+    const sousSeuil = (p: Jour[]) => p.filter((d) => d.type === "Seuil").map((d) => d.detail.match(/(\d+)\s*×\s*(\d+)\s*min/)).reduce((s, m) => s + (m ? Number(m[1]) * Number(m[2]) : 0), 0);
+    let qualites = 0, allures = 0;
+    let plafonne = 0;
+    for (const [seances, jours] of [[SEANCES, 6], [BAS, 3], [BAS, 6], [BAS4, 6], [BAS4, 5]] as const) for (const cs of [true, false]) for (const obj of [objectif(10, 40), objectif(21.1, 40), objectif(42.2, 60)]) {
+      const g = await jumelle("grossesse", cs, obj, seances, jours), cj = await jumelle("cardiaque", cs, obj, seances, jours);
+      assert.equal(g.pilotageSensation, true); assert.equal(cj.pilotageSensation, false);
+      for (let k = 0; k <= 6; k++) {
+        const jour = new Date(`${ilYa(-k)}T12:00:00Z`);
+        const pg = buildWeekPlan(g, jour), pc = buildWeekPlan(cj, jour);
+        const quand = `${seances === SEANCES ? "60 km" : `${seances === BAS ? 18 : 24} km sur ${jours} jours`} · ${obj.data.distanceKm} km${cs ? ", vitesse critique" : ""} · J+${k}`;
+        if (seances !== SEANCES && cs && sousSeuil(pc) > 0 && sousSeuil(pc) < 20) plafonne++;
+        assert.deepEqual(pg.map((d) => `${d.date} ${d.type}`), pc.map((d) => `${d.date} ${d.type}`), `${quand} : pas les mêmes séances`);
+        for (const [i, d] of pg.entries()) assert.deepEqual(dose(d.detail), dose(pc[i].detail), `${quand} · ${d.date} ${d.type} : « ${d.detail.slice(0, 140)} » contre « ${pc[i].detail.slice(0, 140)} »`);
+        assert.equal(sousSeuil(pg), sousSeuil(pc), `${quand} : ${sousSeuil(pg)} min sous le seuil, ${sousSeuil(pc)} pour sa jumelle`);
+        if (sousSeuil(pc) > 0) qualites++;
+        if (pc.some((d) => ALLURE.test(d.detail))) allures++;
+      }
+    }
+    assert.ok(qualites > 0 && allures > 0, `précondition : séances sous le seuil (${qualites}) et allures chez la jumelle (${allures})`);
+    assert.ok(plafonne > 0, "précondition : à faible volume, le plafond de Daniels ne borne jamais la séance sous le seuil de la jumelle");
+    // Deux étiquettes de zone sur un même jour : UNE étiquette « Ressenti » (relecteur J).
+    assert.deepEqual(etiquettesALaSensation(["Endurance", "Z1", "FC Z2"], "fr"), ["Endurance", "Ressenti"]);
   });
 
   await test("grossesse : RIEN sur la montre — le coach et les trois routes admin ne construisent aucune séance (le coach retire celle qu'il avait posée)", () => {

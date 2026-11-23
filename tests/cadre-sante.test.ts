@@ -34,7 +34,8 @@ import { buildWeekPlan, consignesSurPlan, sansCourseCEcartee, avecCourseCEcartee
 import { appliquerAjustement } from "../src/lib/coach/ajustementApplique";
 import { validerAjustement } from "../src/lib/ai/ajustement";
 import { composerPourquoi, LONGUEUR_MAX } from "../src/lib/ai/relectureSemaine";
-import { appliquerMalaise } from "../src/lib/coach/consignesPlan";
+import { appliquerMalaise, pourquoiCourseMalaise, POURQUOI_MAX, phraseAccordKine } from "../src/lib/coach/consignesPlan";
+import { PLAN_T } from "../src/lib/ai/planI18n";
 import type { Lang } from "../src/lib/i18n/translations";
 import { cadreDeSante, lignesCadre, CADRE_FR, type CadreSante } from "../src/lib/coach/cadreSante";
 import { missionSeanceDuJour, inviteSeanceDuJour } from "../src/lib/ai/missionSeance";
@@ -300,6 +301,19 @@ function verifier(ctx: AthleteContext, p: ReturnType<typeof buildWeekPlan>, cas:
       for (const d of jour0) for (const l of LANGUES) {
         const why = texteDe(d, l).why, conseil = MALAISE_T[l].course.trim();
         assert.ok(why.startsWith(conseil), `${quand} : le conseil du malaise n'est pas EN TÊTE du « pourquoi » de la course (${l}) : « ${why.slice(0, 80)} »`);
+        // Le « pourquoi » tient TOUT ENTIER dans ce que l'écriture garde (relecteur I, @HeadCoach, 5e tour) : rien n'est coupé.
+        assert.ok(why.length <= POURQUOI_MAX, `${quand} : « pourquoi » de ${why.length} caractères, coupé à l'écriture (${l})`);
+        // Chaque phrase de sécurité de la même course SANS malaise y est : l'accord du kiné (⚠️), l'effort contrôlé
+        // (« seul ton médecin… »), et le feu rouge (au moins son motif).
+        const sans = buildWeekPlan({ ...ctx, malaiseApresEffort: false }, new Date(`${jour}T12:00:00Z`)).find((x) => x.date === jour && x.type === "Course");
+        if (sans) {
+          const whySans = texteDe(sans, l).why;
+          for (const phrase of whySans.split(/(?<=[.!])\s+(?=⚠️)/).filter((p) => p.trim().startsWith("⚠️")))
+            assert.ok(why.includes(phrase.trim()), `${quand} : « ${phrase.trim().slice(0, 70)} » disparaît du jour de malaise (${l})`);
+          if (whySans.includes(PLAN_T[l].courseWhyControle)) assert.ok(why.includes(PLAN_T[l].courseWhyControle), `${quand} : l'effort contrôlé disparaît (${l})`);
+          const feu = PLAN_T[l].courseFeuRouge("§").split("§")[0].trim();
+          if (whySans.includes(feu)) assert.ok(why.includes(feu), `${quand} : le feu rouge disparaît du jour de malaise (${l})`);
+        }
         // Ce que le coach ENREGISTRE : la coupe à 640, et le conseil Premium le plus long logé dans le « pourquoi ».
         for (const enregistre of [why.slice(0, 640), composerPourquoi(why, "x".repeat(LONGUEUR_MAX)).slice(0, 640)])
           assert.ok(enregistre.includes(conseil), `${quand} : le conseil du malaise disparaît du « pourquoi » enregistré (${l}, ${why.length} caractères)`);
@@ -386,6 +400,9 @@ async function main() {
     assert.deepEqual(l({ conditions: ["grossesse"], consignes: k }),
       [CADRE_FR.sansIntensite, CADRE_FR.sensation, CADRE_FR.dureeMax(40, "2026-12-31"), CADRE_FR.seancesMax(2, "2026-12-31"), CADRE_FR.courseControle, CADRE_FR.courseKine("2026-12-31"), CADRE_FR.limite]);
     assert.deepEqual(l({ conditions: ["cardiaque"] }), [CADRE_FR.seuilBas, CADRE_FR.courseControle, CADRE_FR.limite]);
+    // À la sensation, pas d'« allure tenue » (relecteur J, 5e tour).
+    assert.match(CADRE_FR.seuilBas, /à allure tenue/, "précondition");
+    assert.ok(l({ conditions: ["grossesse"] }).some((x) => x.includes("en blocs longs à la sensation")) && !l({ conditions: ["grossesse"] }).some((x) => x.includes("allure tenue")), "grossesse : la séance sous le seuil « à allure tenue »");
     assert.match(CADRE_FR.dureeMax(40, "2026-12-31"), /40 min au plus.*course A ou B à part.*jusqu'au 31\/12/);
     assert.doesNotMatch(CADRE_FR.marcheCourse(10, 11), /alternance/, "« des alternances » est faux aux dernières étapes (course continue)");
   });
@@ -504,6 +521,23 @@ async function main() {
       assert.equal(ctx.malaiseApresEffort, true, `avis médical + malaise · J+${k} : précondition`);
       assert.equal(ctx.cadreSante?.niveau, "sansSeance");
       for (const d of plan(ctx, k).filter((x) => x.date === jour)) assert.ok(!d.why.includes(MALAISE_T.fr.why), `avis médical + malaise · J+${k} : le repos du malaise remplace celui de l'avis médical`);
+    }
+    // La composition par priorité : conseil, accord du kiné, effort contrôlé, feu rouge (entier ou son motif), reste.
+    const KINE = Object.fromEntries(LANGUES.map((l) => [l, phraseAccordKine(l, "02/01")])) as Record<Lang, string>;
+    // La borne est la coupe de l'ÉCRITURE (lib/ai/autoCoach), pas une constante qui pourrait s'en écarter.
+    const coupe = [...codeNu("src/lib/ai/autoCoach.ts").matchAll(/why: (?:d|t)\.why\.slice\(0, (\d+)\)/g)].map((m) => Number(m[1]));
+    assert.deepEqual(coupe, [POURQUOI_MAX, POURQUOI_MAX], `la coupe de l'écriture (${coupe.join(", ")}) n'est pas POURQUOI_MAX (${POURQUOI_MAX})`);
+    for (const l of LANGUES) for (const motif of ["douleur au genou", "douleur au genou signalée hier, douleur à la hanche, jambes lourdes au réveil et sommeil court"]) {
+      assert.ok(KINE[l].includes("02/01"), "précondition");
+      const charge = `${PLAN_T[l].courseWhyControle}${PLAN_T[l].courseFeuRouge(motif)}${KINE[l]}`;
+      const a = pourquoiCourseMalaise(charge, l);
+      assert.ok(a.length <= POURQUOI_MAX, `${l} : ${a.length} caractères`);
+      assert.ok(a.startsWith(MALAISE_T[l].course.trim()), `${l} : le conseil n'est pas en tête`);
+      assert.ok(a.includes(KINE[l].trim()), `${l} : l'accord du kiné manque (« ${a} »)`);
+      assert.ok(a.includes(PLAN_T[l].courseWhyControle), `${l} : l'effort contrôlé manque`);
+      assert.ok(a.includes(PLAN_T[l].courseFeuRouge("§").split("§")[0].trim()), `${l} : le feu rouge manque, même réduit à son motif`);
+      assert.equal(pourquoiCourseMalaise(a, l), a, `${l} : la composition n'est pas idempotente`);
+      assert.ok(a.indexOf(KINE[l].trim()) < a.indexOf(PLAN_T[l].courseWhyControle), `${l} : l'ordre de priorité n'est pas tenu`);
     }
     // Un jour doublé (matin + soir) : UN repos, sans créneau ; une course et un footing du soir : la course seule.
     const jourDouble = (type: string, moment: "matin" | "soir"): PlanDay => ({ date: "2026-12-01", type, title: type, detail: "", why: "", tags: [], confirmed: true, moment });
@@ -658,7 +692,8 @@ async function main() {
   await test("l'enveloppe du dossier sous cadre : le système du coach, l'invite de la séance du jour, la relecture Premium et les routes admin", () => {
     // Un jour de malaise, la course du jour n'est pas relue par le coach avancé (@HeadCoach, 4e tour) : son conseil
     // (« COMMENT réussir CETTE séance ») contredirait celui de ne pas prendre le départ.
-    assert.match(codeNu("src/lib/ai/relectureServeur.ts"), /const jours = joursARelire\(o\.week, o\.from\)\.filter\(\(d\) => !\(o\.ctx\.malaiseApresEffort && d\.date === o\.from\)\);/, "la relecture Premium relit la course d'un jour de malaise");
+    // …celle du JOUR 0 du plan (le jour du malaise), pas `from` (demain quand une séance est déjà enregistrée aujourd'hui).
+    assert.match(codeNu("src/lib/ai/relectureServeur.ts"), /const jour0 = o\.week\.reduce\(\(min, d\) => \(d\.date < min \? d\.date : min\), o\.week\[0\]\?\.date \?\? o\.from\);\s*const jours = joursARelire\(o\.week, o\.from\)\.filter\(\(d\) => !\(o\.ctx\.malaiseApresEffort && d\.date === jour0\)\);/, "la relecture Premium relit la course d'un jour de malaise (ou écarte celle de demain)");
     // Le système ordinaire, mot pour mot ; celui du cadre, sans un mot d'intensité.
     assert.equal(systemeCoach({ cadreSante: null }), COACH_SYSTEM);
     assert.match(COACH_SYSTEM, /ose la qualité/, "précondition : le système ordinaire pousse à la qualité");

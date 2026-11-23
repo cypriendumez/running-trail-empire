@@ -23,7 +23,8 @@ export async function relireSemaine(
   try {
     // Un jour de malaise (covid long), la course du jour n'est pas relue : « COMMENT réussir CETTE séance » contredirait
     // le conseil de ne pas prendre le départ (@HeadCoach, 23/11/2026).
-    const jours = joursARelire(o.week, o.from).filter((d) => !(o.ctx.malaiseApresEffort && d.date === o.from));
+    const jour0 = o.week.reduce((min, d) => (d.date < min ? d.date : min), o.week[0]?.date ?? o.from);
+    const jours = joursARelire(o.week, o.from).filter((d) => !(o.ctx.malaiseApresEffort && d.date === jour0));
     if (!jours.length) return null;
     const emp = empreinte(jours, o.lang);
     const { data: st, error } = await admin.from("notifications").select("data")

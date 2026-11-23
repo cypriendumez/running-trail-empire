@@ -167,7 +167,7 @@ RÈGLES ABSOLUES
 - Tu n'inventes aucun chiffre : n'utilise que ceux du contexte fourni.
 
 CE QUE FAIT CHAQUE ACTION SI L'ATHLÈTE L'APPLIQUE (la séance change vraiment, jusqu'à sa montre)
-- « alleger » : la séance du jour « date » devient une récupération de 25 min en Z1. Pas sur un repos, une récupération, du renfo ou du vélo.
+- « alleger » : la séance du jour « date » devient une récupération de 25 min en Z1. Pas sur un repos, une récupération, du renfo, du vélo ou une marche-course.
 - « decaler » : la séance du jour « date » passe au jour « vers », qui DOIT être un jour de repos du plan ; « date » devient repos.
 - « echanger » : les séances de « date » et de « vers » (deux jours d'entraînement) échangent leur jour.
 - Jamais deux séances dures (qualité ou sortie longue) deux jours d'affilée.

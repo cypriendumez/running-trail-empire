@@ -105,7 +105,9 @@ export const CADRE_FR = {
 /** Les lignes du cadre, dans l'ordre où le dossier les donne. */
 export function lignesCadre(c: CadreSante): string[] {
   const l: string[] = [];
-  l.push(c.niveau === "sansSeance" ? CADRE_FR.sansSeance : c.niveau === "sansIntensite" ? CADRE_FR.sansIntensite : CADRE_FR.seuilBas);
+  // À la sensation, pas d'« allure tenue » : la séance sous le seuil se tient au ressenti (relecteur J, 5e tour).
+  l.push(c.niveau === "sansSeance" ? CADRE_FR.sansSeance : c.niveau === "sansIntensite" ? CADRE_FR.sansIntensite
+    : c.sensation ? CADRE_FR.seuilBas.replace("à allure tenue", "à la sensation") : CADRE_FR.seuilBas);
   if (c.niveau !== "sansSeance") {
     if (c.marcheCourse) l.push(c.marcheCourse.bloquee && c.kine?.dureeMaxMin != null
       ? CADRE_FR.marcheCourseBloquee(c.marcheCourse.etape, c.marcheCourse.total, c.marcheCourse.totalMin, c.kine.dureeMaxMin, c.kine.jusquAu)
