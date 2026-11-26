@@ -430,8 +430,14 @@ export function appliquerMalaise(plan: readonly PlanDay[], jour: string): PlanDa
   const courses = ceJour.filter((d) => d.type === "Course");
   const remplace: PlanDay[] = courses.length
     ? courses.map((d) => reecrire(d, "Course", (l) => ({ ...texteDe(d, l), why: pourquoiCourseMalaise(texteDe(d, l).why, l) })))
-    // UNE seule entrée (un jour doublé perd son créneau : il n'y a plus qu'un repos).
-    : [reecrire({ ...ceJour[0], moment: undefined }, "Repos", (l) => ({ title: PLAN_T[l].reposTitre, detail: PLAN_T[l].reposFinalDetail, why: MALAISE_T[l].why, tags: [PLAN_T[l].tags["Repos"]] }))];
+    // UNE seule entrée (un jour doublé perd son créneau : il n'y a plus qu'un repos). Elle REPORTE l'orientation douleur
+    // que portait un jour remplacé (`orienterDouleur`, lib/ai/autoPlan, la pose sur le premier jour couru d'une semaine
+    // sans renfo) : sinon elle disparaissait de toute la semaine (@HeadCoach, 7e tour).
+    : [reecrire({ ...ceJour[0], moment: undefined }, "Repos", (l) => {
+        const orientation = PLAN_T[l].douleurOrientation;
+        const portee = ceJour.some((d) => texteDe(d, l).why.includes(orientation.trim()));
+        return { title: PLAN_T[l].reposTitre, detail: PLAN_T[l].reposFinalDetail, why: `${MALAISE_T[l].why}${portee ? orientation : ""}`, tags: [PLAN_T[l].tags["Repos"]] };
+      })];
   const i = plan.findIndex((d) => d.date === jour);
   return [...plan.slice(0, i).filter((d) => d.date !== jour), ...remplace, ...plan.slice(i).filter((d) => d.date !== jour)];
 }

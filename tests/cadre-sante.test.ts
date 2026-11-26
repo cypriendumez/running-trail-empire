@@ -466,6 +466,33 @@ async function main() {
     assert.match(bloque.text, /Aucune séance de marche-course n'est prévue cette semaine[^\n]*Aujourd'hui, repos : il s'est senti nettement plus mal après sa dernière séance/, "bloquée un jour de malaise, le dossier tait le malaise que le plan et la mission disent");
   });
 
+  await test("un jour de malaise SANS course, semaine sans renfo : la douleur déclarée garde son orientation (« consulte un médecin ou un masseur-kinésithérapeute ») dans la semaine ENREGISTRÉE, cinq langues", async () => {
+    // @HeadCoach, 7e tour : le repos du malaise remplaçait le premier jour couru, qui portait l'orientation douleur
+    // (`orienterDouleur`, semaine sans renfo) — elle disparaissait de toute la semaine.
+    let eprouves = 0;
+    for (let k = 0; k <= 6; k++) for (const etat of ["pire", "actif", "mieux"]) for (const deuxJours of [false, true]) for (const kineSI of [false, true]) {
+      const jour = ilYa(-k), hier = ilYa(-k + 1);
+      const jd = new Date(`${jour}T12:00:00Z`).getUTCDay();
+      const bilan = { user_id: "u", type: "bilan_matin", created_at: `${jour}T06:00:00Z`, data: { date: jour, fatigue: 5, jambes: 4, stress: 1 } };
+      const douleurDeclaree = { id: "p-genou", user_id: "u", type: "pain_report", created_at: `${hier}T10:00:00Z`, data: { zone: "genou", level: etat === "mieux" ? 3 : 7, date: hier, etat } };
+      const s = sit(["covid_long"], [bilan, douleurDeclaree, ...(kineSI ? [kine({ sansIntensite: true })] : [])],
+        { days_per_week: deuxJours ? 2 : 1, available_days: deuxJours ? [jd, (jd + 3) % 7] : [jd] });
+      const ctx = await contexte({ ...s, seances: [footing(-k + 1), ...FOOTINGS] }, k);
+      const quand = `${etat}${deuxJours ? ", 2 jours" : ", 1 jour"}${kineSI ? ", kiné" : ""} · J+${k}`;
+      assert.equal(ctx.malaiseApresEffort, true, `${quand} : précondition, pas de malaise`);
+      const p = plan(ctx, k);
+      // La même semaine sans malaise porte l'orientation (sinon le cas n'éprouve rien).
+      const sans = buildWeekPlan({ ...ctx, malaiseApresEffort: false }, new Date(`${jour}T12:00:00Z`));
+      if (!sans.some((d) => d.why.includes(PLAN_T.fr.douleurOrientation.trim()))) continue;
+      eprouves++;
+      for (const l of LANGUES) {
+        const orientation = PLAN_T[l].douleurOrientation.trim();
+        assert.ok(p.some((d) => texteDe(d, l).why.slice(0, POURQUOI_MAX).includes(orientation)), `${quand} : l'orientation douleur disparaît de la semaine enregistrée (${l})`);
+      }
+    }
+    assert.ok(eprouves >= 20, `précondition : ${eprouves} semaines seulement portent l'orientation sans malaise`);
+  });
+
   await test("marche-course avec deux jours VOISINS seulement : le plan les pose côte à côte, le dossier ne promet pas « jamais deux jours de suite »", async () => {
     const cas: Cas = { nom: "marche-course, mardi et mercredi seulement", s: { profil: { peut_courir_30min: false, days_per_week: 2, available_days: [2, 3] } }, niveau: "sansIntensite" };
     let voisins = 0;
