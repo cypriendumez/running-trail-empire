@@ -611,6 +611,14 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
       why: (l) => PLAN_T[l].reposIndispoWhy,
     });
   }
+  // ── 1 ter. UN JOUR SANS COURSE ENTRE DEUX SORTIES (`weekPlan.espacer`, règle d'intensité d'un arrêt de plus de
+  // 28 jours) : couru hier, le jour 0 reste au repos. Les footings, eux, s'espacent à l'étape 5.
+  const espacer = ctx.weekPlan.espacer;
+  if (espacer?.hier && isFree(0)) put(0, {
+    type: "Repos", title: (l) => PLAN_T[l].reposTitre, tags: tags("Repos"),
+    detail: (l) => PLAN_T[l].reposEspaceDetail,
+    why: (l) => PLAN_T[l].reposEspaceWhy,
+  });
   // Budget de séances de COURSE pour la semaine (la course elle-même en consomme une).
   // C'est ce plafond qui empêche de prescrire 6 sorties à quelqu'un qui peut en faire 3.
 
@@ -866,7 +874,13 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // Le jour 0 RESTE un créneau de footing même quand la fraîcheur le convertit en
   // récupération : une séance de récup est un footing court, elle porte du kilométrage.
   // (À la différence d'une séance de qualité annulée, dont les 11 km, eux, se libèrent.)
-  for (let i = 0; i <= 6; i++) if (canRun(i)) { easySlots.push(i); spend(); }
+  // Pendant la règle d'intensité d'un long arrêt (`espacer`), un footing ne touche aucun jour couru : sortie longue,
+  // séance dure, course, footing déjà retenu, ni la sortie d'hier pour le jour 0. Les créneaux se prennent espacés,
+  // jamais les premiers de la liste ; un créneau sans place est perdu et rend sa sortie au budget.
+  const SANS_COURSE = new Set(["Repos", "Renfo", "Vélo", "Natation", "Croisé", "Mobilité"]);
+  // La veille n'est pas lue ici : couru hier, l'étape 1 ter a déjà mis le jour 0 au repos.
+  const couruLe = (j: number) => j >= 0 && j <= 6 && (easySlots.includes(j) || (slot[j] != null && !SANS_COURSE.has(slot[j]!.type)));
+  for (let i = 0; i <= 6; i++) if (canRun(i) && (!espacer || (!couruLe(i - 1) && !couruLe(i + 1)))) { easySlots.push(i); spend(); }
   // La séance du jour est arbitrée par la fraîcheur à l'étape 7. Si la qualité prévue
   // aujourd'hui va être remplacée par de la récupération, ses kilomètres ne doivent PAS
   // être décomptés du budget : sinon les footings de la semaine rétrécissent pour
@@ -888,7 +902,15 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   //  trop courte »). Le plancher se dit donc en TEMPS : 25 min à l'allure facile, 4 km
   //  au moins, et 4 km tout court quand l'allure est inconnue.
   const kmMinFooting = footingMinKm(ctx.allureCalcul ?? ctx.easyPace);
-  const affordable = Math.max(0, Math.floor(remaining / kmMinFooting));
+  // PENDANT UNE REPRISE, AUCUN FOOTING PLUS LONG QUE LA SORTIE HABITUELLE D'AVANT L'ARRÊT (`footingMaxKm`, décidé par le
+  // contexte ; avis du directeur scientifique, 26/11/2026). Elle l'emporte sur les 25 minutes du plus petit footing,
+  // et le NOMBRE de footings se compte avec ce plancher borné : des créneaux déjà ouverts et déjà au budget, jamais un
+  // jour de plus. Ce qui ne rentre toujours pas est perdu (en reprise, une semaine sous sa cible est le bon côté de
+  // l'erreur). Le critère des petites semaines (contexte) garde, lui, le plancher de 25 minutes : la borne ne rouvre
+  // jamais une séance dure.
+  const footingMax = ctx.weekPlan.footingMaxKm;
+  const plancherFooting = footingMax != null ? Math.min(kmMinFooting, footingMax) : kmMinFooting;
+  const affordable = Math.max(0, Math.floor(remaining / plancherFooting));
   if (easySlots.length > affordable) {
     for (const i of easySlots.splice(affordable)) { slot[i] = null; runBudget += 1; }
   }
@@ -901,29 +923,42 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // Un footing plus long que la sortie longue n'a aucun sens : c'est la sortie longue qui
   // porte le volume, et deux séances de même durée n'en font qu'une répétée. Constaté sur
   // 3 sorties par semaine — 16 km de « footing » contre 13 km de sortie longue.
-  const easyCap = Math.min(raceIdx >= 0 ? 10 : 18, longIdx >= 0 ? Math.max(4, longRunKm * 0.85) : 18,
+  const easyCapSansBorne = Math.min(raceIdx >= 0 ? 10 : 18, longIdx >= 0 ? Math.max(4, longRunKm * 0.85) : 18,
     // La durée maximale du kinésithérapeute vaut pour CHAQUE sortie, footing compris.
     ctx.consignes?.kmMax ?? Infinity);
+  const easyCap = Math.min(easyCapSansBorne, footingMax ?? Infinity);
   // Plancher à 4 km SAUF si le budget ne le permet pas : mieux vaut une sortie de moins
   // qu'un dépassement de la cible hebdomadaire.
-  const easyKm = Math.min(easyCap, Math.max(rawEasy >= 3 ? kmMinFooting : 3, Math.round(rawEasy)));
+  const easyKm = Math.min(easyCap, Math.max(rawEasy >= 3 ? plancherFooting : 3, Math.round(rawEasy)));
   // Jamais pendant la récupération d'après-course : le volume y est volontairement réduit,
   // et « scinde en DEUX sorties » à J+5 d'un marathon disait l'inverse du bandeau.
-  const doubles = rawEasy > easyCap && raceIdx < 0 && !ctx.recuperation && !ctx.consignes && !ctx.aptitude?.attente;
+  // Ni pendant une reprise après un arrêt (`footingExige`) : la borne de la sortie habituelle ferait dire « scinde en
+  // deux sorties » à un coureur à qui la reprise demande justement de courir moins.
+  const doubles = rawEasy > easyCap && raceIdx < 0 && !ctx.recuperation && !ctx.consignes && !ctx.aptitude?.attente && !ctx.weekPlan.footingExige;
   // ⚠️ TOUS les créneaux recevaient EXACTEMENT la même séance : même titre, même
   // distance, même texte. Trois footings de suite étaient donc trois fois le même
   // footing — l'athlète l'a signalé, et il avait raison. On fait varier la distance
   // autour de la moyenne SANS toucher au volume de la semaine, et un footing porte
   // des lignes droites (coût en fatigue quasi nul, entretien de la vitesse), ce qui
   // compte double une semaine sans aucune séance de qualité.
-  const distances = repartirFootings(easySlots.length, easyKm, rawEasy >= 3 ? kmMinFooting : 3, easyCap);
+  const distances = repartirFootings(easySlots.length, easyKm, rawEasy >= 3 ? plancherFooting : 3, easyCap);
+  // La borne a-t-elle raccourci CE footing ? On le compare, rang par rang et sur les mêmes créneaux, à la répartition que
+  // la semaine lui aurait donnée sans elle (plancher de 25 minutes, plafond ordinaire). Son « pourquoi » ne le dit que
+  // s'il est plus court : un footing que la sortie longue ou les 18 km plafonnaient déjà n'a rien perdu à la borne
+  // (relecture du 26/11/2026).
+  const distancesSansBorne = footingMax == null ? distances : repartirFootings(easySlots.length,
+    Math.min(easyCapSansBorne, Math.max(rawEasy >= 3 ? kmMinFooting : 3, Math.round(rawEasy))), rawEasy >= 3 ? kmMinFooting : 3, easyCapSansBorne);
+  const raccourciParBorne = (rang: number) => footingMax != null && (distances[rang] ?? 0) < (distancesSansBorne[rang] ?? 0) - 0.01;
   const gardes = { taper: ctx.cycle.taper, semaineCourse: raceIdx >= 0, sansHistorique: ctx.noHistory, douleur, effortMax: !!ctx.effortMaximalInterdit };
   // ⚠️ PAR JOUR, pas par semaine (troisième double relecture, 17/11/2026) : pendant une reprise après
   // un arrêt, un footing posé AVANT le premier jour où une séance dure est permise (`debutQualite`)
   // reste simple. Lire l'état de la semaine (« sans-qualite ») laissait des lignes droites et un
   // footing progressif dans la première moitié d'une reprise longue, quand la séance dure n'est
   // permise qu'au 4ᵉ ou au 5ᵉ jour du plan.
-  const gardesDu = (i: number) => ({ ...gardes, reprise: !!ctx.weekPlan.repriseArret && i < debutQualite });
+  const gardesDu = (i: number) => ({ ...gardes, reprise: !!ctx.weekPlan.repriseArret && i < debutQualite,
+    // (Le lendemain de la sortie longue porte en principe le repos complet de l'étape 3 : la garde ne joue que si cette
+    // règle change. Elle reste écrite ici, au même endroit que la règle qu'elle protège.)
+    lignesPermises: !!ctx.weekPlan.lignesPermises, lendemainLongue: longIdx >= 0 && i === longIdx + 1 });
   easySlots.forEach((i, rang) => put(i, {
     type: "Endurance",
     title: (l) => { const v = varianteFooting(rang, easySlots.length, gardesDu(i));
@@ -934,7 +969,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
         return v === "lignes" ? PLAN_T[l].lignesDroites : v === "progressif" ? PLAN_T[l].footingProgressif : ""; })(),
     why: (l) => (ctx.tooMuchIntensity
       ? PLAN_T[l].enduranceWhyTropIntense(nRaw(ctx.tooMuchIntensity, l))
-      : PLAN_T[l].enduranceWhy(nRaw(targetKm, l))),
+      : PLAN_T[l].enduranceWhy(nRaw(targetKm, l))) + (raccourciParBorne(rang) && footingMax != null ? PLAN_T[l].footingBorneReprise(nRaw(footingMax, l)) : ""),
     tags: (l) => [PLAN_T[l].tags["Endurance"], PLAN_T[l].tags["Z2"], PLAN_T[l].tagKm(nRaw(distances[rang] ?? easyKm, l))],
   }));
 

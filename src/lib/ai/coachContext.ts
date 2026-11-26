@@ -250,6 +250,12 @@ export type AthleteContext = {
     /** Reprise après un arrêt (règle d'intensité, marche de sortie ou reprise de volume d'un long arrêt), hors
      *  consignes du kinésithérapeute : le plan ne pose une séance dure que s'il reste un JOUR pour un footing. */
     footingExige?: true;
+    /** Semaine de reprise trop petite, la règle d'intensité finie : un footing peut porter des lignes droites. */
+    lignesPermises?: true;
+    /** Règle d'intensité d'un arrêt de plus de 28 jours : jamais deux jours de course de suite. `hier` : couru hier. */
+    espacer?: { hier: boolean };
+    /** Pendant une reprise, hors consignes du kinésithérapeute : aucun footing plus long (km). Absent : pas de borne. */
+    footingMaxKm?: number;
   };
   /** Doubles séances (matin + soir) : autorisées ou non, et ce qui manque le cas
    *  échéant. Une case cochée qui ne produit rien est un mensonge silencieux —
@@ -2864,6 +2870,29 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   const qualitesTenables = enRepriseArret && !consignes ? qualitesTenablesAvecFooting({
     targetKm, longRunKm, reserveKm: longRunReserveKm, easyPace: allureCalcul, warmMin: warmCool.warm, coolMin: warmCool.cool }) : Infinity;
   const semaineTropPetite = qualitesTenables < 1;
+  // LES LIGNES DROITES D'UNE SEMAINE TROP PETITE (avis du directeur scientifique, 26/11/2026) : la règle d'intensité
+  // finie (marche de sortie, ou reprise de volume d'un long arrêt encore en cours), une semaine « footings seulement »
+  // parce qu'elle est trop petite garde UN footing à lignes droites. Jamais pendant la règle d'intensité (ni donc au
+  // plancher d'une reprise de 6 à 28 jours), jamais sous consignes du kinésithérapeute (la règle des petites semaines
+  // n'y joue pas : `qualitesTenables` y vaut l'infini) ; les autres gardes (douleur, effort maximal interdit, affûtage,
+  // semaine de course) restent dans `varianteFooting`.
+  const lignesPermises = semaineTropPetite && repriseIntensite == null;
+  // AUCUN FOOTING PLUS LONG QUE LA SORTIE HABITUELLE D'AVANT L'ARRÊT, pendant toute reprise (même avis) : plafonné à son
+  // propre volume, un coureur rapide qui courait 3 à 4 km par sortie recevait UN footing de 8 à 11 km. La sortie
+  // habituelle se lit par la même fonction que pendant la règle d'intensité, sur l'arrêt en cours ; jamais sous 3 km ;
+  // inconnue (sorties sans distance), aucune borne. La sortie longue n'est pas touchée. Arrondie au demi-kilomètre
+  // INFÉRIEUR : le plan arrondit ses footings au demi-kilomètre, et 3,3 km y devenaient 3,5 km, au-dessus de la borne.
+  const arretEnCours = repriseIntensite ?? marcheSortie ?? repriseVolumeLongue;
+  const habituelleRepriseKm = enRepriseArret && !consignes && arretEnCours
+    ? sortieHabituelleKm(distancesAvantArret(sortiesPourArret(histRuns, runs), arretEnCours, todayStr)) : null;
+  // UN JOUR SANS COURSE ENTRE DEUX SORTIES (avis du directeur scientifique, 26/11/2026) : pendant la règle d'intensité
+  // d'un arrêt de PLUS de 28 jours. Le plan gardait les premiers créneaux de la semaine : quatre jours de course d'affilée
+  // au 9ᵉ jour d'une reprise après 150 jours d'arrêt. Le souffle revient plus vite que la tolérance des os et des tendons à
+  // la charge. Une sortie courue HIER compte pour le jour 0 : sans elle, le plan glissant se contredirait d'un jour à l'autre.
+  const veille = (() => { const d = new Date(`${todayStr}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })();
+  const espacer = repriseIntensite != null && repriseIntensite.arretJours > ARRET_MAX_JOURS
+    ? { hier: joursArret.some((j) => String(j).slice(0, 10) === veille) } : null;
+  const footingMaxKm = habituelleRepriseKm != null ? Math.max(3, Math.floor(habituelleRepriseKm * 2) / 2) : null;
   const sansLongueNiDure = repriseIntensite != null && (repriseVolumeLongue != null || semaineAuPlancher) && longueRetiree;
   const footingsSeuls = sansLongueNiDure || semaineTropPetite;
   /** La raison que le motif donne : la sortie longue non posée (ou le plancher, dont le texte suffit) là où cette
@@ -3378,6 +3407,9 @@ ${catalog}`;
       ...(qualiteReprise || footingsSeuls ? { repriseArret: !qualiteReprise || qualiteReprise.max === 0 || footingsSeuls ? "sans-qualite" as const : "une-qualite" as const } : {}),
       ...(marcheSortie ? { sortieReprise: true as const } : {}),
       ...(enRepriseArret && !consignes ? { footingExige: true as const } : {}),
+      ...(lignesPermises ? { lignesPermises: true as const } : {}),
+      ...(espacer ? { espacer } : {}),
+      ...(footingMaxKm != null ? { footingMaxKm } : {}),
     },
     // Doubles séances : on tranche ICI, avec le volume REPRÉSENTATIF (médiane des
     // semaines courues) et non le pic — une semaine à 90 km ne fait pas un athlète

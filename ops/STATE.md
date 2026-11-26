@@ -201,11 +201,12 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    toute semaine de reprise trop petite pour porter le seuil ET un footing ne porte que des footings, la marche de
    sortie écrit ses séances dans la dose courte, et un volume d'avant de 12 km ou moins est plafonné à lui-même. Détail
    et limites : `ops/sparring/PROFILS.md`, profil 4. Reste ouvert : le retour d'un coup du volume à la fin de la
-   reprise (la sortie longue et les séances reviennent désormais par la marche de sortie après un long arrêt). Suites
-   demandées par `@HeadCoach`, non commencées : des lignes droites dans un footing pour une semaine trop petite une
-   fois la règle d'intensité finie ; en reprise, aucune sortie plus longue que la sortie habituelle d'avant l'arrêt ;
-   une horloge décalée dans le test de la dose de la marche de sortie ; le texte « à la place du renforcement » sous
-   consigne du kinésithérapeute.
+   reprise (la sortie longue et les séances reviennent désormais par la marche de sortie après un long arrêt). Les
+   quatre suites demandées par `@HeadCoach` (lignes droites dans une semaine trop petite une fois la règle d'intensité
+   finie ; aucun footing de reprise plus long que la sortie habituelle d'avant l'arrêt ; horloge décalée dans le test
+   de la dose ; « à la place du renforcement » sous consigne du kiné) sont écrites le 26/11 sur la branche
+   `fix/suites-reprise`, avec la garde « un jour sans course entre deux sorties » pendant la règle d'intensité d'un
+   arrêt de plus de 28 jours (décision de `@HeadCoach` après la relecture).
    **Fusionné (PR #57, le 17/11) et EN LIGNE** : pacevo.fr sert `24637bab` le 19/11, qui contient #57 à #61.
    Restent ouverts les deux points ci-dessus.
 

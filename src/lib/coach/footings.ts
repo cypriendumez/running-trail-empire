@@ -92,8 +92,10 @@ export type Variante = "base" | "lignes" | "progressif";
  * hors athlète sans historique (relecture du 10/11/2026 : l'écran l'affirmait toujours), et hors
  * reprise sans séance dure (17/11/2026 : la reprise les avait déjà retirées).
  */
-export function lignesRetireesParDouleur(nbFootings: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean; reprise?: boolean; effortMax?: boolean }): boolean {
-  return varianteFooting(1, nbFootings, { ...o, douleur: false }) === "lignes";
+export function lignesRetireesParDouleur(nbFootings: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean; reprise?: boolean; effortMax?: boolean; lignesPermises?: boolean; lendemainLongue?: boolean }): boolean {
+  // N'IMPORTE QUEL footing de la semaine, pas seulement le deuxième : dans une semaine de reprise trop petite, un
+  // footing UNIQUE porte les lignes droites (`lignesPermises`, 26/11/2026).
+  return Array.from({ length: Math.max(0, nbFootings) }, (_, rang) => varianteFooting(rang, nbFootings, { ...o, douleur: false })).includes("lignes");
 }
 
 /**
@@ -106,12 +108,24 @@ export function lignesRetireesParReprise(o: { reprise: boolean; deuxiemeFootingJ
   return o.reprise && (o.deuxiemeFootingJour == null || o.deuxiemeFootingJour < o.qualiteDes);
 }
 
-export function varianteFooting(rang: number, total: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean; douleur?: boolean; reprise?: boolean; effortMax?: boolean }): Variante {
+export function varianteFooting(rang: number, total: number, o: { taper?: boolean; semaineCourse?: boolean; sansHistorique?: boolean; douleur?: boolean; reprise?: boolean; effortMax?: boolean; lignesPermises?: boolean; lendemainLongue?: boolean }): Variante {
   // `reprise` (17/11/2026) : après un arrêt, tant qu'aucune séance dure n'est permise, le plan
   // annonce « sans séance dure » — ni accélérations ni fin de footing plus rapide non plus.
   // `effortMax` (19/11/2026) : un antécédent qui interdit l'effort maximal (cardiaque : « reste en Z1-Z3 »,
   // covid long : « aucune intensité ») — des accélérations au-dessus de la vitesse de la VMA n'y ont pas leur place.
-  if (o.taper || o.semaineCourse || o.sansHistorique || o.douleur || o.reprise || o.effortMax) return "base";
+  if (o.taper || o.semaineCourse || o.sansHistorique || o.douleur || o.effortMax) return "base";
+  // `lignesPermises` (avis du directeur scientifique, 26/11/2026) : une semaine de reprise TROP PETITE pour porter une
+  // séance dure et un footing, la règle d'intensité finie (marche de sortie, reprise de volume d'un long arrêt). Elle
+  // ne porte que des footings ; UN seul reçoit des lignes droites, qui ne comptent pas comme une séance de qualité.
+  // Jamais de footing progressif : sa fin plus rapide est une petite séance de qualité. Le deuxième footing comme
+  // d'habitude ; s'il n'y en a qu'un, lui, sauf le lendemain de la sortie longue (le seul effort de la semaine).
+  // Le contexte ne pose ce drapeau que hors de la règle d'intensité : la garde « reprise » est levée pour lui seul.
+  if (o.lignesPermises) {
+    if (!Number.isFinite(rang) || !Number.isFinite(total) || total < 1 || rang < 0) return "base";
+    if (total === 1) return rang === 0 && !o.lendemainLongue ? "lignes" : "base";
+    return rang === 1 ? "lignes" : "base";
+  }
+  if (o.reprise) return "base";
   if (!Number.isFinite(rang) || !Number.isFinite(total) || total < 2 || rang < 0) return "base";
   // Le PREMIER footing reste neutre : il suit souvent une séance dure ou une sortie
   // longue, et des accélérations sur des jambes chargées n'apportent rien de bon.

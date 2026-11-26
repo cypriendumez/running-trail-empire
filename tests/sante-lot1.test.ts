@@ -252,6 +252,13 @@ async function main() {
     const courses = plan.filter((d) => !["Repos", "Renfo"].includes(d.type));
     assert.deepEqual(plan.slice(0, 3).map((d) => d.type), ["Repos", "Repos", "Repos"], "précondition : les trois footings posés trop tôt ne sont pas retirés");
     assert.deepEqual(courses.map((d) => d.date), [J(4)], `la semaine n'a pas exactement une course, le jour du renforcement (${plan.map((d) => d.type).join(", ")})`);
+    // SON « POURQUOI » DIT QU'ELLE PREND LA PLACE DU RENFORCEMENT, dans les cinq langues (suggestion du directeur
+    // scientifique, 20/11/2026 : la séance de renforcement disparaissait sans un mot).
+    const PLACE = { fr: /à la place du renforcement musculaire/, en: /in place of the strength work/, de: /anstelle der Kräftigung/, es: /en lugar del trabajo de fuerza/, pt: /em vez do reforço muscular/ } as const;
+    const posee = courses[0];
+    assert.match(posee.why, PLACE.fr, `le « pourquoi » du footing posé à la place du renforcement ne le dit pas (${posee.why})`);
+    assert.match(posee.why, /3 sorties au plus sur 7 jours/, `le « pourquoi » ne dit plus la limite du kiné (${posee.why})`);
+    for (const l of ["en", "de", "es", "pt"] as const) assert.match(posee.i18n?.[l]?.why ?? "", PLACE[l], `${l} : le « pourquoi » ne dit pas que le renforcement est remplacé (${posee.i18n?.[l]?.why})`);
     const courues = [...entree.sortiesRecentes, ...courses.map((d) => d.date)];
     for (const d of plan) assert.ok(courues.filter((x) => x >= fenetre(d.date) && x <= d.date).length <= 3, `plus de trois sorties sur les sept jours finissant le ${d.date}`);
     // CONTRE-POIDS 1 : quand une course reste dans la semaine, le renforcement n'est pas remplacé, même s'il tombe un
@@ -262,6 +269,7 @@ async function main() {
     const avecCourse = appliquerConsignes(semaineB, { ...entree, consignes: consignes({ seancesMaxSemaine: 2 }), sortiesRecentes: [ilYa(1), ilYa(5)], joursDispo: [dow(0), dow(1), dow(2), dow(6)] });
     assert.deepEqual(avecCourse.slice(0, 3).map((d) => d.type === "Repos"), [true, true, false], `précondition : les jours 0 et 1 ne sont pas retirés, ou le jour 2 l'est (${avecCourse.map((d) => d.type).join(", ")})`);
     assert.equal(avecCourse[6].type, "Renfo", "le renforcement est remplacé alors qu'une course reste dans la semaine");
+    for (const d of avecCourse) assert.doesNotMatch(d.why, /à la place du renforcement/, `${d.date} : une séance dit remplacer le renforcement, qui est resté au plan`);
     // CONTRE-POIDS 2 : un jour de renforcement où la fenêtre ne tient pas n'est pas pris (trois sorties jusqu'à hier,
     // renforcement dès le jour 3 : la fenêtre finissant le jour 3 en compte déjà trois avec le jour −3).
     const tropTot = appliquerConsignes(semaine.map((d, n) => (n === 3 ? jour(3, "Renfo", "Renfo", ["Renfo"], "Squats") : n === 4 ? jour(4, "Repos", "Repos", ["Repos"]) : d)),
