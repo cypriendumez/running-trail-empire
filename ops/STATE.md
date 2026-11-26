@@ -66,10 +66,10 @@ Plus de retard de code.
 **Production au 23/11** (relevé en session, `pacevo.fr/version.json`) : pacevo.fr sert `5a536813`, la tête de `main`
 depuis le 20/11 (#63, antécédents qui interdisent l'effort maximal, et #64, plafond de volume après plus de 28 jours
 d'arrêt, en ligne). Plus de retard de code.
-**Production au 26/11** (relevé en session, `pacevo.fr/version.json`) : pacevo.fr sert `71d770e8` (#67, suites du long
-arrêt et petites semaines de reprise, fusionnée et mise en ligne le 26/11). `main` a depuis reçu #68 (cadre de santé
-des coureurs exemptés, `a202e248`), pas encore en ligne : une fusion de retard, déploiement sur GO de Cyprien
-(`/deployer`).
+**Production au 26/11 au soir** (relevé en session, `pacevo.fr/version.json`, `npm run enligne` identique à HEAD) :
+pacevo.fr sert `04b650c0`, qui contient #67 (suites du long arrêt et petites semaines de reprise), #68 (cadre de santé
+des coureurs exemptés) et #70 (suites de la reprise : footings à la longueur habituelle, espacés, lignes droites une
+fois la règle finie). Aucune fusion de retard.
 
 ## Vague 1 : 12 agents sur 12 en place
 
@@ -204,9 +204,10 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    reprise (la sortie longue et les séances reviennent désormais par la marche de sortie après un long arrêt). Les
    quatre suites demandées par `@HeadCoach` (lignes droites dans une semaine trop petite une fois la règle d'intensité
    finie ; aucun footing de reprise plus long que la sortie habituelle d'avant l'arrêt ; horloge décalée dans le test
-   de la dose ; « à la place du renforcement » sous consigne du kiné) sont écrites le 26/11 sur la branche
-   `fix/suites-reprise`, avec la garde « un jour sans course entre deux sorties » pendant la règle d'intensité d'un
-   arrêt de plus de 28 jours (décision de `@HeadCoach` après la relecture).
+   de la dose ; « à la place du renforcement » sous consigne du kiné), avec la garde « un jour sans course entre deux
+   sorties » pendant la règle d'intensité d'un arrêt de plus de 28 jours : **PR #70, fusionnée et EN LIGNE le 26/11**
+   (pacevo.fr sert `04b650c0`, qui contient aussi #68). Suite ouverte par `@HeadCoach` pour `@PhysioLab` : une pause
+   courte pendant la reprise d'un long arrêt fait perdre les protections du long arrêt.
    **Fusionné (PR #57, le 17/11) et EN LIGNE** : pacevo.fr sert `24637bab` le 19/11, qui contient #57 à #61.
    Restent ouverts les deux points ci-dessus.
 
