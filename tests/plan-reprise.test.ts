@@ -23,7 +23,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildAthleteContext, type AthleteContext } from "../src/lib/ai/coachContext";
 import { buildWeekPlan } from "../src/lib/ai/autoPlan";
-import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle, premierJourDeQualite, joursCourusPourArret, sortiesPourArret, partApresLongArret, partPlafondLongArret, plafondReplieSurPlancher, finRegleIntensite, sortieDeRegle, repriseVolumeLongArret, dureeRepriseLongue, joursDepuisLAvantArret, ARRET_LONG_JOURS } from "../src/lib/coach/repriseArret";
+import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle, premierJourDeQualite, joursCourusPourArret, sortiesPourArret, partApresLongArret, partPlafondLongArret, plafondReplieSurPlancher, plafondPetitVolumeKm, finRegleIntensite, sortieDeRegle, repriseVolumeLongArret, dureeRepriseLongue, joursDepuisLAvantArret, ARRET_LONG_JOURS } from "../src/lib/coach/repriseArret";
 import { computeQualityBudget } from "../src/lib/coach/qualityBudget";
 import { MOTIF_T } from "../src/lib/coach/reasonsI18n";
 import { varianteFooting, lignesRetireesParDouleur, lignesRetireesParReprise } from "../src/lib/coach/footings";
@@ -31,6 +31,7 @@ import { semainesAffutage, partAffutage, phaseDeSemaine, allegementDuBloc } from
 import { aujourdhui, FUSEAU_DEFAUT } from "../src/lib/time/fuseau";
 import { testVmaAEviterDe, testVmaAttendLaReprise } from "../src/lib/health/testVmaAEviter";
 import { buildWorkoutDescription } from "../src/lib/watch/intervals";
+import { coutQualiteKm, footingMinKm, semaineTropPetitePourQualite, qualitesTenablesAvecFooting } from "../src/lib/coach/coutSeance";
 
 let passed = 0; const fails: string[] = [];
 async function test(nom: string, fn: () => void | Promise<void>) {
@@ -402,7 +403,7 @@ async function main() {
     assert.match(codeNu("src/lib/ai/coachContext.ts"), /const deload = !taper && semaineAllegeeDuBloc && /, "la semaine allégée a quitté l'horloge du bloc (ou ignore de nouveau la veille de l'affûtage)");
     // La dose des qualités suit la même règle, et ne fait pas de pic la veille de l'affûtage.
     // (16/11/2026 : la reprise après un ARRÊT écrit elle aussi sa séance courte.)
-    assert.match(codeNu("src/lib/ai/coachContext.ts"), /const doseReduite = semaineAllegeeDuBloc \|\| repriseCetteSemaine \|\| qualiteReprise != null;/, "la dose des qualités a quitté la règle de la semaine allégée");
+    assert.match(codeNu("src/lib/ai/coachContext.ts"), /const doseReduite = semaineAllegeeDuBloc \|\| repriseCetteSemaine \|\| qualiteReprise != null \|\| marcheSortie != null;/, "la dose des qualités a quitté la règle de la semaine allégée");
     assert.match(codeNu("src/lib/ai/coachContext.ts"), /const blocDose = veilleAffutage \? Math\.min\(blockWeek, 2\) : blockWeek;[\s\S]*base \+ blocDose \* 2/, "la veille de l'affûtage fait de nouveau un pic de qualité");
     assert.match(codeNu("src/lib/ai/coachContext.ts"), /const semaineAllegeeDuBloc = allegementDuBloc\(blockWeek, weeksToRace, objective\?\.distanceKm\);/, "la semaine allégée a quitté l'horloge du bloc");
     assert.equal(ctx.volume.targetKm, ctx.macroPlan[0].volumeKm, "le plan de la semaine ne vise pas la feuille de route");
@@ -621,7 +622,7 @@ async function main() {
     assert.equal(lignesRetireesParReprise({ reprise: true, deuxiemeFootingJour: 2, qualiteDes: 0 }), false);
     assert.equal(lignesRetireesParReprise({ reprise: true, deuxiemeFootingJour: null, qualiteDes: 4 }), true);
     assert.match(coach, /reprise: lignesRetireesParReprise\(\{ reprise: !!ctx\.weekPlan\.repriseArret, qualiteDes: ctx\.weekPlan\.qualiteDes \?\? 0,\s*deuxiemeFootingJour: deuxieme == null \? null : ecartJours\(deuxieme, today\) \}\) \}\);/, "l'écran Santé attribue de nouveau à la douleur des lignes droites que la reprise a retirées");
-    assert.match(ctxSrc, /\.\.\.\(qualiteReprise \? \{ repriseArret: qualiteReprise\.max === 0 \|\| footingsSeuls \? "sans-qualite" as const : "une-qualite" as const \} : \{\}\),/);
+    assert.match(ctxSrc, /\.\.\.\(qualiteReprise \|\| footingsSeuls \? \{ repriseArret: !qualiteReprise \|\| qualiteReprise\.max === 0 \|\| footingsSeuls \? "sans-qualite" as const : "une-qualite" as const \} : \{\}\),/);
   });
 
   await test("une « sortie longue » plus courte que la sortie habituelle n'en est pas une", () => {
@@ -785,6 +786,16 @@ async function main() {
       assert.doesNotMatch(ctx.readiness.reasons.join(" | "), /% de ton volume habituel/, `${nom} : un pourcentage du volume habituel est annoncé au-dessus d'un plan qui ne le vise pas`);
       assert.deepEqual(dures(ctx), [], `${nom} : la garde d'intensité est tombée avec le plafond`);
     }
+    // LA GARDE D'INTENSITÉ NE TOMBE PAS AVEC LE PLAFOND, là où la règle des petites semaines ne joue pas. Depuis le
+    // 23/11/2026, la semaine de 17 km d'une habitude inconnue est de toute façon trop petite pour une séance dure et un
+    // footing : sans cette scène, rien ne prouvait plus la garde elle-même. Sous consignes du kinésithérapeute (trois
+    // séances par semaine, intensité permise), la règle des petites semaines ne s'applique pas ; la garde, si.
+    const consignesKine = [{ user_id: "u", type: "consignes_kine", created_at: `${ilYa(1)}T10:00:00Z`, data: { dureeMaxMin: null, sansIntensite: false, seancesMaxSemaine: 3, jusquAu: ilYa(-14), majA: ilYa(1) } }];
+    const sousConsignes = await contexte({ seances: sansGps(10, 80), notifications: consignesKine });
+    assert.equal(sousConsignes.weekPlan.footingExige, undefined, "précondition : sous consignes du kinésithérapeute, la règle des petites semaines s'applique, la scène ne prouve rien");
+    assert.equal(sousConsignes.weekPlan.repriseArret, "sans-qualite", "habitude inconnue, sous consignes : l'arrêt n'est plus vu");
+    assert.equal(sousConsignes.weekPlan.qBudget, 0, `habitude inconnue, sous consignes : ${sousConsignes.weekPlan.qBudget} séance(s) au budget, la garde d'intensité est tombée avec le plafond`);
+    assert.deepEqual(dures(sousConsignes), [], "habitude inconnue, sous consignes : une séance dure est posée");
     // LA FEUILLE DE ROUTE AUSSI : avec un objectif à dix semaines, aucune semaine suivante n'est ramenée à 0 km.
     const avecObjectif = await contexte({ seances: sansGps(10, 80), notifications: [objectif({ race: "Semi test", raceDate: ilYa(-70), distanceKm: 21.1, targetTime: "1h45'00", targetSeconds: 6300, targetPace: "4'59/km" })] });
     assert.equal(avecObjectif.weekPlan.repriseArret, "sans-qualite", "précondition : avec un objectif, l'arrêt n'est plus vu");
@@ -1036,7 +1047,7 @@ async function main() {
     // le plafond de volume, si. 90 jours d'arrêt, 70 jours de reprise forte, un marathon dans douze semaines : la
     // feuille de route prévoit une sortie longue de marathonien, la semaine plafonnée à 48 km n'en porte que 30 %.
     const marathon = await contexte({ seances: longArret(90, 70), notifications: [objectif({ race: "Marathon test", raceDate: ilYa(-84), distanceKm: 42.195, targetTime: "3h30'00", targetSeconds: 12600, targetPace: "4'59/km" })] });
-    assert.equal(marathon.weekPlan.repriseArret, undefined, "précondition : au 70ᵉ jour, la règle d'intensité court encore");
+    assert.equal(arretHorsEchelle(longArret(90, 70).map((w) => w.date), AUJOURDHUI), null, "précondition : au 70ᵉ jour, la règle d'intensité court encore");
     assert.equal(marathon.volume.targetKm, 48);
     assert.ok(marathon.volume.longRunPlanned <= 14, `sortie longue de ${marathon.volume.longRunPlanned} km prévue dans une semaine plafonnée à 48 km`);
     // ET LA FEUILLE DE ROUTE DIT LA MÊME CHOSE : elle annonçait 15 km de sortie longue dans une semaine de 30 km.
@@ -1057,7 +1068,7 @@ async function main() {
     const seances = (km: number | null) => [...avantArret(70 + 60 + 1, 56, km), ...depuisReprise(70, 6)];
     assert.deepEqual(repriseVolumeLongArret(seances(6).map((w) => w.date), AUJOURDHUI), { arretJours: 60, enCours: false, joursRepris: 70 }, "précondition : la fixture n'est pas celle annoncée");
     const ctx = await contexte({ seances: seances(6), notifications: marathon8 }), libre = await contexte({ seances: seances(null), notifications: marathon8 });
-    assert.equal(ctx.weekPlan.repriseArret, undefined, "précondition : au 70ᵉ jour, la règle d'intensité court encore");
+    assert.equal(arretHorsEchelle(seances(6).map((w) => w.date), AUJOURDHUI), null, "précondition : au 70ᵉ jour, la règle d'intensité court encore");
     assert.equal(ctx.weekPlan.sortieReprise, undefined, "précondition : au 70ᵉ jour, la marche de sortie court encore");
     const semaines = ctx.macroPlan.slice(0, 6), reference = libre.macroPlan.slice(0, 6);
     assert.equal(semaines.length, 6, `précondition : la feuille de route n'a que ${semaines.length} semaine(s)`);
@@ -1098,7 +1109,10 @@ async function main() {
     const sous = await contexte({ seances: [...avantArret(70 + 57 + 1), ...repriseAvecLongue(70)], notifications: semi });
     assert.match(ditArret(sous), /80 % au plus de ton volume d'avant l'arrêt/, `précondition : le plafond de 80 % n'est pas annoncé (${ditArret(sous)})`);
     assert.ok(T < 48, `précondition : la semaine du jumeau (${T} km) n'est pas sous le plafond de 48 km`);
-    assert.equal(sous.weekPlan.repriseArret, undefined, "précondition : au 70ᵉ jour, la règle d'intensité court encore");
+    // (L'état du plan, lui, peut valoir « sans-qualite » : une semaine allégée, une sur quatre, est trop petite pour
+    // porter une séance dure et un footing. Le jumeau la reçoit de même, et la comparaison tient.)
+    assert.equal(arretHorsEchelle([...avantArret(70 + 57 + 1), ...repriseAvecLongue(70)].map((w) => w.date), AUJOURDHUI), null, "précondition : au 70ᵉ jour, la règle d'intensité court encore");
+    assert.equal(sous.weekPlan.repriseArret, jumeau.weekPlan.repriseArret, "sous le plafond, l'état de la semaine n'est plus celui du jumeau");
     assert.deepEqual(resume(sous), resume(jumeau), "sous le plafond, le plan n'est plus celui d'avant : un plafond qui ne s'applique pas à cette semaine l'a changé");
     // (b) AU PLAFOND, DE PEU : le même coureur, avec un volume d'avant l'arrêt choisi pour que le plafond de 80 % tombe
     // UN kilomètre sous la semaine du jumeau. La semaine perd un kilomètre, sa sortie longue est ramenée à 30 % : sans
@@ -1143,7 +1157,7 @@ async function main() {
     // l'arrêt : la retirer libérait son volume pour une séance dure (95 plans sur 2 800 tirés au hasard). 90 jours
     // d'arrêt, 70ᵉ jour d'une reprise prudente (six sorties de 4 km par semaine).
     const apresRegle = await contexte({ seances: longArret(90, 70, 4) });
-    assert.equal(apresRegle.weekPlan.repriseArret, undefined, "précondition : au 70ᵉ jour, la règle d'intensité court encore");
+    assert.equal(arretHorsEchelle(longArret(90, 70, 4).map((w) => w.date), AUJOURDHUI), null, "précondition : au 70ᵉ jour, la règle d'intensité court encore");
     assert.ok(apresRegle.volume.longRunPlanned >= 4 && apresRegle.volume.longRunPlanned < 10, `précondition : sortie longue prévue de ${apresRegle.volume.longRunPlanned} km, qui ne se compare pas aux 10 km habituels`);
     assert.ok(apresRegle.volume.longRunKm >= 4, `la règle d'intensité finie, la sortie longue (${apresRegle.volume.longRunKm} km) est retirée parce qu'elle est plus courte que la sortie habituelle`);
   });
@@ -1234,11 +1248,11 @@ async function main() {
     const prudentLibre = await contexte({ profil: { ...PROFIL, days_per_week: 5 }, seances: prudentSeances(null) });
     assert.ok(prudent.volume.targetKm >= 12 && prudent.volume.targetKm <= 13, `précondition : le coureur prudent vise ${prudent.volume.targetKm} km, attendu de 12 à 13 (au plafond de 50 % de 25 km ou juste dessous)`);
     assert.equal(prudent.volume.longRunKm, 0, "précondition : la sortie longue du coureur prudent n'est pas retirée");
-    // Le jumeau dont les sorties d'avant l'arrêt n'ont pas de distance (sortie habituelle inconnue : sa sortie longue
-    // n'est pas retirée) garde la séance au seuil de la règle d'intensité. L'état se lit sur le contexte, pas sur le
-    // jour où le plan la pose, qui change avec le jour de la semaine.
-    assert.equal(prudentLibre.weekPlan.repriseArret, "une-qualite", "précondition : sans sortie longue retirée, ce coureur n'est pas à « une séance au plus », le test ne prouverait rien");
-    assert.ok(prudentLibre.weekPlan.qBudget >= 1 && prudentLibre.weekPlan.quality.length >= 1, "précondition : sans sortie longue retirée, ce coureur n'a aucune séance de qualité retenue");
+    // Précondition, lue sur la règle d'intensité elle-même : elle PERMET une séance par semaine à ce coureur. (Le
+    // jumeau dont les sorties d'avant n'ont pas de distance la gardait ; depuis le 23/11/2026 sa semaine de 12-13 km
+    // est trop petite pour un seuil et un footing, elle ne porte que des footings elle aussi.)
+    assert.equal(qualitePendantReprise(arretHorsEchelle(prudentSeances(5).map((w) => w.date), AUJOURDHUI))?.max, 1, "précondition : la règle d'intensité ne permet aucune séance à ce coureur, le test ne prouverait rien");
+    assert.equal(prudentLibre.weekPlan.repriseArret, "sans-qualite", "le jumeau sans distance, à 12-13 km visés, garde un seuil dans une semaine trop petite");
     assert.equal(prudent.weekPlan.repriseArret, "sans-qualite", "coureur prudent sous son plafond : l'état transmis au plan n'est pas « sans-qualite »");
     assert.deepEqual(dures(prudent), [], `coureur prudent sous son plafond : une séance dure est posée (${dures(prudent).join(", ")})`);
     assert.ok(footings(prudent) >= 2, `coureur prudent sous son plafond : ${footings(prudent)} footing(s) seulement`);
@@ -1370,12 +1384,16 @@ async function main() {
       assert.match(ditArret(petit), /sans séance dure pendant les deux premières semaines|aucune séance dure pendant les deux premières semaines/, `15 km par semaine, ${nom} : la règle d'intensité n'est plus dite`);
       assert.deepEqual(dures(petit), [], `15 km par semaine, ${nom} : une séance dure est posée`);
     }
-    // (c bis) Encore plus petit : 9 km par semaine, connus. Pas de plafond non plus, et ce volume n'est pas dit inconnu.
+    // (c bis) Encore plus petit : 9 km par semaine, connus. Ce volume n'est pas dit inconnu, et il est plafonné à
+    // LUI-MÊME (23/11/2026 : sans plafond, ce coureur recevait la cible ordinaire du plan, 17 à 20 km).
     for (const [nom, seances] of [["pas encore repris", avantArret(41, 76, 1.5)], ["repris depuis 5 jours", [...avantArret(5 + 40 + 1, 76, 1.5), ...depuisReprise(5, 1.5)]]] as const) {
       const minuscule = await contexte({ seances: [...seances] });
       assert.doesNotMatch(minuscule.readiness.reasons.join(" | "), /n'est pas connu/, `9 km par semaine, ${nom} : un volume connu est dit inconnu (${ditArret(minuscule)})`);
       assert.doesNotMatch(minuscule.readiness.reasons.join(" | "), pourcentage, `9 km par semaine, ${nom} : un pourcentage est annoncé sans plafond`);
-      assert.doesNotMatch(minuscule.readiness.reasons.join(" | "), /km au plus/, `9 km par semaine, ${nom} : un plafond en kilomètres est annoncé sous deux footings d'avant`);
+      assert.match(ditArret(minuscule), /9 km au plus cette semaine, ton volume d'avant l'arrêt étant déjà petit/, `9 km par semaine, ${nom} : le motif ne dit pas le plafond de 9 km (${ditArret(minuscule)})`);
+      assert.ok(minuscule.volume.targetKm <= 9 && minuscule.volume.targetKm >= 6, `9 km par semaine, ${nom} : ${minuscule.volume.targetKm} km visés, attendu au plus son volume d'avant`);
+      assert.ok(sorties(minuscule) >= 1, `9 km par semaine, ${nom} : la semaine plafonnée à 9 km est vide`);
+      assert.deepEqual(dures(minuscule), [], `9 km par semaine, ${nom} : une séance dure est posée`);
       assert.match(ditArret(minuscule), /séance dure pendant les deux premières semaines/, `9 km par semaine, ${nom} : la règle d'intensité n'est plus dite (${ditArret(minuscule)})`);
     }
     // (d) LA FEUILLE DE ROUTE du coureur de (a bis) ne descend pas non plus sous deux footings, avec un 10 km dans
@@ -1654,9 +1672,11 @@ async function main() {
     // LE BUDGET LUI-MÊME EST BORNÉ À DEUX. À cinq semaines d'un 10 km, ce coureur a trois séances de qualité par semaine :
     // pendant la marche de sortie, le plan en retient deux et le bilan de sa dernière séance en annonce deux, pas trois.
     const dixKm5 = [objectif({ race: "10 km test", raceDate: ilYa(-35), distanceKm: 10, targetTime: "45'00", targetSeconds: 2700, targetPace: "4'30/km" })];
-    for (const [arret, j] of [[35, 30], [57, 65]] as const) {
-      const pendant = await contexte({ seances: longArret(arret, j), notifications: dixKm5 }), apres = await contexte({ seances: longArret(arret, j + 6), notifications: dixKm5 });
-      assert.equal(apres.weekPlan.sortieReprise, undefined, `précondition : ${arret} jours d'arrêt, ${j + 6}ᵉ jour, la marche de sortie court encore`);
+    // (« Après » se lit une fois la reprise de VOLUME finie aussi, au 85ᵉ jour d'un arrêt de 57 jours : tant qu'elle
+    // dure, trois séances ne laisseraient pas de footing à côté, et le budget reste à deux.)
+    for (const [arret, j, jApres] of [[35, 30, 36], [57, 65, 85]] as const) {
+      const pendant = await contexte({ seances: longArret(arret, j), notifications: dixKm5 }), apres = await contexte({ seances: longArret(arret, jApres), notifications: dixKm5 });
+      assert.equal(apres.weekPlan.sortieReprise, undefined, `précondition : ${arret} jours d'arrêt, ${jApres}ᵉ jour, la marche de sortie court encore`);
       assert.equal(apres.weekPlan.qBudget, 3, `précondition : après la marche de sortie, ce coureur n'a pas trois séances de qualité (${apres.weekPlan.qBudget}) : la borne à deux ne prouverait rien`);
       assert.equal(pendant.weekPlan.sortieReprise, true, `précondition : ${arret} jours d'arrêt, ${j}ᵉ jour, pas de marche de sortie`);
       assert.equal(pendant.weekPlan.qBudget, 2, `${arret} jours d'arrêt, ${j}ᵉ jour : ${pendant.weekPlan.qBudget} séances de qualité au budget pendant la marche de sortie`);
@@ -1806,21 +1826,44 @@ async function main() {
     assert.equal(pause.volume.targetKm, 12, `pause en cours pendant la reprise d'un long arrêt : ${pause.volume.targetKm} km visés`);
     assert.match(motifDe(pause)?.fr ?? "", /^aucune course enregistrée depuis 9 jours : 12 km au plus cette semaine, ton volume d'avant l'arrêt étant déjà petit\. Si tu as couru, ta montre ne synchronise plus/, `pause en cours : le motif (${motifDe(pause)?.fr})`);
     for (const l of LANGUES) assert.doesNotMatch(motifDe(pause)?.[l] ?? "%", /%|Daniels/, `pause en cours, ${l} : un pourcentage ou Daniels est cité (${motifDe(pause)?.[l]})`);
-    // LA RÈGLE D'INTENSITÉ FINIE (70ᵉ jour après 90 jours d'arrêt) : seul le volume reste plafonné, et il est dit.
+    // LA RÈGLE D'INTENSITÉ FINIE (70ᵉ jour après 90 jours d'arrêt) : le volume reste plafonné, et il est dit. Une
+    // semaine de 12 km est trop petite pour porter un seuil et un footing : elle ne porte que des footings, et le
+    // motif le dit (avant le 23/11/2026 : un seuil, un renforcement et une « sortie longue » de 4 km).
     const apres = await contexte({ seances: scene(14, 90, 70) });
-    assert.equal(apres.weekPlan.repriseArret, undefined, "précondition : au 70ᵉ jour, la règle d'intensité court encore");
+    assert.equal(arretHorsEchelle(scene(14, 90, 70).map((w) => w.date), AUJOURDHUI), null, "précondition : au 70ᵉ jour, la règle d'intensité court encore");
     assert.ok(apres.volume.targetKm <= 12, `14 km, 90 jours d'arrêt, 70ᵉ jour : ${apres.volume.targetKm} km visés`);
-    assert.equal(motifDe(apres)?.fr, "reprise après 90 jours sans courir : 12 km au plus cette semaine, ton volume d'avant l'arrêt étant déjà petit");
+    assert.equal(motifDe(apres)?.fr, "reprise après 90 jours sans courir : 12 km au plus cette semaine, ton volume d'avant l'arrêt étant déjà petit ; footings seulement cette semaine : elle est trop petite pour porter une séance dure et un footing");
+    assert.equal(apres.weekPlan.repriseArret, "sans-qualite", "14 km, 90 jours d'arrêt, 70ᵉ jour : l'état d'une semaine de footings seulement");
+    assert.deepEqual(planDe(apres).filter((d) => DUR.test(d.type)).map((d) => d.type), [], "14 km, 90 jours d'arrêt, 70ᵉ jour : une séance dure dans une semaine de 12 km");
+    // Ni « sortie longue » de 4 km, qui restait parfois seule dans la semaine : les 12 km sont des footings.
+    assert.deepEqual(planDe(apres).filter((d) => /longue/i.test(d.type)).map((d) => d.type), [], "14 km, 90 jours d'arrêt, 70ᵉ jour : une « sortie longue » dans une semaine plafonnée à 12 km");
+    assert.equal(apres.volume.longRunKm, 0);
+    assert.ok(planDe(apres).filter((d) => /^(Endurance|R[ée]cup)$/i.test(d.type)).length >= 2, `14 km, 90 jours d'arrêt, 70ᵉ jour : moins de deux footings (${planDe(apres).map((d) => d.type).join(", ")})`);
+    assert.doesNotMatch(apres.text, /• 1 sortie longue|• 1 SORTIE LONGUE/, "14 km, 70ᵉ jour : l'invite de l'IA annonce une sortie longue que le plan ne pose pas");
+    // CONTRE-POIDS, un coureur LENT (11 km/h de VMA) au même plafond : sa séance au seuil pèse moins de kilomètres, la
+    // semaine de 12 km la tient avec un footing. Hors de la règle d'intensité, c'est le critère qui décide, pas le plafond.
+    const lent = await buildAthleteContext(fauxClient({ profiles: [PROFIL], performance_baselines: [{ ...BASE[0], vma_kmh: 11 }],
+      workouts: [...avantArret(70 + 90 + 1, 76, 14 / 6).map((w) => ({ ...w, duration_seconds: Math.round((14 / 6) * 480) })), ...depuisReprise(70, 14 / 6).map((w) => ({ ...w, duration_seconds: Math.round((14 / 6) * 480) }))], notifications: [] }), "u");
+    assert.ok(lent.volume.targetKm <= 12, `coureur lent : ${lent.volume.targetKm} km visés`);
+    assert.equal(lent.weekPlan.repriseArret, undefined, `coureur lent, 12 km plafonnés, hors règle d'intensité : sa semaine tient une séance et un footing (allure ${lent.easyPace}), elle est dite « footings seulement »`);
+    assert.equal(planDe(lent).filter((d) => DUR.test(d.type)).length, 1, `coureur lent : ${planDe(lent).map((d) => d.type).join(", ")}`);
+    assert.ok(planDe(lent).some((d) => /^(Endurance|R[ée]cup)$/i.test(d.type)), "coureur lent : aucun footing à côté de la séance");
+    assert.equal(lent.readiness.reasons.find((r) => /^reprise après/.test(r)), "reprise après 90 jours sans courir : 12 km au plus cette semaine, ton volume d'avant l'arrêt étant déjà petit", "coureur lent, la règle d'intensité finie : le motif ne dit pas son plafond en kilomètres");
     // Et la reprise de volume finie (84ᵉ jour), plus de plafond ni de motif.
     const fini = await contexte({ seances: scene(14, 90, 84) });
     assert.equal(motifDe(fini), undefined, `14 km, 90 jours d'arrêt, 84ᵉ jour : un motif de reprise est encore dit (${motifDe(fini)?.fr})`);
-    // CONTRE-POIDS. 12 et 10 km d'avant : pas de plafond, comme en ligne (suite à part). 30 km : le palier de 50 %.
+    // 12 ET 10 KM D'AVANT : plafonnés à EUX-MÊMES (23/11/2026). Sans plafond, ils recevaient la cible ordinaire du plan,
+    // 17 à 20 km au 5ᵉ jour de reprise après 40 jours d'arrêt. Ce n'est pas un plafond « replié » : c'est leur volume.
     for (const v of [12, 10]) {
-      const ctx = await contexte({ seances: scene(v, 40, 5) });
-      assert.doesNotMatch(Object.values(motifDe(ctx) ?? {}).join(" "), /\d ?km|%/, `${v} km d'avant : un plafond est annoncé (${motifDe(ctx)?.fr})`);
-      // (La cible elle-même dépend du jour : une semaine allégée, une sur quatre, la ramène à 12 km. On ne la fige pas.)
+      const ctx = await contexte({ seances: scene(v, 40, 5) }), motif = motifDe(ctx);
+      assert.ok(ctx.volume.targetKm <= v, `${v} km d'avant : ${ctx.volume.targetKm} km visés, plus que son volume d'avant l'arrêt`);
+      assert.match(motif?.fr ?? "", new RegExp(`^reprise après 40 jours sans courir : ${v} km au plus cette semaine, ton volume d'avant l'arrêt étant déjà petit ; `), `${v} km d'avant : le motif (${motif?.fr})`);
+      for (const l of LANGUES) assert.doesNotMatch(motif?.[l] ?? "%", /%|Daniels/, `${v} km d'avant, ${l} : un pourcentage ou Daniels (${motif?.[l]})`);
+      assert.deepEqual(planDe(ctx).filter((d) => DUR.test(d.type) || /longue/i.test(d.type)).map((d) => d.type), [], `${v} km d'avant : une séance dure ou une sortie longue dans une semaine plafonnée à ${v} km`);
+      assert.ok(planDe(ctx).some((d) => /^(Endurance|R[ée]cup)$/i.test(d.type)), `${v} km d'avant : la semaine plafonnée est vide`);
       assert.equal(plafondReplieSurPlancher(repriseVolumeLongArret(scene(v, 40, 5).map((w) => w.date), AUJOURDHUI), v), false, `${v} km d'avant : le plafond est dit replié sur le plancher`);
     }
+    // 30 km : le palier de 50 %.
     const trente = await contexte({ seances: scene(30, 40, 5, 10) });
     assert.equal(trente.volume.targetKm, 15);
     assert.match(motifDe(trente)?.fr ?? "", /^reprise après 40 jours sans courir : 50 % au plus de ton volume d'avant l'arrêt cette semaine ; /);
@@ -1897,6 +1940,340 @@ async function main() {
       assert.deepEqual(dursPoses.map((d) => d.type), ["Seuil"], `${total} km par semaine : le plan ne porte plus sa séance au seuil (${planDe(ctx).map((d) => d.type).join(", ")})`);
       assert.match(motifDe(ctx)?.fr ?? "", /; une seule séance de qualité par semaine au plus, courte, jusqu'à la fin de la reprise$/, `${total} km par semaine : la fin du motif`);
     }
+  });
+
+  console.log("\nUNE SEMAINE DE REPRISE TROP PETITE NE PORTE QUE DES FOOTINGS, ET UN TRÈS PETIT VOLUME EST PLAFONNÉ À LUI-MÊME (23/11/2026)");
+  // ⚠️ Des coureurs aux ALLURES RÉALISTES : six sorties par semaine dont la durée suit la distance (4'50 au km).
+  // `avantArret(…, km)` garde la durée d'une sortie de 10 km : un coureur à 4 km par sortie y court à 12 minutes au km,
+  // et le coût d'une séance de qualité, calculé sur l'allure, tombe à 5 km.
+  const avantReel = (dernier: number, km: number) => Array.from({ length: 76 }, (_, k) => dernier + k).filter((n) => (n - dernier) % 7 !== 3).map((n) => sortie(n, km));
+  /** `v` km par semaine avant, `arret` jours sans courir, reprise au même rythme depuis `repris` jours. */
+  const coureur = (v: number, arret: number, repris: number) => [...avantReel(repris + arret + 1, v / 6), ...depuisReprise(repris, v / 6)];
+  const tropPetiteDe = (ctx: AthleteContext) => semaineTropPetitePourQualite({ targetKm: ctx.volume.targetKm, longRunKm: ctx.volume.longRunKm,
+    reserveKm: ctx.volume.longRunReserveKm, easyPace: ctx.easyPace, warmMin: ctx.warmCool.warm, coolMin: ctx.warmCool.cool });
+  const footingsDe = (ctx: AthleteContext) => planDe(ctx).filter((d) => /^(Endurance|R[ée]cup)$/i.test(d.type));
+  const sansArretFlag = (ctx: AthleteContext) => ctx.weekPlan.footingExige;
+  const duresDe = (ctx: AthleteContext) => planDe(ctx).filter((d) => DUR.test(d.type));
+  const motifArret = (ctx: AthleteContext) => ctx.readiness.reasonsAll.find((m) => /sans courir|aucune course enregistrée/.test(m.fr));
+  const CINQ = ["fr", "en", "de", "es", "pt"] as const;
+  const PETITE = { fr: /; footings seulement cette semaine : elle est trop petite pour porter une séance dure et un footing$/, en: /; easy runs only this week: it is too small to hold a hard session and an easy run$/,
+    de: /; diese Woche nur lockere Läufe: Sie ist zu klein für eine harte Einheit und einen lockeren Lauf$/, es: /; solo rodajes suaves esta semana: es demasiado corta para una sesión dura y un rodaje$/,
+    pt: /; só corridas fáceis esta semana: é demasiado pequena para uma sessão dura e uma corrida fácil$/ } as const;
+
+  await test("le coût d'une séance et le plus petit footing : une seule source, lue par le plan et par le contexte", () => {
+    // 20 minutes d'échauffement, 10 de retour au calme, 25 de corps : 55 minutes à l'allure facile.
+    assert.equal(coutQualiteKm("5'00", 20, 10), 11);
+    assert.equal(coutQualiteKm("8'00", 15, 10), 6.3);
+    assert.equal(coutQualiteKm("15'00", 15, 10), 5, "le coût d'une séance descend sous 5 km");
+    assert.equal(coutQualiteKm(null, 15, 10), 11, "allure inconnue : le coût n'est pas le repli de 11 km");
+    assert.equal(coutQualiteKm("facile", 15, 10), 11);
+    // Le plus petit footing : 25 minutes à l'allure facile, 4 km au moins.
+    assert.deepEqual(["4'10", "5'00", "6'30", "8'00", null].map(footingMinKm), [6, 5, 4, 4, 4]);
+    // Le critère : ce qui reste hors sortie longue (et hors réserve) tient-il la séance PLUS le plus petit footing ?
+    const o = { easyPace: "5'00", warmMin: 20, coolMin: 10 };
+    assert.equal(semaineTropPetitePourQualite({ ...o, targetKm: 16, longRunKm: 0 }), false, "16 km à 5'00 au km : une séance de 11 km et un footing de 5 km tiennent");
+    assert.equal(semaineTropPetitePourQualite({ ...o, targetKm: 15, longRunKm: 0 }), true);
+    assert.equal(semaineTropPetitePourQualite({ ...o, targetKm: 20, longRunKm: 5 }), true, "la sortie longue compte comme un footing");
+    assert.equal(semaineTropPetitePourQualite({ ...o, targetKm: 21, longRunKm: 5 }), false);
+    assert.equal(semaineTropPetitePourQualite({ ...o, targetKm: 21, longRunKm: 5, reserveKm: 1 }), true, "la réserve du long arrêt fait de la place à la séance dure");
+    // COMBIEN de séances la semaine tient en gardant un footing à côté (coût 11 km, footing 5 km à 5'00 au km).
+    assert.deepEqual([15, 16, 26, 27, 37, 38].map((targetKm) => qualitesTenablesAvecFooting({ ...o, targetKm, longRunKm: 0 })), [0, 1, 1, 2, 2, 3]);
+    assert.equal(qualitesTenablesAvecFooting({ ...o, targetKm: 30, longRunKm: 9 }), 1, "30 km dont 9 de sortie longue : deux séances de 11 km ne laissent pas de footing");
+    assert.equal(qualitesTenablesAvecFooting({ ...o, targetKm: 36, longRunKm: 9 }), 2);
+    assert.equal(qualitesTenablesAvecFooting({ ...o, targetKm: 36, longRunKm: 9, reserveKm: 1 }), 1);
+    assert.equal(qualitesTenablesAvecFooting({ ...o, targetKm: 3, longRunKm: 4 }), 0, "un nombre de séances négatif");
+    // « Trop petite » : aucune séance ne tient avec un footing. Les deux fonctions disent la même chose.
+    for (let targetKm = 0; targetKm <= 40; targetKm++) assert.equal(semaineTropPetitePourQualite({ ...o, targetKm, longRunKm: 4 }), qualitesTenablesAvecFooting({ ...o, targetKm, longRunKm: 4 }) === 0);
+    // Le plan et le contexte lisent CES fonctions, avec la même allure et les mêmes minutes.
+    const plan = codeNu("src/lib/ai/autoPlan.ts"), ctxSrc = codeNu("src/lib/ai/coachContext.ts");
+    assert.match(plan, /const QUALITY_KM = coutQualiteKm\(ctx\.easyPace, warm, cool\);/);
+    assert.match(plan, /const kmMinFooting = footingMinKm\(ctx\.easyPace\);/);
+    assert.doesNotMatch(plan, /warm \+ cool \+ 25|\(25 \* 60\)/, "le plan recalcule le coût d'une séance ou le plus petit footing de son côté");
+    assert.match(ctxSrc, /qualitesTenablesAvecFooting\(\{\s*targetKm, longRunKm, reserveKm: longRunReserveKm, easyPace: easyPaceCorrige, warmMin: warmCool\.warm, coolMin: warmCool\.cool \}\)/);
+    assert.match(ctxSrc, /\n    easyPace: easyPaceCorrige,/, "l'allure que le plan lit n'est plus celle du critère");
+    assert.match(ctxSrc, /\n    warmCool,\n/, "les minutes d'échauffement que le plan lit ne sont plus celles du critère");
+  });
+
+  await test("une semaine de reprise trop petite pour un seuil et un footing ne porte que des footings", async () => {
+    // (a) REPRISE DE 6 À 28 JOURS, seconde moitié, HORS plancher : 20 et 24 km par semaine, 14 jours d'arrêt, 8ᵉ jour. La
+    // règle d'intensité permet une séance ; la semaine (15 à 18 km, dont 4 à 5 de sortie longue) ne tient pas un seuil
+    // de 10 à 11 km ET un footing de 6 km. Avant : un seuil, un renforcement et la sortie longue, sans footing.
+    for (const v of [20, 24]) for (const notifications of [[], dixKm16]) {
+      const seances = coureur(v, 14, 8), ctx = await contexte({ seances, notifications }), motif = motifArret(ctx), ici = `${v} km par semaine${notifications.length ? ", 10 km dans seize semaines" : ""}`;
+      assert.equal(qualitePendantReprise(repriseApresArret(seances.map((w) => w.date), AUJOURDHUI))?.max, 1, `précondition, ${ici} : la règle d'intensité ne permet aucune séance, le test ne prouverait rien`);
+      assert.match(motif?.fr ?? "", /% de ton volume habituel cette semaine/, `précondition, ${ici} : la semaine est au plancher (${motif?.fr})`);
+      assert.equal(tropPetiteDe(ctx), true, `précondition, ${ici} : la semaine de ${ctx.volume.targetKm} km (sortie longue ${ctx.volume.longRunKm} km) n'est pas trop petite`);
+      assert.equal(ctx.weekPlan.repriseArret, "sans-qualite", `${ici} : l'état de la reprise`);
+      assert.equal(ctx.weekPlan.qBudget, 0); assert.deepEqual(ctx.weekPlan.quality, []);
+      assert.deepEqual(duresDe(ctx).map((d) => d.type), [], `${ici} : une séance dure dans une semaine trop petite`);
+      assert.ok(footingsDe(ctx).length >= 1 && footingsDe(ctx).length + planDe(ctx).filter((d) => /longue/i.test(d.type)).length >= 2, `${ici} : moins de deux sorties faciles (${planDe(ctx).map((d) => d.type).join(", ")})`);
+      for (const l of CINQ) assert.match(motif![l], PETITE[l], `${ici}, ${l} : la fin du motif (${motif![l]})`);
+      assert.doesNotMatch(Object.values(motif!).join(" "), /séance de qualité|quality session|Qualitätseinheit|sesión de calidad|sessão de qualidade/, `${ici} : le motif promet encore une séance de qualité`);
+      assert.match(ctx.lastSession?.effect ?? "", /→ aucune séance de qualité cette semaine\.$/, `${ici} : le bilan de la dernière séance (${ctx.lastSession?.effect})`);
+      assert.doesNotMatch(ctx.text, /• Qualité \d/, `${ici} : l'invite de l'IA annonce une séance de qualité`);
+      assert.ok(ctx.text.includes(motif!.fr), `${ici} : l'invite de l'IA ne porte pas le motif du plan`);
+      // La sortie longue, elle, reste quand elle tient : l'invite de l'IA ne dit pas qu'il n'y en a pas.
+      assert.ok(planDe(ctx).some((d) => /longue/i.test(d.type)), `précondition, ${ici} : la sortie longue n'est pas posée`);
+      assert.doesNotMatch(ctx.text, /PAS de sortie longue cette semaine/, `${ici} : l'invite de l'IA annonce une semaine sans sortie longue, le plan en pose une`);
+      if (notifications.length) {
+        assert.deepEqual(ctx.macroPlan[0]?.quality, [], `${ici} : la semaine en cours de la feuille de route annonce ${ctx.macroPlan[0]?.quality.join(", ")}`);
+        assert.match(ctx.macroPlan[0].focus, /^Reprise après un arrêt : footings seulement/, `${ici} : le texte de la semaine en cours (${ctx.macroPlan[0].focus})`);
+        assert.equal(ctx.macroPlan[0].longRunKm > 0, planDe(ctx).some((d) => /longue/i.test(d.type)), `${ici} : la feuille de route et le plan ne disent pas la même sortie longue`);
+      }
+    }
+    // (b) CONTRE-POIDS : à 36 et 60 km par semaine, la séance au seuil reste, avec au moins un footing à côté.
+    for (const v of [36, 60]) {
+      const ctx = await contexte({ seances: coureur(v, 14, 8) });
+      assert.equal(tropPetiteDe(ctx), false, `précondition, ${v} km par semaine : la semaine de ${ctx.volume.targetKm} km est trop petite`);
+      assert.equal(ctx.weekPlan.repriseArret, "une-qualite", `${v} km par semaine : la séance permise est retirée d'une semaine qui la tient`);
+      assert.deepEqual(duresDe(ctx).map((d) => d.type), ["Seuil"], `${v} km par semaine : le plan (${planDe(ctx).map((d) => d.type).join(", ")})`);
+      assert.ok(footingsDe(ctx).length >= 1, `${v} km par semaine : aucun footing à côté du seuil`);
+      assert.match(motifArret(ctx)?.fr ?? "", /; une seule séance de qualité par semaine au plus, courte, jusqu'à la fin de la reprise$/);
+    }
+    // (c) L'INVARIANT, sur tous les volumes : jamais de séance dure sans footing à côté pendant une reprise, et l'état
+    // suit le critère partagé avec le plan. Les deux branches doivent tourner.
+    let petites = 0, tenues = 0;
+    for (let v = 16; v <= 64; v += 4) for (const [arret, repris] of [[14, 8], [20, 12], [40, 20]] as const) {
+      const ctx = await contexte({ seances: coureur(v, arret, repris) }), ici = `${v} km par semaine, ${arret} jours d'arrêt, ${repris}ᵉ jour`;
+      if (duresDe(ctx).length) assert.ok(footingsDe(ctx).length >= 1, `${ici} : une séance dure sans aucun footing à côté (${planDe(ctx).map((d) => d.type).join(", ")})`);
+      if (tropPetiteDe(ctx)) { petites++; assert.equal(ctx.weekPlan.repriseArret, "sans-qualite", `${ici} : semaine trop petite, état ${ctx.weekPlan.repriseArret}`); assert.deepEqual(duresDe(ctx).map((d) => d.type), [], `${ici} : une séance dure dans une semaine trop petite`); }
+      else if (ctx.weekPlan.repriseArret === "une-qualite") tenues++;
+    }
+    assert.ok(petites >= 6 && tenues >= 6, `précondition : ${petites} semaines trop petites, ${tenues} semaines qui gardent leur séance`);
+    // (d) PENDANT LA MARCHE DE SORTIE (90 jours d'arrêt, 64ᵉ jour) : à 24 km par semaine d'avant, la semaine plafonnée
+    // à 19 km ne porte que des footings ; le motif de la marche le dit, celui du plafond ne le répète pas.
+    const marchePetite = await contexte({ seances: coureur(24, 90, 64), notifications: dixKm16 });
+    const motifMarche = marchePetite.readiness.reasonsAll.find((m) => /^fin de la reprise après/.test(m.fr));
+    assert.equal(marchePetite.weekPlan.sortieReprise, true, "précondition : 64ᵉ jour, pas de marche de sortie");
+    assert.equal(tropPetiteDe(marchePetite), true, `précondition : la semaine de ${marchePetite.volume.targetKm} km n'est pas trop petite`);
+    assert.equal(marchePetite.weekPlan.repriseArret, "sans-qualite"); assert.equal(testVmaAttendLaReprise(marchePetite.weekPlan), true);
+    assert.deepEqual(duresDe(marchePetite).map((d) => d.type), [], "marche de sortie, semaine trop petite : une séance dure est posée");
+    assert.deepEqual(marchePetite.macroPlan[0].quality, [], "marche de sortie, semaine trop petite : la feuille de route annonce une séance");
+    assert.match(marchePetite.macroPlan[0].focus, /^Reprise après un arrêt : footings seulement/);
+    const FIN_MARCHE = { fr: /^fin de la reprise après 90 jours sans courir : footings seulement cette semaine, elle est trop petite pour porter une séance dure et un footing$/, en: /: easy runs only this week, it is too small to hold a hard session and an easy run$/,
+      de: /: diese Woche nur lockere Läufe, sie ist zu klein für eine harte Einheit und einen lockeren Lauf$/, es: /: solo rodajes suaves esta semana, es demasiado corta para una sesión dura y un rodaje$/, pt: /: só corridas fáceis esta semana, é demasiado pequena para uma sessão dura e uma corrida fácil$/ } as const;
+    for (const l of CINQ) assert.match(motifMarche?.[l] ?? "", FIN_MARCHE[l], `marche de sortie, ${l} : le motif (${motifMarche?.[l]})`);
+    assert.doesNotMatch(marchePetite.readiness.reasons.join(" | "), /deux séances de qualité au plus/, "marche de sortie, semaine trop petite : le motif promet encore deux séances");
+    assert.match(motifArret(marchePetite)?.fr ?? "", /^reprise après 90 jours sans courir : 80 % au plus de ton volume d'avant l'arrêt cette semaine \(règle de Daniels\)$/, "le motif du plafond répète « footings seulement » pendant la marche de sortie");
+    assert.ok(marchePetite.text.includes(motifMarche!.fr), "l'invite de l'IA ne porte pas le motif de la marche de sortie");
+    const marcheGrande = await contexte({ seances: coureur(60, 90, 64), notifications: dixKm16 });
+    assert.equal(marcheGrande.weekPlan.repriseArret, undefined, "60 km par semaine, marche de sortie : la semaine est dite « footings seulement »");
+    assert.ok(duresDe(marcheGrande).length >= 1, "60 km par semaine, marche de sortie : plus aucune séance");
+    assert.match(marcheGrande.readiness.reasons.join(" | "), /deux séances de qualité au plus cette semaine, sans VMA ni côtes/);
+    // (d bis) LA MARCHE DE SORTIE SEULE, la reprise de volume déjà finie (30 jours d'arrêt, 32ᵉ jour : la règle a fini
+    // au 28ᵉ, le plafond au 30ᵉ) : la règle des petites semaines vaut encore, et il n'y a plus de motif de plafond.
+    const marcheSeule = await contexte({ seances: coureur(14, 30, 32) });
+    assert.equal(marcheSeule.weekPlan.sortieReprise, true, "précondition : 30 jours d'arrêt, 32ᵉ jour, pas de marche de sortie");
+    assert.equal(repriseVolumeLongArret(coureur(14, 30, 32).map((w) => w.date), AUJOURDHUI), null, "précondition : la reprise de volume court encore");
+    assert.equal(tropPetiteDe(marcheSeule), true, `précondition : la semaine de ${marcheSeule.volume.targetKm} km n'est pas trop petite`);
+    assert.equal(marcheSeule.weekPlan.repriseArret, "sans-qualite", "marche de sortie seule : une semaine trop petite garde ses séances");
+    assert.deepEqual(duresDe(marcheSeule).map((d) => d.type), []);
+    assert.match(marcheSeule.readiness.reasons.join(" | "), /fin de la reprise après 30 jours sans courir : footings seulement cette semaine, elle est trop petite/);
+    assert.deepEqual(marcheSeule.readiness.reasons.filter((r) => /^reprise après|^aucune course enregistrée/.test(r)), [], "marche de sortie seule : un motif de plafond est encore dit");
+    // (d ter) UNE SÉANCE, PAS DEUX. Pendant la marche de sortie, deux séances sont permises ; une semaine qui en tient
+    // une avec un footing, mais pas deux, n'en porte qu'une (elle portait un seuil, une séance spécifique et la sortie
+    // longue, sans footing). 40 km par semaine d'avant, 60 jours d'arrêt, 66ᵉ jour : 32 km au plus.
+    const marcheUne = await contexte({ seances: coureur(40, 60, 66), notifications: dixKm16 });
+    const tenables = qualitesTenablesAvecFooting({ targetKm: marcheUne.volume.targetKm, longRunKm: marcheUne.volume.longRunKm, reserveKm: marcheUne.volume.longRunReserveKm, easyPace: marcheUne.easyPace, warmMin: marcheUne.warmCool.warm, coolMin: marcheUne.warmCool.cool });
+    assert.equal(marcheUne.weekPlan.sortieReprise, true, "précondition : 60 jours d'arrêt, 66ᵉ jour, pas de marche de sortie");
+    assert.equal(tenables, 1, `précondition : la semaine de ${marcheUne.volume.targetKm} km (sortie longue ${marcheUne.volume.longRunKm} km) tient ${tenables} séance(s) avec un footing, attendu une`);
+    assert.equal(marcheUne.weekPlan.qBudget, 1, `marche de sortie : ${marcheUne.weekPlan.qBudget} séances au budget d'une semaine qui n'en tient qu'une avec un footing`);
+    assert.equal(marcheUne.weekPlan.quality.length, 1); assert.equal(marcheUne.weekPlan.repriseArret, undefined, "une semaine qui tient une séance est dite « footings seulement »");
+    assert.equal(duresDe(marcheUne).length, 1, `marche de sortie : ${duresDe(marcheUne).length} séance(s) dure(s) (${planDe(marcheUne).map((d) => d.type).join(", ")})`);
+    assert.ok(footingsDe(marcheUne).length >= 1, `marche de sortie : aucun footing à côté de la séance dure (${planDe(marcheUne).map((d) => d.type).join(", ")})`);
+    assert.ok(marcheUne.macroPlan[0].quality.length <= 1, `marche de sortie : la feuille de route annonce ${marcheUne.macroPlan[0].quality.join(", ")}`);
+    assert.match(marcheUne.lastSession?.effect ?? "", /→ 1 séance de qualité cette semaine\.$/, `marche de sortie : le bilan de la dernière séance (${marcheUne.lastSession?.effect})`);
+    assert.doesNotMatch(marcheUne.text, /• Qualité 2/, "marche de sortie : l'invite de l'IA annonce une seconde séance");
+    // LA FEUILLE DE ROUTE AUSSI, à cinq semaines d'un 10 km (phase spécifique : elle annonçait deux séances, seuil et
+    // allure de course, là où le plan n'en pose qu'une).
+    const dixKmProche = [objectif({ race: "10 km test", raceDate: ilYa(-35), distanceKm: 10, targetTime: "45'00", targetSeconds: 2700, targetPace: "4'30/km" })];
+    const marcheUneProche = await contexte({ seances: coureur(46, 60, 66), notifications: dixKmProche });
+    assert.equal(marcheUneProche.weekPlan.sortieReprise, true); assert.equal(marcheUneProche.weekPlan.qBudget, 1, `10 km dans cinq semaines : ${marcheUneProche.weekPlan.qBudget} séance(s) au budget`);
+    assert.equal(marcheUneProche.macroPlan[0].quality.length, 1, `10 km dans cinq semaines : la semaine en cours de la feuille de route annonce ${marcheUneProche.macroPlan[0].quality.join(", ")}, le plan pose une séance`);
+    // DEUX AU PLUS, même quand la semaine en tiendrait trois : 96 km par semaine, 35 jours d'arrêt, à cinq semaines
+    // d'un 10 km. Au 30ᵉ jour (marche de sortie) le budget est de deux ; au 36ᵉ (plan normal) il est de trois.
+    const marcheGros = await contexte({ seances: coureur(96, 35, 30), notifications: dixKmProche }), apresGros = await contexte({ seances: coureur(96, 35, 36), notifications: dixKmProche });
+    const tenablesGros = qualitesTenablesAvecFooting({ targetKm: marcheGros.volume.targetKm, longRunKm: marcheGros.volume.longRunKm, reserveKm: marcheGros.volume.longRunReserveKm, easyPace: marcheGros.easyPace, warmMin: marcheGros.warmCool.warm, coolMin: marcheGros.warmCool.cool });
+    assert.equal(marcheGros.weekPlan.sortieReprise, true, "précondition : 35 jours d'arrêt, 30ᵉ jour, pas de marche de sortie");
+    assert.ok(tenablesGros >= 3, `précondition : la semaine de ${marcheGros.volume.targetKm} km ne tient que ${tenablesGros} séance(s) avec un footing, la borne à deux ne prouverait rien`);
+    assert.equal(apresGros.weekPlan.qBudget, 3, `précondition : après la marche de sortie, ce coureur n'a pas trois séances au budget (${apresGros.weekPlan.qBudget})`);
+    assert.equal(marcheGros.weekPlan.qBudget, 2, `marche de sortie : ${marcheGros.weekPlan.qBudget} séances au budget d'un coureur à 96 km par semaine`);
+    // Contre-poids : à 60 km par semaine, la marche de sortie garde ses deux séances, avec des footings.
+    assert.equal(duresDe(marcheGrande).length, 2, `60 km par semaine, marche de sortie : ${duresDe(marcheGrande).length} séance(s) dure(s)`);
+    assert.ok(footingsDe(marcheGrande).length >= 1);
+    // L'INVARIANT hors de la règle d'intensité (marche de sortie, reprise de volume) : jamais de séance dure sans footing.
+    let deuxSeances = 0, uneSeance = 0;
+    for (let v = 16; v <= 64; v += 6) for (const [arret, repris] of [[90, 64], [90, 72], [40, 30], [40, 36]] as const) {
+      const ctx = await contexte({ seances: coureur(v, arret, repris), notifications: dixKm16 });
+      if (duresDe(ctx).length) assert.ok(footingsDe(ctx).length >= 1, `${v} km par semaine, ${arret} jours d'arrêt, ${repris}ᵉ jour : ${duresDe(ctx).length} séance(s) dure(s) sans aucun footing (${planDe(ctx).map((d) => d.type).join(", ")})`);
+      if (duresDe(ctx).length >= 2) deuxSeances++; else if (duresDe(ctx).length === 1) uneSeance++;
+    }
+    assert.ok(deuxSeances >= 2 && uneSeance >= 2, `précondition : ${deuxSeances} semaines à deux séances, ${uneSeance} à une séance`);
+    // (d quater) LE CALENDRIER. Le volume peut tenir deux séances et un footing sans que la semaine ait un JOUR pour ce
+    // footing : quatre jours disponibles, deux séances dures, la sortie longue, et le repos complet que le plan pose à
+    // côté d'elle (26 plans sur 12 960, relecture du 23/11/2026). Le plan ne pose une séance dure que s'il reste un jour
+    // pour un footing. Tous les jeux de trois et de quatre jours disponibles, pendant la marche de sortie (deux séances
+    // au budget) et pendant la règle d'intensité (une séance).
+    const jeux = (n: number) => { const out: number[][] = []; const rec = (de: number, pris: number[]) => { if (pris.length === n) { out.push(pris); return; } for (let j = de; j <= 6; j++) rec(j + 1, [...pris, j]); }; rec(0, []); return out; };
+    let avecSeance = 0, retenues = 0, mordu = 0;
+    for (const jours of [...jeux(3), ...jeux(4)]) for (const [seances, notifications] of [[coureur(60, 90, 64), dixKmProche], [coureur(60, 14, 8), []]] as const) {
+      const ctx = await contexte({ profil: { ...PROFIL, days_per_week: jours.length, available_days: jours }, seances: [...seances], notifications: [...notifications] });
+      const plan = planDe(ctx), dures = plan.filter((d) => DUR.test(d.type)), faciles = plan.filter((d) => /^(Endurance|R[ée]cup)$/i.test(d.type)), ici = `jours disponibles ${jours.join(",")}, ${notifications.length ? "marche de sortie" : "règle d'intensité"}`;
+      assert.equal(ctx.weekPlan.footingExige, true, `${ici} : le plan ne sait pas qu'un footing est exigé`);
+      if (dures.length) { avecSeance++; assert.ok(faciles.length >= 1, `${ici} : ${dures.length} séance(s) dure(s) sans aucun footing (${plan.map((d) => `${d.date.slice(8)} ${d.type}`).join(", ")})`); }
+      if (dures.length === ctx.weekPlan.quality.length) retenues++; else if (dures.length < ctx.weekPlan.quality.length) mordu++;
+    }
+    // MOINS DE SORTIES VOULUES QUE DE JOURS DISPONIBLES (deux, trois ou quatre sorties par semaine, sept jours libres) :
+    // ce n'est plus le calendrier qui manque, c'est le budget de sorties. La dernière sortie reste au footing.
+    let budgetMordu = 0;
+    for (const sortiesVoulues of [2, 3, 4]) for (const [seances, notifications] of [[coureur(60, 90, 64), dixKmProche], [coureur(60, 14, 8), []]] as const) {
+      const ctx = await contexte({ profil: { ...PROFIL, days_per_week: sortiesVoulues, available_days: [0, 1, 2, 3, 4, 5, 6] }, seances: [...seances], notifications: [...notifications] });
+      const plan = planDe(ctx), dures = plan.filter((d) => DUR.test(d.type)), faciles = plan.filter((d) => /^(Endurance|R[ée]cup)$/i.test(d.type));
+      if (dures.length) assert.ok(faciles.length >= 1, `${sortiesVoulues} sorties par semaine, sept jours libres : ${dures.length} séance(s) dure(s) sans footing (${plan.map((d) => d.type).filter((t) => t !== "Repos").join(", ")})`);
+      if (dures.length < ctx.weekPlan.quality.length) budgetMordu++;
+    }
+    assert.ok(budgetMordu >= 1, "précondition : le budget de sorties n'a retenu aucune séance, la clause n'est pas jouée");
+    assert.ok(avecSeance >= 40 && retenues >= 40, `précondition : ${avecSeance} plans avec une séance dure, ${retenues} qui posent tout leur budget`);
+    assert.ok(mordu >= 1, `précondition : la garde de calendrier n'a retenu aucune séance sur 140 plans (${mordu})`);
+    // HORS REPRISE, le plan n'exige rien : un coureur SANS arrêt garde les séances que la garde retiendrait. On lui
+    // tend le même contexte avec l'exigence : sur les 35 jeux de quatre jours, elle retire au moins une séance, que
+    // son plan à lui pose encore.
+    let sansGarde = 0, avecGarde = 0;
+    for (const jours of jeux(4)) {
+      const ctx = await contexte({ profil: { ...PROFIL, days_per_week: 4, available_days: jours }, seances: avantReel(1, 10), notifications: dixKmProche });
+      assert.equal(sansArretFlag(ctx), undefined, `jours disponibles ${jours.join(",")} : un coureur sans arrêt reçoit la garde de calendrier`);
+      sansGarde += planDe(ctx).filter((d) => DUR.test(d.type)).length;
+      avecGarde += planDe({ ...ctx, weekPlan: { ...ctx.weekPlan, footingExige: true } }).filter((d) => DUR.test(d.type)).length;
+    }
+    assert.ok(sansGarde > avecGarde, `hors reprise, le plan retient déjà les séances que la garde de calendrier retiendrait (${sansGarde} séances dures sans elle, ${avecGarde} avec)`);
+    // (e) LA MARCHE FINIE, LA REPRISE DE VOLUME COURT ENCORE (72ᵉ jour) : c'est le motif du plafond qui le dit.
+    const volumePetit = await contexte({ seances: coureur(24, 90, 72) });
+    assert.equal(volumePetit.weekPlan.sortieReprise, undefined, "précondition : 72ᵉ jour, la marche de sortie court encore");
+    assert.equal(volumePetit.weekPlan.repriseArret, "sans-qualite"); assert.deepEqual(duresDe(volumePetit).map((d) => d.type), []);
+    for (const l of CINQ) assert.match(motifArret(volumePetit)?.[l] ?? "", PETITE[l], `72ᵉ jour, ${l} : le motif (${motifArret(volumePetit)?.[l]})`);
+    assert.match(motifArret(volumePetit)?.fr ?? "", /^reprise après 90 jours sans courir : 80 % au plus de ton volume d'avant l'arrêt cette semaine \(règle de Daniels\) ; footings/);
+    const volumeGrand = await contexte({ seances: coureur(60, 90, 72) });
+    assert.equal(volumeGrand.weekPlan.repriseArret, undefined); assert.ok(duresDe(volumeGrand).length >= 1, "60 km par semaine, 72ᵉ jour : plus aucune séance dure");
+    // (e ter) LA SORTIE LONGUE RETIRÉE, LA SÉANCE GARDÉE : trois sorties de 15 km par semaine, 20 jours d'arrêt, 12ᵉ jour.
+    // À 75 % (34 km), la sortie longue serait plus courte que sa sortie habituelle : elle n'est pas posée ; la semaine
+    // tient un seuil et un footing. La semaine en cours de la feuille de route dit les deux.
+    const troisParSemaine = (de: number, a: number) => Array.from({ length: a - de + 1 }, (_, k) => de + k).filter((n) => [0, 2, 4].includes(n % 7)).map((n) => sortie(n, 15));
+    const grandesSorties = await contexte({ seances: [...troisParSemaine(12 + 20 + 1, 12 + 20 + 76), ...troisParSemaine(1, 12)], notifications: dixKm16 });
+    assert.equal(grandesSorties.weekPlan.repriseArret, "une-qualite", `précondition : trois sorties de 15 km, état ${grandesSorties.weekPlan.repriseArret} (cible ${grandesSorties.volume.targetKm} km)`);
+    assert.equal(grandesSorties.volume.longRunKm, 0, "précondition : la sortie longue n'est pas retirée");
+    assert.equal(duresDe(grandesSorties).length <= 1 && footingsDe(grandesSorties).length >= 1, true, `trois sorties de 15 km : ${planDe(grandesSorties).map((d) => d.type).join(", ")}`);
+    assert.equal(grandesSorties.macroPlan[0].longRunKm, 0, `la semaine en cours de la feuille de route annonce ${grandesSorties.macroPlan[0].longRunKm} km de sortie longue, le plan n'en pose pas`);
+    assert.deepEqual(grandesSorties.macroPlan[0].quality, ["Seuil"], "la semaine en cours de la feuille de route n'annonce plus la séance que le plan garde");
+    // (e bis) VOLUME D'AVANT L'ARRÊT INCONNU (montre sans distance), la règle d'intensité et la marche de sortie finies :
+    // il n'y a ni plafond ni motif de plafond. La semaine de footings seulement n'est pas muette pour autant
+    // (relecture du 23/11/2026 : état « sans-qualite », plan sans séance, et AUCUN motif).
+    const inconnuSeances = [...avantReel(75 + 90 + 1, 6).map((w) => ({ ...w, distance_km: null })), ...depuisReprise(75, 3)];
+    const inconnu = await contexte({ seances: inconnuSeances });
+    assert.equal(arretHorsEchelle(inconnuSeances.map((w) => w.date), AUJOURDHUI), null, "précondition : au 75ᵉ jour, la règle d'intensité court encore");
+    assert.equal(inconnu.weekPlan.sortieReprise, undefined, "précondition : au 75ᵉ jour, la marche de sortie court encore");
+    assert.equal(tropPetiteDe(inconnu), true, `précondition : la semaine de ${inconnu.volume.targetKm} km n'est pas trop petite`);
+    assert.equal(inconnu.weekPlan.repriseArret, "sans-qualite"); assert.deepEqual(duresDe(inconnu).map((d) => d.type), []);
+    const motifInconnu = motifArret(inconnu);
+    assert.match(motifInconnu?.fr ?? "", /^reprise après 90 jours sans courir : ton volume d'avant l'arrêt n'est pas connu, aucun plafond de volume n'est posé ; footings seulement cette semaine : elle est trop petite pour porter une séance dure et un footing$/, `volume d'avant inconnu : le motif (${inconnu.readiness.reasons.join(" | ") || "aucun"})`);
+    for (const l of CINQ) assert.match(motifInconnu?.[l] ?? "", PETITE[l], `volume d'avant inconnu, ${l} : le motif (${motifInconnu?.[l]})`);
+    assert.ok(inconnu.text.includes(`• À savoir : ${motifInconnu!.fr}`) || inconnu.text.includes(` ; ${motifInconnu!.fr}`), "volume d'avant inconnu : l'invite de l'IA ne porte pas le motif");
+    assert.equal(inconnu.readiness.reasons.filter((r) => /^reprise après/.test(r)).length, 1, "volume d'avant inconnu : le motif est dit deux fois");
+    // AVEC UN AUTRE MOTIF D'INFORMATION (une course C inscrite cette semaine), l'invite de l'IA porte les deux.
+    const inconnuCourse = await contexte({ seances: inconnuSeances, notifications: [{ user_id: "u", type: "planned_race", created_at: `${AUJOURDHUI}T10:00:00Z`, data: { name: "Corrida du quartier", date: ilYa(-4), distanceKm: 5, priorite: "C" } }] });
+    const motifInconnuCourse = motifArret(inconnuCourse);
+    assert.match(inconnuCourse.readiness.reasons.join(" | "), /course C cette semaine : Corrida du quartier/, "précondition : la course C n'a pas son motif");
+    if (inconnuCourse.weekPlan.repriseArret === "sans-qualite") {
+      assert.ok(motifInconnuCourse && /footings seulement cette semaine : elle est trop petite/.test(motifInconnuCourse.fr), `avec une course C : la semaine de footings n'a pas son motif (${inconnuCourse.readiness.reasons.join(" | ")})`);
+      assert.ok(inconnuCourse.text.includes(` ; ${motifInconnuCourse!.fr}`), "avec une course C : l'invite de l'IA ne porte pas le motif ajouté à la suite des autres");
+    }
+    assert.equal(inconnuCourse.weekPlan.repriseArret, "sans-qualite", `précondition : avec une course C, la semaine n'est plus trop petite (cible ${inconnuCourse.volume.targetKm} km)`);
+    // Contre-poids : le même, à 60 km par semaine depuis sa reprise, garde ses séances et n'a aucun motif ajouté.
+    const inconnuGrand = await contexte({ seances: [...avantReel(75 + 90 + 1, 10).map((w) => ({ ...w, distance_km: null })), ...depuisReprise(75, 10)] });
+    assert.equal(inconnuGrand.weekPlan.repriseArret, undefined); assert.deepEqual(inconnuGrand.readiness.reasons.filter((r) => /^reprise après/.test(r)), [], "volume d'avant inconnu, grosse semaine : un motif de reprise est ajouté");
+    // (f) HORS CHAMP. Un petit coureur SANS arrêt garde ses séances ; sous consignes du kinésithérapeute, la règle
+    // ne s'applique pas (leur fenêtre de séances décide déjà).
+    const sansArret = await contexte({ seances: avantReel(1, 20 / 6) });
+    assert.equal(sansArret.weekPlan.repriseArret, undefined, "un petit coureur sans arrêt est dit en reprise");
+    assert.doesNotMatch(sansArret.readiness.reasons.join(" | "), /trop petite/);
+    assert.ok(sansArret.weekPlan.qBudget >= 1, `précondition : le petit coureur sans arrêt n'a aucune séance de qualité (${sansArret.weekPlan.qBudget})`);
+    const kine = [{ user_id: "u", type: "consignes_kine", created_at: `${ilYa(1)}T10:00:00Z`, data: { dureeMaxMin: null, sansIntensite: false, seancesMaxSemaine: 3, jusquAu: ilYa(-14), majA: ilYa(1) } }];
+    const sousKine = await contexte({ seances: coureur(24, 14, 8), notifications: kine });
+    assert.doesNotMatch(sousKine.readiness.reasons.join(" | "), /trop petite/, "sous consignes du kinésithérapeute, la règle des petites semaines s'applique");
+    assert.equal(sousKine.weekPlan.footingExige, undefined, "sous consignes du kinésithérapeute, le plan exige un jour de footing");
+    // Et un petit volume plafonné, hors de la règle d'intensité (15 km d'avant, 40 jours d'arrêt, 36ᵉ jour), y garde sa
+    // sortie longue : la retirer laissait le seuil seul dans la semaine.
+    const kinePetit = await contexte({ seances: coureur(15, 40, 36), notifications: kine });
+    assert.ok(kinePetit.volume.targetKm <= 12, `précondition : sous consignes, ${kinePetit.volume.targetKm} km visés, la semaine n'est pas plafonnée`);
+    assert.equal(arretHorsEchelle(coureur(15, 40, 36).map((w) => w.date), AUJOURDHUI), null, "précondition : au 36ᵉ jour, la règle d'intensité court encore");
+    assert.ok(kinePetit.volume.longRunKm > 0, "sous consignes du kinésithérapeute, la sortie longue d'une semaine plafonnée est retirée");
+    // Un débutant en marche-course qui revient d'un arrêt : son programme n'a aucune séance dure, sa semaine est au
+    // plancher (footings seulement, déjà), et son motif ne parle pas d'une semaine « trop petite pour une séance dure ».
+    // Quatre sorties, vingt jours d'arrêt, puis une sortie tous les deux jours depuis treize jours : onze sorties en
+    // tout, le programme (33 séances) est en cours, et la règle d'intensité permettrait une séance.
+    const sortiesDebutant = [40, 38, 36, 34, 13, 11, 9, 7, 5, 3, 1].map((n) => sortie(n, 3));
+    assert.equal(qualitePendantReprise(repriseApresArret(sortiesDebutant.map((w) => w.date), AUJOURDHUI))?.max, 1, "précondition : le débutant n'est pas dans la seconde moitié de sa reprise");
+    const debutant = await contexte({ profil: { ...PROFIL, running_years: 0, peut_courir_30min: false }, seances: sortiesDebutant });
+    assert.doesNotMatch(debutant.readiness.reasons.join(" | "), /trop petite/, `marche-course : la règle des petites semaines s'applique (${debutant.readiness.reasons.join(" | ")})`);
+    assert.match(debutant.readiness.reasons.join(" | "), /marche-course/, "précondition : le débutant n'est pas en marche-course");
+    assert.deepEqual(duresDe(debutant).map((d) => d.type), [], "marche-course : une séance dure est posée");
+  });
+
+  await test("la marche de sortie écrit ses séances dans la dose courte de la reprise", async () => {
+    // 60 km par semaine, 90 jours d'arrêt, un 10 km dans seize semaines. Pendant la marche de sortie (63ᵉ au 69ᵉ jour),
+    // la séance qui revient est celle de la reprise ; la semaine suivante, la dose normale. On compare la MÊME séance
+    // (même texte, aux chiffres près) : la dose de la marche est plus petite.
+    const dose = (desc: string) => Number(desc.match(/(\d+)\s*(?:×|min)/)?.[1] ?? NaN), gabarit = (desc: string) => desc.replace(/\d+/g, "N");
+    // ⚠️ La semaine de comparaison ne doit PAS être une semaine allégée du bloc (une sur quatre, calée sur le
+    // calendrier) : la dose y est réduite elle aussi, et la comparaison ne dirait rien (visa RENVOYÉ, 23/11/2026).
+    // On compare donc chaque jour de la marche à la semaine suivante ET à celle d'après, en écartant l'allégée.
+    const semaineDe = async (jour: number) => { const ctx = await contexte({ seances: longArret(90, jour), notifications: dixKm16 }); return { allegee: ctx.cycle.deload, seances: ctx.weekPlan.quality.filter((q) => q.type !== "VMA") }; };
+    let comparees = 0, normales = 0;
+    for (const pendant of [63, 65, 67, 69]) {
+      const m = await semaineDe(pendant);
+      for (const plusTard of [7, 14]) {
+        const a = await semaineDe(pendant + plusTard);
+        if (a.allegee) continue;
+        normales++;
+        for (const q of m.seances) for (const r of a.seances) if (q.type === r.type && gabarit(q.desc) === gabarit(r.desc) && Number.isFinite(dose(q.desc)) && Number.isFinite(dose(r.desc))) {
+          comparees++;
+          assert.ok(dose(q.desc) < dose(r.desc), `${pendant}ᵉ jour contre ${pendant + plusTard}ᵉ : la séance de la marche de sortie (${q.desc.slice(0, 70)}) n'est pas plus courte que la séance normale (${r.desc.slice(0, 70)})`);
+        }
+      }
+    }
+    // LA SEMAINE DU CALENDRIER EST ELLE-MÊME ALLÉGÉE (une sur quatre) : la dose est réduite pour tout le monde, il n'y a
+    // rien à comparer ce jour-là. Le test le dit et s'arrête là ; l'ancre de source ci-dessous tient à toute date.
+    if (normales === 0) {
+      assert.equal((await contexte({ seances: reguliere(1, 100), notifications: dixKm16 })).cycle.deload, true, "aucune semaine de comparaison, alors que la semaine du calendrier n'est pas allégée");
+      comparees = 2;
+    }
+    assert.ok(comparees >= 2, `précondition : ${comparees} séance(s) comparable(s) entre la marche de sortie et la semaine suivante`);
+    assert.match(codeNu("src/lib/ai/coachContext.ts"), /const doseReduite = semaineAllegeeDuBloc \|\| repriseCetteSemaine \|\| qualiteReprise != null \|\| marcheSortie != null;/);
+  });
+
+  await test("un volume d'avant l'arrêt de 12 km ou moins est plafonné à lui-même, jamais sous un footing", async () => {
+    const debut = { arretJours: 40, joursRepris: 0 }, tresLong = { arretJours: 90, joursRepris: 2 };
+    for (const r of [debut, tresLong]) {
+      for (let v = 1; v <= 12; v++) assert.equal(plafondPetitVolumeKm(r, v), Math.max(6, v), `${v} km d'avant, ${r.arretJours} jours d'arrêt : plafond de ${plafondPetitVolumeKm(r, v)} km`);
+      assert.equal(plafondPetitVolumeKm(r, 9.4), 9); assert.equal(plafondPetitVolumeKm(r, 0), null, "volume inconnu : un plafond est posé");
+    }
+    // Au-dessus de 12 km : le plafond replié (12 km) tant qu'aucun palier ne laisse deux footings, puis les paliers.
+    assert.deepEqual([13, 15, 16, 30].map((v) => plafondPetitVolumeKm(debut, v)), [12, 12, null, null]);
+    assert.deepEqual([14, 15, 60].map((v) => plafondPetitVolumeKm(tresLong, v)), [12, null, null]);
+    // Jamais hors de la reprise de volume d'un long arrêt.
+    for (const r of [null, { arretJours: 20, joursRepris: 0 }, { arretJours: 40, joursRepris: 40 }, { arretJours: 90, joursRepris: 84 }]) assert.equal(plafondPetitVolumeKm(r, 10), null, `${r ? r.arretJours + " jours d'arrêt, " + r.joursRepris + "ᵉ jour" : "pas d'arrêt"} : un plafond est posé`);
+    for (const [r, dans, attendu] of [[{ arretJours: 40, joursRepris: 35 }, 0, 10], [{ arretJours: 40, joursRepris: 35 }, 7, null]] as const) assert.equal(plafondPetitVolumeKm(r, 10, dans), attendu, "le plafond d'un petit volume ne suit pas la fin de la reprise de volume");
+    // LE PLAN. 8 km par semaine d'avant, 90 jours d'arrêt, 2ᵉ jour de reprise : 17 à 20 km visés avant ; 8 km au plus.
+    for (const [v, arret, repris] of [[8, 90, 2], [10, 40, 5], [5, 60, 3]] as const) {
+      const ctx = await contexte({ seances: coureur(v, arret, repris) }), plafond = Math.max(6, v), ici = `${v} km d'avant, ${arret} jours d'arrêt, ${repris}ᵉ jour`;
+      assert.ok(ctx.volume.targetKm <= plafond, `${ici} : ${ctx.volume.targetKm} km visés pour un plafond de ${plafond} km`);
+      assert.ok(footingsDe(ctx).length >= 1, `${ici} : la semaine plafonnée est vide (${planDe(ctx).map((d) => d.type).join(", ")})`);
+      assert.deepEqual(planDe(ctx).filter((d) => DUR.test(d.type) || /longue/i.test(d.type)).map((d) => d.type), [], `${ici} : une séance dure ou une sortie longue`);
+      assert.match(motifArret(ctx)?.fr ?? "", new RegExp(`: ${plafond} km au plus cette semaine, ton volume d'avant l'arrêt étant déjà petit ; `), `${ici} : le motif (${motifArret(ctx)?.fr})`);
+      for (const l of CINQ) assert.doesNotMatch(motifArret(ctx)?.[l] ?? "%", /%|Daniels/, `${ici}, ${l} : un pourcentage ou Daniels`);
+    }
+    // La reprise de volume finie, plus de plafond : la cible ordinaire du plan revient.
+    const fini = await contexte({ seances: coureur(8, 40, 41) });
+    assert.equal(motifArret(fini), undefined, `8 km d'avant, reprise finie : un motif de reprise est encore dit (${motifArret(fini)?.fr})`);
   });
 
   await test("les textes du plancher et de la fin de règle, phrase entière, et ce que le coureur lit", async () => {

@@ -26,6 +26,7 @@ import { avertissementsAge } from "@/lib/coach/ageDistance";
 import { etatDouble, seanceDoubleSeuil, doseDoubleSeuil, type EtatDouble } from "@/lib/coach/doubleSessions";
 import { DOUBLE_T } from "@/lib/coach/doubleSessionsI18n";
 import { warmCoolMin } from "@/lib/watch/intervals";
+import { qualitesTenablesAvecFooting } from "@/lib/coach/coutSeance";
 import { tr, nLoc, nRaw, type I18nText } from "@/lib/i18n/multi";
 import type { Lang } from "@/lib/i18n/translations";
 import { MOTIF_T } from "@/lib/coach/reasonsI18n";
@@ -44,7 +45,7 @@ const dureeLoc = (min: number, l: Lang) => {
 import { QUALITE_T } from "@/lib/ai/qualityI18n";
 import { aujourdhui, FUSEAU_DEFAUT, formatDateCivile, finDuJourCoureur } from "@/lib/time/fuseau";
 import { apresCourse, facteurVolumeApresCourse, type PhaseApresCourse } from "@/lib/coach/apresCourse";
-import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle, joursCourusPourArret, sortiesPourArret, repriseVolumeLongArret, partPlafondLongArret, plafondReplieSurPlancher, partApresLongArret, joursDepuisLAvantArret, PLAFOND_MIN_REPRISE_LONGUE_KM, finRegleIntensite, sortieDeRegle, MARCHE_SORTIE_JOURS, ARRET_MAX_JOURS, REPRISE_HORS_ECHELLE_JOURS } from "@/lib/coach/repriseArret";
+import { repriseApresArret, partApresArret, qualitePendantReprise, sortieHabituelleKm, sortieLongueTient, distancesAvantArret, arretLong, arretHorsEchelle, joursCourusPourArret, sortiesPourArret, repriseVolumeLongArret, partPlafondLongArret, plafondPetitVolumeKm, partApresLongArret, joursDepuisLAvantArret, PLAFOND_MIN_REPRISE_LONGUE_KM, finRegleIntensite, sortieDeRegle, MARCHE_SORTIE_JOURS, ARRET_MAX_JOURS, REPRISE_HORS_ECHELLE_JOURS } from "@/lib/coach/repriseArret";
 import { programmeMarcheCourse, dureesMarcheCourse, type SeanceMarcheCourse } from "@/lib/coach/marcheCourse";
 import { testEnVigueur, allureFacileMaxSec, fmtAllure, TYPE_TEST_LACTATE, type TestLactate } from "@/lib/coach/lactate";
 import { courseCEcarteeDe, type CourseCEcartee } from "@/lib/coach/courseCEcartee";
@@ -229,6 +230,9 @@ export type AthleteContext = {
     /** Marche de sortie de la règle d'intensité d'un arrêt de plus de 28 jours (sept jours) : deux séances
      *  de qualité au plus, sans VMA ni côtes ni test VMA. Absent hors de cette semaine. */
     sortieReprise?: true;
+    /** Reprise après un arrêt (règle d'intensité, marche de sortie ou reprise de volume d'un long arrêt), hors
+     *  consignes du kinésithérapeute : le plan ne pose une séance dure que s'il reste un JOUR pour un footing. */
+    footingExige?: true;
   };
   /** Doubles séances (matin + soir) : autorisées ou non, et ce qui manque le cas
    *  échéant. Une case cochée qui ne produit rien est un mensonge silencieux —
@@ -1515,6 +1519,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // d'intensité d'un arrêt de plus de 28 jours. Le plan normal ne revient pas d'un coup : deux séances de qualité
   // au plus, sans VMA ni côtes (seuil ou allure de course), pas de double seuil, pas de test VMA.
   const marcheSortie = repriseIntensite ? null : sortieDeRegle(joursArret, todayStr);
+  /** Minutes d'échauffement et de retour au calme du coureur : le plan et la règle des petites semaines les lisent. */
+  const warmCool = warmCoolMin(num(p?.warmup_min), num(p?.cooldown_min));
   const habitudeKm = robustWeekly?.km ?? (avg4wkKm > 0 ? avg4wkKm : weekKm);
   // ⚠️ L'HABITUDE DE LA REPRISE SE LIT LÀ OÙ L'ARRÊT S'EST LU (19/11/2026). L'arrêt se lit désormais
   // aussi sur l'historique long ; `habitudeKm`, elle, vient des 60 dernières séances. Quand le vélo
@@ -1604,6 +1610,9 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const plafondLongArretKm = (dansJours = 0) => {
     // Volume d'avant l'arrêt inconnu (0) : la part vaut 1, il n'y a pas de plafond. Petit volume : la part
     // monte au premier palier qui laisse deux footings dans la semaine (`partPlafondLongArret`).
+    // Très petit volume (12 km ou moins) ou plafond replié : un plafond en kilomètres (`plafondPetitVolumeKm`).
+    const petit = plafondPetitVolumeKm(repriseVolumeLongue, volumeAvantLongArretKm, dansJours);
+    if (petit != null) return petit;
     const part = partPlafondLongArret(repriseVolumeLongue, volumeAvantLongArretKm, dansJours);
     return part < 1 ? Math.round(volumeAvantLongArretKm * part) : Infinity;
   };
@@ -1693,8 +1702,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // LE PLAFOND REPLIÉ SUR LE PLANCHER (avis du directeur scientifique, 23/11/2026) : aucun palier ne laisse deux
   // footings à ce coureur, son plafond vaut 12 km. Le motif le dit en kilomètres, sans pourcentage ni Daniels, et
   // la semaine compte comme « au plancher » (`semaineAuPlancher` : footings seulement tant que la règle d'intensité dure).
-  const longArretAuPlancher = plafondReplieSurPlancher(repriseVolumeLongue, volumeAvantLongArretKm);
-  const plancherLongArretDit = (l: Lang) => longArretAuPlancher ? nRaw(PLAFOND_MIN_REPRISE_LONGUE_KM, l) : null;
+  // Un volume d'avant de 12 km ou moins est plafonné à lui-même, et dit de la même façon.
+  const plafondPetitKm = plafondPetitVolumeKm(repriseVolumeLongue, volumeAvantLongArretKm);
+  const longArretAuPlancher = plafondPetitKm != null;
+  const plancherLongArretDit = (l: Lang) => plafondPetitKm != null ? nRaw(plafondPetitKm, l) : null;
   /** Le jour de reprise où la règle d'intensité du long arrêt s'arrête, dit dans le motif quand ce n'est pas le 28ᵉ. */
   const finRegleDite = (l: Lang) => {
     const fin = repriseIntensite && !repriseArret ? finRegleIntensite(repriseIntensite.arretJours) : REPRISE_HORS_ECHELLE_JOURS;
@@ -1781,7 +1792,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // L'arrêt n'est pas une fatigue : il borne déjà le volume (Daniels), il ne doit pas en
   // plus faire passer le feu à l'orange et raccourcir la sortie longue une seconde fois.
   if (arretMotif) infoFlags.push(arretMotif);
-  if (marcheSortie) infoFlags.push(tr((l) => MOTIF_T[l].sortieReprise(nRaw(marcheSortie.arretJours, l))));
+  const marcheMotif = marcheSortie ? tr((l) => MOTIF_T[l].sortieReprise(nRaw(marcheSortie.arretJours, l))) : null;
+  if (marcheMotif) infoFlags.push(marcheMotif);
   // Le programme marche-course est un cadre, pas une fatigue : il se dit sans colorer le feu.
   if (marcheCourseMotif) infoFlags.push(marcheCourseMotif);
   if (secondaireMotif) infoFlags.push(secondaireMotif);
@@ -2072,7 +2084,10 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   // la séance, elle recevrait sinon la version complète.
   // Même dosage pendant la reprise après un ARRÊT : le volume est à 50 puis 75 %, la seule
   // séance de qualité permise est écrite courte, elle aussi.
-  const doseReduite = semaineAllegeeDuBloc || repriseCetteSemaine || qualiteReprise != null;
+  // Et pendant la MARCHE DE SORTIE (visa du directeur scientifique, 23/11/2026) : la première séance qui revient
+  // après la règle était un tempo dans sa dose normale (24 minutes, contre 18 pour la séance courte de la règle),
+  // y compris pour un coureur resté aux footings pendant toute la règle.
+  const doseReduite = semaineAllegeeDuBloc || repriseCetteSemaine || qualiteReprise != null || marcheSortie != null;
   /** Nombre de répétitions, plafonné par la règle des 8 % sur la distance travaillée. */
   const prog = (base: number, repMeters?: number): number => {
     const n = doseReduite ? Math.max(2, Math.round(base * 0.7)) : base + Math.min(2, blockWeek);
@@ -2283,6 +2298,8 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   let longuePrevueAvantBorne: number | null = null;
   /** Le texte de la feuille de route pour une semaine sous la règle de reprise après un arrêt. */
   const FOCUS_REPRISE_ARRET = "Reprise après un arrêt : une séance courte au seuil";
+  const FOCUS_MARCHE_SORTIE = "Fin de reprise après un arrêt : deux séances au plus, sans VMA";
+  const FOCUS_FOOTINGS_SEULS = "Reprise après un arrêt : footings seulement";
   const macroPlan: { week: number; phase: string; volumeKm: number; quality: string[]; longRunKm: number; focus: string }[] = (() => {
     // ⚠️ LA SEMAINE DE COURSE N'EXISTAIT PAS. `weeksToRace` arrondit vers le bas : à 27 jours
     // du marathon de Lille (Cyprien, 28/09/2026), il vaut 3, et la feuille de route
@@ -2460,7 +2477,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
       const focus = sansQualite ? `Récupération après ${recup.nom} : footings seulement`
         : enReprise ? `Reprise après ${recup.nom} : une séance courte au seuil`
         : sousRegleArret ? FOCUS_REPRISE_ARRET
-        : marcheArret ? "Fin de reprise après un arrêt : deux séances au plus, sans VMA"
+        : marcheArret ? FOCUS_MARCHE_SORTIE
         : ph === "Base" ? "Volume aérobie + pose de vitesse"
         : ph === "Développement" ? "VMA & seuil — montée en charge"
         : ph === "Spécifique" ? `Allure course${goalPace ? ` (${goalPace}/km)` : ""} + endurance spécifique`
@@ -2735,7 +2752,12 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // Le plafond d'un long arrêt replié sur ses 12 km (`longArretAuPlancher`) compte de même ; hors de la règle
   // d'intensité (`repriseIntensite` nul), seul le volume est plafonné.
   const semaineAuPlancher = pauseAuPlancher() != null || longArretAuPlancher;
-  const longueRetiree = repriseIntensite != null && (semaineAuPlancher || !sortieLongueTient(longRunKmBorne, habituelleKm));
+  // ⚠️ ET HORS DE LA RÈGLE D'INTENSITÉ quand le plafond est celui d'un petit volume (12 km ou moins, `plafondPetitKm`) :
+  // une « sortie longue » de 4 km y restait seule dans la semaine, sous un motif « footings seulement » (relecture
+  // du 23/11/2026). Ses kilomètres restent des footings ; la séance dure, elle, se décide sur ce que la semaine tient.
+  // (Pas sous consignes du kinésithérapeute : la règle des petites semaines n'y vaut pas, et retirer la sortie
+  // longue y laissait le seuil seul dans la semaine.)
+  const longueRetiree = repriseIntensite != null ? (semaineAuPlancher || !sortieLongueTient(longRunKmBorne, habituelleKm)) : longArretAuPlancher && !consignes;
   const longRunKm = longueRetiree ? 0 : longRunKmBorne;
   // ⚠️ PENDANT LA REPRISE D'UN ARRÊT DE PLUS DE 28 JOURS, UNE SEMAINE SANS SORTIE LONGUE NE PORTE QUE DES
   // FOOTINGS (double relecture, tirages et visas du directeur scientifique du 20/11/2026). La sortie longue
@@ -2750,32 +2772,72 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // Elle vaut donc à tous les paliers et sans plafond (petit volume), et pendant une pause courte survenue
   // depuis. C'est un choix de Pacevo ; les sources secondaires prêtent à Daniels « allure facile seulement »
   // pendant les paliers réduits. Cette règle ne peut que RETIRER une séance dure.
-  const footingsSeuls = (repriseVolumeLongue != null || semaineAuPlancher) && longueRetiree;
+  // ⚠️ ET TOUTE SEMAINE DE REPRISE TROP PETITE POUR PORTER LA SÉANCE DURE **ET** UN FOOTING (avis du directeur
+  // scientifique, 23/11/2026). Le plan pose toujours au moins une séance de qualité quand le budget le permet
+  // (`maxByVolume`, autoPlan) : à 24 km par semaine en trois sorties, au 8ᵉ jour de reprise après 14 jours d'arrêt
+  // (12 km visés à 50 %), la semaine se réduisait à UN seuil et un renforcement ; après la règle d'intensité, une
+  // semaine plafonnée à 12 km portait un seuil et une « sortie longue » de 4 km, sans footing. Le critère compte
+  // comme le plan (`lib/coach/coutSeance`) : le volume hors sortie longue doit tenir une séance de qualité plus le
+  // plus petit footing du coureur. Il vaut pendant la règle d'intensité, pendant la marche de sortie et tant que la
+  // reprise de volume d'un long arrêt dure ; la sortie longue, si elle tient, reste (c'est une sortie facile).
+  // Hors champ : les consignes du kinésithérapeute (leur fenêtre de séances décide déjà). Le débutant en marche-course
+  // n'a aucune séance dure à retirer, et sa semaine est déjà au plancher.
+  const enRepriseArret = repriseIntensite != null || marcheSortie != null || repriseVolumeLongue != null;
+  // Et quand la semaine tient UNE séance et un footing mais pas deux (marche de sortie, reprise de volume), le budget
+  // est borné à ce qu'elle tient : jamais de séance dure sans footing à côté pendant une reprise.
+  const qualitesTenables = enRepriseArret && !consignes ? qualitesTenablesAvecFooting({
+    targetKm, longRunKm, reserveKm: longRunReserveKm, easyPace: easyPaceCorrige, warmMin: warmCool.warm, coolMin: warmCool.cool }) : Infinity;
+  const semaineTropPetite = qualitesTenables < 1;
+  const sansLongueNiDure = repriseIntensite != null && (repriseVolumeLongue != null || semaineAuPlancher) && longueRetiree;
+  const footingsSeuls = sansLongueNiDure || semaineTropPetite;
+  /** La raison que le motif donne : la sortie longue non posée (ou le plancher, dont le texte suffit) là où cette
+   *  règle s'appliquait déjà ; sinon la semaine trop petite. */
+  const raisonFootings = sansLongueNiDure ? "footings" as const : "petite" as const;
   // LE MOTIF DIT LA MÊME CHOSE QUE LE PLAN : « une seule séance de qualité par semaine au plus » au-dessus d'une
   // semaine sans séance dure se contredisait. Avant la première séance permise (« aucune séance dure pendant… »),
   // le motif d'origine est déjà juste. Le motif garde sa forme (pause courte ou long arrêt) et son pourcentage ;
   // seule sa fin change.
   const arretMotifDuPlan = arretMotif && footingsSeuls && qualiteReprise?.max === 1
     ? repriseArret && !longArretPlusBas
-      ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.depuisJours ?? repriseArret.arretJours, l), habitudeArretInconnue || pauseAuPlancher() ? null : nRaw(Math.round(repriseArret.part * 100), l), false, "footings", arretLong(repriseArret), pauseAuPlancher()))
+      ? tr((l) => MOTIF_T[l].repriseArret(nRaw(repriseArret.depuisJours ?? repriseArret.arretJours, l), habitudeArretInconnue || pauseAuPlancher() ? null : nRaw(Math.round(repriseArret.part * 100), l), false, raisonFootings, arretLong(repriseArret), pauseAuPlancher()))
       : repriseVolumeLongue
-        ? tr((l) => MOTIF_T[l].repriseLongArret(nRaw(repriseVolumeLongue.arretJours, l), false, "footings", partLongArretDite(l), volumeAvantInconnu, palierRemonte, null, plancherLongArretDit(l)))
+        ? tr((l) => MOTIF_T[l].repriseLongArret(nRaw(repriseVolumeLongue.arretJours, l), false, raisonFootings, partLongArretDite(l), volumeAvantInconnu, palierRemonte, null, plancherLongArretDit(l)))
         : arretMotif
-    : arretMotif;
-  const motifsInfo = infoFlags.map((f) => (f === arretMotif && arretMotifDuPlan ? arretMotifDuPlan : f));
-  const readinessBlockDuPlan = arretMotif && arretMotifDuPlan && arretMotifDuPlan !== arretMotif
+    // LA RÈGLE D'INTENSITÉ FINIE, la reprise de volume court encore, et la semaine est trop petite : le motif du
+    // plafond dit aussi « footings seulement ». Pendant la marche de sortie, c'est son motif à elle qui le dit.
+    : arretMotif && footingsSeuls && !repriseIntensite && !marcheSortie && repriseVolumeLongue
+      ? tr((l) => MOTIF_T[l].repriseLongArret(nRaw(repriseVolumeLongue.arretJours, l), false, raisonFootings, partLongArretDite(l), false, palierRemonte, null, plancherLongArretDit(l)))
+      : arretMotif;
+  const marcheMotifDuPlan = marcheMotif && marcheSortie && footingsSeuls
+    ? tr((l) => MOTIF_T[l].sortieReprise(nRaw(marcheSortie.arretJours, l), true)) : marcheMotif;
+  // ⚠️ UNE SEMAINE DE FOOTINGS SEULEMENT NE RESTE JAMAIS SANS MOTIF (relecture du 23/11/2026). La règle d'intensité
+  // et la marche de sortie finies, la reprise de volume court encore par les dates ; si le volume d'avant l'arrêt
+  // est INCONNU, il n'y a ni plafond ni motif de plafond, et la semaine perdait sa séance sans un mot.
+  const motifFootingsAjoute = footingsSeuls && !arretMotif && !marcheMotif && repriseVolumeLongue
+    ? tr((l) => MOTIF_T[l].repriseLongArret(nRaw(repriseVolumeLongue.arretJours, l), false, "petite", null, volumeAvantInconnu, false, null, null)) : null;
+  const motifsInfo = [
+    ...infoFlags.map((f) => (f === arretMotif && arretMotifDuPlan ? arretMotifDuPlan : f === marcheMotif && marcheMotifDuPlan ? marcheMotifDuPlan : f)),
+    ...(motifFootingsAjoute ? [motifFootingsAjoute] : []),
+  ];
+  const readinessBlockArret = arretMotif && arretMotifDuPlan && arretMotifDuPlan !== arretMotif
     ? readinessBlock.split(arretMotif.fr).join(arretMotifDuPlan.fr) : readinessBlock;
+  const readinessBlockMarche = marcheMotif && marcheMotifDuPlan && marcheMotifDuPlan !== marcheMotif
+    ? readinessBlockArret.split(marcheMotif.fr).join(marcheMotifDuPlan.fr) : readinessBlockArret;
+  const readinessBlockDuPlan = !motifFootingsAjoute ? readinessBlockMarche
+    : readinessBlockMarche.includes("\n  • À savoir : ") ? `${readinessBlockMarche} ; ${motifFootingsAjoute.fr}` : `${readinessBlockMarche}\n  • À savoir : ${motifFootingsAjoute.fr}`;
   /** Le budget de qualité que le plan applique : celui de l'arbitrage, sauf dans une semaine de footings seulement. */
-  const qBudgetDuPlan = footingsSeuls ? 0 : qBudget;
+  const qBudgetDuPlan = footingsSeuls ? 0 : Math.min(qBudget, qualitesTenables);
+  /** Les séances que le plan reçoit : celles de l'arbitrage, bornées au budget du plan. */
+  const chosenDuPlan = footingsSeuls ? [] : chosen.slice(0, qBudgetDuPlan);
   // LA SEMAINE EN COURS DE LA FEUILLE DE ROUTE DIT CE QUE LE PLAN FAIT (avis du directeur scientifique, 23/11/2026) :
   // elle annonçait encore une séance de qualité et une sortie longue dans une semaine de reprise qui n'en pose pas.
   // Seule la semaine en cours est alignée : on ne prédit pas si la sortie longue tiendra les semaines suivantes.
-  const semaineSansQualite = qualiteReprise != null && (qualiteReprise.max === 0 || footingsSeuls);
-  const macroPlanDuPlan = macroPlan.length && qualiteReprise != null && (semaineSansQualite || longueRetiree)
+  const semaineSansQualite = footingsSeuls || (qualiteReprise != null && qualiteReprise.max === 0);
+  const macroPlanDuPlan = macroPlan.length && (semaineSansQualite || longueRetiree || qualitesTenables < macroPlan[0].quality.length)
     ? [{ ...macroPlan[0],
-        quality: semaineSansQualite ? [] : macroPlan[0].quality,
+        quality: semaineSansQualite ? [] : macroPlan[0].quality.slice(0, Math.max(1, qBudgetDuPlan)),
         longRunKm: longueRetiree ? 0 : macroPlan[0].longRunKm,
-        focus: semaineSansQualite ? macroPlan[0].focus.replace(FOCUS_REPRISE_ARRET, "Reprise après un arrêt : footings seulement") : macroPlan[0].focus,
+        focus: semaineSansQualite ? macroPlan[0].focus.replace(FOCUS_REPRISE_ARRET, FOCUS_FOOTINGS_SEULS).replace(FOCUS_MARCHE_SORTIE, FOCUS_FOOTINGS_SEULS) : macroPlan[0].focus,
       }, ...macroPlan.slice(1)]
     : macroPlan;
   const longRunEased = !longueRetiree && longRunKm < longRunPlanned;
@@ -2998,7 +3060,7 @@ ${objLines.length ? objLines.join("\n") : "• Aucun objectif de course → vise
 • Phase d'entraînement recommandée : ${phase}
 
 STRUCTURE CIBLE DE LA SEMAINE (squelette à RESPECTER — calculé pour CE coureur ; tu ajustes l'ordre des jours et les allures à sa fraîcheur, mais tu tiens le nombre de séances de qualité indiqué, ni moins par excès de prudence, ni plus)
-${structureSemaine(footingsSeuls ? [] : chosen, footingsSeuls)}
+${structureSemaine(chosenDuPlan, footingsSeuls && longueRetiree)}
 
 GARDE-FOUS ANTI-BLESSURE (à respecter ABSOLUMENT — la santé prime sur la performance)
 - Progressivité : +10 % de charge/volume maximum par semaine.${load.acr > 1.4 ? " ⚠️ Ratio aigu:chronique élevé → prévoir une semaine ALLÉGÉE." : ""}${monotony > 2 ? " ⚠️ Monotonie élevée → varier l'intensité, garantir un vrai jour facile/repos." : ""}
@@ -3088,15 +3150,18 @@ ${catalog}`;
     weekPlan: {
       // Pendant une reprise après un arrêt, la séance est DÉJÀ écrite courte (`doseReduite`) : la dire
       // « sauvée par le plancher » la couperait une seconde fois, sous un texte qui parle de charge.
-      qBudget: qBudgetDuPlan, quality: footingsSeuls ? [] : chosen, easyPace: easyPaceCorrige, eased: easeReasons.length > 0, floored: qb.floored && qualiteReprise == null,
+      qBudget: qBudgetDuPlan, quality: chosenDuPlan, easyPace: easyPaceCorrige, eased: easeReasons.length > 0, floored: qb.floored && qualiteReprise == null,
       // La reprise après une course : séance marquée comme telle, et jamais avant son jour.
       // Et jamais avant le jour que fixe la reprise après un arrêt (`qualitePendantReprise`).
       reprise: repriseCetteSemaine && qBudget > 0,
       qualiteDes: footingsSeuls ? 7 : Math.max(repriseCetteSemaine ? joursAvantReprise : 0, qualiteReprise?.des ?? 0),
       // ⚠️ Le budget ne suffit pas (double relecture du 17/11/2026) : la sortie longue « épicée »
       // et les footings variés ne le lisent pas. Le plan reçoit donc l'état de la reprise.
-      ...(qualiteReprise ? { repriseArret: qualiteReprise.max === 0 || footingsSeuls ? "sans-qualite" as const : "une-qualite" as const } : {}),
+      // Une semaine « footings seulement » porte l'état « sans-qualite » même hors de la règle d'intensité (marche de
+      // sortie, reprise de volume) : le test VMA attend, la sortie longue reste facile, les footings restent simples.
+      ...(qualiteReprise || footingsSeuls ? { repriseArret: !qualiteReprise || qualiteReprise.max === 0 || footingsSeuls ? "sans-qualite" as const : "une-qualite" as const } : {}),
       ...(marcheSortie ? { sortieReprise: true as const } : {}),
+      ...(enRepriseArret && !consignes ? { footingExige: true as const } : {}),
     },
     // Doubles séances : on tranche ICI, avec le volume REPRÉSENTATIF (médiane des
     // semaines courues) et non le pic — une semaine à 90 km ne fait pas un athlète
@@ -3148,7 +3213,7 @@ ${catalog}`;
     availability: { daysPerWeek: consignes?.seancesMaxSemaine != null ? Math.min(availDaysPerWeek, consignes.seancesMaxSemaine) : availDaysPerWeek, days: availDays },
     forecast,
     altitude: { elevationM, lossPct: altLoss },
-    warmCool: warmCoolMin(num(p?.warmup_min), num(p?.cooldown_min)),
+    warmCool,
     heatAcclim,
     tooMuchIntensity: hardTimePct != null && hardTimePct > 25 ? hardTimePct : null,
     ciblesFc,

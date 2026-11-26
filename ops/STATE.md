@@ -193,8 +193,9 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    palier de volume puis une marche de sortie de sept jours la suit, pas de test VMA pendant la reprise, la feuille
    de route connaît la reprise, le plancher de deux footings vaut pour toute reprise et la semaine au plancher ne porte que des footings, dernier
    palier à 80 %, et le plafond d'un petit volume se replie sur 12 km au lieu de disparaître. Suite demandée par
-   `@HeadCoach`, en PR à part et en tête : toute semaine de reprise trop petite pour porter le seuil ET un footing ne
-   porte que des footings, et un volume d'avant de 12 km ou moins est plafonné à lui-même. Détail
+   `@HeadCoach`, écrite le 23/11 sur la branche `fix/reprise-petites-semaines` (au-dessus de la précédente, en local) :
+   toute semaine de reprise trop petite pour porter le seuil ET un footing ne porte que des footings, la marche de
+   sortie écrit ses séances dans la dose courte, et un volume d'avant de 12 km ou moins est plafonné à lui-même. Détail
    et limites : `ops/sparring/PROFILS.md`, profil 4. Reste ouvert : le retour d'un coup du volume à la fin de la
    reprise (la sortie longue et les séances reviennent désormais par la marche de sortie après un long arrêt).
    **Fusionné (PR #57, le 17/11) et EN LIGNE** : pacevo.fr sert `24637bab` le 19/11, qui contient #57 à #61.

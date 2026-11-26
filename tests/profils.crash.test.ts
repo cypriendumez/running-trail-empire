@@ -1188,9 +1188,14 @@ async function profilChaotique() {
       }
       // Le contre-poids : quatre semaines après le retour, la reprise est finie, les séances dures reviennent.
       {
-        const apres = Array.from({ length: 15 }, (_, k) => facile(jour, 29 - 2 * k)).filter((w) => String(w.date) < jour);
+        // ⚠️ La reprise se court ici en sorties de 14 km (49 km par semaine) : depuis le 23/11/2026, une semaine trop
+        // petite pour porter une séance dure et un footing ne porte que des footings tant que la marche de sortie dure
+        // (au 29ᵉ jour, 21 km visés dont 8 de sortie longue, avec des sorties de 6 km). Ce contre-poids-ci dit autre
+        // chose : la règle d'intensité finie, une semaine qui tient ses séances les retrouve.
+        const apres = Array.from({ length: 15 }, (_, k): Ligne => ({ ...facile(jour, 29 - 2 * k), distance_km: 14, duration_seconds: 14 * 340 })).filter((w) => String(w.date) < jour);
         const r = await contexte(jour, tablesGros(jour, [...historiqueGros(jour, 34 + 29), ...apres]));
-        assert.equal(r.ctx.weekPlan.repriseArret, undefined, `${jour} : 29 jours après le retour d'un arrêt de 34 jours, la reprise dure encore`);
+        assert.equal(r.ctx.weekPlan.repriseArret, undefined, `${jour} : 29 jours après le retour d'un arrêt de 34 jours, la reprise dure encore (cible ${r.ctx.volume.targetKm} km, sortie longue ${r.ctx.volume.longRunKm} km ; ${r.ctx.readiness.reasons.join(" | ")})`);
+        assert.ok(r.plan.filter((d) => DURS.test(d.type)).length >= 1, `${jour} : 29 jours après le retour, aucune séance dure ne revient (${r.plan.map((d) => d.type).join(", ")})`);
       }
 
       // (c) UNE PAR SEMAINE, PAS UNE PAR PLAN — arrêt de 20 jours, repris depuis 14, donc dans la seconde

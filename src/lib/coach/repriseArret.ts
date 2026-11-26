@@ -215,8 +215,8 @@ export const PLAFOND_MIN_REPRISE_LONGUE_KM = 12;
  * ordinaire du plan, 17 à 20 km, au 2ᵉ jour de reprise après 70 jours d'arrêt (51 coureurs sur 1 000 à
  * petit volume tirés au hasard). Tant que la reprise de volume dure et que le volume d'avant dépasse le
  * plancher, la part rendue est celle qui donne exactement le plancher (12 km : `plafondReplieSurPlancher`).
- * Il n'y a plus de plafond que dans deux cas : volume d'avant inconnu (0), et volume d'avant de 12 km ou
- * moins (suite à part : le plafonner à lui-même).
+ * Cette PART vaut 1 dans deux cas : volume d'avant inconnu (0, aucun plafond), et volume d'avant de 12 km ou
+ * moins, que `plafondPetitVolumeKm` plafonne à lui-même.
  * C'est un choix de Pacevo, pas un chiffre de Daniels.
  * Cette fonction ne rend JAMAIS une part plus basse que `partApresLongArret`, ni un plafond sous le plancher.
  */
@@ -227,6 +227,25 @@ export function partPlafondLongArret(r: Pick<RepriseArret, "arretJours" | "jours
   const palier = echelle.find((p) => p >= part && Math.round(volumeAvantKm * p) >= PLAFOND_MIN_REPRISE_LONGUE_KM);
   if (palier != null) return palier;
   return volumeAvantKm > PLAFOND_MIN_REPRISE_LONGUE_KM ? PLAFOND_MIN_REPRISE_LONGUE_KM / volumeAvantKm : 1;
+}
+
+/** Le plus petit plafond de semaine : un footing, pour le coureur le plus rapide (25 minutes à 4'10 au km). */
+export const PLAFOND_UN_FOOTING_KM = 6;
+
+/**
+ * LE PLAFOND D'UN PETIT VOLUME, EN KILOMÈTRES, ou `null` quand le plafond est un palier de l'échelle (ou qu'il
+ * n'y en a pas : pas de long arrêt en cours, reprise de volume finie, volume d'avant inconnu).
+ *  - volume d'avant de plus de 12 km dont aucun palier ne laisse deux footings : 12 km (`plafondReplieSurPlancher`) ;
+ *  - volume d'avant de 12 km ou moins : CE VOLUME LUI-MÊME (avis du directeur scientifique, 23/11/2026). Il n'avait
+ *    aucun plafond : un coureur à 8-10 km par semaine recevait la cible ordinaire du plan, 17 à 20 km, au 2ᵉ jour de
+ *    reprise après trois mois d'arrêt, le double de ce qu'il courait. Jamais sous un footing (6 km) : un plafond plus
+ *    bas que le plus petit footing viderait la semaine.
+ * Le motif le dit en kilomètres, et la semaine est « au plancher » tant que la règle d'intensité dure.
+ */
+export function plafondPetitVolumeKm(r: Pick<RepriseArret, "arretJours" | "joursRepris"> | null, volumeAvantKm: number, dansJours = 0): number | null {
+  if (!r || !(volumeAvantKm > 0) || partApresLongArret(r, dansJours) >= 1) return null;
+  if (plafondReplieSurPlancher(r, volumeAvantKm, dansJours)) return PLAFOND_MIN_REPRISE_LONGUE_KM;
+  return volumeAvantKm <= PLAFOND_MIN_REPRISE_LONGUE_KM ? Math.max(PLAFOND_UN_FOOTING_KM, Math.round(volumeAvantKm)) : null;
 }
 
 /**

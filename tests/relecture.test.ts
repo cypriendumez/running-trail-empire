@@ -125,7 +125,9 @@ test("l'allure corrigée est celle qui PART dans le plan", () => {
   const src = codeOf("src/lib/ai/coachContext.ts");
   assert.match(src, /easyPace: easyPaceCorrige/, "le plan reçoit encore l'allure NON corrigée");
   const n = (src.match(/easyPace: easyPaceCorrige/g) ?? []).length;
-  assert.equal(n, 2, `${n} sortie(s) corrigée(s) : le contexte ET le plan doivent la recevoir`);
+  // Trois lectures depuis le 23/11/2026 : le contexte, le plan, et le critère des petites semaines de reprise
+  // (`qualitesTenablesAvecFooting`), qui doit compter avec l'allure que le plan reçoit.
+  assert.equal(n, 3, `${n} sortie(s) corrigée(s) : le contexte, le plan ET le critère des petites semaines doivent la recevoir`);
   assert.match(src, /relireExecution\(/, "la relecture n'est plus calculée");
 });
 
