@@ -491,6 +491,15 @@ async function main() {
       }
     }
     assert.ok(eprouves >= 20, `précondition : ${eprouves} semaines seulement portent l'orientation sans malaise`);
+    // Le contre-poids (@HeadCoach, visa du 7e tour) : SANS douleur déclarée, le repos du malaise n'en invente pas.
+    for (let k = 0; k <= 6; k++) {
+      const jour = ilYa(-k), jd = new Date(`${jour}T12:00:00Z`).getUTCDay();
+      const bilan = { user_id: "u", type: "bilan_matin", created_at: `${jour}T06:00:00Z`, data: { date: jour, fatigue: 5, jambes: 4, stress: 1 } };
+      const ctx = await contexte({ ...sit(["covid_long"], [bilan], { days_per_week: 1, available_days: [jd] }), seances: [footing(-k + 1), ...FOOTINGS] }, k);
+      assert.equal(ctx.malaiseApresEffort, true, `sans douleur · J+${k} : précondition, pas de malaise`);
+      for (const d of plan(ctx, k)) for (const l of LANGUES)
+        assert.ok(!texteDe(d, l).why.includes(PLAN_T[l].douleurOrientation.trim()), `sans douleur · J+${k} · ${d.date} ${d.type} : une orientation douleur inventée (${l})`);
+    }
   });
 
   await test("marche-course avec deux jours VOISINS seulement : le plan les pose côte à côte, le dossier ne promet pas « jamais deux jours de suite »", async () => {
