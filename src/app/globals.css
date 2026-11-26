@@ -228,6 +228,29 @@
   isolation: isolate;
 }
 
+/* ══ LE POINT BLEU DE L'ÉCRAN « ENREGISTRER » (27/11/2026) ══════════════════════
+   Comme Strava et les cartes des téléphones : un point bleu cerclé de blanc, avec un
+   halo qui respire — on se repère d'un coup d'œil, même en plein soleil. */
+.pacevo-point {
+  width: 18px; height: 18px; border-radius: 9999px;
+  background: #2563eb; border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  position: relative;
+}
+.pacevo-point::after {
+  content: ""; position: absolute; inset: -11px; border-radius: 9999px;
+  background: rgba(37, 99, 235, 0.22);
+  animation: pacevoHalo 2s ease-out infinite;
+  z-index: -1;
+}
+@keyframes pacevoHalo {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .pacevo-point::after { animation: none; } }
+/* L'attribution de la carte, discrète mais lisible (obligatoire par licence). */
+.maplibregl-ctrl-attrib { font-size: 10px; background: rgba(255, 255, 255, 0.75) !important; border-radius: 9999px; }
+
 /* ══ LA CARTE SUR TÉLÉPHONE (22/09/2026) ═══════════════════════════════════════
    La barre du pouce du constructeur de parcours occupe le bas de la carte. Deux
    conséquences à régler ICI, parce que Leaflet place ses propres éléments :

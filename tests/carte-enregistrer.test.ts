@@ -6,8 +6,7 @@
  * ne lèvent AUCUNE erreur et laissent une carte qui a l'air de marcher :
  *
  *  · un fond satellite proposé SANS clé MapTiler → 403 sur chaque tuile, carte grise ;
- *  · une taille de tuile et un `zoomOffset` qui ne s'accordent pas → carte décalée d'un
- *    facteur deux, qu'on prend pour un GPS imprécis ;
+ *  · un style vectoriel qui ne se charge pas → carte vide, sans repli ;
  *  · une attribution vide → carte utilisée sans droit (OpenStreetMap, MapTiler) ;
  *  · un suivi automatique qu'on ne peut pas couper → la carte revient sur soi à chaque
  *    point GPS, et on ne peut rien regarder d'autre.
@@ -16,7 +15,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { fondsCarteDirecte, offsetDe } from "../src/lib/courses/fondsCarte";
+import { fondsCarteDirecte, satelliteDisponible, stylePacevo, REPLI_PLAN, ATTRIBUTION_PLAN, STYLE_PLAN_URL } from "../src/lib/courses/fondsCarte";
 import { FONDS, avecCle } from "../src/lib/trail/couches";
 
 let passed = 0; const fails: string[] = [];
@@ -31,22 +30,20 @@ console.log("\n=== CARTE « ENREGISTRER » ===\n");
 
 test("sans clé MapTiler, le satellite n'est pas proposé — et le plan reste ouvert", () => {
   for (const sans of [undefined, ""]) {
-    const fonds = fondsCarteDirecte(sans);
-    assert.equal(fonds.length, 1, "un fond payant est proposé sans clé : ses tuiles répondront 403");
-    assert.equal(fonds[0].id, "plan");
-    assert.match(fonds[0].url, /tile\.openstreetmap\.org/, "le repli n'est plus une source ouverte");
-    assert.ok(!/key=/.test(fonds[0].url), `une clé traîne dans l'URL de repli : ${fonds[0].url}`);
+    assert.deepEqual(fondsCarteDirecte(sans), ["plan"], "un fond payant est proposé sans clé : ses tuiles répondront 403");
+    assert.equal(satelliteDisponible(sans), null);
   }
+  // Le plan ne dépend d'aucune clé : OpenFreeMap, puis OpenStreetMap en repli.
+  assert.ok(!/key=/.test(STYLE_PLAN_URL) && !/key=/.test(REPLI_PLAN.url), "le plan exige de nouveau une clé");
+  assert.match(REPLI_PLAN.url, /tile\.openstreetmap\.org/, "le repli n'est plus une source ouverte");
 });
 
-test("avec la clé, les deux fonds la portent — et aucun ne garde le marqueur", () => {
-  const fonds = fondsCarteDirecte("CLE_TEST_123");
-  assert.equal(fonds.length, 2, "le satellite n'est plus proposé alors que la clé existe");
-  assert.deepEqual(fonds.map((f) => f.id), ["plan", "satellite"]);
-  for (const f of fonds) {
-    assert.match(f.url, /key=CLE_TEST_123/, `${f.id} n'emporte pas la clé : ses tuiles répondront 403`);
-    assert.ok(!f.url.includes("{cleMapTiler}"), `${f.id} garde le marqueur de clé : l'URL est littéralement fausse`);
-  }
+test("avec la clé, le satellite la porte — et ne garde pas le marqueur", () => {
+  assert.deepEqual(fondsCarteDirecte("CLE_TEST_123"), ["plan", "satellite"], "le satellite n'est plus proposé alors que la clé existe");
+  const sat = satelliteDisponible("CLE_TEST_123")!;
+  assert.match(sat.url, /key=CLE_TEST_123/, "le satellite n'emporte pas la clé : ses tuiles répondront 403");
+  assert.ok(!sat.url.includes("{cleMapTiler}"), "le satellite garde le marqueur de clé : l'URL est littéralement fausse");
+  assert.ok(sat.zoomMax >= 17, `le satellite plafonne au zoom ${sat.zoomMax} : on ne voit plus la rue`);
 });
 
 test("l'URL satellite vient du catalogue vérifié, pas d'une copie", () => {
@@ -54,40 +51,71 @@ test("l'URL satellite vient du catalogue vérifié, pas d'une copie", () => {
   // Une seconde copie de l'adresse, c'est une copie qui se périme sans prévenir.
   const source = FONDS.find((f) => f.id === "satellite");
   assert.ok(source, "l'entrée satellite a disparu du catalogue");
-  const attendue = avecCle(source!.url, "CLE_TEST_123");
-  const sat = fondsCarteDirecte("CLE_TEST_123").find((f) => f.id === "satellite");
-  assert.equal(sat!.url, attendue, "l'URL satellite ne vient plus du catalogue vérifié");
+  const sat = satelliteDisponible("CLE_TEST_123");
+  assert.equal(sat!.url, avecCle(source!.url, "CLE_TEST_123"), "l'URL satellite ne vient plus du catalogue vérifié");
   assert.equal(sat!.attribution, source!.attribution, "l'attribution ne suit plus la source");
+  assert.equal(sat!.taille, source!.taille, "la taille de tuile ne suit plus la source : carte décalée d'un facteur deux");
 });
 
-test("taille de tuile et zoomOffset s'accordent, sinon la carte est décalée d'un facteur deux", () => {
-  assert.equal(offsetDe(512), -1);
-  assert.equal(offsetDe(256), 0);
-  for (const cle of [undefined, "CLE_TEST_123"]) {
-    for (const f of fondsCarteDirecte(cle)) {
-      assert.equal(f.zoomOffset, f.taille === 512 ? -1 : 0, `${f.id} : tuiles de ${f.taille} px avec un décalage de ${f.zoomOffset}`);
-      assert.ok(f.zoomMax >= 17, `${f.id} plafonne au zoom ${f.zoomMax} : on ne voit plus la rue`);
-    }
-  }
+test("la palette Pacevo repeint une COPIE du style, sans rien perdre d'utile", () => {
+  // Cyprien, 27/11/2026 : « la carte fait vieille ». Le style Liberty est repeint façon
+  // Strava. La fonction est pure : le style reçu ne doit pas bouger (il peut être en cache).
+  const base = { version: 8, layers: [
+    { id: "background", type: "background", paint: { "background-color": "#f8f4f0" } },
+    { id: "park", type: "fill", paint: { "fill-color": "#d8e8c8" } },
+    { id: "road_minor", type: "line", paint: { "line-color": "#fea" } },
+    { id: "road_minor_casing", type: "line", paint: { "line-color": "#e9ac77" } },
+    { id: "road_trunk_primary", type: "line", paint: { "line-color": "#fea", "line-width": 3 } },
+    { id: "road_path_pedestrian", type: "line", paint: { "line-color": "#fff", "line-dasharray": [1, 1] } },
+    { id: "road_major_rail", type: "line", paint: { "line-color": "#bbb" } },
+    { id: "building", type: "fill", maxzoom: 14, paint: { "fill-color": "#ddd" } },
+    { id: "building-3d", type: "fill-extrusion", paint: {} },
+    { id: "poi_r20", type: "symbol" },
+    { id: "label_city", type: "symbol", layout: { "text-field": "{name}" } },
+  ] };
+  const avant = JSON.stringify(base);
+  const s = stylePacevo(base);
+  assert.equal(JSON.stringify(base), avant, "le style d'origine a été modifié en place");
+  const c = (id: string) => s.layers.find((l) => l.id === id);
+  assert.notEqual(c("background")!.paint!["background-color"], "#f8f4f0", "le fond n'est plus repeint");
+  assert.notEqual(c("road_trunk_primary")!.paint!["line-color"], "#fea", "les grands axes gardent le jaune criard");
+  assert.equal(c("road_trunk_primary")!.paint!["line-width"], 3, "la repeinte écrase des propriétés qu'elle ne touche pas");
+  assert.equal(c("road_minor")!.paint!["line-color"], "#ffffff", "les petites rues ne sont plus blanches");
+  // Les chemins : c'est là qu'on court. Blancs sur fond clair, on ne les voyait pas.
+  assert.notEqual(c("road_path_pedestrian")!.paint!["line-color"], "#fff", "les chemins sont de nouveau invisibles");
+  assert.deepEqual(c("road_path_pedestrian")!.paint!["line-dasharray"], [1, 1], "les chemins ont perdu leur pointillé");
+  assert.equal(c("road_major_rail")!.paint!["line-color"], "#bbb", "la voie ferrée est repeinte comme une route");
+  assert.equal(c("building-3d"), undefined, "les bâtiments en relief encombrent de nouveau la carte");
+  // …mais les bâtiments à plat continuent au-delà du zoom 14, où le relief les dessinait.
+  assert.equal((c("building") as { maxzoom?: number }).maxzoom, undefined, "les maisons disparaissent dès qu'on zoome sur sa rue");
+  assert.equal(c("poi_r20"), undefined, "les commerces de second rang encombrent de nouveau la carte");
+  assert.ok(c("label_city"), "une étiquette a disparu : la repeinte retire plus qu'elle ne doit");
 });
 
 test("chaque fond porte son attribution — c'est une obligation de licence", () => {
-  for (const cle of [undefined, "CLE_TEST_123"]) {
-    for (const f of fondsCarteDirecte(cle)) {
-      assert.ok(f.attribution.trim().length > 3, `${f.id} n'a pas d'attribution : la carte serait utilisée sans droit`);
-    }
-  }
-  // Elle doit atteindre l'écran : Leaflet ne l'affiche que si la COUCHE la porte.
+  assert.match(ATTRIBUTION_PLAN, /OpenStreetMap/, "le plan n'attribue plus OpenStreetMap");
+  assert.match(ATTRIBUTION_PLAN, /OpenFreeMap/, "le plan n'attribue plus OpenFreeMap");
+  assert.ok(REPLI_PLAN.attribution.trim().length > 3, "le repli n'a pas d'attribution");
+  assert.ok(satelliteDisponible("CLE_TEST_123")!.attribution.trim().length > 3, "le satellite n'a pas d'attribution");
+  // Elle doit atteindre l'écran : MapLibre ne l'affiche que si la SOURCE la porte.
   const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
-  // ⚠️ TOUS les appels, pas le premier trouvé : la couche est posée à deux endroits (à la
-  // création, puis au changement de fond). Une assertion qui se satisfait d'un seul site
-  // reste verte le jour où l'autre perd son attribution.
-  const couches = [...carte.matchAll(/Lf\.tileLayer\([\s\S]*?\.addTo\(/g)].map((m) => m[0]);
-  assert.ok(couches.length >= 2, `${couches.length} pose de couche trouvée, attendu au moins 2 (création + changement de fond)`);
-  for (const c of couches) assert.match(c, /attribution: f\.attribution/, "une couche est posée sans attribution : la carte s'affiche sans crédit");
-  // ⚠️ EN HAUT : le bloc blanc des chiffres couvre tout le bas de la carte, et une
-  // attribution recouverte vaut une attribution absente.
-  assert.match(carte, /control\.attribution\(\{ position: "topleft", prefix: false \}\)/, "l'attribution est repassée sous le bloc blanc des chiffres, où personne ne la voit");
+  assert.match(carte, /if \(om\) om\.attribution = ATTRIBUTION_PLAN;/, "le style vectoriel est posé sans attribution");
+  assert.match(carte, /attribution: REPLI_PLAN\.attribution/, "le repli est posé sans attribution");
+  assert.match(carte, /attribution: SATELLITE\.attribution/, "le satellite est posé sans attribution");
+  // ⚠️ EN HAUT, ET DÉPLIÉE : le bloc blanc des chiffres couvre tout le bas de la carte, et
+  // une attribution recouverte ou repliée vaut une attribution absente.
+  assert.match(carte, /new maplibregl\.AttributionControl\(\{ compact: false \}\), "top-left"/, "l'attribution est repassée sous le bloc blanc, ou repliée");
+});
+
+test("si le style vectoriel ne vient pas, la carte retombe sur OpenStreetMap", () => {
+  // Un style qui échoue ne lève rien à l'écran : la carte reste vide.
+  const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
+  const charge = carte.slice(carte.indexOf("async function stylePlan()"), carte.indexOf("export function CarteDirect"));
+  assert.match(charge, /if \(!r\.ok\) return styleRepli\(\);/, "une réponse en erreur n'a plus de repli");
+  assert.match(charge, /catch \{\s*\n\s*return styleRepli\(\);/, "une panne réseau n'a plus de repli");
+  assert.match(charge, /stylePacevo\(/, "le style chargé n'est plus repeint aux couleurs de Pacevo");
+  // Et la politique de sécurité laisse passer la source, sinon elle est bloquée sans bruit.
+  assert.match(readFileSync("next.config.ts", "utf8"), /"https:\/\/tiles\.openfreemap\.org"/, "OpenFreeMap n'est pas dans la CSP : la carte serait bloquée");
 });
 
 test("le suivi automatique se coupe à la main et se reprend au bouton", () => {
@@ -95,20 +123,23 @@ test("le suivi automatique se coupe à la main et se reprend au bouton", () => {
   // Glisser la carte prévient le parent…
   assert.match(carte, /m\.on\("dragstart", \(\) => deplacementRef\.current\?\.\(\)\)/, "déplacer la carte ne coupe plus le suivi : la position suivante la ramène");
   // …et le recentrage automatique est conditionné à ce suivi.
-  assert.match(carte, /if \(!suivreRef\.current\) return;\s*\n\s*nous\.current = true;\s*\n\s*m\.setView\(position/, "la carte se recentre encore à chaque point GPS, suivi coupé ou non");
-  // ⚠️ `zoomstart` est aussi émis par NOS `setView` : sans le drapeau, le premier
-  // recentrage automatique couperait le suivi lui-même.
-  assert.match(carte, /m\.on\("zoomstart", \(\) => \{ if \(!nous\.current\) deplacementRef\.current\?\.\(\); \}\)/, "le zoom ne distingue plus la main de nos propres recentrages");
+  assert.match(carte, /if \(!suivreRef\.current\) return;\s*\n\s*m\.easeTo\(\{ center: versLngLat\(position\)/, "la carte se recentre encore à chaque point GPS, suivi coupé ou non");
+  // ⚠️ `zoomstart` est aussi émis par NOS `easeTo` : seul un geste porte `originalEvent`.
+  // Sans ce filtre, le premier recentrage automatique couperait le suivi lui-même.
+  assert.match(carte, /m\.on\("zoomstart", \(e\) => \{ if \(\(e as \{ originalEvent\?: unknown \}\)\.originalEvent\) deplacementRef\.current\?\.\(\); \}\)/, "le zoom ne distingue plus la main de nos propres recentrages");
+  // ⚠️ MapLibre parle en [longitude, latitude] : un oubli pose le coureur dans l'océan.
+  assert.match(carte, /const versLngLat = \(p: \[number, number\]\): \[number, number\] => \[p\[1\], p\[0\]\];/, "la conversion latitude/longitude a changé");
+  assert.ok(!/setLngLat\(p\)|center: position[,\s]|coordinates: t[,\s]/.test(carte), "une position part à MapLibre sans être retournée en [lng, lat]");
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
   assert.match(gr, /onDeplacement=\{\(\) => setSuiviCarte\(false\)\}/, "l'écran n'écoute plus le déplacement de la carte");
   assert.match(gr, /setSuiviCarte\(true\); setRecentrages\(\(n\) => n \+ 1\)/, "le bouton de recentrage ne rend plus le suivi");
 });
 
 test("la carte change de hauteur en cours de vie : elle se remesure", () => {
-  // Plein écran avant le départ, réduite pendant la course. Leaflet garde la taille
-  // mesurée à la création et n'affiche les tuiles que dessus : le reste reste gris.
+  // Plein écran avant le départ, réduite pendant la course. La carte garde la taille
+  // mesurée à la création et ne dessine que dessus : le reste reste vide.
   const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
-  assert.match(carte, /new ResizeObserver\(\(\) => carte\.current\?\.invalidateSize\(\)\)/, "la carte ne se remesure plus quand sa hauteur change : la moitié reste grise");
+  assert.match(carte, /new ResizeObserver\(\(\) => carte\.current\?\.resize\(\)\)/, "la carte ne se remesure plus quand sa hauteur change : la moitié reste grise");
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
   assert.match(gr, /phase === "setup"\s*\n?\s*\? "h-\[calc\(100dvh-13\.5rem\)\]/, "la carte ne prend plus l'écran avant le départ");
   assert.match(gr, /: "h-\[40vh\] min-h-\[220px\] w-full md:h-\[380px\]"/, "la carte ne se réduit plus pendant la course : les chiffres géants passent sous le pli");
@@ -127,7 +158,7 @@ test("le bloc blanc est POSÉ sur la carte, pas dedans — sinon Leaflet mange l
 
 test("le bouton satellite n'apparaît que si la clé existe", () => {
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
-  assert.match(gr, /const SATELLITE_DISPO = fondsCarteDirecte\(process\.env\.NEXT_PUBLIC_MAPTILER_KEY[^)]*\)\.some\(\(f\) => f\.id === "satellite"\)/, "la disponibilité du satellite n'est plus déduite de la clé");
+  assert.match(gr, /const SATELLITE_DISPO = fondsCarteDirecte\(process\.env\.NEXT_PUBLIC_MAPTILER_KEY[^)]*\)\.includes\("satellite"\)/, "la disponibilité du satellite n'est plus déduite de la clé");
   assert.match(gr, /\{SATELLITE_DISPO && \(\s*\n?\s*<BtnCarte/, "le bouton de fond n'est plus conditionné à la clé : il basculerait sur des tuiles 403");
   // Et la clé n'est jamais écrite en dur nulle part.
   for (const f of ["src/components/ghost-runner/CarteDirect.tsx", "src/lib/courses/fondsCarte.ts", "src/components/ghost-runner/GhostRunner.tsx"]) {
@@ -153,7 +184,7 @@ test("React ne réécrit jamais la classe du conteneur de Leaflet", () => {
   // conteneur fait 0 px de large : CARTE BLANCHE. Tuiles téléchargées, aucune en échec,
   // aucune erreur en console.
   const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
-  assert.match(carte, /<div className=\{`relative isolate overflow-hidden \$\{className\}`\}>/, "la mise en page variable n'est plus portée par une enveloppe");
+  assert.match(carte, /<div className=\{`relative isolate overflow-hidden bg-\[#f2f1ed\] \$\{className\}`\}>/, "la mise en page variable n'est plus portée par une enveloppe");
   assert.match(carte, /<div ref=\{conteneur\}[^>]*className="h-full w-full" \/>/, "l'élément de Leaflet n'a plus de classe constante");
   assert.ok(!/ref=\{conteneur\}[^>]*className=\{/.test(carte), "le conteneur de Leaflet reçoit de nouveau une classe variable : React effacera les classes de Leaflet et la carte deviendra blanche");
 });
@@ -171,11 +202,12 @@ test("la carte s'ouvre chez l'athlète, pas sur l'Europe entière", () => {
   assert.match(page, /centreInitial=\{centreInitial\}/, "le cadrage n'est plus transmis à l'écran");
 
   const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
-  assert.match(carte, /const depart = position \?\? centre \?\? null;/, "la position réelle ne prime plus sur le cadrage");
-  assert.match(carte, /zoom: position \? 15 : depart \? 13 : 5/, "le cadrage ne change plus le zoom : on reverrait l'Europe");
+  assert.match(carte, /const depart = positionRef\.current \?\? centre \?\? null;/, "la position réelle ne prime plus sur le cadrage");
+  assert.match(carte, /zoom: positionRef\.current \? 15 : depart \? 13 : 5/, "le cadrage ne change plus le zoom : on reverrait l'Europe");
   // ⚠️ LE CADRAGE N'EST PAS UNE POSITION : le point bleu ne doit JAMAIS s'y afficher.
-  const dessinPoint = carte.slice(carte.indexOf("circleMarker") - 400, carte.indexOf("circleMarker") + 200);
-  assert.ok(!/centre/.test(dessinPoint), "le point bleu est dessiné à partir du cadrage : l'athlète se verrait là où il n'est pas");
+  const appels = [...carte.matchAll(/poserPoint\(m, ([^)]*)\)/g)].map((x) => x[1]);
+  assert.ok(appels.length >= 2, "le point bleu n'est plus posé à la création ni au déplacement");
+  for (const a of appels) assert.ok(!/centre|depart/.test(a), `le point bleu est dessiné à partir du cadrage (${a}) : l'athlète se verrait là où il n'est pas`);
 });
 
 test("un refus de localisation se dit, et se rattrape", () => {
@@ -219,6 +251,20 @@ test("le plein écran ne repose pas sur une API absente d'iPhone", () => {
     const n = [...readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8").matchAll(new RegExp(`"${k.replace(/\./g, "\\.")}":`, "g"))].length;
     assert.equal(n, 5, `« ${k} » présent ${n} fois, attendu 5`);
   }
+});
+
+test("sur téléphone, l'écran s'ouvre en grand — et rend la page au départ", () => {
+  // Cyprien, 27/11/2026 : « mets-le en grand écran directement, comme sur Strava ».
+  const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
+  assert.match(gr, /window\.matchMedia\?\.\("\(max-width: 767px\)"\)\.matches\) return;\s*\n\s*pleinAuto\.current = true;\s*\n\s*setPlein\(true\);/, "l'écran ne s'ouvre plus en grand sur téléphone");
+  // ⚠️ Le lien de suivi et la limite de la veille s'affichent HORS de la carte : sous la
+  // couverture, l'athlète partirait sans les voir. Le grand écran automatique se referme.
+  assert.match(gr, /if \(phase !== "setup" && pleinAuto\.current\) \{ pleinAuto\.current = false; setPlein\(false\); \}/, "le grand écran automatique cache le lien de suivi au départ");
+  // Celui que l'athlète a demandé lui-même reste : basculer efface la marque « automatique ».
+  assert.match(gr, /function basculerPlein\(\) \{\s*\n\s*const suivant = !plein;\s*\n\s*pleinAuto\.current = false;/, "un grand écran demandé à la main se refermerait seul au départ");
+  // « Réglages » sort du grand écran avant de défiler, sinon rien ne bouge à l'écran.
+  const vers = gr.slice(gr.indexOf("const versDetails = () =>"), gr.indexOf("const versDetails = () =>") + 500);
+  assert.match(vers, /setPlein\(false\);/, "« Réglages » défile derrière la couverture : rien ne bouge à l'écran");
 });
 
 test("« Arrêter » enregistre la course — il ne la jetait pas, il la perdait de vue", () => {
