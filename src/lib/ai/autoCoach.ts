@@ -11,7 +11,7 @@ import { lignesRetireesParDouleur, lignesRetireesParReprise } from "@/lib/coach/
 import { ecartJours } from "@/lib/coach/recuperation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildAthleteContext } from "@/lib/ai/coachContext";
-import { buildWeekPlan, consignesSurPlan, avecCourseCEcartee, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
+import { buildWeekPlan, consignesSurPlan, avecCourseCEcartee, planALaSensation, CONFIRMED_DAYS, type PlanDay } from "@/lib/ai/autoPlan";
 import { TYPE_APTITUDE, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
 import { effortMaximalInterdit } from "@/lib/health/effortMaximal";
 import { estQualitePrescrite } from "@/lib/coach/qualiteRecente";
@@ -307,7 +307,8 @@ export async function autoCoachForUser(
   // Puis le message d'une course C écartée, EN DERNIER : un ajustement peut l'avoir effacé (« alléger »)
   // ou déplacé (« décaler », « échanger ») (relecture du 13/11/2026). La relecture Premium qui suit
   // ajoute au « pourquoi » sans le remplacer.
-  const week = avecCourseCEcartee(ctx, consignesSurPlan(ctx, ajuste.week, jourPlan), jourPlan);
+  // Et, pour une coureuse à la sensation, plus aucune zone de FC dans les jours ainsi réécrits (`planALaSensation`).
+  const week = planALaSensation(ctx, avecCourseCEcartee(ctx, consignesSurPlan(ctx, ajuste.week, jourPlan), jourPlan));
 
   // ── LE COACH AVANCÉ (Premium, et l'essai qui le montre) ─────────────────────
   // Le modèle relit les séances CLÉS et ajoute à leur « pourquoi » un conseil d'exécution
@@ -323,7 +324,7 @@ export async function autoCoachForUser(
   // coupe la fin du motif pour loger un conseil, puis l'écriture coupe à 640 (relectures du 16/11/2026).
   // Il est reposé après les conseils par précaution (`avecCourseCEcartee` est idempotente).
   const semaineCoach = relecture?.conseils.length
-    ? avecCourseCEcartee(ctx, appliquerConseils(week, relecture.conseils), jourPlan)
+    ? planALaSensation(ctx, avecCourseCEcartee(ctx, appliquerConseils(week, relecture.conseils), jourPlan))
     : week;
 
   // 2) Remplace le plan à venir. On n'efface QUE le futur : l'historique des séances
@@ -447,7 +448,10 @@ export async function autoCoachForUser(
       // doublent. On sélectionne donc les dates, puis toutes leurs séances.
       const datesConfirmees = [...new Set(week.map((x) => x.date))].sort().slice(0, CONFIRMED_DAYS);
       for (const d of week.filter((x) => x.date >= from && datesConfirmees.includes(x.date))) {
-        const built = buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin, montre, ciblesFc);
+        // À LA SENSATION (grossesse, décision de Cyprien du 20/11/2026) : rien sur la montre — une séance sans
+        // cible n'est pas un format éprouvé chez intervals.icu, et toute cible (allure, FC) est écartée. Le
+        // chemin « jour sans séance courable » retire aussi ce que le coach y avait posé avant.
+        const built = ctx.pilotageSensation ? null : buildWorkoutDescription(d.title, d.detail, `${d.type} ${d.tags.join(" ")}`, objectiveRace, ctx.vma, warmMin, coolMin, montre, ciblesFc);
         // ⚠️ UN JOUR SANS SÉANCE COURABLE DOIT ÊTRE NETTOYÉ, PAS IGNORÉ. `continue` seul
         // laissait sur la montre la séance poussée la veille, quand ce jour portait encore
         // un footing. Résultat constaté le 31/08/2026 : plan « Repos », montre « Footing ».

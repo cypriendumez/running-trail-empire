@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { effortMaximalInterdit } from "@/lib/health/effortMaximal";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -41,7 +42,7 @@ export default async function PageJourJ() {
   if (!user) redirect("/login");
 
   const { data: profil, error: eProfil } = await sb.from("profiles")
-    .select(`${COLONNES_ACCES}, preferred_language, weight_kg, garmin_vo2max, pace_curve, last_lat, last_lon`)
+    .select(`${COLONNES_ACCES}, preferred_language, weight_kg, garmin_vo2max, pace_curve, last_lat, last_lon, health_conditions`)
     .eq("id", user.id).maybeSingle();
   // La lecture qui porte la PORTE D'ACCÈS est signalée AVANT le verrou (relecture du 12/11/2026) : en
   // panne, un abonné verrait « Premium » sans qu'aucune trace ne parte dans error_logs.
@@ -124,6 +125,8 @@ export default async function PageJourJ() {
     terrain: c?.terrain ?? c?.type ?? null,
     poidsKg: Number(p?.weight_kg) > 0 ? Number(p?.weight_kg) : null,
     meteo: prevision ? { tempC: prevision.tempMax, humidite: prevision.humidity, ventKmh: prevision.windMaxKmh } : null,
+    // Antécédent qui interdit l'effort maximal : la course se court à effort contrôlé (20/11/2026).
+    effortControle: effortMaximalInterdit(p?.health_conditions),
   });
 
   // Séances ou test de référence illisibles : le pack s'affiche, mais le coureur sait qu'il est incomplet.

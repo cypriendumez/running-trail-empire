@@ -12,6 +12,7 @@
 //  cycle, dernière séance dure, jours systématiquement ratés. Ce module POSE ces
 //  séances dans la semaine sans violer les règles de récupération.
 // ─────────────────────────────────────────────────────────────────────────────
+import { aLaSensation, etiquettesALaSensation, QUALITE_WHY_SENSATION } from "@/lib/coach/sensation";
 import type { AthleteContext, QualitySession } from "@/lib/ai/coachContext";
 import { coutQualiteKm, footingMinKm } from "@/lib/coach/coutSeance";
 import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
@@ -25,7 +26,7 @@ import { axesRenforcement } from "@/lib/coach/renforcement";
 import { scinderFacile, seanceMatinFacile } from "@/lib/coach/doubleSessions";
 import { PLAN_T } from "@/lib/ai/planI18n";
 import { courseCEcarteeDe, type CourseCEcartee } from "@/lib/coach/courseCEcartee";
-import { appliquerConsignes, appliquerAptitude } from "@/lib/coach/consignesPlan";
+import { appliquerConsignes, appliquerAptitude, appliquerMalaise } from "@/lib/coach/consignesPlan";
 import { BILAN_T } from "@/lib/health/bilanMatin";
 import { nRaw, type I18nText } from "@/lib/i18n/multi";
 import type { Lang } from "@/lib/i18n/translations";
@@ -121,6 +122,34 @@ function kmAndTime(km: number, pace: string | null, lang: Lang): string {
  * d'intensité, quoi qu'il ait été planifié.
  */
 export function buildWeekPlan(ctx: AthleteContext, today = new Date()): PlanDay[] {
+  return planALaSensation(ctx, buildWeekPlanBrut(ctx, today));
+}
+
+/**
+ * À LA SENSATION (grossesse, 20/11/2026) : plus aucune zone de FC dans les textes, dans les cinq langues. Idempotente.
+ * Le coach la refait après ses ajustements et sa seconde passe de consignes, qui réécrivent des jours (le footing du
+ * kiné et la récupération d'« alléger » remettaient « piloté à la FRÉQUENCE CARDIAQUE » ; relecteur, 3e tour).
+ */
+export function planALaSensation(ctx: AthleteContext, plan: PlanDay[]): PlanDay[] {
+  return ctx.pilotageSensation ? plan.map(jourALaSensation) : plan;
+}
+
+function jourALaSensation(d: PlanDay): PlanDay {
+  // La note « sur terrain vallonné… fie-toi à la FC » tombe ; le « pourquoi » calé sur la VMA devient celui de la
+  // sensation ; les étiquettes de zone aussi (relecteur, 3e tour).
+  const s = (t: PlanDayText, l: Lang): PlanDayText => ({ ...t,
+    title: aLaSensation(t.title, l),
+    detail: aLaSensation(t.detail.split(PLAN_T[l].noteGAP).join(""), l),
+    why: aLaSensation(t.why === PLAN_T[l].qualiteWhy ? QUALITE_WHY_SENSATION[l] : t.why.split(PLAN_T[l].qualiteWhy).join(QUALITE_WHY_SENSATION[l]), l),
+    tags: etiquettesALaSensation(t.tags ?? [], l) });
+  const fr = s({ title: d.title, detail: d.detail, why: d.why, tags: d.tags }, "fr");
+  return {
+    ...d, ...fr,
+    i18n: d.i18n ? Object.fromEntries(Object.entries(d.i18n).map(([l, t]) => [l, t ? s(t as PlanDayText, l as Lang) : t])) as PlanDay["i18n"] : d.i18n,
+  };
+}
+
+function buildWeekPlanBrut(ctx: AthleteContext, today: Date): PlanDay[] {
   // LES CONSIGNES DU KINÉSITHÉRAPEUTE : un contrôle unique sur le plan FINI, quel que soit le
   // chemin qui a produit chaque séance (lib/coach/consignesPlan).
   // Puis le message d'une course C écartée, posé EN DERNIER : le feu rouge, le bilan du matin ou les
@@ -194,12 +223,12 @@ export function sansCourseCEcartee<T extends { why: string; i18n?: Partial<Recor
  */
 export function consignesSurPlan(ctx: AthleteContext, plan: PlanDay[], today = new Date()): PlanDay[] {
   const aptitude = !!ctx.aptitude?.attente;
-  if (!ctx.consignes && !aptitude) return plan;
+  if (!ctx.consignes && !aptitude && !ctx.malaiseApresEffort) return plan;
   const debut = new Date(today); debut.setHours(0, 0, 0, 0);
   const cs = ctx.courseSecondaire ?? null;
   const objectifIdx = ctx.daysToRace != null && ctx.daysToRace >= 0 && ctx.daysToRace <= 6 ? ctx.daysToRace : -1;
   const commun = {
-    allureFacile: ctx.easyPace ?? null,
+    allureFacile: ctx.allureCalcul ?? ctx.easyPace ?? null,
     // Celles d'aujourd'hui comprises : une sortie non prévue courue ce matin compte.
     sortiesRecentes: (ctx.sortiesRecentes ?? []).filter((d) => d <= iso(debut)),
     courseC: cs?.priorite === "C" && cs.idx !== objectifIdx ? iso(addDays(debut, cs.idx)) : null,
@@ -210,6 +239,9 @@ export function consignesSurPlan(ctx: AthleteContext, plan: PlanDay[], today = n
   // LE QUESTIONNAIRE D'APTITUDE (lot 3, décision de Cyprien) : une situation cochée et pas encore
   // d'avis médical → AUCUNE séance d'endurance (lib/coach/consignesPlan, `appliquerAptitude`).
   if (aptitude) semaine = appliquerAptitude(semaine);
+  // LE MALAISE D'UN COVID LONG, en dernier, sur la semaine finie (lib/coach/consignesPlan `appliquerMalaise`) — sauf
+  // sous avis médical attendu, où aucune séance n'est posée et dont le « pourquoi » prime.
+  else if (ctx.malaiseApresEffort) semaine = appliquerMalaise(semaine, iso(debut));
   return semaine;
 }
 
@@ -291,8 +323,8 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
       + windAdvice(f.windMaxKmh).penaltySecPerKm;
   };
 
-  const paceFor = (i: number): string | null => {
-    const base = ctx.easyPace;
+  /** L'allure facile du jour i, pénalité météo comprise, à partir de `base`. */
+  const allureDuJour = (base: string | null | undefined, i: number): string | null => {
     if (!base) return null;
     const m = base.match(/(\d+)['’:](\d{2})/);
     const f = ctx.forecast.find((x) => x.date === iso(dates[i]));
@@ -302,6 +334,10 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     const sec = Number(m[1]) * 60 + Number(m[2]) + penalty;
     return `${Math.floor(sec / 60)}'${String(sec % 60).padStart(2, "0")}`;
   };
+  /** L'allure AFFICHÉE (vide à la sensation). */
+  const paceFor = (i: number): string | null => allureDuJour(ctx.easyPace, i);
+  /** L'allure des CALCULS (découpe, durées) : à la sensation, celle qu'on n'affiche pas. Jamais écrite. */
+  const paceCalcFor = (i: number): string | null => allureDuJour(ctx.allureCalcul ?? ctx.easyPace, i);
 
   /**
    * UN FOOTING OU UNE SORTIE LONGUE DÉCOUPÉS : échauffement, corps, retour au calme.
@@ -320,7 +356,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
    * toute la distance et l'échauffement le réglage du profil, faute de mieux que d'inventer.
    */
   const decoupe = (totalKm: number, i: number): { e: number; k: number; corps: number } => {
-    const m = paceFor(i)?.match(/(\d+)['’:](\d{1,2})/);
+    const m = paceCalcFor(i)?.match(/(\d+)['’:](\d{1,2})/);
     if (!m) return { e: warm, k: cool, corps: totalKm };
     const secKm = Number(m[1]) * 60 + Number(m[2]);
     const totalMin = (totalKm * secKm) / 60;
@@ -463,7 +499,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     put(raceIdx, courseB ? {
       type: "Course",
       title: (l) => PLAN_T[l].courseSecondaireTitre(cs!.nom, "B"),
-      detail: (l) => PLAN_T[l].courseBDetail,
+      detail: (l) => ctx.effortMaximalInterdit ? PLAN_T[l].courseBDetailControle : PLAN_T[l].courseBDetail,
       why: (l) => PLAN_T[l].courseBWhy,
       tags: (l) => [PLAN_T[l].tags["Course"], ...(cs!.distanceKm ? [PLAN_T[l].tagKm(nRaw(cs!.distanceKm, l))] : [])],
     } : {
@@ -471,8 +507,10 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
       // Le NOM DE LA COURSE est un nom propre : il traverse les cinq langues tel quel.
       title: (l) => PLAN_T[l].courseTitre(o?.race ?? null),
       // Une course A du calendrier n'a pas de chrono visé : chaîne vide → aucune allure écrite.
-      detail: (l) => PLAN_T[l].courseDetail(goalPace),
-      why: (l) => PLAN_T[l].courseWhy(o?.targetTime || null),
+      // ⚠️ À EFFORT CONTRÔLÉ pour un antécédent qui interdit l'effort maximal (décision de Cyprien, 20/11/2026) :
+      // ni lignes droites à l'échauffement, ni allure de départ chiffrée, ni chrono à aller chercher.
+      detail: (l) => ctx.effortMaximalInterdit ? PLAN_T[l].courseDetailControle : PLAN_T[l].courseDetail(goalPace),
+      why: (l) => ctx.effortMaximalInterdit ? PLAN_T[l].courseWhyControle : PLAN_T[l].courseWhy(o?.targetTime || null),
       tags: (l) => [PLAN_T[l].tags["Course"], o?.distanceKm ? PLAN_T[l].tagKm(nRaw(o.distanceKm, l)) : PLAN_T[l].tags["Objectif"]],
     });
     // Les 2 jours qui précèdent : décrassage seulement. Aucune séance dure dans les 48 h.
@@ -496,7 +534,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
             tags: tags("Récup", "Veille de course") }
         : { type: "Récup", title: (l) => PLAN_T[l].avantVeilleTitre,
             detail: avantVeilleDetail,
-            why: (l) => PLAN_T[l].avantVeilleWhy, tags: tags("Récup", "Affûtage") })) spend();
+            why: (l) => ctx.effortMaximalInterdit ? PLAN_T[l].avantVeilleWhySansAllure : PLAN_T[l].avantVeilleWhy, tags: tags("Récup", "Affûtage") })) spend();
     }
     // Les jours qui suivent : récupération obligatoire.
     for (const d of [1, 2]) {
@@ -529,7 +567,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
         ? { type: "Récup", title: (l) => PLAN_T[l].veilleTitre, detail: veilleDetail,
             why: (l) => PLAN_T[l].veilleWhy, tags: tags("Récup", "Veille de course") }
         : { type: "Récup", title: (l) => PLAN_T[l].avantVeilleTitre, detail: avantVeilleDetail,
-            why: (l) => PLAN_T[l].avantVeilleWhy, tags: tags("Récup", "Affûtage") })) spend();
+            why: (l) => ctx.effortMaximalInterdit ? PLAN_T[l].avantVeilleWhySansAllure : PLAN_T[l].avantVeilleWhy, tags: tags("Récup", "Affûtage") })) spend();
     }
   }
 
@@ -538,7 +576,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     const poseeC = put(courseCIdx, {
       type: "Course",
       title: (l) => PLAN_T[l].courseSecondaireTitre(cs!.nom, "C"),
-      detail: (l) => PLAN_T[l].courseCDetail,
+      detail: (l) => ctx.effortMaximalInterdit ? PLAN_T[l].courseCDetailControle : PLAN_T[l].courseCDetail,
       why: (l) => PLAN_T[l].courseCWhy,
       tags: (l) => [PLAN_T[l].tags["Course"], ...(cs!.distanceKm ? [PLAN_T[l].tagKm(nRaw(cs!.distanceKm, l))] : [])],
     });
@@ -609,7 +647,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   if (longIdx >= 0) {
     put(longIdx, bike
       ? { type: "Vélo", title: (l) => PLAN_T[l].veloLongTitre,
-          detail: (l) => PLAN_T[l].veloLongDetail(warm, durationFor(longRunKm, paceFor(longIdx)) ?? "1h30", cycleNote(l)),
+          detail: (l) => PLAN_T[l].veloLongDetail(warm, durationFor(longRunKm, paceCalcFor(longIdx)) ?? "1h30", cycleNote(l)),
           why: (l) => PLAN_T[l].veloLongWhy, tags: tags("Vélo", "Z2", "Long") }
       : (() => {
           // ── SORTIE LONGUE : PLUS UN SIMPLE BLOC DE Z2 ────────────────────────
@@ -733,8 +771,9 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // consommait plus de la moitié, et le plan dépassait sa cible de 45 %. On le calcule
   // sur SON allure : échauffement + retour au calme + ~25 min de corps.
   // ⚠️ Calculé dans `lib/coach/coutSeance`, que le contexte du coach lit aussi : c'est lui qui décide qu'une semaine
-  // de reprise est trop petite pour une séance dure, et il doit compter comme le plan.
-  const QUALITY_KM = coutQualiteKm(ctx.easyPace, warm, cool);
+  // de reprise est trop petite pour une séance dure, et il doit compter comme le plan. Sur l'allure de CALCUL : à la
+  // sensation, l'allure affichée est vide (relecteur J, 5e tour du cadre de santé).
+  const QUALITY_KM = coutQualiteKm(ctx.allureCalcul ?? ctx.easyPace, warm, cool);
   // `longRunReserveKm` : ce que le plafond d'un long arrêt a retiré à la sortie longue ne fait pas de
   // place à une séance de qualité de plus (voir `coachContext`).
   const maxByVolume = Math.max(1, Math.floor((targetKm - longRunKm - (ctx.volume.longRunReserveKm ?? 0)) / QUALITY_KM));
@@ -848,7 +887,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   //  donnaient 21 min — en dessous de ce qui vaut une séance (scénarios : « séance montre
   //  trop courte »). Le plancher se dit donc en TEMPS : 25 min à l'allure facile, 4 km
   //  au moins, et 4 km tout court quand l'allure est inconnue.
-  const kmMinFooting = footingMinKm(ctx.easyPace);
+  const kmMinFooting = footingMinKm(ctx.allureCalcul ?? ctx.easyPace);
   const affordable = Math.max(0, Math.floor(remaining / kmMinFooting));
   if (easySlots.length > affordable) {
     for (const i of easySlots.splice(affordable)) { slot[i] = null; runBudget += 1; }

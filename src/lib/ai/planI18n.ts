@@ -132,6 +132,13 @@ export type TextesPlan = {
   courseBDetail: string;
   courseBWhy: string;
   courseCDetail: string;
+  /** Course A, B, C et avant-veille à EFFORT CONTRÔLÉ : antécédent qui interdit l'effort maximal
+   *  (décision de Cyprien, 20/11/2026) — sans accélération ni allure chiffrée, « tu dois pouvoir parler ». */
+  courseDetailControle: string;
+  courseBDetailControle: string;
+  courseCDetailControle: string;
+  courseWhyControle: string;
+  avantVeilleWhySansAllure: string;
   courseCWhy: string;
   /** Posé EN TÊTE du « pourquoi » du jour où une course C est écartée (13/11/2026, 16/11/2026). */
   courseCEcartee: (nom: string) => string;
@@ -286,6 +293,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseBDetail: "Course de préparation : échauffe-toi 15 min avec quelques accélérations, puis cours-la vite mais sans te mettre dans le rouge — c'est une répétition générale de ton objectif, pas l'objectif. Note tes sensations et ton allure.",
     courseBWhy: "Une course B se prépare légèrement — deux jours calmes avant, une semaine allégée — et se récupère ensuite : elle sert ton objectif sans le compromettre.",
     courseCDetail: "Course d'entraînement : échauffe-toi 15 min, puis cours-la à l'effort d'une séance au seuil, pas à fond. Retour au calme 10 min.",
+    courseDetailControle: "Échauffement 10 à 15 min de footing facile. Cours-la à l'aise, sans jamais forcer : tu dois pouvoir parler par phrases courtes du début à la fin. Douleur dans la poitrine, malaise ou essoufflement anormal : arrête-toi. Retour au calme 10 min en marchant ou en trottinant.",
+    courseBDetailControle: "Course de préparation, à effort contrôlé : échauffe-toi 10 à 15 min en footing facile, puis cours-la à l'aise, sans jamais forcer — tu dois pouvoir parler. Note tes sensations.",
+    courseCDetailControle: "Course d'entraînement, à effort contrôlé : échauffe-toi 10 min, puis cours-la comme un footing, sans jamais forcer. Retour au calme 10 min.",
+    courseWhyControle: "Avec l'antécédent déclaré dans ta santé, cette course se court à effort contrôlé, sans chrono à aller chercher : seul ton médecin peut lever cette limite.",
+    avantVeilleWhySansAllure: "On réveille les jambes sans entamer la fraîcheur.",
     courseCWhy: "Une course C remplace une séance de qualité de la semaine : pas d'affûtage, on s'en sert pour s'entraîner en conditions de course.",
     courseCEcartee: (n) => `Ta course « ${n} » (C) est écartée du plan : elle tombe trop près d'une course plus importante.`,
     courseCEcarteeRecup: (n, a) => `Ta course « ${n} » (C) est écartée du plan : elle tombe pendant ta récupération${a ? ` de « ${a} »` : ""}.`,
@@ -417,6 +429,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseBDetail: "Tune-up race: warm up 15 min with a few strides, then run it fast but without going into the red — it is a dress rehearsal for your goal, not the goal. Note how it felt and your pace.",
     courseBWhy: "A B race gets a light taper — two easy days before, a lighter week — and a recovery afterwards: it serves your goal without compromising it.",
     courseCDetail: "Training race: warm up 15 min, then run it at threshold-session effort, not all out. Cool down 10 min.",
+    courseDetailControle: "Warm up 10 to 15 min with easy running. Run it comfortably, never pushing: you should be able to talk in short sentences from start to finish. Chest pain, feeling faint or unusual breathlessness: stop. Cool down 10 min walking or jogging.",
+    courseBDetailControle: "Tune-up race at controlled effort: warm up 10 to 15 min with easy running, then run it comfortably, never pushing — you should be able to talk. Note how you feel.",
+    courseCDetailControle: "Training race at controlled effort: warm up 10 min, then run it like an easy run, never pushing. Cool down 10 min.",
+    courseWhyControle: "With the health history you declared, this race is run at controlled effort, with no time to chase: only your doctor can lift this limit.",
+    avantVeilleWhySansAllure: "We wake the legs up without eating into your freshness.",
     courseCWhy: "A C race replaces one quality session of the week: no taper, you use it to train in race conditions.",
     courseCEcartee: (n) => `Your race “${n}” (C) is left out of the plan: it falls too close to a more important race.`,
     courseCEcarteeRecup: (n, a) => `Your race “${n}” (C) is left out of the plan: it falls during your recovery${a ? ` from “${a}”` : ""}.`,
@@ -548,6 +565,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseBDetail: "Vorbereitungsrennen: 15 Min einlaufen mit ein paar Steigerungen, dann schnell laufen, aber ohne in den roten Bereich zu gehen — eine Generalprobe für dein Ziel, nicht das Ziel. Notiere Gefühl und Tempo.",
     courseBWhy: "Ein B-Rennen bekommt ein leichtes Tapering — zwei ruhige Tage davor, eine leichtere Woche — und danach Erholung: Es dient deinem Ziel, ohne es zu gefährden.",
     courseCDetail: "Trainingsrennen: 15 Min einlaufen, dann im Tempo einer Schwelleneinheit laufen, nicht voll. 10 Min auslaufen.",
+    courseDetailControle: "10 bis 15 Min locker einlaufen. Lauf es entspannt, ohne dich je zu forcieren: Du solltest von Anfang bis Ende in kurzen Sätzen sprechen können. Brustschmerz, Schwindel oder ungewöhnliche Atemnot: anhalten. 10 Min gehend oder trabend auslaufen.",
+    courseBDetailControle: "Vorbereitungsrennen mit kontrollierter Anstrengung: 10 bis 15 Min locker einlaufen, dann entspannt laufen, ohne dich je zu forcieren — du solltest sprechen können. Notiere, wie du dich fühlst.",
+    courseCDetailControle: "Trainingsrennen mit kontrollierter Anstrengung: 10 Min einlaufen, dann wie einen lockeren Dauerlauf laufen, ohne dich je zu forcieren. 10 Min auslaufen.",
+    courseWhyControle: "Mit der angegebenen Vorgeschichte läufst du dieses Rennen mit kontrollierter Anstrengung, ohne Zeitziel: Nur deine Ärztin oder dein Arzt kann diese Grenze aufheben.",
+    avantVeilleWhySansAllure: "Wir wecken die Beine, ohne die Frische anzugreifen.",
     courseCWhy: "Ein C-Rennen ersetzt eine Qualitätseinheit der Woche: kein Tapering, du trainierst damit unter Wettkampfbedingungen.",
     courseCEcartee: (n) => `Dein Rennen „${n}“ (C) ist nicht im Plan: Es liegt zu nah an einem wichtigeren Rennen.`,
     courseCEcarteeRecup: (n, a) => `Dein Rennen „${n}“ (C) ist nicht im Plan: Es fällt in deine Erholung${a ? ` nach „${a}“` : ""}.`,
@@ -679,6 +701,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseBDetail: "Carrera de preparación: calienta 15 min con algunas progresiones y córrela rápido pero sin entrar en rojo; es un ensayo general de tu objetivo, no el objetivo. Anota tus sensaciones y tu ritmo.",
     courseBWhy: "Una carrera B se prepara ligeramente (dos días tranquilos antes, una semana más suave) y se recupera después: sirve a tu objetivo sin comprometerlo.",
     courseCDetail: "Carrera de entrenamiento: calienta 15 min y córrela al esfuerzo de una sesión de umbral, no a tope. Vuelta a la calma 10 min.",
+    courseDetailControle: "Calienta 10 a 15 min con rodaje suave. Córrela cómodo, sin forzar nunca: debes poder hablar con frases cortas de principio a fin. Dolor en el pecho, mareo o falta de aire anormal: detente. Vuelta a la calma 10 min caminando o trotando.",
+    courseBDetailControle: "Carrera de preparación a esfuerzo controlado: calienta 10 a 15 min con rodaje suave y córrela cómodo, sin forzar nunca — debes poder hablar. Anota tus sensaciones.",
+    courseCDetailControle: "Carrera de entrenamiento a esfuerzo controlado: calienta 10 min y córrela como un rodaje, sin forzar nunca. Vuelta a la calma 10 min.",
+    courseWhyControle: "Con el antecedente declarado en tu salud, esta carrera se corre a esfuerzo controlado, sin buscar marca: solo tu médico puede levantar este límite.",
+    avantVeilleWhySansAllure: "Despertamos las piernas sin tocar la frescura.",
     courseCWhy: "Una carrera C sustituye una sesión de calidad de la semana: sin puesta a punto, te sirve para entrenar en condiciones de carrera.",
     courseCEcartee: (n) => `Tu carrera «${n}» (C) queda fuera del plan: cae demasiado cerca de una carrera más importante.`,
     courseCEcarteeRecup: (n, a) => `Tu carrera «${n}» (C) queda fuera del plan: cae durante tu recuperación${a ? ` de «${a}»` : ""}.`,
@@ -810,6 +837,11 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     courseBDetail: "Prova de preparação: aquece 15 min com algumas acelerações e corre-a depressa, mas sem entrar no vermelho; é um ensaio geral do teu objetivo, não o objetivo. Anota as sensações e o ritmo.",
     courseBWhy: "Uma prova B prepara-se de forma ligeira (dois dias calmos antes, uma semana mais leve) e recupera-se depois: serve o teu objetivo sem o comprometer.",
     courseCDetail: "Prova de treino: aquece 15 min e corre-a ao esforço de uma sessão de limiar, não no máximo. Retorno à calma 10 min.",
+    courseDetailControle: "Aquece 10 a 15 min em corrida leve. Corre-a à vontade, sem nunca forçar: deves conseguir falar em frases curtas do início ao fim. Dor no peito, mal-estar ou falta de ar anormal: para. Retorno à calma 10 min a andar ou a trotar.",
+    courseBDetailControle: "Prova de preparação com esforço controlado: aquece 10 a 15 min em corrida leve e corre-a à vontade, sem nunca forçar — deves conseguir falar. Regista as tuas sensações.",
+    courseCDetailControle: "Prova de treino com esforço controlado: aquece 10 min e corre-a como uma corrida leve, sem nunca forçar. Retorno à calma 10 min.",
+    courseWhyControle: "Com o antecedente declarado na tua saúde, esta prova corre-se com esforço controlado, sem marca a procurar: só o teu médico pode levantar este limite.",
+    avantVeilleWhySansAllure: "Acordamos as pernas sem mexer na frescura.",
     courseCWhy: "Uma prova C substitui uma sessão de qualidade da semana: sem afinamento, serve para treinar em condições de prova.",
     courseCEcartee: (n) => `A tua prova «${n}» (C) fica fora do plano: está demasiado perto de uma prova mais importante.`,
     courseCEcarteeRecup: (n, a) => `A tua prova «${n}» (C) fica fora do plano: cai durante a tua recuperação${a ? ` de «${a}»` : ""}.`,

@@ -71,7 +71,12 @@ export function weightTrainingRules(plan: WeightPlan): WeightTrainingRules {
  * une IA à qui l'on décrit une situation improvise ; une IA à qui l'on donne une règle
  * l'applique. Même logique que les consignes de `healthCatalog.ts`.
  */
-export function weightCoachBlock(plan: WeightPlan): string {
+// `cadreSante` : le coureur a un cadre de santé (lib/coach/cadreSante, 20/11/2026). Sa règle d'intensité
+// (« une séance un peu soutenue », « entraînement classique », « N séances de qualité maximum ») ne s'écrit
+// pas : c'est le cadre qui fixe l'intensité. La plus STRICTE des deux règles reste dite : « AUCUNE séance de
+// qualité » d'une obésité de classe 2 ou 3 garde sa place (@HeadCoach, relecteur, tour 6).
+// `sansImpactAuPlan` : sous cadre, en marche-course, le plan ne pose aucun vélo — la part « sans impact » ne se dit pas.
+export function weightCoachBlock(plan: WeightPlan, cadreSante = false, sansImpactAuPlan = true): string {
   const rules = weightTrainingRules(plan);
   const v = trendVerdict(plan);
   const lines: string[] = [];
@@ -81,15 +86,23 @@ export function weightCoachBlock(plan: WeightPlan): string {
   lines.push(`Énergie : métabolisme de base ${plan.bmr} kcal, dépense totale estimée ${plan.tdee} kcal/jour (dont ${plan.training.kcalPerDay} kcal/jour de sport RÉEL sur 28 j), cible ${plan.targetKcal} kcal/jour, protéines ${plan.proteinG} g/jour.`);
   lines.push(`Tendance mesurée : ${v.message}`);
 
-  lines.push(`ENTRAÎNEMENT — ${rules.rationale}`);
-  lines.push(`Contraintes chiffrées à RESPECTER : progression du volume ≤ +${rules.maxWeeklyProgressPct} %/semaine, ${rules.maxQualityPerWeek === 0 ? "AUCUNE séance de qualité pour l'instant" : `${rules.maxQualityPerWeek} séance(s) de qualité maximum/semaine`}, ${rules.strengthPerWeek} séance(s) de renforcement/semaine (NON NÉGOCIABLE)${rules.lowImpactSharePct > 0 ? `, ~${rules.lowImpactSharePct} % du volume sans impact (vélo, elliptique, marche rapide, aqua-jogging)` : ""}.`);
+  lines.push(cadreSante
+    ? "ENTRAÎNEMENT — c'est le cadre de santé de ce dossier qui décide ; le mode perte de poids n'y ajoute que ses propres limites, ci-dessous."
+    : `ENTRAÎNEMENT — ${rules.rationale}`);
+  const qualitePoids = rules.maxQualityPerWeek === 0 ? "AUCUNE séance de qualité pour l'instant, "
+    : cadreSante ? "" : `${rules.maxQualityPerWeek} séance(s) de qualité maximum/semaine, `;
+  lines.push(`Contraintes chiffrées à RESPECTER : progression du volume ≤ +${rules.maxWeeklyProgressPct} %/semaine, ${qualitePoids}${rules.strengthPerWeek} séance(s) de renforcement/semaine (NON NÉGOCIABLE)${rules.lowImpactSharePct > 0 && (!cadreSante || sansImpactAuPlan) ? `, ~${rules.lowImpactSharePct} % du volume sans impact (vélo, elliptique, marche rapide, aqua-jogging)` : ""}.`);
 
-  if (rules.walkRunAdvised) {
+  // Sous cadre, le format des séances est celui que son plan pose (marche-course comprise) : « 1 min / 2 min »
+  // contredisait la séance de son étape (relecture du 20/11/2026).
+  if (rules.walkRunAdvised && !cadreSante) {
     lines.push("FORMAT D'ENTRÉE : alterne course et marche (par exemple 1 min de course / 2 min de marche, répété). Présente-le comme la MÉTHODE des coureurs qui durent, jamais comme une version dégradée de la course. Allonger les blocs courus vient tout seul, semaine après semaine.");
   }
 
   // Le piège n°1 du coureur en déficit : sous-alimenter la séance de qualité.
-  lines.push("NUTRITION AUTOUR DES SÉANCES : le déficit se prend sur les jours faciles et les jours de repos, JAMAIS autour d'une séance de qualité ni d'une sortie longue. Une séance dure abordée à jeun et en restriction ne brûle pas plus de graisse : elle dégrade la séance, attaque le muscle et prépare une blessure. Glucides avant, protéines dans l'heure après.");
+  lines.push(cadreSante
+    ? "NUTRITION AUTOUR DES SÉANCES : le déficit se prend sur les jours de repos, JAMAIS autour d'une sortie longue. Une sortie abordée à jeun et en restriction ne brûle pas plus de graisse : elle attaque le muscle et prépare une blessure. Glucides avant, protéines dans l'heure après."
+    : "NUTRITION AUTOUR DES SÉANCES : le déficit se prend sur les jours faciles et les jours de repos, JAMAIS autour d'une séance de qualité ni d'une sortie longue. Une séance dure abordée à jeun et en restriction ne brûle pas plus de graisse : elle dégrade la séance, attaque le muscle et prépare une blessure. Glucides avant, protéines dans l'heure après.");
   lines.push("PROTÉINES : c'est le levier principal contre la fonte musculaire en déficit — réparties sur la journée, pas concentrées le soir. Un coureur qui perd du poids sans protéines suffisantes perd de la performance en même temps que des kilos.");
   lines.push("SIGNAUX D'ALERTE À SURVEILLER (déficit trop agressif ou trop long) : FC de repos qui monte, VFC qui s'effondre, sommeil dégradé, allures qui se dégradent à FC constante, arrêt des règles. Si tu en vois, dis-lui de REMONTER l'apport — la performance passe avant la perte de poids dès qu'un de ces signaux apparaît.");
 

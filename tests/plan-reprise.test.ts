@@ -1986,11 +1986,12 @@ async function main() {
     for (let targetKm = 0; targetKm <= 40; targetKm++) assert.equal(semaineTropPetitePourQualite({ ...o, targetKm, longRunKm: 4 }), qualitesTenablesAvecFooting({ ...o, targetKm, longRunKm: 4 }) === 0);
     // Le plan et le contexte lisent CES fonctions, avec la même allure et les mêmes minutes.
     const plan = codeNu("src/lib/ai/autoPlan.ts"), ctxSrc = codeNu("src/lib/ai/coachContext.ts");
-    assert.match(plan, /const QUALITY_KM = coutQualiteKm\(ctx\.easyPace, warm, cool\);/);
-    assert.match(plan, /const kmMinFooting = footingMinKm\(ctx\.easyPace\);/);
+    // (L'allure de CALCUL : `allureCalcul` vaut l'allure corrigée hors sensation — cadre de santé, 26/11/2026.)
+    assert.match(plan, /const QUALITY_KM = coutQualiteKm\(ctx\.allureCalcul \?\? ctx\.easyPace, warm, cool\);/);
+    assert.match(plan, /const kmMinFooting = footingMinKm\(ctx\.allureCalcul \?\? ctx\.easyPace\);/);
     assert.doesNotMatch(plan, /warm \+ cool \+ 25|\(25 \* 60\)/, "le plan recalcule le coût d'une séance ou le plus petit footing de son côté");
-    assert.match(ctxSrc, /qualitesTenablesAvecFooting\(\{\s*targetKm, longRunKm, reserveKm: longRunReserveKm, easyPace: easyPaceCorrige, warmMin: warmCool\.warm, coolMin: warmCool\.cool \}\)/);
-    assert.match(ctxSrc, /\n    easyPace: easyPaceCorrige,/, "l'allure que le plan lit n'est plus celle du critère");
+    assert.match(ctxSrc, /qualitesTenablesAvecFooting\(\{\s*targetKm, longRunKm, reserveKm: longRunReserveKm, easyPace: allureCalcul, warmMin: warmCool\.warm, coolMin: warmCool\.cool \}\)/);
+    assert.match(ctxSrc, /\n    allureCalcul,\n/, "l'allure que le plan lit n'est plus celle du critère");
     assert.match(ctxSrc, /\n    warmCool,\n/, "les minutes d'échauffement que le plan lit ne sont plus celles du critère");
   });
 

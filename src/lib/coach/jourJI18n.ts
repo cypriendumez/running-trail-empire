@@ -20,6 +20,8 @@ export type TextesJourJ = {
   marche: string; km: string; tempsPassage: string;
   strategieCourte: string; strategieLongue: string;
   trail: string; trailDplus: (dplus: string) => string;
+  /** Course à effort contrôlé (antécédent qui interdit l'effort maximal). */
+  controle: string;
   meteo: string; prevue: (t: string) => string; prevueVent: (v: string) => string; prevueAllure: (allure: string, temps: string) => string;
   meteoAttente: string; meteoTrail: string; tranche: Record<TrancheTemperature, string>; chaleur: string;
   ravito: string; ravitoRien: string;
@@ -53,6 +55,7 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
     strategieCourte: "Le premier kilomètre à l'allure, jamais plus vite : c'est là que se perd une course courte. Le dernier : tout ce qui reste.",
     strategieLongue: "Les trois premiers kilomètres un peu plus lents que l'allure, puis la régularité : la fin de course se joue dans le premier tiers.",
     trail: "Course en relief : pas d'allure au kilomètre, elle serait fausse dès la première côte. Monte à l'effort, la respiration encore contrôlée, marche dès que la pente l'impose, descends relâché et garde des forces pour le dernier tiers.",
+    controle: "Course à effort contrôlé, à cause de l'antécédent déclaré dans ta santé : pas de chrono à viser ni d'allure à tenir. Cours à l'aise, tu dois pouvoir parler par phrases courtes ; douleur dans la poitrine, malaise ou essoufflement anormal : arrête-toi. Seul ton médecin peut lever cette limite.",
     trailDplus: (d) => `Dénivelé positif : ${d} m.`,
     meteo: "Selon la température",
     prevue: (t) => `Prévision pour le jour J : ${t} °C au plus chaud de la journée.`,
@@ -73,6 +76,7 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
       moyen: "10 min de footing facile et 3 lignes droites : le début de course finit l'échauffement.",
       leger: "5 à 10 min de footing très facile ou de marche active : les premiers kilomètres, plus lents, finissent l'échauffement.",
       marche: "Pas d'échauffement de course : 5 min de marche active et de mobilité suffisent, l'épreuve est longue.",
+      controle: "10 à 15 min de footing facile, sans accélération ni lignes droites : la course elle-même se court à l'aise.",
     },
     veille: "La veille et le matin",
     veilleGlucides: (g) => `Environ ${g} g de glucides au total entre la veille et le petit-déjeuner (pâtes, riz, pain, fruits).`,
@@ -101,6 +105,7 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
     strategieCourte: "Run the first kilometre at pace, never faster: that's where a short race is lost. The last one: everything you have left.",
     strategieLongue: "The first three kilometres a little slower than pace, then steady: the finish is decided in the first third.",
     trail: "Hilly course: no pace per kilometre — it would be wrong from the first climb. Climb by effort with your breathing still under control, walk when the gradient demands it, run the descents relaxed and keep something for the last third.",
+    controle: "Controlled-effort race, because of the health history you declared: no time to aim for and no pace to hold. Run comfortably — you should be able to talk in short sentences; chest pain, feeling faint or unusual breathlessness: stop. Only your doctor can lift this limit.",
     trailDplus: (d) => `Elevation gain: ${d} m.`,
     meteo: "By temperature",
     prevue: (t) => `Race-day forecast: ${t} °C at the hottest point of the day.`,
@@ -121,6 +126,7 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
       moyen: "10 min of easy running and 3 strides: the start of the race finishes the warm-up.",
       leger: "5 to 10 min of very easy running or brisk walking: the first, slower kilometres finish the warm-up.",
       marche: "No race warm-up: 5 min of brisk walking and mobility is enough, the event is long.",
+      controle: "10 to 15 min of easy running, no strides or surges: the race itself is run comfortably.",
     },
     veille: "The day before and the morning",
     veilleGlucides: (g) => `About ${g} g of carbohydrate in total between the day before and breakfast (pasta, rice, bread, fruit).`,
@@ -149,6 +155,7 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
     strategieCourte: "Den ersten Kilometer im Tempo, nie schneller: Dort geht ein kurzes Rennen verloren. Den letzten: alles, was übrig ist.",
     strategieLongue: "Die ersten drei Kilometer etwas langsamer als das Tempo, dann gleichmäßig: Das Rennende entscheidet sich im ersten Drittel.",
     trail: "Profilierte Strecke: kein Tempo pro Kilometer — es wäre ab dem ersten Anstieg falsch. Steige nach Gefühl, mit noch kontrollierter Atmung, gehe, wenn die Steigung es verlangt, laufe locker bergab und spare Kraft für das letzte Drittel.",
+    controle: "Rennen mit kontrollierter Anstrengung wegen der angegebenen Vorgeschichte: kein Zeitziel und kein Tempo. Lauf entspannt — du solltest in kurzen Sätzen sprechen können; bei Brustschmerz, Schwindel oder ungewöhnlicher Atemnot: anhalten. Nur deine Ärztin oder dein Arzt kann diese Grenze aufheben.",
     trailDplus: (d) => `Höhenmeter: ${d} m.`,
     meteo: "Je nach Temperatur",
     prevue: (t) => `Vorhersage für den Renntag: ${t} °C zur wärmsten Tageszeit.`,
@@ -169,6 +176,7 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
       moyen: "10 Min. lockeres Laufen und 3 Steigerungen: Der Rennbeginn beendet das Aufwärmen.",
       leger: "5 bis 10 Min. sehr lockeres Laufen oder zügiges Gehen: Die ersten, langsameren Kilometer beenden das Aufwärmen.",
       marche: "Kein Renn-Aufwärmen: 5 Min. zügiges Gehen und Mobilisation genügen, der Wettkampf ist lang.",
+      controle: "10 bis 15 Min lockerer Dauerlauf, ohne Steigerungen: Das Rennen selbst läufst du entspannt.",
     },
     veille: "Am Vortag und am Morgen",
     veilleGlucides: (g) => `Insgesamt etwa ${g} g Kohlenhydrate zwischen Vortag und Frühstück (Nudeln, Reis, Brot, Obst).`,
@@ -197,6 +205,7 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
     strategieCourte: "El primer kilómetro al ritmo, nunca más rápido: ahí se pierde una carrera corta. El último: todo lo que te quede.",
     strategieLongue: "Los tres primeros kilómetros algo más lentos que el ritmo, luego regularidad: el final se decide en el primer tercio.",
     trail: "Carrera con desnivel: sin ritmo por kilómetro, sería falso desde la primera subida. Sube por sensaciones con la respiración aún controlada, camina cuando la pendiente lo exija, baja suelto y guarda fuerzas para el último tercio.",
+    controle: "Carrera a esfuerzo controlado por el antecedente declarado en tu salud: sin marca que buscar ni ritmo que mantener. Corre cómodo — debes poder hablar con frases cortas; dolor en el pecho, mareo o falta de aire anormal: detente. Solo tu médico puede levantar este límite.",
     trailDplus: (d) => `Desnivel positivo: ${d} m.`,
     meteo: "Según la temperatura",
     prevue: (t) => `Previsión para el día de la carrera: ${t} °C en el momento más caluroso.`,
@@ -217,6 +226,7 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
       moyen: "10 min de rodaje suave y 3 rectas: el inicio de la carrera termina el calentamiento.",
       leger: "5 a 10 min de rodaje muy suave o de marcha activa: los primeros kilómetros, más lentos, terminan el calentamiento.",
       marche: "Sin calentamiento de carrera: 5 min de marcha activa y movilidad bastan, la prueba es larga.",
+      controle: "10 a 15 min de rodaje suave, sin progresiones: la carrera en sí se corre cómoda.",
     },
     veille: "La víspera y la mañana",
     veilleGlucides: (g) => `Unos ${g} g de hidratos en total entre la víspera y el desayuno (pasta, arroz, pan, fruta).`,
@@ -245,6 +255,7 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
     strategieCourte: "O primeiro quilómetro ao ritmo, nunca mais rápido: é aí que se perde uma prova curta. O último: tudo o que restar.",
     strategieLongue: "Os três primeiros quilómetros um pouco mais lentos do que o ritmo, depois regularidade: o final decide-se no primeiro terço.",
     trail: "Prova com desnível: sem ritmo por quilómetro, estaria errado logo na primeira subida. Sobe pelo esforço com a respiração ainda controlada, caminha quando a inclinação o exigir, desce solto e guarda forças para o último terço.",
+    controle: "Prova com esforço controlado por causa do antecedente declarado na tua saúde: sem marca a procurar nem ritmo a manter. Corre à vontade — deves conseguir falar em frases curtas; dor no peito, mal-estar ou falta de ar anormal: para. Só o teu médico pode levantar este limite.",
     trailDplus: (d) => `Desnível positivo: ${d} m.`,
     meteo: "Conforme a temperatura",
     prevue: (t) => `Previsão para o dia da prova: ${t} °C no momento mais quente do dia.`,
@@ -265,6 +276,7 @@ export const JOURJ_T: Record<Lang, TextesJourJ> = {
       moyen: "10 min de corrida fácil e 3 retas: o início da prova termina o aquecimento.",
       leger: "5 a 10 min de corrida muito fácil ou marcha ativa: os primeiros quilómetros, mais lentos, terminam o aquecimento.",
       marche: "Sem aquecimento de prova: 5 min de marcha ativa e mobilidade bastam, a prova é longa.",
+      controle: "10 a 15 min de corrida leve, sem progressões: a prova em si corre-se à vontade.",
     },
     veille: "A véspera e a manhã",
     veilleGlucides: (g) => `Cerca de ${g} g de hidratos no total entre a véspera e o pequeno-almoço (massa, arroz, pão, fruta).`,

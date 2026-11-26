@@ -60,7 +60,8 @@ import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
 import { TYPE_CONSIGNES, consignesEnVigueur, kmPourDuree, type ConsignesKine } from "@/lib/health/consignesKine";
 import { TYPE_BILAN, BILAN_T, bilanDuJour, effetBilan, type BilanMatin } from "@/lib/health/bilanMatin";
 import { TYPE_APTITUDE, APTITUDE_T, lireAptitude, avisAttendu } from "@/lib/health/aptitude";
-import { effortMaximalInterdit, intensiteInterdite, EFFORT_MAX_T } from "@/lib/health/effortMaximal";
+import { effortMaximalInterdit, intensiteInterdite, pilotageSensation, EFFORT_MAX_T, MALAISE_T } from "@/lib/health/effortMaximal";
+import { cadreDeSante, lignesCadre, CADRE_FR, type CadreSante } from "@/lib/coach/cadreSante";
 import { recupAllongee, verdictExecution } from "@/lib/coach/arretsQualite";
 import { arretsMemorises, memoriserArrets } from "@/lib/activities/cacheArrets";
 import { estUnePanne } from "@/lib/dashboard/lectures";
@@ -115,6 +116,22 @@ export const COACH_SYSTEM = `Tu es un entraîneur de course à pied et de trail 
 - PROGRAMME COMPLET (pas seulement courir) : intègre le RENFORCEMENT musculaire (1–2×/sem — prévention blessure n°1 + économie), les ÉDUCATIFS / la technique (cadence, gammes), le CROSS-TRAINING (vélo/natation/aqua-jogging pour ajouter du volume ou s'entraîner/récupérer SANS impact en cas de bobo), et la NUTRITION DE COURSE (30–60 g de glucides/h au-delà de 90 min, hydratation, à TESTER à l'entraînement). Tu disposes d'une palette de 100 séances : choisis et ADAPTE, ne récite pas.
 - BOUCLE ADAPTATIVE : compare le PRESCRIT au RÉALISÉ. Si l'athlète court ses footings trop vite (FC trop haute en facile) → ralentis-le explicitement et explique pourquoi (la base se construit lentement, courir facile rend plus fort). S'il rate/écourte des séances → réajuste sans culpabiliser. S'il assimile bien (RPE bas, allures tenues, VFC stable ou ↑) → progresse d'un cran. S'il galère (RPE haut, VFC ↓) → allège. Le plan ÉVOLUE séance après séance selon ce qu'il fait réellement.
 Tu ANALYSES CHAQUE donnée fournie sans EN OUBLIER AUCUNE, et tu n'oublies JAMAIS l'objectif de course. Conseils concrets, chiffrés (allures, zones FC, durées, dénivelé), personnalisés et sûrs.`;
+
+/**
+ * LE SYSTÈME DU COACH POUR UN COUREUR SOUS CADRE DE SANTÉ (lib/coach/cadreSante, refonte du 20/11/2026). Le
+ * système ordinaire précédait son dossier dans la séance du jour et la relecture Premium : « athlète frais →
+ * ose la qualité », « travaille l'allure spécifique », « 3-5 lignes droites », « conseils chiffrés (allures,
+ * zones FC) » (@HeadCoach, relecteur). Écrit pour le cadre, comme son dossier.
+ */
+export const COACH_SYSTEM_CADRE = `Tu es un entraîneur de course à pied attentif. Le coureur dont le dossier suit est SOUS CADRE DE SANTÉ : ce cadre est écrit en tête de son dossier, et son plan l'applique déjà.
+- LE CADRE D'ABORD, TOUJOURS : tu ne prescris, ne suggères ni ne promets rien au-delà de ce cadre — ni parce qu'il est frais, ni pour son objectif, ni parce qu'il en a envie. Seul un médecin (ou, pour ses consignes, son kinésithérapeute) peut le lever. Tu n'en cites pas la cause médicale.
+- COACH PARTICULIER : tu t'adresses à UNE personne dont tu connais le profil, la santé, le sommeil, la charge et les dernières séances. Une consigne qu'on pourrait donner telle quelle à quelqu'un d'autre est une consigne ratée.
+- LA SANTÉ AVANT TOUT : une douleur signalée ou un signal de fatigue franc → tu allèges, jamais l'inverse. Tu ne poses aucun diagnostic ; toute question médicale → un médecin ou un masseur-kinésithérapeute.
+- LA CHARGE : le volume monte lentement, jamais d'un coup ; au moins un jour de repos chaque semaine.
+- BOUCLE ADAPTATIVE : compare ce qui était prévu à ce qu'il a fait ; s'il court trop vite en facile, ralentis-le et dis-lui pourquoi.
+Tu analyses CHAQUE donnée fournie. Conseils concrets, en durée et en sensation (en fréquence cardiaque ou en allure seulement si son dossier en donne), personnalisés et sûrs.`;
+/** Le système du coach selon le cadre de santé du coureur (`null` : le système ordinaire, mot pour mot). */
+export const systemeCoach = (c: { cadreSante?: CadreSante | null }) => (c.cadreSante ? COACH_SYSTEM_CADRE : COACH_SYSTEM);
 
 type Wk = {
   id?: string; date: string; type?: string | null; sport?: string | null; distance_km?: number | null; duration_seconds?: number | null;
@@ -269,6 +286,8 @@ export type AthleteContext = {
   hardGapHours: number;
   /** Allure d'endurance facile (~70 % VMA), en min/km — null si VMA inconnue. */
   easyPace: string | null;
+  /** L'allure facile des CALCULS (durées, coûts) : `easyPace`, ou à la sensation celle qu'on n'affiche pas. Jamais écrite. */
+  allureCalcul?: string | null;
   /** Jours écoulés depuis la dernière séance DURE réellement effectuée (0 = aujourd'hui). */
   lastHardDaysAgo: number | null;
   /** Les jours de qualité des sept derniers jours — courus, ou prescrits et MANQUÉS. Le plan
@@ -313,6 +332,15 @@ export type AthleteContext = {
    *  intensité hors du budget de qualité (sortie longue, footings, échauffement). Optionnel : un contexte
    *  bâti à la main (tests) sans ce champ n'a pas d'antécédent. */
   effortMaximalInterdit?: boolean;
+  /** Antécédent qui interdit toute intensité (covid long). */
+  intensiteInterdite?: boolean;
+  /** Antécédent qui se pilote à la sensation (grossesse) : ni allure, ni FC, rien sur la montre. */
+  pilotageSensation?: boolean;
+  /** Covid long, bilan du matin à 4-5/5 dans les deux jours qui suivent une sortie : repos aujourd'hui. */
+  malaiseApresEffort?: boolean;
+  /** Le cadre de santé que son plan applique (lib/coach/cadreSante) : `null` = coureur ordinaire. Optionnel :
+   *  un contexte bâti à la main (tests) sans ce champ n'a pas de cadre. */
+  cadreSante?: CadreSante | null;
   /** Disponibilités déclarées : nb de séances de course/semaine et jours praticables (0 = dim). */
   availability: { daysPerWeek: number; days: number[] };
   /** Prévisions RÉELLES à 7 jours (Open-Meteo) — vide si la position est inconnue. */
@@ -1202,6 +1230,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const noMaxEffort = effortMaximalInterdit(p?.health_conditions);
   // Et toute intensité (covid long) : zéro qualité, ni lignes droites, ni sortie longue accélérée.
   const sansIntensite = intensiteInterdite(p?.health_conditions);
+  // Et la grossesse, à la sensation : aucune allure chiffrée (elles viendraient d'une VMA d'avant), aucune FC.
+  const sensation = pilotageSensation(p?.health_conditions);
+  // COVID LONG, plus mal après une séance (catalogue santé) : bilan du matin à 4-5/5 dans les deux jours qui
+  // suivent une sortie → la séance du jour devient un repos, et le motif oriente vers le médecin.
+  const malaiseApresEffort = sansIntensite && effetDuBilan.allege && daysSinceLast != null && daysSinceLast <= 2;
 
   // ── MODE PERTE DE POIDS ──
   // Ne s'active QUE si l'athlète l'a demandé ET que son profil y est éligible (les
@@ -1236,7 +1269,8 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     : "PROGRESSION GLOBALE (base aérobie + 1-2 qualités/sem selon le niveau ; jamais 100 % facile pour qui veut progresser)";
 
   // Allures cibles calculées depuis la VMA (repli si zones non stockées).
-  const paceAt = (pct: number) => { if (!vma) return "?"; const s = 3600 / (vma * pct / 100); return `${Math.floor(s / 60)}'${String(Math.round(s % 60)).padStart(2, "0")}`; };
+  // À la sensation (grossesse) : aucune allure chiffrée, comme sans VMA — « au ressenti » partout.
+  const paceAt = (pct: number) => { if (!vma || sensation) return "?"; const s = 3600 / (vma * pct / 100); return `${Math.floor(s / 60)}'${String(Math.round(s % 60)).padStart(2, "0")}`; };
   /**
    * L'allure de footing affichée et prescrite : la MESURE d'abord, le modèle ensuite.
    * `easyPaceSource` dit laquelle a servi — un athlète doit pouvoir savoir si son
@@ -1246,9 +1280,14 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     easyPaceMesure != null ? "mesurée" : vma ? "modèle" : null;
   // Le plafond d'un test de lactate (seuil 1) s'applique UNE fois, à la fin (`easyPaceCorrige`) :
   // posé ici, il faussait la relecture, qui « corrigeait » vers plus vite un écart fabriqué.
-  const easyPaceLisible = easyPaceMesure != null
+  // À la sensation, l'allure n'est ni affichée ni prescrite — mais elle sert encore aux CALCULS (durée maximale du
+  // kiné, coût d'une séance, plancher des footings) : `allureCalcul`, jamais écrite (@HeadCoach, 23/11/2026 : masquer
+  // n'est pas effacer ; les sorties d'une grossesse sous « 40 min au plus » tombaient à 15 min).
+  const easyPaceSansMasque = easyPaceMesure != null
     ? `${Math.floor(easyPaceMesure / 60)}'${String(Math.round(easyPaceMesure % 60)).padStart(2, "0")}`
-    : vma ? paceAt(70) : null;
+    // Hors sensation, `paceAt(70)` tel quel ; à la sensation (où `paceAt` rend « ? »), le même calcul.
+    : vma ? (sensation ? (() => { const s = 3600 / (vma * 70 / 100); return `${Math.floor(s / 60)}'${String(Math.round(s % 60)).padStart(2, "0")}`; })() : paceAt(70)) : null;
+  const easyPaceLisible = sensation ? null : easyPaceSansMasque;
   /**
    * Allure d'une RÉPÉTITION, plafonnée par ce que l'athlète a réellement produit.
    *
@@ -1387,8 +1426,11 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const fmtPace = (secPerKm: number) => `${Math.floor(secPerKm / 60)}'${String(Math.round(secPerKm % 60)).padStart(2, "0")}`;
   // ⚠️ UN TEST DE LACTATE PASSE DEVANT (lib/coach/lactate) : il MESURE le seuil, la vitesse
   // critique l'ajuste sur des efforts. Six mois au plus ; sinon, la vitesse critique.
-  const thresholdPace = lactate ? fmtAllure(lactate.lt2.allureSec)
+  // À la sensation, elle n'est ni affichée ni prescrite, mais elle borne encore la DOSE (plafond de Daniels, `progMin`) :
+  // masquer n'est pas effacer (@HeadCoach, 5e tour : sans elle, 26 min sous le seuil au lieu de 10).
+  const thresholdPaceCalcul = lactate ? fmtAllure(lactate.lt2.allureSec)
     : csMs && csMs > 1 ? fmtPace(1000 / csMs) : null;
+  const thresholdPace = sensation ? null : thresholdPaceCalcul;
   const bestLine = pc?.best?.length
     ? pc.best.map(b => {
         const t = b.sec, mm = Math.floor(t / 60), ss = Math.round(t % 60);
@@ -1494,6 +1536,16 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
     peutCourir30: (p as Record<string, unknown> | null)?.peut_courir_30min as boolean | null | undefined,
     joursCourus: runs.map((w) => String(w.date).slice(0, 10)),
     aujourdhui: todayStr,
+  });
+  // ── LE CADRE DE SANTÉ (lib/coach/cadreSante, refonte du 20/11/2026) ─────────────────────────────────
+  // Avis médical attendu, marche-course, consignes du kiné, antécédent : le dossier de l'IA d'un coureur
+  // sous cadre est un AUTRE dossier (`textCadre`, plus bas), et ses avertissements d'objectif ne parlent
+  // ni de chrono ni de volume à aller chercher.
+  const cadre = cadreDeSante({
+    avisMedical: aptitudeAttente,
+    marcheCourse: marcheCourse ? { etape: marcheCourse.etape, total: marcheCourse.total, totalMin: dureesMarcheCourse(marcheCourse.seance).totalMin } : null,
+    consignes: consignes ?? null,
+    conditions: p?.health_conditions,
   });
   const marcheCourseMotif = marcheCourse
     ? tr((l) => MOTIF_T[l].marcheCourse(nRaw(marcheCourse.etape, l), nRaw(marcheCourse.total, l)))
@@ -1806,6 +1858,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   if (aptitudeAttente) infoFlags.push(tr((l) => APTITUDE_T[l].motif));
   // L'antécédent qui écarte l'effort maximal se DIT (catalogue santé : « Dis-le-lui clairement »), sans le nommer.
   if (noMaxEffort) infoFlags.push(tr((l) => EFFORT_MAX_T[l].motif(sansIntensite)));
+  if (malaiseApresEffort) infoFlags.push(tr((l) => MALAISE_T[l].motif));
   if (bilan && effetDuBilan.stressHaut) infoFlags.push(tr((l) => BILAN_T[l].stress(bilan.stress)));
   if (pains.length) redFlags.push(tr((l) => MOTIF_T[l].douleur(pains.map((x) => traduireDouleur(x, l)).join(", "))));
   // ── LA CHARGE SEULE NE SUFFIT PLUS À DÉCLARER ROUGE ─────────────────────────
@@ -2075,7 +2128,7 @@ export async function buildAthleteContext(sb: SB, userId: string, lecture: Lectu
   const capIntervalKm = Math.min(10, weeklyRef * 0.08);
   const capThresholdKm = weeklyRef * 0.10;
   const thrSecPerKm = (() => {
-    const m = (thresholdPace ?? "").match(/(\d+)['’](\d{2})/);
+    const m = (thresholdPaceCalcul ?? "").match(/(\d+)['’](\d{2})/);
     return m ? Number(m[1]) * 60 + Number(m[2]) : null;
   })();
 
@@ -2476,6 +2529,9 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
         : priority.slice(0, Math.max(1, qn));
       const focus = sansQualite ? `Récupération après ${recup.nom} : footings seulement`
         : enReprise ? `Reprise après ${recup.nom} : une séance courte au seuil`
+        // Le focus vu par l'admin dit le cadre de santé, pas « VMA & seuil » (20/11/2026).
+        : sansIntensite ? "Endurance facile — cadre de santé"
+        : noMaxEffort ? "Endurance + un seuil bas au plus — cadre de santé"
         : sousRegleArret ? FOCUS_REPRISE_ARRET
         : marcheArret ? FOCUS_MARCHE_SORTIE
         : ph === "Base" ? "Volume aérobie + pose de vitesse"
@@ -2563,8 +2619,10 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // On compare ici l'allure facile PRESCRITE à celle réellement tenue sur 90 jours,
   // en GAP quand la montre le donne — sans quoi une semaine en côtes passerait pour
   // une baisse de forme.
+  // Sur l'allure NON masquée : à la sensation, la relecture recale encore l'allure de CALCUL (`allureCalcul`), jamais
+  // écrite (relecteurs K et L, @HeadCoach, 6e tour ; hors sensation, c'est la même allure).
   const cibleFacileSec = (() => {
-    const m = String(easyPaceLisible ?? "").match(/(\d+)['’:](\d{2})/);
+    const m = String(easyPaceSansMasque ?? "").match(/(\d+)['’:](\d{2})/);
     return m ? Number(m[1]) * 60 + Number(m[2]) : null;
   })();
   // ⚠️ SANS FC MAX, PAS DE RELECTURE (12/11/2026) : impossible de reconnaître les sorties faciles ;
@@ -2591,18 +2649,29 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // ⚠️ LA RELECTURE NE REPASSE PAS AU-DESSUS DU SEUIL 1 MESURÉ. Elle recale la cible sur ce
   // que l'athlète court vraiment : un coureur qui fait ses footings à 4'10 la tirait vers
   // 4'20 quand son test de lactate place le seuil aérobie à 4'20 (relevé par le test).
+  const corrigerFacile = (base: string | null) => {
+    const relue = relecture?.correctionSec ? corrigerAllure(base, relecture.correctionSec) ?? base : base;
+    if (!lactate || !relue) return relue;
+    const m = relue.match(/(\d+)['’](\d{2})/);
+    const sec = m ? Number(m[1]) * 60 + Number(m[2]) : null;
+    return sec != null && sec < allureFacileMaxSec(lactate) ? fmtAllure(allureFacileMaxSec(lactate)) : relue;
+  };
   const easyPaceCorrige = (() => {
     if (!lactate || !easyPaceRelu) return easyPaceRelu;
     const m = easyPaceRelu.match(/(\d+)['’](\d{2})/);
     const sec = m ? Number(m[1]) * 60 + Number(m[2]) : null;
     return sec != null && sec < allureFacileMaxSec(lactate) ? fmtAllure(allureFacileMaxSec(lactate)) : easyPaceRelu;
   })();
+  /** L'allure des CALCULS : celle qu'on affiche, ou, à la sensation, celle qu'on aurait affichée (jamais écrite). */
+  const allureCalcul = sensation ? corrigerFacile(easyPaceSansMasque) : easyPaceCorrige;
 
   const objectiveWarnings: string[] = (() => {
     const out: string[] = [];
     if (!objective) return out;
     // 1. Le chrono visé est-il atteignable au potentiel actuel ?
-    if (vma && objective.targetSeconds > 0) {
+    // Sous cadre de santé, aucun verdict de chrono : la course se court comme son cadre le dit (« un gros bloc
+    // de VMA » à un coureur cardiaque, @HeadCoach, 20/11/2026).
+    if (vma && objective.targetSeconds > 0 && !cadre) {
       const needKmh = objective.distanceKm / (objective.targetSeconds / 3600);
       const pctVma = needKmh / vma;
       // Un marathon se court ~80 % de VMA, un semi ~85 %, un 10 km ~90 %.
@@ -2619,10 +2688,17 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
     // semaines à venir : à trois semaines de la course, il ne contient plus que l'affûtage
     // (75 %, 55 % de la plus longue, puis la semaine de course à 0), et un athlète qui venait
     // de courir 30 km lisait que sa préparation « plafonnera à ~22 km ».
+    // …ni « augmente la fréquence des sorties pour faire monter le volume » : sous cadre, la distance hors de
+    // portée se dit, et se discute avec son médecin (@HeadCoach, 20/11/2026).
     if (macroPlan.length) {
       const plannedPeak = Math.max(longestRecentKm, ...macroPlan.map(w => w.longRunKm));
-      const gap = longRunGap(plannedPeak, longRunPeakKm(libGoal as RaceGoal, objective.distanceKm), objective.distanceKm);
-      if (gap) out.push(gap);
+      const besoin = longRunPeakKm(libGoal as RaceGoal, objective.distanceKm);
+      const gap = longRunGap(plannedPeak, besoin, objective.distanceKm);
+      // Sous cadre, un FAIT, et seulement si le plan garde la course (pas sous avis médical, qui la retire, ni en
+      // marche-course, qui n'en pose pas).
+      if (gap && !(cadre && (cadre.niveau === "sansSeance" || cadre.marcheCourse))) out.push(cadre
+        ? `⚠️ DISTANCE : sous son cadre de santé, sa préparation ne l'amènera qu'à une sortie longue de ~${Math.round(plannedPeak)} km${besoin != null ? `, quand une course de ${frNum(objective.distanceKm, 1)} km en demande ~${Math.round(besoin)}` : ` pour une course de ${frNum(objective.distanceKm, 1)} km`}.`
+        : gap);
     }
     // 3. L'ÂGE autorise-t-il cette distance ? Un athlète de 18 ans qui vise un marathon
     // ne pourra pas s'inscrire à une épreuve officielle en France (limite Junior : 25 km).
@@ -2722,7 +2798,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   const longRunEase = readyLevel === "rouge" ? 0.6 : readyLevel === "orange" ? 0.8 : motifsAllegement ? 0.85 : 1;
   // Une durée maximale donnée par le kinésithérapeute plafonne la sortie longue (et donc les
   // footings, bornés à 85 % d'elle) : la distance que tient cette durée à l'allure facile.
-  const kmConsigne = consignes?.dureeMaxMin != null ? kmPourDuree(consignes.dureeMaxMin, easyPaceCorrige) : null;
+  const kmConsigne = consignes?.dureeMaxMin != null ? kmPourDuree(consignes.dureeMaxMin, allureCalcul) : null;
   const longRunKmBrut = Math.max(4, Math.round(longRunPlanned * longRunEase));
   const longRunKmBorne = kmConsigne != null ? Math.min(longRunKmBrut, kmConsigne) : longRunKmBrut;
   // ⚠️ PENDANT UNE REPRISE, UNE « SORTIE LONGUE » PLUS COURTE QUE LA SORTIE HABITUELLE N'EN EST
@@ -2786,7 +2862,7 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // Et quand la semaine tient UNE séance et un footing mais pas deux (marche de sortie, reprise de volume), le budget
   // est borné à ce qu'elle tient : jamais de séance dure sans footing à côté pendant une reprise.
   const qualitesTenables = enRepriseArret && !consignes ? qualitesTenablesAvecFooting({
-    targetKm, longRunKm, reserveKm: longRunReserveKm, easyPace: easyPaceCorrige, warmMin: warmCool.warm, coolMin: warmCool.cool }) : Infinity;
+    targetKm, longRunKm, reserveKm: longRunReserveKm, easyPace: allureCalcul, warmMin: warmCool.warm, coolMin: warmCool.cool }) : Infinity;
   const semaineTropPetite = qualitesTenables < 1;
   const sansLongueNiDure = repriseIntensite != null && (repriseVolumeLongue != null || semaineAuPlancher) && longueRetiree;
   const footingsSeuls = sansLongueNiDure || semaineTropPetite;
@@ -2924,7 +3000,147 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // (le plan est déterministe, le texte ne fait que s'adresser à l'athlète) et c'est une
   // donnée d'identité de plus envoyée à un tiers avec des données de santé.
   const prenomSeul = String(p?.full_name ?? "").trim().split(/\s+/)[0] || "Athlète";
-  const text = `PROFIL
+  // ── LE DOSSIER D'UN COUREUR SOUS CADRE DE SANTÉ (refonte du 20/11/2026) ───────────────────────────────
+  // Un AUTRE dossier, en LISTE BLANCHE : le cadre que son plan applique (lib/coach/cadreSante), son profil, sa
+  // fraîcheur, sa santé, les FAITS de sa charge et la structure de sa semaine. Ni palette de séances, ni
+  // capacités (VMA, zones, chronos, seuils), ni verdict d'objectif, ni analyse de performance : corrigé ligne
+  // par ligne, le dossier ordinaire laissait toujours passer une ligne qui poussait vers l'intensité (cinq
+  // tours de relecture). Une ligne ajoutée au dossier ordinaire n'arrive donc JAMAIS ici sans être écrite
+  // pour le cadre. Le dossier d'un coureur ordinaire, lui, ne change pas d'un octet.
+  const textCadre = !cadre ? null : (() => {
+    const sansSeance = cadre.niveau === "sansSeance";
+    const mc = cadre.marcheCourse;
+    // La fraîcheur, ÉCRITE pour le cadre : un malaise après la dernière séance (covid long) donne le repos du
+    // plan ; la marche-course n'a jamais de « footing » (@HeadCoach, relecteurs, 20/11/2026).
+    const regle = sansSeance
+      ? "Aucune séance d'endurance n'est prévue tant qu'un médecin ne l'a pas vu : ces signaux ne disent que sa récupération."
+      : mc?.bloquee
+      ? `Aucune séance de marche-course n'est prévue cette semaine (durée fixée par son kinésithérapeute) : ces signaux ne disent que sa récupération.${malaiseApresEffort ? " Aujourd'hui, repos : il s'est senti nettement plus mal après sa dernière séance (bilan du matin) ; qu'il en parle à son médecin, et sans attendre si cela se répète." : ""}`
+      // Le même conseil que le plan, qu'une course tombe aujourd'hui ou non (décision de Cyprien, 20/11/2026) : rien
+      // n'est affirmé de ce que le plan fait de la course.
+      : malaiseApresEffort
+      ? "Aujourd'hui, repos : il s'est senti nettement plus mal après sa dernière séance (bilan du matin). Si une course tombe aujourd'hui, mieux vaut qu'il ne prenne pas le départ — la décision lui appartient ; qu'il en parle à son médecin avant sa prochaine course, et sans attendre si cela se répète."
+      : {
+          rouge: mc ? "Repos ou marche tranquille aujourd'hui — dis-lui pourquoi, sans dramatiser."
+            : "Repos, ou un footing très facile et court, aujourd'hui — dis-lui pourquoi, sans dramatiser.",
+          orange: mc ? "Séance de son étape raccourcie (moins de répétitions), ou une marche tranquille. Réévalue demain."
+            : "Séance allégée : coupe son volume d'environ un tiers, ou remplace-la par un footing très facile. Réévalue demain.",
+          jaune: "La séance prévue peut se faire telle quelle ; si les sensations ne viennent pas dans les 15 premières minutes, raccourcis-la.",
+          vert: "Il est frais : la séance prévue se fait telle quelle — la fraîcheur n'autorise jamais à aller au-delà du cadre.",
+        }[readyLevel];
+    // Les SIGNAUX : des faits (VFC, sommeil, charge, ressenti, douleur). Pas les motifs qui prescrivent (« une
+    // seule séance de qualité par semaine », « la qualité est maintenue ») : récupération d'après-course et
+    // notes du budget de qualité.
+    const prescriptifs = new Set<I18nText>([...(recupMotif ? [recupMotif] : []), ...qb.notesAll]);
+    const rougesCadre = redFlags.filter((f) => !prescriptifs.has(f)).map((f) => f.fr);
+    const orangesCadre = orangeFlags.filter((f) => !prescriptifs.has(f)).map((f) => f.fr);
+    // « À savoir » : des faits écrits pour le cadre — jamais les motifs du dossier ordinaire (le seuil bas d'un
+    // antécédent, le programme marche-course qui « s'allonge », la course C qui « remplace une séance de qualité »).
+    const reprise = repriseArret ?? repriseIntensite;
+    const infoCadre = [
+      ...(!sansSeance && reprise ? [`reprise après ${reprise.depuisJours ?? reprise.arretJours} jours sans courir : son plan réduit le volume pour l'instant`] : []),
+      ...(!sansSeance && recup ? [`récupération après ${recup.nom} (J+${recup.joursDepuis}) : son plan réduit le volume pour l'instant`] : []),
+      ...(bilan && effetDuBilan.allege ? [BILAN_T.fr.motif(bilan.fatigue, bilan.jambes)] : []),
+      ...(bilan && effetDuBilan.stressHaut ? [BILAN_T.fr.stress(bilan.stress)] : []),
+    ];
+    // La SANTÉ : sous avis médical attendu, les seuls NOMS (une précaution qui parle de vélo, de volume ou de
+    // sortie longue proposerait l'endurance que le plan retire) ; sinon la précaution écrite pour le cadre.
+    const nomsDe = (slugs: unknown, cat: typeof HEALTH_CONDITIONS) => {
+      const set = new Set(Array.isArray(slugs) ? slugs.map(String) : []);
+      return cat.filter((c) => set.has(c.slug)).map((c) => c.label.fr);
+    };
+    const noms = [...nomsDe(p?.health_conditions, HEALTH_CONDITIONS), ...nomsDe(p?.injury_zones, INJURY_ZONES)];
+    const precautions = sansSeance
+      ? (noms.length ? [`Antécédents et blessures déclarés : ${noms.join(", ")} — à évoquer avec le médecin qu'il doit voir.`] : [])
+      : [...healthCoachLines(p?.health_conditions, HEALTH_CONDITIONS, true).rules, ...healthCoachLines(p?.injury_zones, INJURY_ZONES, true).rules];
+    const zoneFacile = hrZone(0.6, 0.7);
+    const facile = cadre.sensation ? "à la sensation, il doit pouvoir parler"
+      : `à la conversation${zoneFacile ? ` (FC ~${zoneFacile})` : ""}${easyPaceCorrige ? `, ~${easyPaceCorrige}/km` : ""}`;
+    const duree = cadre.kine?.dureeMaxMin != null ? ` — ${cadre.kine.dureeMaxMin} min au plus par sortie` : "";
+    // Le nombre de sorties que le plan peut poser : ses disponibilités, bornées par le kiné ; en marche-course,
+    // 2 à 3 séances de l'étape (lib/ai/autoPlan), bornées elles aussi par le kiné.
+    const maxKine = cadre.kine?.seancesMaxSemaine ?? null;
+    const dispoPlan = maxKine != null ? Math.min(availDaysPerWeek, maxKine) : availDaysPerWeek;
+    const seancesMc = Math.min(Math.max(2, Math.min(3, dispoPlan || 3)), maxKine ?? Infinity);
+    const sorties = mc ? (mc.bloquee ? 0 : seancesMc) : dispoPlan;
+    // LE MODE PERTE DE POIDS, tel que le plan le pose (lib/ai/autoPlan `menagerArticulations`) : une part des sorties
+    // faciles en vélo, les autres en alternance 2 min de course / 1 min de marche. Pas en marche-course (ce chemin
+    // s'arrête avant) ni sans séance (relecteurs, 2e tour).
+    const reglesPoids = weightLoss && !sansSeance && !mc ? weightLoss.rules : null;
+    const velo = !!reglesPoids && reglesPoids.lowImpactSharePct > 0;
+    const alterne = !!reglesPoids && reglesPoids.walkRunAdvised;
+    const modePoids = velo || alterne
+      ? `• Mode perte de poids : ${velo ? "une partie des sorties faciles en vélo (sans impact)" : ""}${velo && alterne ? ", les autres" : alterne ? "les sorties faciles" : ""}${alterne ? " en alternance course/marche (2 min de course / 1 min de marche)" : ""}, comme son plan les pose.`
+      : null;
+    // La structure que pose son plan : la séance sous le seuil est CELLE du plan (`chosen`, le budget de qualité).
+    // Aucune sortie longue n'est annoncée : le plan n'en pose pas en semaine de course, de reprise ou sous durée
+    // maximale, et le dossier ne promet rien qu'il ne pose pas (@HeadCoach).
+    const structure = sansSeance
+      ? ["• Aucune séance d'endurance : du repos, de la mobilité, de la marche tranquille et un renforcement doux sans saut."]
+      : mc && marcheCourse
+      ? (mc.bloquee
+          ? ["• Aucune séance de marche-course cette semaine (durée fixée par son kinésithérapeute) : un renforcement pour débuter, du repos ailleurs."]
+          // La séance EXACTE de son étape, au plus autant de fois que le plan peut la poser.
+          : [`• PROGRAMME MARCHE-COURSE, étape ${marcheCourse.etape}/${marcheCourse.total} : ${"continuMin" in marcheCourse.seance
+              ? `${marcheCourse.seance.continuMin} min de course continue`
+              : `${marcheCourse.seance.reps} × (${marcheCourse.seance.courseMin} min de course / ${marcheCourse.seance.marcheMin} min de marche)`}, au plus ${seancesMc} fois sur 7 jours, ${mc.totalMin} min marche comprise, en évitant deux jours de suite quand ses disponibilités le permettent${duree} ; un renforcement pour débuter ; du repos ailleurs. ${"continuMin" in marcheCourse.seance ? "Ni allure, ni volume en kilomètres : la durée seulement. Encourage la régularité." : "Il ne court pas encore 30 minutes d'affilée : ni allure, ni volume en kilomètres. Encourage la régularité ; la marche fait partie de la séance."}`])
+      : [
+          ...(cadre.niveau === "seuilBas"
+            ? [!chosen.length ? "• Aucune séance sous le seuil ce cycle."
+              : cadre.sensation ? "• Au plus une séance sous le seuil cette semaine, en blocs longs, à la sensation."
+              : `• Au plus une séance sous le seuil cette semaine : ${chosen[0].desc}`]
+            : []),
+          `• ${cadre.niveau === "seuilBas" ? "Tout le reste en endurance facile" : "Endurance facile seulement"}, ${facile}${duree}.`,
+          ...(modePoids ? [modePoids] : []),
+          "• Au moins un jour de repos complet.",
+        ];
+    const courseSemaine = secondaireActive && !sansSeance && !mc
+      ? `\n• Course ${secondaireActive.course.priorite} au calendrier cette semaine : ${secondaireActive.course.nom}, le ${secondaireActive.course.date}.` : "";
+    // À la sensation (grossesse) : ses séances passées sans allure ni fréquence cardiaque, que le modèle pourrait citer.
+    const seancesPassees = cadre.sensation
+      ? runs.slice(0, 5).map((w) => `${String(w.date).slice(5, 10)} ${classifyRun(w, fcMaxEst)} ${r1(w.distance_km ?? 0)}km`)
+      : last5;
+    const garde = sansSeance
+      ? "- Douleur dans la poitrine, malaise ou essoufflement anormal → un médecin sans attendre (15 ou 112 en urgence)."
+      : `- ${mc ? "Progression : celle des étapes du programme, rien de plus." : `Progressivité : +${Math.min(10, reglesPoids?.maxWeeklyProgressPct ?? 10)} % de volume par semaine au plus${cadre.intensiteInterdite ? ", plus lentement encore pour une fatigue post-virale" : ""}.`}
+- Au moindre signal de douleur → adapter immédiatement, pas de stoïcisme.
+- Si VFC sous la base ou sommeil dégradé → alléger la séance du jour.`;
+    return `${CADRE_FR.titre}
+${lignesCadre(cadre).map((l) => `- ${l}`).join("\n")}
+
+PROFIL
+- ${prenomSeul} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm
+- ANCIENNETÉ en course à pied : ${expLabel ?? "non renseignée"}
+- TERRAINS habituels : ${terr.labels.length ? terr.labels.join(" + ") : "non renseignés"}
+
+⚡ FRAÎCHEUR DU JOUR (VFC, sommeil, charge et ressenti — elle peut réduire ce que prévoit le cadre, jamais l'élargir)
+${readiness} — ${regle}${rougesCadre.length ? `\n  • Signaux rouges : ${rougesCadre.join(" ; ")}` : ""}${orangesCadre.length ? `\n  • Signaux orange : ${orangesCadre.join(" ; ")}` : ""}${infoCadre.length ? `\n  • À savoir : ${infoCadre.join(" ; ")}` : ""}
+
+SANTÉ & ANTÉCÉDENTS
+- Ces consignes règlent la CHARGE d'entraînement, rien d'autre : tu ne poses aucun diagnostic, tu ne prescris ni exercice de soin, ni traitement, ni examen. Toute question médicale → un médecin ou un masseur-kinésithérapeute.
+${cadre.avisMedical ? "- Questionnaire d'aptitude : une situation cochée demande l'avis d'un médecin avant toute reprise de l'effort.\n" : ""}${precautions.map((r) => `- ${r}\n`).join("")}${healthNotes ? `- 🗣️ Note santé écrite par l'athlète (LIS-LA et tiens-en compte) : « ${healthNotes} »\n` : ""}${weightLoss && !sansSeance ? `${weightCoachBlock(weightLoss.plan, true, !mc)}\n` : ""}
+FORME & RÉCUPÉRATION (aujourd'hui)
+- État physiologique (dernière VFC face à SA base, zone normale ± 6 %) : ${state}
+- VFC (${precisionMetrique(metriqueVfc)}) : ${hrvLatest ?? "?"} ms (base 14j ${hrvBase ?? "?"} ms → ${hrvTrend})
+- Sommeil : ${freshSleep ? `${freshSleep.sleep_score ?? "?"}/100 cette nuit${lastSleepMin ? ` (${Math.floor(lastSleepMin / 60)}h${String(lastSleepMin % 60).padStart(2, "0")})` : ""}` : "montre non portée la nuit dernière (donnée ignorée)"} · moyenne 7j ${sleepAvg ?? "?"}/100
+
+CHARGE (des faits, pas des objectifs)
+- Volume : ${Math.round(weekKm)} km COURUS cette semaine · ~${Math.round(avg4wkKm)} km/sem (moy. 4 sem.)${sansSeance || !sorties ? "" : `
+- 📆 DISPONIBILITÉS : au plus ${sorties} sortie(s) d'entraînement à pied sur 7 jours${mc ? "" : ", une course au calendrier à part"}${availDays.length < 7 ? `, uniquement les ${availDays.map(d => ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"][d]).join(", ")}` : ""} — NE DÉPASSE PAS ce nombre.`}
+- Repos : dernière séance il y a ${daysSinceLast ?? "?"} j · ${restDays7} j sans courir sur les 7 derniers
+- CTL ${Math.round(load.ctl)} (forme) · ATL ${Math.round(load.atl)} (fatigue) · TSB ${Math.round(load.tsb)} (fraîcheur) · ratio aigu:chronique ${r1(load.acr)}${load.acr > 1.5 ? " ⚠️ élevé (risque)" : ""}
+- 5 dernières séances : ${seancesPassees.join(" | ") || "aucune"}${pains.length ? `\n- ⚠️ DOULEUR(S) SIGNALÉE(S) par l'athlète (zone précise) : ${pains.join(", ")} → ${sansSeance ? "à montrer au médecin qu'il doit voir." : "ADAPTE les prochaines séances à CETTE zone."}` : ""}${fbNotes.length ? `\n- 🗣️ Notes récentes de l'athlète (ressenti/douleur — LIS-LES et tiens-en compte) : ${fbNotes.map(n => `« ${n} »`).join(" ; ")}` : ""}${lastRpe != null ? `\n- Dernier ressenti d'effort (RPE) : ${lastRpe}/10${rpeAvg != null ? ` · moyenne des 3 derniers : ${rpeAvg}/10` : ""}` : ""}
+
+OBJECTIF DE COURSE
+${objLines[0] ?? "• Aucun objectif de course."}${courseSemaine}
+
+STRUCTURE DE SA SEMAINE (ce que pose son plan : tu t'y tiens — jamais plus ; moins si ses sensations le demandent)
+${structure.join("\n")}
+
+GARDE-FOUS
+${garde}`;
+  })();
+  const text = textCadre ?? `PROFIL
 - ${prenomSeul} · ${p?.age ?? "?"} ans · ${genderLabel} · ${num(p?.weight_kg) ?? "?"} kg · ${num(p?.height_cm) ?? "?"} cm · mode ${p?.mode ?? "?"}
 - NIVEAU estimé : ${level}${vma ? ` (VMA ${vma} km/h${vmaIsEst ? " estimée" : ""})` : ""}
 - ANCIENNETÉ en course à pied : ${expLabel ?? "non renseignée (reste prudent sur la charge tant que tu ne sais pas)"}
@@ -3179,6 +3395,7 @@ ${catalog}`;
     },
     hardGapHours: hardGapH,
     easyPace: easyPaceCorrige,
+    allureCalcul,
     lastHardDaysAgo,
     qualiteRecente,
     volume: { weekKm: Math.round(weekKm), avg4wkKm: Math.round(avg4wkKm), targetKm, longRunKm, longRunPlanned, longRunEased, ...(longRunReserveKm > 0 ? { longRunReserveKm } : {}) },
@@ -3203,6 +3420,10 @@ ${catalog}`;
     bilanMatin: bilan ? { ...bilan, ...effetDuBilan } : null,
     aptitude: { attente: aptitudeAttente },
     effortMaximalInterdit: noMaxEffort,
+    intensiteInterdite: sansIntensite,
+    pilotageSensation: sensation,
+    malaiseApresEffort,
+    cadreSante: cadre,
     sortiesRecentes: (() => {
       const jour = aujourdhui(FUSEAU_DEFAUT);
       const d = new Date(`${jour}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 7);

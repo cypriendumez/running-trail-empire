@@ -867,14 +867,22 @@ test("les consignes santé du coach règlent la charge : ni soin, ni cause, ni e
   const SOIN = /excentrique|nordic|renforc|gainage|mobilit|imagerie|ferritine|h[ée]moglobine|bronchodilat|glyc[ée]mie|sucres rapides|p[ée]rin[ée]e|b[êe]tabloquant|\bcause|facteur de risque|d[ée]clencheu/i;
   assert.ok(HEALTH_CONDITIONS.length >= 13 && INJURY_ZONES.length >= 8, "le catalogue santé a perdu des entrées");
   for (const item of [...HEALTH_CONDITIONS, ...INJURY_ZONES]) {
-    const m = item.coach.match(SOIN);
-    assert.ok(!m, `« ${item.slug} » prescrit de nouveau un soin ou affirme une cause (« ${m?.[0]} »)`);
+    // La consigne ordinaire, et celle d'un coureur sous cadre de santé (`coachCadre`, 20/11/2026).
+    for (const texte of [item.coach, item.coachCadre ?? ""]) {
+      const m = texte.match(SOIN);
+      assert.ok(!m, `« ${item.slug} » prescrit de nouveau un soin ou affirme une cause (« ${m?.[0]} »)`);
+    }
   }
-  // L'invite cadre la section : la charge, et l'orientation pour tout le reste.
+  // L'invite cadre la section : la charge, et l'orientation pour tout le reste — dans le dossier ordinaire
+  // ET dans celui d'un coureur sous cadre de santé (`textCadre`, qui le précède dans le fichier depuis le 20/11/2026).
   const src = codeNu("src/lib/ai/coachContext.ts");
+  const CHARGE = "tu ne poses aucun diagnostic, tu ne prescris ni exercice de soin, ni traitement, ni examen. Toute question médicale → un médecin ou un masseur-kinésithérapeute.";
   const sante = src.indexOf("SANTÉ & ANTÉCÉDENTS (");
-  const cadre = src.indexOf("tu ne poses aucun diagnostic, tu ne prescris ni exercice de soin, ni traitement, ni examen. Toute question médicale → un médecin ou un masseur-kinésithérapeute.");
+  const cadre = src.indexOf(CHARGE, sante);
   assert.ok(sante > 0 && cadre > sante && cadre < src.indexOf("${cond.rules.length", sante), "l'invite ne dit plus au coach qu'il règle la charge et oriente pour le reste");
+  const santeCadre = src.indexOf("SANTÉ & ANTÉCÉDENTS\n");
+  const chargeCadre = src.indexOf(CHARGE, santeCadre);
+  assert.ok(santeCadre > 0 && chargeCadre > santeCadre && chargeCadre < src.indexOf("${precautions.map", santeCadre), "le dossier d'un coureur sous cadre ne dit plus au coach qu'il règle la charge et oriente pour le reste");
   // La consigne de sécurité sur la douleur (même invite) : de la charge et une orientation, pas de soin.
   const securite = src.slice(src.indexOf("⚠️ DOULEUR SIGNALÉE ("), src.indexOf("La santé prime sur le plan."));
   assert.ok(securite.length > 200 && /médecin/.test(securite), "la consigne de sécurité sur la douleur a disparu, ou n'oriente plus vers un médecin");

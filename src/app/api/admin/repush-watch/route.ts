@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { pilotageSensation } from "@/lib/health/effortMaximal";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -64,7 +65,8 @@ export async function POST(req: Request) {
     const d = (r.data ?? {}) as { date?: string; sessionType?: string; subtitle?: string };
     const date = String(d.date ?? "").slice(0, 10);
     if (!date) return false;
-    const built = buildWorkoutDescription(
+    // À la sensation (grossesse, 20/11/2026) : rien sur la montre.
+    const built = pilotageSensation((prof as Record<string, unknown> | null)?.health_conditions) ? null : buildWorkoutDescription(
       r.title || d.sessionType || "Séance", d.subtitle || "",
       `${d.sessionType || ""} ${r.title || ""}`, objectiveRace, vma, warmMin, coolMin, montre, ciblesFc,
     );

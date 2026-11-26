@@ -156,7 +156,8 @@ test("le coach réapplique les ajustements AVANT de publier le plan et de l'envo
   assert.ok(iApplique > 0 && iPurge > iApplique, "les ajustements ne sont plus appliqués avant la publication");
   // Le plan ajusté, puis les consignes du kinésithérapeute réappliquées dessus (Santé, lot 1).
   // …et le message d'une course C écartée reposé en dernier (13/11/2026) : il enveloppe, sans le changer.
-  assert.match(src, /const week = avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, jourPlan\), jourPlan\);/, "le plan publié n'est plus le plan ajusté");
+  // (`planALaSensation` autour ne touche que les zones de FC d'une coureuse à la sensation : tests/effort-max-restes.)
+  assert.match(src, /const week = planALaSensation\(ctx, avecCourseCEcartee\(ctx, consignesSurPlan\(ctx, ajuste\.week, jourPlan\), jourPlan\)\);/, "le plan publié n'est plus le plan ajusté");
   assert.match(src, /joursCourables: ctx\.availability\.days\.filter\(\(d\) => !ctx\.skippedWeekdays\.includes\(d\)\)/);
 });
 

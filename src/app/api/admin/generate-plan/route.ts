@@ -154,6 +154,17 @@ export async function POST(req: NextRequest) {
     wellness: icuSource ? icuWellness : [...fallbackHrv, ...fallbackSleep],
   };
 
+  // Cerveau coach complet (tendances, forme de course, sommeil, cycle, palette de séances).
+  const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], user_id).catch(() => null);
+
+  // AVANT le premier appel à Gemini (relecteur K, 6e tour : l'analyse consommait du quota pour rien).
+  // Coureur sous cadre de santé (lib/coach/cadreSante, 20/11/2026) : cette invite prescrit de la qualité (« un
+  // objectif chrono EXIGE de la qualité », « ne propose JAMAIS une semaine quasi 100 % footing »). Pas de plan
+  // rédigé par l'IA : le plan du coach, qui applique le cadre, s'applique.
+  // Contexte illisible : on ne sait pas s'il a un cadre — dans le doute, rien (@HeadCoach, 20/11/2026).
+  if (!ctx) return NextResponse.json({ error: "Contexte du coureur illisible : pas de plan rédigé par l'IA, réessaie dans un instant." }, { status: 503 });
+  if (ctx.cadreSante) return NextResponse.json({ error: "Coureur sous cadre de santé : pas de plan rédigé par l'IA, le plan du coach s'applique." }, { status: 409 });
+
   // Step 1 — Gemini Flash: analysis
   const analysisRes = await fetch(GEMINI_URL("gemini-2.5-flash"), {
     method: "POST",
@@ -173,9 +184,6 @@ export async function POST(req: NextRequest) {
   const rawText = analysisData.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
   let analysis: Record<string, unknown> = {};
   try { analysis = JSON.parse(rawText); } catch { const m = rawText.match(/\{[\s\S]*\}/); if (m) try { analysis = JSON.parse(m[0]); } catch {} }
-
-  // Cerveau coach complet (tendances, forme de course, sommeil, cycle, palette de séances).
-  const ctx = await buildAthleteContext(admin as unknown as Parameters<typeof buildAthleteContext>[0], user_id).catch(() => null);
 
   // Step 2 — Gemini: coaching plan
   const planRes = await fetch(GEMINI_URL("gemini-2.5-flash"), {

@@ -63,6 +63,10 @@ export type Ajustement = {
 
 /** Un type de séance compte-t-il dans le budget qualité ? */
 export const EST_QUALITE = /vma|seuil|tempo|sp[ée]cifique|allure|c[oô]te|fractionn/i;
+/** Ce qui ne s'allège pas : déjà du repos, déjà de la récupération, du renfo, du vélo ou la marche-course d'une étape
+ *  (l'alléger en footing continu de 50 min, c'est ce que ce coureur ne sait pas encore faire ; relecteur G, 23/11/2026).
+ *  La même règle à la proposition (ici) et à l'application (lib/coach/ajustementApplique). */
+export const NON_ALLEGEABLE = /^(repos|r[ée]cup|renfo|v[ée]lo|marche)/i;
 
 export function contraintesDe(week: JourPlan[], qBudget: number, raisons: string[]): Contraintes {
   return {
@@ -111,7 +115,7 @@ export function validerAjustement(
   // Mêmes règles que lib/coach/ajustementApplique, vérifiées AVANT d'afficher : on ne
   // propose pas un bouton « Appliquer » sur ce que le moteur refuserait.
   const type = c.types[date] ?? "";
-  if (action === "alleger" && /^(repos|r[ée]cup|renfo|v[ée]lo)/i.test(type)) {
+  if (action === "alleger" && NON_ALLEGEABLE.test(type)) {
     return { ok: false, motif: "rien à alléger ce jour-là" };
   }
   let vers: string | undefined;
@@ -163,7 +167,7 @@ RÈGLES ABSOLUES
 - Tu n'inventes aucun chiffre : n'utilise que ceux du contexte fourni.
 
 CE QUE FAIT CHAQUE ACTION SI L'ATHLÈTE L'APPLIQUE (la séance change vraiment, jusqu'à sa montre)
-- « alleger » : la séance du jour « date » devient une récupération de 25 min en Z1. Pas sur un repos, une récupération, du renfo ou du vélo.
+- « alleger » : la séance du jour « date » devient une récupération de 25 min en Z1. Pas sur un repos, une récupération, du renfo, du vélo ou une marche-course.
 - « decaler » : la séance du jour « date » passe au jour « vers », qui DOIT être un jour de repos du plan ; « date » devient repos.
 - « echanger » : les séances de « date » et de « vers » (deux jours d'entraînement) échangent leur jour.
 - Jamais deux séances dures (qualité ou sortie longue) deux jours d'affilée.

@@ -17,6 +17,12 @@ export const ANTECEDENTS_SANS_EFFORT_MAXIMAL = ["cardiaque", "covid_long", "gros
  * Cyprien sur l'avis de @HeadCoach, 19/11/2026).
  */
 export const ANTECEDENTS_SANS_INTENSITE = ["covid_long"] as const;
+/**
+ * Ceux qui se pilotent À LA SENSATION, sans allure chiffrée ni cible de FC : la grossesse (« Pilote à la
+ * sensation et à la conversation, PAS à la FC (elle est faussée) ») — les allures viendraient d'une VMA
+ * d'avant la grossesse. Rien n'est envoyé à la montre (décisions de Cyprien, 20/11/2026).
+ */
+export const ANTECEDENTS_A_LA_SENSATION = ["grossesse"] as const;
 
 const parmi = (healthConditions: unknown, liste: readonly string[]): boolean =>
   Array.isArray(healthConditions) && healthConditions.some((s) => typeof s === "string" && liste.includes(s));
@@ -30,6 +36,37 @@ export function effortMaximalInterdit(healthConditions: unknown): boolean {
 export function intensiteInterdite(healthConditions: unknown): boolean {
   return parmi(healthConditions, ANTECEDENTS_SANS_INTENSITE);
 }
+
+/** L'un d'eux se pilote-t-il à la sensation (aucune allure, aucune FC, rien sur la montre) ? */
+export function pilotageSensation(healthConditions: unknown): boolean {
+  return parmi(healthConditions, ANTECEDENTS_A_LA_SENSATION);
+}
+
+/**
+ * COVID LONG : « si l'athlète se sent plus mal 24-48 h APRÈS une séance, réduis immédiatement et oriente-le
+ * vers son médecin » (catalogue santé). Signal : le bilan du matin à 4-5/5 (fatigue ou jambes) dans les deux
+ * jours qui suivent une sortie — la séance du jour devient un repos (décision de Cyprien, 20/11/2026).
+ */
+// `course` : le jour d'une course, que le plan garde (le départ appartient au coureur) — ajouté à son « pourquoi ». Il
+// conseille de NE PAS prendre le départ (décision de Cyprien du 20/11/2026, sur l'avis de @HeadCoach : la réadaptation
+// du covid long déconseille l'effort en présence d'un malaise post-effort), et d'en parler au médecin avant la suivante.
+export const MALAISE_T: Record<Lang, { motif: string; why: string; course: string }> = {
+  fr: { motif: "bilan du matin après une séance : fatigue marquée — repos aujourd'hui ; si cela se répète, parles-en à ton médecin",
+    why: "Ton bilan de ce matin montre une fatigue marquée après ta dernière séance : avec l'antécédent déclaré dans ta santé, on se repose aujourd'hui. Si cela se répète, parles-en à ton médecin.",
+    course: " ⚠️ Bilan du matin : nettement plus mal après ta dernière séance. Mieux vaut ne pas prendre le départ aujourd'hui — la décision t'appartient. Parles-en à ton médecin avant ta prochaine course." },
+  en: { motif: "morning check-in after a session: marked fatigue — rest today; if it happens again, talk to your doctor",
+    why: "Your check-in this morning shows marked fatigue after your last session: with the health history you declared, today is a rest day. If it happens again, talk to your doctor.",
+    course: " ⚠️ Morning check-in: clearly worse after your last session. It is better not to start today — the decision is yours. Talk to your doctor before your next race." },
+  de: { motif: "Morgen-Check nach einer Einheit: deutliche Müdigkeit — heute Ruhe; wenn es wieder vorkommt, sprich mit deiner Ärztin oder deinem Arzt",
+    why: "Dein Morgen-Check zeigt deutliche Müdigkeit nach deiner letzten Einheit: Mit der angegebenen Vorgeschichte ist heute Ruhetag. Wenn es wieder vorkommt, sprich mit deiner Ärztin oder deinem Arzt.",
+    course: " ⚠️ Morgen-Check: nach der letzten Einheit deutlich schlechter. Starte heute besser nicht — die Entscheidung liegt bei dir. Sprich vor deinem nächsten Rennen mit deiner Ärztin oder deinem Arzt." },
+  es: { motif: "chequeo matinal tras una sesión: cansancio marcado — descanso hoy; si se repite, háblalo con tu médico",
+    why: "Tu chequeo de esta mañana muestra un cansancio marcado tras tu última sesión: con el antecedente declarado en tu salud, hoy toca descanso. Si se repite, háblalo con tu médico.",
+    course: " ⚠️ Chequeo de la mañana: claramente peor tras tu última sesión. Mejor no tomar la salida hoy — la decisión es tuya. Háblalo con tu médico antes de tu próxima carrera." },
+  pt: { motif: "balanço da manhã após uma sessão: cansaço marcado — descanso hoje; se se repetir, fala com o teu médico",
+    why: "O teu balanço desta manhã mostra um cansaço marcado após a tua última sessão: com o antecedente declarado na tua saúde, hoje é dia de descanso. Se se repetir, fala com o teu médico.",
+    course: " ⚠️ Balanço da manhã: claramente pior após a tua última sessão. É melhor não partir hoje — a decisão é tua. Fala com o teu médico antes da tua próxima prova." },
+};
 
 /**
  * Le motif affiché au coureur (« Dis-le-lui clairement », catalogue santé) : ce qui est écarté, pourquoi,
