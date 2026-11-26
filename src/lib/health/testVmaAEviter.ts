@@ -5,7 +5,9 @@
  * À éviter : l'avis d'un médecin est attendu (questionnaire d'aptitude), le coureur suit le programme
  * marche-course (le coach ne prescrit pas le test tant qu'il ne court pas 30 minutes d'affilée), un
  * antécédent lui interdit l'effort maximal (cardiaque, covid long, grossesse : `lib/health/effortMaximal`,
- * 19/11/2026), ou l'une des lectures est en panne — dans le doute, on ne pousse pas un effort maximal.
+ * 19/11/2026), il reprend après un arrêt (règle de reprise ou marche de sortie en cours : aucune séance dure
+ * n'y est permise, encore moins un effort maximal ; 23/11/2026), ou l'une des lectures est en panne — dans le
+ * doute, on ne pousse pas un effort maximal.
  * ⚠️ La VMA estimée, désormais affichée partout, ne doit pas emporter avec elle une invitation au test
  * vers ces coureurs-là (@HeadCoach, 17/11/2026). Le tableau de bord recopiait la règle et ignorait la
  * panne de l'état du coach : il appelle désormais `testVmaAEviterDe` avec ses propres lectures.
@@ -36,8 +38,18 @@ export function avisMedicalEnAttenteDe(aptitude: Lecture): boolean {
 export function testVmaAEviterDe(aptitude: Lecture, etatCoach: Lecture, profil?: Lecture): boolean {
   if (avisMedicalEnAttenteDe(aptitude) || etatCoach.error || profil?.error) return true;
   if (effortMaximalInterdit((profil?.data as { health_conditions?: unknown } | null)?.health_conditions)) return true;
-  const marche = ((etatCoach.data as { data?: { marcheCourse?: { etape?: unknown } | null } } | null)?.data)?.marcheCourse;
-  return typeof marche?.etape === "number";
+  const etat = (etatCoach.data as { data?: { marcheCourse?: { etape?: unknown } | null; repriseArret?: unknown } } | null)?.data;
+  return typeof etat?.marcheCourse?.etape === "number" || typeof etat?.repriseArret === "string";
+}
+
+/**
+ * LE TEST VMA ATTEND-IL LA FIN D'UNE REPRISE APRÈS UN ARRÊT ? — lu sur le plan de la semaine du coach :
+ * `repriseArret` tant que la règle de reprise dure (6 à 28 jours d'arrêt, ou plus), `sortieReprise` pendant la
+ * marche de sortie d'un long arrêt. Une seule règle pour le coach (qui ne prescrit pas le test) et pour l'état
+ * qu'il écrit (que le bandeau du test relit).
+ */
+export function testVmaAttendLaReprise(semaine: { repriseArret?: string | null; sortieReprise?: boolean | null } | null | undefined): boolean {
+  return semaine?.repriseArret != null || semaine?.sortieReprise === true;
 }
 
 /** La même règle, lectures comprises. */

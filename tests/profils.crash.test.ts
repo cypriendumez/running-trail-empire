@@ -978,7 +978,7 @@ async function profilChaotique() {
     const facile = (jour: string, n: number): Ligne => ({ user_id: "u", date: plusJours(jour, -n), type: "easy", sport: "run",
       distance_km: 6, duration_seconds: 6 * 340, elevation_gain_m: 20, avg_hr: 138, max_hr: 150, tss: 30 });
     const derniereDe = (w: Ligne[]) => w.map((x) => String(x.date)).sort().at(-1)!;
-    let qualiteSansArret = 0, longueSansArret = 0, qualiteRevenue = 0, vus = 0;
+    let qualiteSansArret = 0, longueSansArret = 0, qualiteRevenue = 0, plancherVus = 0, vus = 0;
     for (const jour of HORLOGES) {
       // Le contre-poids : sans arrêt, cette coureuse a bien des qualités et une sortie longue.
       const regulier = await contexte(jour, tablesChaos(jour));
@@ -1033,12 +1033,26 @@ async function profilChaotique() {
       if (premierJour > 6) assert.ok(rl.ctx.readiness.reasons.some((m) => /aucune séance dure pendant la première moitié de la reprise/.test(m)),
         `${jour}, arrêt long : le motif n'annonce pas l'attente de la seconde moitié (${rl.ctx.readiness.reasons.join(" | ")})`);
 
-      // (d) LE CONTRE-POIDS DE LA SORTIE LONGUE : une coureuse à 4 km par sortie garde la sienne,
-      // la règle ne retire que ce qui est PLUS COURT que l'habitude.
-      const petites = await contexte(jour, tablesChaos(jour, { workouts: historiqueChaos(jour, 5, [], 4) }));
+      // (d) LE CONTRE-POIDS DE LA SORTIE LONGUE : une coureuse qui court 4 km TOUS LES JOURS (28 km par semaine) garde
+      // la sienne, la règle ne retire que ce qui est PLUS COURT que l'habitude.
+      const quotidien = Array.from({ length: 65 }, (_, k) => ({ user_id: "u", date: plusJours(jour, -(6 + k)), type: "easy", sport: "run", distance_km: 4,
+        duration_seconds: 4 * 330, elevation_gain_m: 30, avg_hr: 140, max_hr: 155, tss: 45 }));
+      const petites = await contexte(jour, tablesChaos(jour, { workouts: quotidien }));
+      assert.ok(!petites.ctx.readiness.reasons.some((m) => /deux footings courts|déjà petit/.test(m)), `${jour} : précondition, la coureuse à 28 km par semaine est au plancher (${petites.ctx.readiness.reasons.join(" | ")})`);
       assert.ok(petites.ctx.volume.longRunKm >= 4, `${jour} : sortie longue retirée (${petites.ctx.volume.longRunKm} km) alors qu'elle vaut la sortie habituelle de 4 km`);
+      // (d bis) AU PLANCHER DE DEUX FOOTINGS (23/11/2026) : la même à 4 km par sortie, trois ou quatre fois par semaine.
+      // Sa semaine de reprise ne porte que des footings : la « sortie longue » de 4 km n'est plus posée, ses
+      // kilomètres restent des footings, et la semaine n'est pas vidée.
+      const auPlancher = await contexte(jour, tablesChaos(jour, { workouts: historiqueChaos(jour, 5, [], 4) }));
+      if (auPlancher.ctx.readiness.reasons.some((m) => /deux footings courts|déjà petit/.test(m))) {
+        plancherVus++;
+        assert.equal(auPlancher.ctx.volume.longRunKm, 0, `${jour} : une « sortie longue » de ${auPlancher.ctx.volume.longRunKm} km dans une semaine au plancher`);
+        assert.deepEqual([durs(auPlancher.plan), longues(auPlancher.plan).map((d) => d.date)], [[], []], `${jour} : séance dure ou sortie longue dans une semaine au plancher`);
+        assert.ok(auPlancher.plan.filter((d) => /^(Endurance|R[ée]cup)$/i.test(d.type)).length >= 1, `${jour} : aucun footing dans la semaine au plancher (${auPlancher.plan.map((d) => d.type).join(", ")})`);
+      }
     }
     assert.equal(vus, HORLOGES.length * 3, "précondition : tous les départs n'ont pas tourné");
+    assert.ok(plancherVus >= 3, `précondition : la coureuse à 4 km par sortie n'est au plancher que sur ${plancherVus} départ(s), « footings seulement » n'y prouve rien`);
     assert.ok(qualiteSansArret >= 1, "précondition : sans arrêt, ce profil n'a de séance dure sur aucun départ, « aucune qualité » ne prouve rien");
     assert.ok(longueSansArret >= 1, "précondition : sans arrêt, ce profil n'a de sortie longue sur aucun départ");
     assert.ok(qualiteRevenue >= 1, "une fois la première sortie facile courue, la séance dure ne revient sur aucun départ : la règle interdit au lieu de différer");
@@ -1174,9 +1188,14 @@ async function profilChaotique() {
       }
       // Le contre-poids : quatre semaines après le retour, la reprise est finie, les séances dures reviennent.
       {
-        const apres = Array.from({ length: 15 }, (_, k) => facile(jour, 29 - 2 * k)).filter((w) => String(w.date) < jour);
+        // ⚠️ La reprise se court ici en sorties de 14 km (49 km par semaine) : depuis le 23/11/2026, une semaine trop
+        // petite pour porter une séance dure et un footing ne porte que des footings tant que la marche de sortie dure
+        // (au 29ᵉ jour, 21 km visés dont 8 de sortie longue, avec des sorties de 6 km). Ce contre-poids-ci dit autre
+        // chose : la règle d'intensité finie, une semaine qui tient ses séances les retrouve.
+        const apres = Array.from({ length: 15 }, (_, k): Ligne => ({ ...facile(jour, 29 - 2 * k), distance_km: 14, duration_seconds: 14 * 340 })).filter((w) => String(w.date) < jour);
         const r = await contexte(jour, tablesGros(jour, [...historiqueGros(jour, 34 + 29), ...apres]));
-        assert.equal(r.ctx.weekPlan.repriseArret, undefined, `${jour} : 29 jours après le retour d'un arrêt de 34 jours, la reprise dure encore`);
+        assert.equal(r.ctx.weekPlan.repriseArret, undefined, `${jour} : 29 jours après le retour d'un arrêt de 34 jours, la reprise dure encore (cible ${r.ctx.volume.targetKm} km, sortie longue ${r.ctx.volume.longRunKm} km ; ${r.ctx.readiness.reasons.join(" | ")})`);
+        assert.ok(r.plan.filter((d) => DURS.test(d.type)).length >= 1, `${jour} : 29 jours après le retour, aucune séance dure ne revient (${r.plan.map((d) => d.type).join(", ")})`);
       }
 
       // (c) UNE PAR SEMAINE, PAS UNE PAR PLAN — arrêt de 20 jours, repris depuis 14, donc dans la seconde
