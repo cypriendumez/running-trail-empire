@@ -72,6 +72,9 @@ export type TextesPlan = {
   reposJourRateWhy: string;
   reposIndispoDetail: string;
   reposIndispoWhy: string;
+  /** Jour 0 laissé sans course pendant la règle d'intensité d'un long arrêt : le coureur a couru hier. */
+  reposEspaceDetail: string;
+  reposEspaceWhy: string;
   reposCompletTitre: string;
   reposCompletDetail: string;
   reposCompletWhy: string;
@@ -167,6 +170,8 @@ export type TextesPlan = {
   /** ⚠️ La CIBLE de la semaine, pas ce qui est couru : « tu es sur ~32 km cette semaine »
    *  se lisait comme un bilan, constaté le 06/11/2026 chez un coureur à 0 km en 7 jours. */
   enduranceWhy: (cible: string) => string;
+  /** Ajouté au « pourquoi » d'un footing que la borne de reprise a raccourci (sortie habituelle d'avant l'arrêt). */
+  footingBorneReprise: (km: string) => string;
 
   // ── Renforcement ────────────────────────────────────────────────────────────
   renfoTitre: string;
@@ -252,6 +257,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     reposJourRateWhy: "Tu n'as pas couru ce jour-là les dernières fois qu'il était prévu. Un plan qu'on ne suit pas ne sert à rien : on l'adapte à ta vraie vie.",
     reposIndispoDetail: "Repos — tu as indiqué ne pas pouvoir t'entraîner ce jour-là.",
     reposIndispoWhy: "Ton plan est calé sur tes vraies disponibilités : c'est ce qui le rend tenable dans la durée.",
+    reposEspaceDetail: "Repos — tu as couru hier.",
+    reposEspaceWhy: "Pendant la reprise d'un long arrêt, un jour sans course entre deux sorties : le souffle revient plus vite que la tolérance des os et des tendons à la charge.",
     reposCompletTitre: "Repos complet",
     reposCompletDetail: "Repos complet. Marche, étirements doux ou mobilité si tu en ressens le besoin, rien de plus.",
     reposCompletWhy: "C'est pendant le repos que l'adaptation se fait, pas pendant l'effort.",
@@ -318,6 +325,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     enduranceDetail: (e, c, a, k, g, s, cy) => `Échauffement ${e} min progressif FC Z1→Z2 → Corps : ${c} en Z2${a}, tu dois pouvoir tenir une conversation → Retour au calme ${k} min FC Z1.${g}${s ? " 💡 À ton volume, scinde en DEUX sorties dans la journée (matin + soir) plutôt qu'un seul footing interminable." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Tu passes ${p} % de ton temps de course en zone 3 et plus, alors que la cible est 20 %. Tes footings sont courus trop vite — c'est le frein n°1 à la progression. Ralentis jusqu'à pouvoir tenir une conversation complète : c'est censé paraître TROP facile.`,
     enduranceWhy: (c) => `Le socle aérobie. Ta semaine vise ~${c} km au total, séances comprises — c'est le volume facile qui construit la forme de fond, pas les séances dures.`,
+    footingBorneReprise: (km) => ` Pendant ta reprise, aucun footing ne dépasse ta sortie habituelle d'avant l'arrêt (${km} km).`,
 
     renfoTitre: "Renforcement musculaire",
     renfoAffutage: `20 à 25 min, ENTRETIEN seulement : gainage 3×45 s, montées de mollets 2×15, proprioception 2×30 s par jambe, quelques bondissements courts. AUCUNE charge lourde ni série longue à l'approche de la course — on préserve la fraîcheur, la force est déjà acquise.`,
@@ -388,6 +396,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     reposJourRateWhy: "You did not run on that day the last times it was planned. A plan you do not follow is worth nothing: we fit it to your real life.",
     reposIndispoDetail: "Rest — you said you cannot train on that day.",
     reposIndispoWhy: "Your plan is built on your real availability: that is what makes it sustainable.",
+    reposEspaceDetail: "Rest — you ran yesterday.",
+    reposEspaceWhy: "While coming back from a long break, a day without running between two runs: your breathing comes back faster than your bones' and tendons' tolerance to load.",
     reposCompletTitre: "Complete rest",
     reposCompletDetail: "Complete rest. Walking, gentle stretching or mobility if you feel the need, nothing more.",
     reposCompletWhy: "Adaptation happens during rest, not during the effort.",
@@ -454,6 +464,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     enduranceDetail: (e, c, a, k, g, s, cy) => `Warm-up ${e} min building HR Z1→Z2 → Main set: ${c} at Z2${a}, you must be able to hold a conversation → Cool-down ${k} min HR Z1.${g}${s ? " 💡 At your volume, split it into TWO runs in the day (morning + evening) rather than one endless jog." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ You spend ${p} % of your running time in zone 3 and above, when the target is 20 %. Your easy runs are run too fast — that is the number 1 brake on progress. Slow down until you can hold a full conversation: it is supposed to feel TOO easy.`,
     enduranceWhy: (c) => `The aerobic base. Your week aims for ~${c} km in total, all sessions included — it is the easy volume that builds deep fitness, not the hard sessions.`,
+    footingBorneReprise: (km) => ` During your comeback, no easy run is longer than your usual run before the break (${km} km).`,
 
     renfoTitre: "Strength work",
     renfoAffutage: `20 to 25 min, MAINTENANCE only: core 3×45 s, calf raises 2×15, proprioception 2×30 s per leg, a few short bounds. NO heavy load and no long sets close to the race — we protect freshness, the strength is already banked.`,
@@ -524,6 +535,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     reposJourRateWhy: "Du bist an diesem Tag die letzten Male, an denen er geplant war, nicht gelaufen. Ein Plan, den man nicht befolgt, nützt nichts: Wir passen ihn deinem echten Leben an.",
     reposIndispoDetail: "Ruhe — du hast angegeben, an diesem Tag nicht trainieren zu können.",
     reposIndispoWhy: "Dein Plan richtet sich nach deiner echten Verfügbarkeit: Genau das macht ihn auf Dauer durchhaltbar.",
+    reposEspaceDetail: "Ruhe — du bist gestern gelaufen.",
+    reposEspaceWhy: "Beim Wiedereinstieg nach einer langen Pause liegt zwischen zwei Läufen ein Tag ohne Laufen: Die Ausdauer kommt schneller zurück als die Belastbarkeit von Knochen und Sehnen.",
     reposCompletTitre: "Vollständige Ruhe",
     reposCompletDetail: "Vollständige Ruhe. Gehen, sanftes Dehnen oder Mobilität, wenn du das Bedürfnis hast, mehr nicht.",
     reposCompletWhy: "Die Anpassung passiert in der Ruhe, nicht in der Belastung.",
@@ -590,6 +603,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     enduranceDetail: (e, c, a, k, g, s, cy) => `Aufwärmen ${e} min ansteigend HF Z1→Z2 → Hauptteil: ${c} in Z2${a}, du musst dich unterhalten können → Auslaufen ${k} min HF Z1.${g}${s ? " 💡 Bei deinem Umfang teile ihn auf ZWEI Läufe am Tag auf (morgens + abends) statt eines endlosen Dauerlaufs." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Du verbringst ${p} % deiner Laufzeit in Zone 3 und höher, Ziel sind 20 %. Deine lockeren Läufe sind zu schnell — das ist die Bremse Nummer 1 für den Fortschritt. Werde so langsam, dass du dich vollständig unterhalten kannst: Es soll sich ZU leicht anfühlen.`,
     enduranceWhy: (c) => `Die aerobe Basis. Deine Woche zielt auf insgesamt ~${c} km, alle Einheiten zusammen — es ist der lockere Umfang, der die Grundform baut, nicht die harten Einheiten.`,
+    footingBorneReprise: (km) => ` Während deines Wiedereinstiegs ist kein lockerer Lauf länger als dein üblicher Lauf vor der Pause (${km} km).`,
 
     renfoTitre: "Kräftigung",
     renfoAffutage: `20 bis 25 min, nur ERHALTUNG: Rumpf 3×45 s, Wadenheben 2×15, Propriozeption 2×30 s pro Bein, ein paar kurze Sprünge. KEINE schweren Lasten und keine langen Sätze kurz vor dem Wettkampf — wir schützen die Frische, die Kraft ist längst da.`,
@@ -660,6 +674,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     reposJourRateWhy: "No corriste ese día las últimas veces que estaba previsto. Un plan que no se sigue no sirve de nada: lo adaptamos a tu vida real.",
     reposIndispoDetail: "Descanso — indicaste que no puedes entrenar ese día.",
     reposIndispoWhy: "Tu plan está ajustado a tu disponibilidad real: eso es lo que lo hace sostenible.",
+    reposEspaceDetail: "Descanso — corriste ayer.",
+    reposEspaceWhy: "Durante la vuelta tras una pausa larga, un día sin correr entre dos salidas: el aliento vuelve más rápido que la tolerancia de huesos y tendones a la carga.",
     reposCompletTitre: "Descanso completo",
     reposCompletDetail: "Descanso completo. Caminar, estiramientos suaves o movilidad si lo necesitas, nada más.",
     reposCompletWhy: "La adaptación se produce durante el descanso, no durante el esfuerzo.",
@@ -726,6 +742,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     enduranceDetail: (e, c, a, k, g, s, cy) => `Calentamiento ${e} min progresivo FC Z1→Z2 → Parte principal: ${c} en Z2${a}, tienes que poder mantener una conversación → Vuelta a la calma ${k} min FC Z1.${g}${s ? " 💡 Con tu volumen, divídelo en DOS salidas en el día (mañana + tarde) en vez de un rodaje interminable." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Pasas el ${p} % de tu tiempo de carrera en zona 3 o más, cuando el objetivo es el 20 %. Tus rodajes van demasiado rápidos — es el freno n.º 1 al progreso. Baja hasta poder mantener una conversación completa: tiene que parecer DEMASIADO fácil.`,
     enduranceWhy: (c) => `La base aeróbica. Tu semana apunta a ~${c} km en total, sesiones incluidas — es el volumen fácil el que construye la forma de fondo, no las sesiones duras.`,
+    footingBorneReprise: (km) => ` Durante tu vuelta, ningún rodaje es más largo que tu salida habitual de antes de la pausa (${km} km).`,
 
     renfoTitre: "Trabajo de fuerza",
     renfoAffutage: `20 a 25 min, solo MANTENIMIENTO: core 3×45 s, elevaciones de gemelos 2×15, propiocepción 2×30 s por pierna, algunos saltos cortos. NINGUNA carga pesada ni serie larga cerca de la carrera — preservamos la frescura, la fuerza ya está adquirida.`,
@@ -796,6 +813,8 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     reposJourRateWhy: "Não correste nesse dia das últimas vezes em que estava previsto. Um plano que não se cumpre não serve de nada: adaptamo-lo à tua vida real.",
     reposIndispoDetail: "Descanso — indicaste que não podes treinar nesse dia.",
     reposIndispoWhy: "O teu plano está calibrado pela tua disponibilidade real: é isso que o torna sustentável.",
+    reposEspaceDetail: "Descanso — correste ontem.",
+    reposEspaceWhy: "Durante a retoma após uma pausa longa, um dia sem correr entre duas saídas: o fôlego volta mais depressa do que a tolerância dos ossos e tendões à carga.",
     reposCompletTitre: "Descanso completo",
     reposCompletDetail: "Descanso completo. Caminhar, alongamentos suaves ou mobilidade se sentires necessidade, nada mais.",
     reposCompletWhy: "É durante o descanso que a adaptação acontece, não durante o esforço.",
@@ -862,6 +881,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     enduranceDetail: (e, c, a, k, g, s, cy) => `Aquecimento ${e} min progressivo FC Z1→Z2 → Parte principal: ${c} em Z2${a}, tens de conseguir manter uma conversa → Retorno à calma ${k} min FC Z1.${g}${s ? " 💡 Com o teu volume, divide em DUAS saídas no dia (manhã + tarde) em vez de uma corrida interminável." : ""}${cy}`,
     enduranceWhyTropIntense: (p) => `⚠️ Passas ${p} % do teu tempo de corrida em zona 3 ou acima, quando o alvo são 20 %. As tuas corridas fáceis vão depressa demais — é o travão n.º 1 ao progresso. Abranda até conseguires manter uma conversa completa: é suposto parecer DEMASIADO fácil.`,
     enduranceWhy: (c) => `A base aeróbia. A tua semana aponta para ~${c} km no total, sessões incluídas — é o volume fácil que constrói a forma de fundo, não as sessões duras.`,
+    footingBorneReprise: (km) => ` Durante a tua retoma, nenhuma corrida fácil é mais longa do que a tua corrida habitual de antes da pausa (${km} km).`,
 
     renfoTitre: "Reforço muscular",
     renfoAffutage: `20 a 25 min, só MANUTENÇÃO: core 3×45 s, elevações de gémeos 2×15, propriocepção 2×30 s por perna, alguns saltos curtos. NENHUMA carga pesada nem série longa perto da prova — preservamos a frescura, a força já está adquirida.`,

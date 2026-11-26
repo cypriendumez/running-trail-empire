@@ -559,6 +559,8 @@ export async function autoCoachForUser(
         return lignesRetireesParDouleur(footings.length,
           { taper: ctx.cycle.taper, semaineCourse: week.some((d: PlanDay) => d.type === "Course"), sansHistorique: ctx.noHistory,
             effortMax: !!ctx.effortMaximalInterdit,
+            lignesPermises: !!ctx.weekPlan.lignesPermises,
+            lendemainLongue: footings.length === 1 && week.some((d: PlanDay) => d.type === "Sortie longue" && ecartJours(footings[0].date, d.date) === 1),
             reprise: lignesRetireesParReprise({ reprise: !!ctx.weekPlan.repriseArret, qualiteDes: ctx.weekPlan.qualiteDes ?? 0,
               deuxiemeFootingJour: deuxieme == null ? null : ecartJours(deuxieme, today) }) });
       })(),

@@ -331,7 +331,7 @@ async function main() {
   await test("une seule définition des antécédents : le coach, le verrou et l'interface lisent effortMaximalInterdit", () => {
     assert.match(codeNu("src/lib/ai/coachContext.ts"), /const noMaxEffort = effortMaximalInterdit\(p\?\.health_conditions\);/, "le coach garde sa propre liste d'antécédents");
     // Les lignes droites retirées pour l'antécédent ne sont pas attribuées à une douleur (motif affiché).
-    assert.match(codeNu("src/lib/ai/autoCoach.ts"), /effortMax: !!ctx\.effortMaximalInterdit,\s*reprise: lignesRetireesParReprise\(/, "une douleur se voit attribuer des lignes droites que l'antécédent avait déjà retirées");
+    assert.match(codeNu("src/lib/ai/autoCoach.ts"), /effortMax: !!ctx\.effortMaximalInterdit,\s*lignesPermises: !!ctx\.weekPlan\.lignesPermises,\s*lendemainLongue: [^\n]+\n\s*reprise: lignesRetireesParReprise\(/, "une douleur se voit attribuer des lignes droites que l'antécédent avait déjà retirées");
     // Le double seuil (deux séances au seuil le même jour, option cochée) : pas pour eux non plus.
     assert.match(codeNu("src/lib/ai/coachContext.ts"), /&& !repriseIntensite && !marcheSortie && !marcheCourse && !noMaxEffort;/, "le double seuil est de nouveau posé à un coureur dont l'effort maximal est interdit");
     assert.match(codeNu("src/lib/health/testVmaAEviter.ts"), /effortMaximalInterdit\(/, "l'interface ne lit pas les antécédents");

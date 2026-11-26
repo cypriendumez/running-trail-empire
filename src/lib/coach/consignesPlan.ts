@@ -38,6 +38,8 @@ const TYPES_INTENSES = new Set(["VMA", "Seuil", "Spécifique", "Côtes", "Tempo"
 const T: Record<Lang, {
   titre: string; why: (d: string) => string; repos: (n: number, d: string) => string;
   mc: (d: string) => string; course: (d: string) => string; renfo: string; decale: (n: number, d: string) => string;
+  /** La sortie retirée a pris la place du renforcement ce jour-là : le « pourquoi » le dit. */
+  decaleRenfo: (n: number, d: string) => string;
 }> = {
   fr: {
     titre: "Footing encadré par ton kiné",
@@ -47,6 +49,7 @@ const T: Record<Lang, {
     course: (d) => ` ⚠️ Cette course tombe pendant les consignes de ton kinésithérapeute (jusqu'au ${d}) : demande-lui son accord avant de la courir.`,
     renfo: " Consigne de ton kiné : aucun saut ni bondissement.",
     decale: (n, d) => `Consignes de ton kinésithérapeute jusqu'au ${d} : ${n} sortie${n > 1 ? "s" : ""} au plus sur 7 jours. Cette sortie a été décalée ici, en footing très facile, pour tenir cette limite.`,
+    decaleRenfo: (n, d) => `Consignes de ton kinésithérapeute jusqu'au ${d} : ${n} sortie${n > 1 ? "s" : ""} au plus sur 7 jours. Cette sortie a été décalée ici, à la place du renforcement musculaire, en footing très facile, un jour où elle tenait dans cette limite.`,
   },
   en: {
     titre: "Run within your physio's limits",
@@ -56,6 +59,7 @@ const T: Record<Lang, {
     course: (d) => ` ⚠️ This race falls within your physiotherapist's instructions (until ${d}): ask for their go-ahead before running it.`,
     renfo: " Your physio's instruction: no jumps or bounds.",
     decale: (n, d) => `Your physiotherapist's instructions until ${d}: ${n} run${n > 1 ? "s" : ""} at most over 7 days. This run was moved here, as a very easy run, to stay within that limit.`,
+    decaleRenfo: (n, d) => `Your physiotherapist's instructions until ${d}: ${n} run${n > 1 ? "s" : ""} at most over 7 days. This run was moved here, in place of the strength work, as a very easy run, on a day where it fit within that limit.`,
   },
   de: {
     titre: "Lauf im Rahmen deiner Physiotherapie",
@@ -65,6 +69,7 @@ const T: Record<Lang, {
     course: (d) => ` ⚠️ Dieser Wettkampf fällt in die Vorgaben deiner Physiotherapie (bis ${d}): Hol dir vorher ihr Einverständnis.`,
     renfo: " Vorgabe deiner Physiotherapie: keine Sprünge.",
     decale: (n, d) => `Vorgaben deiner Physiotherapie bis ${d}: höchstens ${n} Lauf${n > 1 ? "e" : ""} in 7 Tagen. Dieser Lauf wurde hierher verschoben, als sehr lockerer Lauf, um diese Grenze einzuhalten.`,
+    decaleRenfo: (n, d) => `Vorgaben deiner Physiotherapie bis ${d}: höchstens ${n} Lauf${n > 1 ? "e" : ""} in 7 Tagen. Dieser Lauf wurde hierher verschoben, anstelle der Kräftigung, als sehr lockerer Lauf, an einem Tag, an dem er in diese Grenze passte.`,
   },
   es: {
     titre: "Rodaje dentro de las indicaciones de tu fisio",
@@ -74,6 +79,7 @@ const T: Record<Lang, {
     course: (d) => ` ⚠️ Esta carrera cae dentro de las indicaciones de tu fisioterapeuta (hasta el ${d}): pídele su visto bueno antes de correrla.`,
     renfo: " Indicación de tu fisio: ningún salto ni bote.",
     decale: (n, d) => `Indicaciones de tu fisioterapeuta hasta el ${d}: ${n} salida${n > 1 ? "s" : ""} como máximo en 7 días. Esta salida se ha movido aquí, como rodaje muy suave, para respetar ese límite.`,
+    decaleRenfo: (n, d) => `Indicaciones de tu fisioterapeuta hasta el ${d}: ${n} salida${n > 1 ? "s" : ""} como máximo en 7 días. Esta salida se ha movido aquí, en lugar del trabajo de fuerza, como rodaje muy suave, un día en que cabía dentro de ese límite.`,
   },
   pt: {
     titre: "Corrida dentro das indicações do teu fisio",
@@ -83,6 +89,7 @@ const T: Record<Lang, {
     course: (d) => ` ⚠️ Esta prova cai dentro das indicações do teu fisioterapeuta (até ${d}): pede-lhe autorização antes de a correres.`,
     renfo: " Indicação do teu fisio: nenhum salto.",
     decale: (n, d) => `Indicações do teu fisioterapeuta até ${d}: ${n} corrida${n > 1 ? "s" : ""} no máximo em 7 dias. Esta corrida foi movida para aqui, como corrida muito fácil, para respeitar esse limite.`,
+    decaleRenfo: (n, d) => `Indicações do teu fisioterapeuta até ${d}: ${n} corrida${n > 1 ? "s" : ""} no máximo em 7 dias. Esta corrida foi movida para aqui, em vez do reforço muscular, como corrida muito fácil, num dia em que cabia nesse limite.`,
   },
 };
 
@@ -284,7 +291,9 @@ export function appliquerConsignes(plan: readonly PlanDay[], c: ContexteConsigne
       if (cible < 0) continue;
       gardees.push(sortie[cible].date);
       const decalee = footing({ ...origine, date: sortie[cible].date, confirmed: sortie[cible].confirmed });
-      sortie[cible] = reecrire(decalee, decalee.type, (l) => ({ ...texteDe(decalee, l), why: T[l].decale(max, fin) }));
+      // Son « pourquoi » dit qu'elle prend la place du renforcement (suggestion du directeur scientifique, 20/11/2026) :
+      // le coureur voyait disparaître sa séance de renforcement sans un mot.
+      sortie[cible] = reecrire(decalee, decalee.type, (l) => ({ ...texteDe(decalee, l), why: T[l].decaleRenfo(max, fin) }));
       break;
     }
   }
