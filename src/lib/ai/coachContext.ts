@@ -252,8 +252,13 @@ export type AthleteContext = {
     footingExige?: true;
     /** Semaine de reprise trop petite, la règle d'intensité finie : un footing peut porter des lignes droites. */
     lignesPermises?: true;
-    /** Règle d'intensité d'un arrêt de plus de 28 jours : jamais deux jours de course de suite. `hier` : couru hier. */
-    espacer?: { hier: boolean };
+    /** Règle d'intensité d'un arrêt de plus de 28 jours : jamais deux jours de course de suite. `hier` : couru hier ;
+     *  `aujourdhui` : la sortie du jour est déjà faite (absent dans un contexte d'avant le 27/11/2026). */
+    espacer?: { hier: boolean; aujourdhui?: boolean };
+    /** Reprise après un arrêt, hors `espacer` : les footings qui ne remplissent pas les jours libres s'étalent
+     *  (`joursEtales`, lib/coach/footings) au lieu de prendre les premiers jours. `hier` : couru hier ; `aujourdhui` : la
+     *  sortie du jour est déjà faite. */
+    etaler?: { hier: boolean; aujourdhui?: boolean };
     /** Pendant une reprise, hors consignes du kinésithérapeute : aucun footing plus long (km). Absent : pas de borne. */
     footingMaxKm?: number;
   };
@@ -2890,8 +2895,18 @@ RÈGLE 80/20 — À COMPRENDRE : c'est une répartition du VOLUME (temps total),
   // au 9ᵉ jour d'une reprise après 150 jours d'arrêt. Le souffle revient plus vite que la tolérance des os et des tendons à
   // la charge. Une sortie courue HIER compte pour le jour 0 : sans elle, le plan glissant se contredirait d'un jour à l'autre.
   const veille = (() => { const d = new Date(`${todayStr}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })();
+  // La sortie déjà courue AUJOURD'HUI compte aussi (visa @HeadCoach, 27/11/2026) : couru hier et ce matin, le plan
+  // affichait « Repos » au jour 0 et posait une sortie demain, trois jours de course d'affilée.
+  const couruHier = joursArret.some((j) => String(j).slice(0, 10) === veille);
+  const couruAujourdhui = joursArret.some((j) => String(j).slice(0, 10) === todayStr);
   const espacer = repriseIntensite != null && repriseIntensite.arretJours > ARRET_MAX_JOURS
-    ? { hier: joursArret.some((j) => String(j).slice(0, 10) === veille) } : null;
+    ? { hier: couruHier, aujourdhui: couruAujourdhui } : null;
+  // LES FOOTINGS D'UNE REPRISE S'ÉTALENT SUR LA SEMAINE (26/11/2026) : pendant une reprise de 6 à 28 jours, le plan
+  // posait ses trois footings jeudi, vendredi et samedi, puis trois jours vides, parce qu'il prenait les jours libres dans
+  // l'ordre et coupait la fin de la liste. Pour toute reprise que la garde `espacer` ne couvre pas, le plan choisit des
+  // jours non consécutifs quand la semaine en laisse (préférence, pas interdiction : aucune sortie retirée). La sortie
+  // d'HIER compte pour le jour 0, sinon le plan glissant reposerait une sortie chaque matin ; celle d'aujourd'hui aussi.
+  const etaler = enRepriseArret && !espacer ? { hier: couruHier, aujourdhui: couruAujourdhui } : null;
   const footingMaxKm = habituelleRepriseKm != null ? Math.max(3, Math.floor(habituelleRepriseKm * 2) / 2) : null;
   const sansLongueNiDure = repriseIntensite != null && (repriseVolumeLongue != null || semaineAuPlancher) && longueRetiree;
   const footingsSeuls = sansLongueNiDure || semaineTropPetite;
@@ -3409,6 +3424,7 @@ ${catalog}`;
       ...(enRepriseArret && !consignes ? { footingExige: true as const } : {}),
       ...(lignesPermises ? { lignesPermises: true as const } : {}),
       ...(espacer ? { espacer } : {}),
+      ...(etaler ? { etaler } : {}),
       ...(footingMaxKm != null ? { footingMaxKm } : {}),
     },
     // Doubles séances : on tranche ICI, avec le volume REPRÉSENTATIF (médiane des

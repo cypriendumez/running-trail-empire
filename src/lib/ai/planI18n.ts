@@ -75,6 +75,8 @@ export type TextesPlan = {
   /** Jour 0 laissé sans course pendant la règle d'intensité d'un long arrêt : le coureur a couru hier. */
   reposEspaceDetail: string;
   reposEspaceWhy: string;
+  /** Repos laissé entre deux footings pendant une reprise (`weekPlan.etaler`). */
+  reposEtaleWhy: string;
   reposCompletTitre: string;
   reposCompletDetail: string;
   reposCompletWhy: string;
@@ -259,6 +261,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     reposIndispoWhy: "Ton plan est calé sur tes vraies disponibilités : c'est ce qui le rend tenable dans la durée.",
     reposEspaceDetail: "Repos — tu as couru hier.",
     reposEspaceWhy: "Pendant la reprise d'un long arrêt, un jour sans course entre deux sorties : le souffle revient plus vite que la tolérance des os et des tendons à la charge.",
+    reposEtaleWhy: "Pendant la reprise, des jours sans course : le souffle revient plus vite que la tolérance des os et des tendons à la charge.",
     reposCompletTitre: "Repos complet",
     reposCompletDetail: "Repos complet. Marche, étirements doux ou mobilité si tu en ressens le besoin, rien de plus.",
     reposCompletWhy: "C'est pendant le repos que l'adaptation se fait, pas pendant l'effort.",
@@ -398,6 +401,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     reposIndispoWhy: "Your plan is built on your real availability: that is what makes it sustainable.",
     reposEspaceDetail: "Rest — you ran yesterday.",
     reposEspaceWhy: "While coming back from a long break, a day without running between two runs: your breathing comes back faster than your bones' and tendons' tolerance to load.",
+    reposEtaleWhy: "While coming back, days without running: your breathing comes back faster than your bones' and tendons' tolerance to load.",
     reposCompletTitre: "Complete rest",
     reposCompletDetail: "Complete rest. Walking, gentle stretching or mobility if you feel the need, nothing more.",
     reposCompletWhy: "Adaptation happens during rest, not during the effort.",
@@ -537,6 +541,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     reposIndispoWhy: "Dein Plan richtet sich nach deiner echten Verfügbarkeit: Genau das macht ihn auf Dauer durchhaltbar.",
     reposEspaceDetail: "Ruhe — du bist gestern gelaufen.",
     reposEspaceWhy: "Beim Wiedereinstieg nach einer langen Pause liegt zwischen zwei Läufen ein Tag ohne Laufen: Die Ausdauer kommt schneller zurück als die Belastbarkeit von Knochen und Sehnen.",
+    reposEtaleWhy: "Beim Wiedereinstieg gibt es Tage ohne Laufen: Die Ausdauer kommt schneller zurück als die Belastbarkeit von Knochen und Sehnen.",
     reposCompletTitre: "Vollständige Ruhe",
     reposCompletDetail: "Vollständige Ruhe. Gehen, sanftes Dehnen oder Mobilität, wenn du das Bedürfnis hast, mehr nicht.",
     reposCompletWhy: "Die Anpassung passiert in der Ruhe, nicht in der Belastung.",
@@ -676,6 +681,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     reposIndispoWhy: "Tu plan está ajustado a tu disponibilidad real: eso es lo que lo hace sostenible.",
     reposEspaceDetail: "Descanso — corriste ayer.",
     reposEspaceWhy: "Durante la vuelta tras una pausa larga, un día sin correr entre dos salidas: el aliento vuelve más rápido que la tolerancia de huesos y tendones a la carga.",
+    reposEtaleWhy: "Durante la vuelta, días sin correr: el aliento vuelve más rápido que la tolerancia de huesos y tendones a la carga.",
     reposCompletTitre: "Descanso completo",
     reposCompletDetail: "Descanso completo. Caminar, estiramientos suaves o movilidad si lo necesitas, nada más.",
     reposCompletWhy: "La adaptación se produce durante el descanso, no durante el esfuerzo.",
@@ -815,6 +821,7 @@ export const PLAN_T: Record<Lang, TextesPlan> = {
     reposIndispoWhy: "O teu plano está calibrado pela tua disponibilidade real: é isso que o torna sustentável.",
     reposEspaceDetail: "Descanso — correste ontem.",
     reposEspaceWhy: "Durante a retoma após uma pausa longa, um dia sem correr entre duas saídas: o fôlego volta mais depressa do que a tolerância dos ossos e tendões à carga.",
+    reposEtaleWhy: "Durante a retoma, dias sem correr: o fôlego volta mais depressa do que a tolerância dos ossos e tendões à carga.",
     reposCompletTitre: "Descanso completo",
     reposCompletDetail: "Descanso completo. Caminhar, alongamentos suaves ou mobilidade se sentires necessidade, nada mais.",
     reposCompletWhy: "É durante o descanso que a adaptação acontece, não durante o esforço.",
