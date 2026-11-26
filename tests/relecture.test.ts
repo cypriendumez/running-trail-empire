@@ -125,7 +125,11 @@ test("l'allure corrigée est celle qui PART dans le plan", () => {
   const src = codeOf("src/lib/ai/coachContext.ts");
   assert.match(src, /easyPace: easyPaceCorrige/, "le plan reçoit encore l'allure NON corrigée");
   const n = (src.match(/easyPace: easyPaceCorrige/g) ?? []).length;
-  assert.equal(n, 2, `${n} sortie(s) corrigée(s) : le contexte ET le plan doivent la recevoir`);
+  // Le contexte et le plan la reçoivent ; le critère des petites semaines de reprise (`qualitesTenablesAvecFooting`,
+  // 23/11/2026) compte avec l'allure de CALCUL que le plan lit aussi — la même, hors sensation (cadre de santé, 26/11/2026).
+  assert.equal(n, 2, `${n} sortie(s) corrigée(s) : le contexte et le plan doivent la recevoir`);
+  assert.match(src, /const allureCalcul = sensation \? corrigerFacile\(easyPaceSansMasque\) : easyPaceCorrige;/, "hors sensation, l'allure de calcul n'est plus l'allure corrigée");
+  assert.match(src, /reserveKm: longRunReserveKm, easyPace: allureCalcul,/, "le critère des petites semaines ne reçoit plus l'allure corrigée (de calcul)");
   assert.match(src, /relireExecution\(/, "la relecture n'est plus calculée");
 });
 

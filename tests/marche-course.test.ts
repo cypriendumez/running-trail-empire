@@ -210,7 +210,9 @@ async function main() {
   await test("le verrou du test VMA laisse passer le programme, et seulement lui", () => {
     const src = codeNu("src/lib/ai/autoCoach.ts");
     const verrou = src.slice(src.indexOf("if (!vmaMesuree && !estFondateur"), src.indexOf("const ctx = await buildAthleteContext("));
-    assert.match(verrou, /if \(!\(await marcheCourseDe\(admin, userId\)\)\) \{\s*return prescrireTestVma\(/, "le test VMA est imposé au débutant en marche-course");
+    // Hors marche-course, le test est DÛ ; il n'est prescrit qu'une fois le contexte bâti, hors reprise après un arrêt (23/11/2026).
+    assert.match(verrou, /if \(!\(await marcheCourseDe\(admin, userId\)\)\) testVmaDu = true;/, "le test VMA est imposé au débutant en marche-course");
+    assert.match(src, /if \(testVmaDu && !testVmaAttendLaReprise\(ctx\.weekPlan\)\) \{\s*return prescrireTestVma\(/, "le test VMA dû n'est plus prescrit, ou l'est pendant une reprise après un arrêt");
     const lecture = src.slice(src.indexOf("async function marcheCourseDe"), src.indexOf("async function prescrireTestVma"));
     assert.match(lecture, /if \(error \|\| \(profil[^)]*\)\?\.peut_courir_30min !== false\) return null;/, "une colonne absente ouvre le programme");
     assert.match(src, /marcheCourse: ctx\.marcheCourse \? \{ etape: ctx\.marcheCourse\.etape, total: ctx\.marcheCourse\.total \} : null/, "l'état du coach ne dit pas le programme");

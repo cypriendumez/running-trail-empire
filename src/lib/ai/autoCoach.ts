@@ -31,6 +31,7 @@ import { isRun } from "@/lib/intervals/sport";
 import { decaleJour } from "@/lib/streak/compute";
 import { reecritureLue, type SeanceEcrite } from "@/lib/coach/planNotifie";
 import { journaliserEchec, journaliserEchecUneFois, causeStable } from "@/lib/journal/echecServeur";
+import { testVmaAttendLaReprise } from "@/lib/health/testVmaAEviter";
 
 type Admin = SupabaseClient;
 
@@ -228,14 +229,14 @@ export async function autoCoachForUser(
   // tant que la VMA manque, une qualité au plus (le seuil bas). Seul un avis médical lèverait l'interdit,
   // et Pacevo ne le recueille pas pour ces antécédents.
   const effortMaxInterdit = effortMaximalInterdit((profilAcces as { health_conditions?: unknown } | null)?.health_conditions);
+  let testVmaDu = false;
   if (!vmaMesuree && !estFondateur && !avisMedicalAttendu && !effortMaxInterdit) {
     // ⚠️ SAUF EN MARCHE-COURSE. « Cours 6 minutes À FOND » était le premier effort de
     // coureur d'une personne qui ne court pas encore 30 minutes d'affilée (Cyprien,
     // 05/11/2026). Son programme ne dépend d'aucune allure : il démarre sans test, et le
     // test revient à la dernière étape franchie (`lib/coach/marcheCourse`).
-    if (!(await marcheCourseDe(admin, userId))) {
-      return prescrireTestVma(admin, { userId, athleteId: opts.athleteId, apiKey: opts.apiKey, pushToWatch: planComplet });
-    }
+    // ⚠️ NI PENDANT UNE REPRISE APRÈS UN ARRÊT (23/11/2026) : la décision attend le contexte, plus bas.
+    if (!(await marcheCourseDe(admin, userId))) testVmaDu = true;
   }
 
   // Le contexte qui plante perdait sa CAUSE : le journal de nuit ne disait que « ctx_failed »
@@ -246,6 +247,14 @@ export async function autoCoachForUser(
   if (!ctx) {
     await journaliserEchecUneFois(admin, { source: "coach-auto", userId, message: `Contexte du coach impossible, plan laissé en place : ${causeCtx || "contexte vide"}` });
     return { processed: false, reason: "ctx_failed" };
+  }
+  // ⚠️ PAS DE TEST « 6 MIN À FOND » PENDANT UNE REPRISE APRÈS UN ARRÊT (avis du directeur scientifique, 23/11/2026).
+  // Le test se prescrivait AVANT que le contexte soit bâti : un coureur sans VMA mesurée qui revenait de trois mois
+  // d'arrêt recevait un effort maximal le jour même, là où son plan lui interdit toute séance dure. Tant que la
+  // règle de reprise ou sa marche de sortie dure (`testVmaAttendLaReprise`), il reçoit son plan, aux allures au
+  // ressenti ; le test revient ensuite. Contexte illisible : dans le doute, pas d'effort maximal (retour ci-dessus).
+  if (testVmaDu && !testVmaAttendLaReprise(ctx.weekPlan)) {
+    return prescrireTestVma(admin, { userId, athleteId: opts.athleteId, apiKey: opts.apiKey, pushToWatch: planComplet });
   }
 
   // L'instant est retenu : le rappel Premium bâtit le plan complet pour le MÊME jour.
@@ -519,6 +528,8 @@ export async function autoCoachForUser(
     recuperation: ctx.recuperation ?? null,
     // Le tableau de bord tait le bandeau « Fais ton test VMA » tant que le programme dure.
     marcheCourse: ctx.marcheCourse ? { etape: ctx.marcheCourse.etape, total: ctx.marcheCourse.total } : null,
+    // Et pendant une reprise après un arrêt, marche de sortie comprise (`lib/health/testVmaAEviter`).
+    repriseArret: testVmaAttendLaReprise(ctx.weekPlan) ? ctx.weekPlan.repriseArret ?? "sortie" : null,
     advice: ctx.readiness.advice.slice(0, 400),
     qBudget: ctx.weekPlan.qBudget,
     // La dernière qualité n'a survécu que grâce au plancher « préparation en cours » :

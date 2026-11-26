@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { aLaSensation, etiquettesALaSensation, QUALITE_WHY_SENSATION } from "@/lib/coach/sensation";
 import type { AthleteContext, QualitySession } from "@/lib/ai/coachContext";
+import { coutQualiteKm, footingMinKm } from "@/lib/coach/coutSeance";
 import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
 import { dureesMarcheCourse, MARCHE_ENCADRANTE_MIN } from "@/lib/coach/marcheCourse";
 import { choisirJourQualite } from "@/lib/coach/meteoPlacement";
@@ -769,13 +770,10 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // soit le coureur : pour un débutant visant 18 km par semaine, une seule séance en
   // consommait plus de la moitié, et le plan dépassait sa cible de 45 %. On le calcule
   // sur SON allure : échauffement + retour au calme + ~25 min de corps.
-  const QUALITY_KM = (() => {
-    const p2 = (ctx.allureCalcul ?? ctx.easyPace)?.match(/(\d+)['’](\d{2})/);
-    if (!p2) return 11;
-    const secPerKm = Number(p2[1]) * 60 + Number(p2[2]);
-    const minutes = warm + cool + 25;
-    return Math.max(5, Math.round((minutes * 60 / secPerKm) * 10) / 10);
-  })();
+  // ⚠️ Calculé dans `lib/coach/coutSeance`, que le contexte du coach lit aussi : c'est lui qui décide qu'une semaine
+  // de reprise est trop petite pour une séance dure, et il doit compter comme le plan. Sur l'allure de CALCUL : à la
+  // sensation, l'allure affichée est vide (relecteur J, 5e tour du cadre de santé).
+  const QUALITY_KM = coutQualiteKm(ctx.allureCalcul ?? ctx.easyPace, warm, cool);
   // `longRunReserveKm` : ce que le plafond d'un long arrêt a retiré à la sortie longue ne fait pas de
   // place à une séance de qualité de plus (voir `coachContext`).
   const maxByVolume = Math.max(1, Math.floor((targetKm - longRunKm - (ctx.volume.longRunReserveKm ?? 0)) / QUALITY_KM));
@@ -821,6 +819,14 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     // dans le chemin de secours.
     if (idx < 0) for (let i = debutQualite; i <= 6; i++) if (canRun(i) && okSpacing(i)) { idx = i; break; }
     if (idx < 0) break; // impossible sans violer la récupération ou le budget → on n'insiste pas
+    // ── PENDANT UNE REPRISE, UNE SÉANCE DURE N'EST POSÉE QUE S'IL RESTE UN JOUR POUR UN FOOTING ──────
+    // Le contexte borne le NOMBRE de séances à ce que le VOLUME tient avec un footing à côté
+    // (`qualitesTenablesAvecFooting`). Le CALENDRIER, lui, ne se lit qu'ici : avec quatre jours
+    // disponibles, deux séances dures, la sortie longue et le repos complet posé à côté d'elle
+    // ne laissaient aucun jour au footing (26 plans sur 12 960, relecture du 23/11/2026).
+    // Il faut donc un autre jour libre et disponible, et une sortie de plus au budget.
+    const jourPourUnFooting = runBudget >= 2 && [0, 1, 2, 3, 4, 5, 6].some((i) => i !== idx && isFree(i) && avail(i));
+    if (ctx.weekPlan.footingExige && !jourPourUnFooting) break;
     const title = (l: Lang) => q.type === "VMA" ? PLAN_T[l].qualiteTitreVMA
       : q.type === "Seuil" ? PLAN_T[l].qualiteTitreSeuil
       : q.type === "Spécifique" ? PLAN_T[l].qualiteTitreSpecifique : q.type;
@@ -881,10 +887,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   //  donnaient 21 min — en dessous de ce qui vaut une séance (scénarios : « séance montre
   //  trop courte »). Le plancher se dit donc en TEMPS : 25 min à l'allure facile, 4 km
   //  au moins, et 4 km tout court quand l'allure est inconnue.
-  const kmMinFooting = (() => {
-    const m = (ctx.allureCalcul ?? ctx.easyPace)?.match(/(\d+)['’:](\d{1,2})/);
-    return m ? Math.max(4, Math.ceil((25 * 60) / (Number(m[1]) * 60 + Number(m[2])))) : 4;
-  })();
+  const kmMinFooting = footingMinKm(ctx.allureCalcul ?? ctx.easyPace);
   const affordable = Math.max(0, Math.floor(remaining / kmMinFooting));
   if (easySlots.length > affordable) {
     for (const i of easySlots.splice(affordable)) { slot[i] = null; runBudget += 1; }

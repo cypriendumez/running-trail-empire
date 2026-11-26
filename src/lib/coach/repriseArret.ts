@@ -73,12 +73,33 @@ export function repriseApresArret(joursCourus: readonly string[], aujourdhui: st
 /** Ce qu'il faut savoir d'un arrêt pour borner l'INTENSITÉ (le volume, lui, lit `RepriseArret`). */
 export type ArretVu = Pick<RepriseArret, "arretJours" | "enCours" | "joursRepris" | "depuisJours">;
 
-/** Durée de la reprise appliquée à l'intensité après un arrêt de plus de 28 jours. */
+/** Durée MINIMALE de la règle d'intensité après un arrêt de plus de 28 jours (voir `finRegleIntensite`). */
 export const REPRISE_HORS_ECHELLE_JOURS = ARRET_MAX_JOURS;
+/** Durée de la MARCHE DE SORTIE qui suit la règle d'intensité (voir `sortieDeRegle`). */
+export const MARCHE_SORTIE_JOURS = 7;
+
+/**
+ * LA FIN DE LA RÈGLE D'INTENSITÉ après un arrêt de plus de 28 jours : le rang du premier jour de reprise
+ * (0 = jour de la première sortie) où elle ne s'applique plus. UNE seule fonction, lue par le plan, la
+ * feuille de route et le motif.
+ *
+ * ⚠️ ELLE S'ÉTEIGNAIT AU 28ᵉ JOUR QUEL QUE SOIT L'ARRÊT (visa et avis du directeur scientifique, 20 et
+ * 23/11/2026). Après 90 jours d'arrêt, le coureur passait de zéro à deux séances dures en deux jours
+ * (27ᵉ au 29ᵉ jour, volume encore plafonné à 50 %), recevait de la VMA au 42ᵉ jour dans 28 à 30 km, et sa
+ * sortie longue revenait plus courte que sa sortie habituelle le lendemain d'un motif qui disait « la
+ * séance dure attend son retour ». La règle dure désormais jusqu'au DÉBUT du dernier palier de volume :
+ *  · arrêt de plus de 56 jours : le 63ᵉ jour (fin du palier de 70 %) ;
+ *  · arrêt de 29 à 56 jours : les deux tiers de la reprise, jamais moins de 28 jours.
+ * ⚠️ JAMAIS DÉCROISSANTE quand l'arrêt s'allonge (un test le vérifie de 29 à 200 jours).
+ */
+export function finRegleIntensite(arretJours: number): number {
+  if (arretJours > ARRET_TRES_LONG_JOURS) return (PARTS_REPRISE_TRES_LONGUE.length - 1) * PALIER_REPRISE_TRES_LONGUE_JOURS;
+  return Math.max(REPRISE_HORS_ECHELLE_JOURS, Math.ceil((2 * arretJours) / 3));
+}
 
 /**
  * L'ARRÊT DE PLUS DE 28 JOURS, pour l'intensité seulement — `null` de 6 à 28 jours (c'est
- * `repriseApresArret`) et une fois ses quatre semaines de reprise écoulées.
+ * `repriseApresArret`) et une fois la règle d'intensité finie (`finRegleIntensite`).
  *
  * ⚠️ UNE GARDE NE BAISSE PAS QUAND LE RISQUE MONTE (visa du directeur scientifique, 17/11/2026).
  * Au-delà de 28 jours, la règle de Daniels change d'échelle pour le VOLUME, et ce module rendait
@@ -91,8 +112,23 @@ export const REPRISE_HORS_ECHELLE_JOURS = ARRET_MAX_JOURS;
 export function arretHorsEchelle(joursCourus: readonly string[], aujourdhui: string): ArretVu | null {
   const a = dernierArret(joursCourus, aujourdhui);
   if (!a || a.arretJours <= ARRET_MAX_JOURS) return null;
-  if (!a.enCours && a.joursRepris >= REPRISE_HORS_ECHELLE_JOURS) return null;
+  if (!a.enCours && a.joursRepris >= finRegleIntensite(a.arretJours)) return null;
   return a;
+}
+
+/**
+ * LA MARCHE DE SORTIE : les sept jours qui suivent la fin de la règle d'intensité d'un arrêt de plus de
+ * 28 jours, ou `null`. Le plan normal ne revient pas d'un coup (avis du directeur scientifique,
+ * 23/11/2026) : pendant cette semaine, deux séances de qualité au plus, sans VMA ni côtes ni test VMA
+ * (seuil ou allure de course seulement). Comme la règle elle-même, elle se lit sur le DERNIER arrêt :
+ * une pause courte survenue depuis l'emporte.
+ */
+export function sortieDeRegle(joursCourus: readonly string[], aujourdhui: string): Pick<RepriseArret, "arretJours" | "joursRepris"> | null {
+  const a = dernierArret(joursCourus, aujourdhui);
+  // Pas encore repris : `joursRepris` vaut 0, jamais dans la fenêtre (la règle dure 28 jours au moins).
+  if (!a || a.arretJours <= ARRET_MAX_JOURS) return null;
+  const fin = finRegleIntensite(a.arretJours);
+  return a.joursRepris >= fin && a.joursRepris < fin + MARCHE_SORTIE_JOURS ? { arretJours: a.arretJours, joursRepris: a.joursRepris } : null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -107,9 +143,11 @@ export function arretHorsEchelle(joursCourus: readonly string[], aujourdhui: str
 //  19/11/2026 dans des sources secondaires concordantes, le livre n'étant pas lisible en ligne) :
 //   · de 4 à 8 semaines d'arrêt (29 à 56 jours) : la reprise dure autant que l'arrêt, un tiers à
 //     33 % du volume d'avant, un tiers à 50 %, un tiers à 75 % ;
-//   · au-delà de 8 semaines : trois semaines à 33 %, trois à 50 %, trois à 70 %, trois à 85 %,
+//   · au-delà de 8 semaines : trois semaines à 33 %, trois à 50 %, trois à 70 %, trois à 80 %,
 //     puis le volume d'avant. ⚠️ Trois sources donnent 85 % pour le dernier palier, une donne
-//     80 % : 85 % est retenu, l'écart est signalé.
+//     80 % : 80 % est retenu (avis du directeur scientifique, 23/11/2026 : c'est un plafond, la
+//     valeur la plus basse est la prudente tant que le livre n'est pas relu) ; 85 % a été en
+//     ligne du 20 au 23/11/2026. Le troisième palier, 70 %, est concordant.
 //  Les plafonds en miles que le livre joint à ces paliers n'ont pas pu être relus : ils ne sont
 //  pas appliqués (on ne code pas un chiffre non vérifié).
 //
@@ -123,7 +161,7 @@ export const ARRET_TRES_LONG_JOURS = 56;
 /** Parts du volume d'avant l'arrêt, par tiers de la reprise, après 29 à 56 jours d'arrêt. */
 export const PARTS_REPRISE_LONGUE = [0.33, 0.5, 0.75] as const;
 /** Parts du volume d'avant l'arrêt, par paliers de trois semaines, après plus de 56 jours d'arrêt. */
-export const PARTS_REPRISE_TRES_LONGUE = [0.33, 0.5, 0.7, 0.85] as const;
+export const PARTS_REPRISE_TRES_LONGUE = [0.33, 0.5, 0.7, 0.8] as const;
 /** Durée d'un palier après plus de 56 jours d'arrêt : trois semaines. */
 export const PALIER_REPRISE_TRES_LONGUE_JOURS = 21;
 
@@ -169,23 +207,62 @@ export const PLAFOND_MIN_REPRISE_LONGUE_KM = 12;
  * qu'une, plus longue que la sortie habituelle du coureur. Le plafond passe alors au premier
  * palier SUIVANT de la même échelle qui laisse au moins `PLAFOND_MIN_REPRISE_LONGUE_KM` : le
  * pourcentage annoncé reste un palier de la règle, et il ne fait que monter avec les semaines.
- * Aucun palier n'y suffit : pas de plafond (1). C'est le cas sous 16 km par semaine environ avant
- * un arrêt de 29 à 56 jours (dernier palier à 75 %), sous 14 km environ au-delà (dernier palier à
- * 85 %), et quand le volume est inconnu (0). Exemples : 30 km par semaine donnent 50 % d'emblée
- * dans les deux cas ; 20 km donnent 75 % après 40 jours d'arrêt, 70 % puis 85 % après 90 jours.
+ * Exemples : 30 km par semaine donnent 50 % d'emblée ; 20 km donnent 75 % après 40 jours d'arrêt,
+ * 70 % puis 80 % après 90 jours.
+ * ⚠️ AUCUN PALIER N'Y SUFFIT : LE PLAFOND SE REPLIE SUR LE PLANCHER, IL NE DISPARAÎT PAS (avis du
+ * directeur scientifique, 23/11/2026). La fonction rendait 1, « pas de plafond » : en abaissant le dernier
+ * palier de 85 à 80 %, un coureur à 14 km par semaine perdait son plafond de 12 km et recevait la cible
+ * ordinaire du plan, 17 à 20 km, au 2ᵉ jour de reprise après 70 jours d'arrêt (51 coureurs sur 1 000 à
+ * petit volume tirés au hasard). Tant que la reprise de volume dure et que le volume d'avant dépasse le
+ * plancher, la part rendue est celle qui donne exactement le plancher (12 km : `plafondReplieSurPlancher`).
+ * Cette PART vaut 1 dans deux cas : volume d'avant inconnu (0, aucun plafond), et volume d'avant de 12 km ou
+ * moins, que `plafondPetitVolumeKm` plafonne à lui-même.
  * C'est un choix de Pacevo, pas un chiffre de Daniels.
- * Cette fonction ne rend JAMAIS une part plus basse que `partApresLongArret`.
+ * Cette fonction ne rend JAMAIS une part plus basse que `partApresLongArret`, ni un plafond sous le plancher.
  */
 export function partPlafondLongArret(r: Pick<RepriseArret, "arretJours" | "joursRepris"> | null, volumeAvantKm: number, dansJours = 0): number {
   const part = partApresLongArret(r, dansJours);
   if (!r || part >= 1) return 1;
   const echelle: readonly number[] = r.arretJours > ARRET_TRES_LONG_JOURS ? PARTS_REPRISE_TRES_LONGUE : PARTS_REPRISE_LONGUE;
-  return echelle.find((p) => p >= part && Math.round(volumeAvantKm * p) >= PLAFOND_MIN_REPRISE_LONGUE_KM) ?? 1;
+  const palier = echelle.find((p) => p >= part && Math.round(volumeAvantKm * p) >= PLAFOND_MIN_REPRISE_LONGUE_KM);
+  if (palier != null) return palier;
+  return volumeAvantKm > PLAFOND_MIN_REPRISE_LONGUE_KM ? PLAFOND_MIN_REPRISE_LONGUE_KM / volumeAvantKm : 1;
+}
+
+/** Le plus petit plafond de semaine : un footing, pour le coureur le plus rapide (25 minutes à 4'10 au km). */
+export const PLAFOND_UN_FOOTING_KM = 6;
+
+/**
+ * LE PLAFOND D'UN PETIT VOLUME, EN KILOMÈTRES, ou `null` quand le plafond est un palier de l'échelle (ou qu'il
+ * n'y en a pas : pas de long arrêt en cours, reprise de volume finie, volume d'avant inconnu).
+ *  - volume d'avant de plus de 12 km dont aucun palier ne laisse deux footings : 12 km (`plafondReplieSurPlancher`) ;
+ *  - volume d'avant de 12 km ou moins : CE VOLUME LUI-MÊME (avis du directeur scientifique, 23/11/2026). Il n'avait
+ *    aucun plafond : un coureur à 8-10 km par semaine recevait la cible ordinaire du plan, 17 à 20 km, au 2ᵉ jour de
+ *    reprise après trois mois d'arrêt, le double de ce qu'il courait. Jamais sous un footing (6 km) : un plafond plus
+ *    bas que le plus petit footing viderait la semaine.
+ * Le motif le dit en kilomètres, et la semaine est « au plancher » tant que la règle d'intensité dure.
+ */
+export function plafondPetitVolumeKm(r: Pick<RepriseArret, "arretJours" | "joursRepris"> | null, volumeAvantKm: number, dansJours = 0): number | null {
+  if (!r || !(volumeAvantKm > 0) || partApresLongArret(r, dansJours) >= 1) return null;
+  if (plafondReplieSurPlancher(r, volumeAvantKm, dansJours)) return PLAFOND_MIN_REPRISE_LONGUE_KM;
+  return volumeAvantKm <= PLAFOND_MIN_REPRISE_LONGUE_KM ? Math.max(PLAFOND_UN_FOOTING_KM, Math.round(volumeAvantKm)) : null;
+}
+
+/**
+ * Le plafond du long arrêt est-il REPLIÉ SUR LE PLANCHER (aucun palier de l'échelle ne laisse deux footings) ?
+ * Le motif le dit alors en kilomètres, et la semaine est « au plancher » : footings seulement tant que la règle
+ * d'intensité dure (`coachContext`). Lu sur la même fonction que le plafond, jamais recalculé ailleurs.
+ */
+export function plafondReplieSurPlancher(r: Pick<RepriseArret, "arretJours" | "joursRepris"> | null, volumeAvantKm: number, dansJours = 0): boolean {
+  if (!r) return false;
+  const part = partPlafondLongArret(r, volumeAvantKm, dansJours);
+  const echelle: readonly number[] = r.arretJours > ARRET_TRES_LONG_JOURS ? PARTS_REPRISE_TRES_LONGUE : PARTS_REPRISE_LONGUE;
+  return part < 1 && !echelle.includes(part);
 }
 
 /**
  * L'ARRÊT DE PLUS DE 28 JOURS dont la reprise de VOLUME est en cours, ou `null`. Elle dure plus
- * longtemps que la reprise d'intensité (`arretHorsEchelle`, quatre semaines) : autant que
+ * longtemps que la règle d'intensité (`arretHorsEchelle`, `finRegleIntensite`) : autant que
  * l'arrêt, ou douze semaines au-delà de 56 jours.
  *
  * ⚠️ UN ARRÊT COURT SURVENU DEPUIS NE L'EFFACE PAS : on ne lit pas « le dernier arrêt » mais le
@@ -285,7 +362,8 @@ function dernierArret(joursCourus: readonly string[], aujourdhui: string): Arret
 //     d'arrêt ou plus, pas avant 48 h ;
 //   · après un arrêt de plus de 14 jours, la qualité attend la seconde moitié de la reprise ;
 //   · après un arrêt de plus de 28 jours (le volume y a son propre plafond, plus bas), l'intensité
-//     garde AU MOINS cette protection : pas avant le 14ᵉ jour d'une reprise de quatre semaines ;
+//     garde AU MOINS cette protection : pas avant le 14ᵉ jour, et la règle dure jusqu'au début du
+//     dernier palier de volume (`finRegleIntensite`), puis une semaine de marche de sortie ;
 //   · jusqu'à la fin de la reprise, UNE séance de qualité PAR SEMAINE au plus, écrite courte
 //     et au seuil (le volume est à 50 puis 75 %) : la même borne que la reprise d'après-course.
 //     ⚠️ « Par semaine », pas « pour toute la reprise » (double relecture du 17/11/2026) : la
@@ -330,7 +408,7 @@ export const ARRET_48H_JOURS = 10;
  *    le lendemain d'une seule sortie facile après dix jours d'arrêt) ;
  *  · de 15 à 28 jours : le premier jour de la seconde moitié de la reprise ;
  *  · au-delà de 28 jours : comme l'arrêt le plus long de l'échelle, le 14ᵉ jour d'une reprise
- *    de quatre semaines.
+ *    de quatre semaines (la règle, elle, dure jusqu'à `finRegleIntensite`).
  */
 export function premierJourDeQualite(arretJours: number): number {
   if (arretJours > ARRET_MAX_JOURS) return Math.ceil(REPRISE_HORS_ECHELLE_JOURS / 2);

@@ -300,6 +300,10 @@ async function main() {
     const BAS4 = Array.from({ length: 70 }, (_, k) => k + 1).filter((n) => n % 7 !== 0 && n % 7 !== 2 && n % 7 !== 4).map((n) => ({
       user_id: "u", date: ilYa(n), type: "easy", sport: "run", distance_km: 6, duration_seconds: 2100, elevation_gain_m: 20, avg_hr: 135, max_hr: 150, tss: 35, hr_zone_seconds: [400, 1700, 0, 0, 0] }));
     // …et le faible volume réparti sur six jours disponibles : le plancher des footings (25 min) décide combien en tiennent.
+    // Une REPRISE après 14 jours d'arrêt (24 km par semaine avant, 8ᵉ jour de reprise) : la petite semaine décide si une
+    // séance dure tient à côté d'un footing (`qualitesTenablesAvecFooting`, PR 67), sur l'allure de CALCUL.
+    const REPRISE = Array.from({ length: 70 }, (_, k) => k + 1).filter((n) => (n <= 8 && n % 2 === 1) || (n >= 23 && [1, 3, 5, 6].includes(n % 7))).map((n) => ({
+      user_id: "u", date: ilYa(n), type: "easy", sport: "run", distance_km: 6, duration_seconds: 2100, elevation_gain_m: 20, avg_hr: 135, max_hr: 150, tss: 35, hr_zone_seconds: [400, 1700, 0, 0, 0] }));
     // Un test de lactate au seuil 1 lent : le plancher de l'allure facile joue (lib/coach/lactate).
     const LACTATE = { user_id: "u", type: "test_lactate", created_at: `${ilYa(20)}T10:00:00Z`, data: { date: ilYa(20), lt1: { allureSec: 400, fc: 140 }, lt2: { allureSec: 330, fc: 165 } } };
     const jumelle = async (c: string, cs: boolean, obj: Ligne, seances: Ligne[], jours: number, autres: Ligne[] = [], prof: Ligne = {}) => buildAthleteContext(fauxClient({
@@ -314,7 +318,7 @@ async function main() {
     let plafonne = 0;
     const corrigees = new Set<string>();
     for (const [seances, jours, autres, prof] of [[SEANCES, 6, [], {}], [BAS, 3, [], {}], [BAS, 6, [], {}], [BAS4, 6, [], {}], [BAS4, 5, [], {}],
-      [LENTS, 6, [], {}], [RAPIDES, 6, [], {}], [SEANCES, 6, [LACTATE], {}], [SEANCES, 6, [], { long_run_mode: "bike" }]] as [Ligne[], number, Ligne[], Ligne][])
+      [LENTS, 6, [], {}], [RAPIDES, 6, [], {}], [SEANCES, 6, [LACTATE], {}], [SEANCES, 6, [], { long_run_mode: "bike" }], [REPRISE, 4, [], {}], [REPRISE, 5, [], {}]] as [Ligne[], number, Ligne[], Ligne][])
     for (const cs of [true, false]) for (const obj of [objectif(10, 40), objectif(21.1, 40), objectif(42.2, 60)]) {
       const g = await jumelle("grossesse", cs, obj, seances, jours, autres, prof), cj = await jumelle("cardiaque", cs, obj, seances, jours, autres, prof);
       assert.equal(g.allureCalcul, cj.easyPace, `l'allure des calculs d'une grossesse (${g.allureCalcul}) n'est pas l'allure de sa jumelle (${cj.easyPace})`);
@@ -323,7 +327,7 @@ async function main() {
       for (let k = 0; k <= 6; k++) {
         const jour = new Date(`${ilYa(-k)}T12:00:00Z`);
         const pg = buildWeekPlan(g, jour), pc = buildWeekPlan(cj, jour);
-        const quand = `${seances === SEANCES ? `60 km${autres.length ? " + lactate" : ""}${prof.long_run_mode ? " + sortie longue à vélo" : ""}` : seances === LENTS ? "footings lents" : seances === RAPIDES ? "footings rapides" : `${seances === BAS ? 18 : 24} km sur ${jours} jours`} · ${obj.data.distanceKm} km${cs ? ", vitesse critique" : ""} · J+${k}`;
+        const quand = `${seances === SEANCES ? `60 km${autres.length ? " + lactate" : ""}${prof.long_run_mode ? " + sortie longue à vélo" : ""}` : seances === LENTS ? "footings lents" : seances === RAPIDES ? "footings rapides" : seances === REPRISE ? `reprise après 14 jours d'arrêt, ${jours} jours` : `${seances === BAS ? 18 : 24} km sur ${jours} jours`} · ${obj.data.distanceKm} km${cs ? ", vitesse critique" : ""} · J+${k}`;
         if (seances !== SEANCES && cs && sousSeuil(pc) > 0 && sousSeuil(pc) < 20) plafonne++;
         assert.deepEqual(pg.map((d) => `${d.date} ${d.type}`), pc.map((d) => `${d.date} ${d.type}`), `${quand} : pas les mêmes séances`);
         for (const [i, d] of pg.entries()) assert.deepEqual(dose(d.detail), dose(pc[i].detail), `${quand} · ${d.date} ${d.type} : « ${d.detail.slice(0, 140)} » contre « ${pc[i].detail.slice(0, 140)} »`);

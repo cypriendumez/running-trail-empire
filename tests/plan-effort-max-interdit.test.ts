@@ -333,7 +333,7 @@ async function main() {
     // Les lignes droites retirées pour l'antécédent ne sont pas attribuées à une douleur (motif affiché).
     assert.match(codeNu("src/lib/ai/autoCoach.ts"), /effortMax: !!ctx\.effortMaximalInterdit,\s*reprise: lignesRetireesParReprise\(/, "une douleur se voit attribuer des lignes droites que l'antécédent avait déjà retirées");
     // Le double seuil (deux séances au seuil le même jour, option cochée) : pas pour eux non plus.
-    assert.match(codeNu("src/lib/ai/coachContext.ts"), /&& !repriseIntensite && !marcheCourse && !noMaxEffort;/, "le double seuil est de nouveau posé à un coureur dont l'effort maximal est interdit");
+    assert.match(codeNu("src/lib/ai/coachContext.ts"), /&& !repriseIntensite && !marcheSortie && !marcheCourse && !noMaxEffort;/, "le double seuil est de nouveau posé à un coureur dont l'effort maximal est interdit");
     assert.match(codeNu("src/lib/health/testVmaAEviter.ts"), /effortMaximalInterdit\(/, "l'interface ne lit pas les antécédents");
     for (const f of ["src/lib/ai/coachContext.ts", "src/lib/ai/autoCoach.ts", "src/lib/health/testVmaAEviter.ts"])
       assert.doesNotMatch(codeNu(f), /\["cardiaque", "covid_long", "grossesse"\]/, `${f} recopie la liste des antécédents`);
