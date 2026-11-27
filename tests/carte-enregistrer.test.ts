@@ -15,9 +15,9 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { fondsCarteDirecte, satelliteDisponible, stylePacevo, REPLI_PLAN, ATTRIBUTION_PLAN, STYLE_PLAN_URL } from "../src/lib/courses/fondsCarte";
+import { fondsCarteDirecte, satelliteDisponible, stylePacevo, fondsDisponibles, calquesDisponibles, tuileDe, peinturesNuit, REPLI_PLAN, ATTRIBUTION_PLAN, STYLE_PLAN_URL } from "../src/lib/courses/fondsCarte";
 import { FONDS, avecCle } from "../src/lib/trail/couches";
-import { allegerParcours, MAX_POINTS } from "../src/lib/courses/mesParcours";
+import { allegerParcours, parcoursDates, sortiesDepuis, MAX_POINTS } from "../src/lib/courses/mesParcours";
 import { encodePolyline } from "../src/lib/segments/geo";
 
 let passed = 0; const fails: string[] = [];
@@ -103,10 +103,15 @@ test("chaque fond porte son attribution — c'est une obligation de licence", ()
   const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
   assert.match(carte, /if \(om\) om\.attribution = ATTRIBUTION_PLAN;/, "le style vectoriel est posé sans attribution");
   assert.match(carte, /attribution: REPLI_PLAN\.attribution/, "le repli est posé sans attribution");
-  assert.match(carte, /attribution: SATELLITE\.attribution/, "le satellite est posé sans attribution");
-  // ⚠️ EN HAUT À DROITE, ET DÉPLIÉE : le bloc de chiffres et le tiroir couvrent le bas de
-  // la carte, la flèche ⌄ le haut à gauche. Recouverte ou repliée = absente.
-  assert.match(carte, /new maplibregl\.AttributionControl\(\{ compact: false \}\), "top-right"/, "l'attribution est repassée sous le bloc de chiffres ou sous la flèche, ou repliée");
+  // Tout fond ou calque d'image porte l'attribution de SA source (catalogue vérifié).
+  assert.match(carte, /m\.addSource\(id, \{ type: "raster", tiles: f\.urls,[^}]*attribution: f\.attribution \}\)/, "un modèle de carte est posé sans attribution");
+  assert.match(carte, /m\.addSource\(id, \{ type: "raster", tiles: c\.urls,[^}]*attribution: c\.attribution \}\)/, "un calque est posé sans attribution");
+  // ⚠️ EN HAUT À DROITE (le bas est couvert par le bloc de chiffres et le tiroir, le haut
+  // gauche par la flèche ⌄). Repliée en ⓘ depuis le 27/11/2026, comme Strava — mais
+  // EXPOSÉE EN ENTIER À L'OUVERTURE, et le repli se fait seulement après 5 s (ou au
+  // premier geste) : jamais une carte qui s'ouvre sans dire d'où viennent ses données.
+  assert.match(carte, /const credit = new maplibregl\.AttributionControl\(\{ compact: true \}\);\s*\n\s*m\.addControl\(credit, "top-right"\);/, "l'attribution n'est plus en haut à droite");
+  assert.match(carte, /setTimeout\(\(\) => \{\s*\n\s*conteneur\.current\?\.querySelector\("\.maplibregl-ctrl-attrib"\)\?\.classList\.remove\("maplibregl-compact-show"\);\s*\n\s*\}, 5000\);/, "l'attribution se replie avant d'avoir été montrée (ou ne se replie plus)");
 });
 
 test("si le style vectoriel ne vient pas, la carte retombe sur OpenStreetMap", () => {
@@ -168,23 +173,66 @@ test("le bloc de chiffres et le tiroir sont POSÉS sur la carte, pas dedans — 
   // de 200 px avalait les doigts, et le pincement n'atteignait pas la carte. Les deux
   // enveloppes sont transparentes au doigt ; seuls les éléments visibles le reprennent.
   assert.match(gr, /<div className="pointer-events-none absolute inset-x-0 bottom-0 z-\[500\] flex flex-col">\s*\n\s*<div className="pointer-events-none mx-auto w-full max-w-md px-3">/, "l'enveloppe des boutons ronds reprend le doigt sur toute la largeur : la carte ne se pince plus");
-  assert.match(gr, /function BtnCarte[\s\S]{0,400}className=\{`pointer-events-auto flex h-11 w-11/, "les boutons ronds ne reprennent plus le doigt : ils seraient morts");
+  assert.match(gr, /function BtnCarte[\s\S]{0,400}className=\{`pointer-events-auto relative flex h-11 w-11/, "les boutons ronds ne reprennent plus le doigt : ils seraient morts");
   assert.match(gr, /"pointer-events-auto mb-3 overflow-hidden rounded-2xl/, "le bloc de chiffres ne reprend plus le doigt : son bouton ⤡ serait mort");
   assert.match(gr, /"pointer-events-auto rounded-t-\[28px\] bg-white px-6/, "le tiroir ne reprend plus le doigt : « Démarrer » serait mort");
   assert.match(codeNu("src/components/ghost-runner/CarteDirect.tsx"), /el\.className = "pacevo-point";\s*\n\s*el\.style\.pointerEvents = "none";/, "le point bleu avale de nouveau le doigt qui commence un pincement sur lui");
 });
 
-test("le satellite n'est proposé que si la clé existe", () => {
-  const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
-  assert.match(gr, /const SATELLITE_DISPO = fondsCarteDirecte\(process\.env\.NEXT_PUBLIC_MAPTILER_KEY[^)]*\)\.includes\("satellite"\)/, "la disponibilité du satellite n'est plus déduite de la clé");
-  assert.match(gr, /\.\.\.\(SATELLITE_DISPO \? \[\["satellite"/, "le satellite n'est plus conditionné à la clé dans les calques : il basculerait sur des tuiles 403");
-  // Même règle pour le relief : pas de « 3D » sans clé, pas de carte inclinée déguisée.
-  assert.match(gr, /const RELIEF_DISPO = avecCle\(RELIEF\.url, process\.env\.NEXT_PUBLIC_MAPTILER_KEY[^)]*\) !== null;/, "le bouton 3D n'est plus conditionné à la clé");
-  assert.match(gr, /\{RELIEF_DISPO && \(\s*\n?\s*<BtnCarte/, "le bouton 3D apparaît sans relief disponible");
-  // Et la clé n'est jamais écrite en dur nulle part.
+test("les modèles de carte : selon la clé et le PAYS, jamais une tuile 403 ni une carte hors de son pays", () => {
+  const paris: [number, number] = [48.85, 2.35], zurich: [number, number] = [47.37, 8.54], ny: [number, number] = [40.71, -74.0];
+  const ids = (cle: string | undefined, c: [number, number] | null) => fondsDisponibles(cle, c).map((f) => f.id);
+  // Sans clé : ni satellite, ni hybride (403 sur chaque tuile) ; nos deux styles restent.
+  for (const sans of [undefined, ""]) {
+    const l = ids(sans, paris);
+    assert.ok(l.includes("plan") && l.includes("nuit"), "Pacevo ou Pacevo Nuit a disparu sans clé");
+    assert.ok(!l.includes("satellite") && !l.includes("hybride"), "un fond payant est proposé sans clé : ses tuiles répondront 403");
+    assert.ok(!calquesDisponibles(sans, paris).some((c) => c.id === "ombrage"), "l'ombrage (relief MapTiler) est proposé sans clé");
+  }
+  // Avec la clé, à Paris : satellite, hybride, et les cartes de l'IGN — pas celles de la Suisse.
+  const fr = ids("CLE_TEST_123", paris);
+  for (const id of ["plan", "nuit", "satellite", "hybride", "topo", "ign-plan", "ign-photo"]) assert.ok(fr.includes(id as never), `${id} manque à Paris`);
+  assert.ok(!fr.includes("swisstopo") && !fr.includes("us-topo"), "une carte nationale est proposée hors de son pays");
+  assert.ok(ids("CLE_TEST_123", zurich).includes("swisstopo"), "swisstopo n'est pas proposé en Suisse");
+  assert.ok(!ids("CLE_TEST_123", ny).includes("ign-plan"), "l'IGN est proposé à New York");
+  assert.deepEqual(calquesDisponibles("CLE_TEST_123", ny).filter((c) => /-fr$/.test(c.id)), [], "les pentes ou courbes de l'IGN sont proposées hors de France");
+  // Chaque image vient du catalogue vérifié, avec la clé et sans marqueur, et son attribution.
+  const source = FONDS.find((f) => f.id === "satellite")!;
+  const sat = fondsDisponibles("CLE_TEST_123", paris).find((f) => f.id === "satellite")!;
+  assert.deepEqual(sat.urls, [avecCle(source.url, "CLE_TEST_123")], "l'URL satellite ne vient plus du catalogue vérifié");
+  for (const f of [...fondsDisponibles("CLE_TEST_123", paris), ...fondsDisponibles("CLE_TEST_123", zurich)]) {
+    if (f.type !== "image") continue;
+    assert.ok((f.attribution ?? "").trim().length > 3, `${f.id} n'a pas d'attribution`);
+    for (const u of f.urls ?? []) assert.ok(!u.includes("{cleMapTiler}") && !u.includes("{s}"), `${f.id} garde un marqueur dans son URL : ${u}`);
+  }
+  // OpenTopoMap : les trois sous-domaines, MapLibre ne connaît pas `{s}`.
+  assert.equal(fondsDisponibles("CLE_TEST_123", paris).find((f) => f.id === "topo")!.urls!.length, 3, "OpenTopoMap n'est plus réparti sur ses sous-domaines");
+  // Sans position ni cadrage : le monde seulement, et toujours au moins Pacevo.
+  assert.equal(fondsDisponibles(undefined, null)[0].id, "plan", "sans position, la liste ne commence plus par Pacevo");
+  // La vignette est la VRAIE tuile du quartier : tuile 14 de Paris = 8299/5636 (calcul indépendant).
+  assert.equal(tuileDe("https://t/{z}/{x}/{y}.png", 48.8566, 2.3522, 14), "https://t/14/8299/5636.png", "la vignette ne montre plus le quartier de l'athlète");
+  // Pacevo Nuit : sombre, et les noms en clair.
+  const nuit = peinturesNuit({ layers: [{ id: "background", type: "background" }, { id: "road_minor", type: "line" }, { id: "label_city", type: "symbol" }] });
+  assert.equal(nuit.background["background-color"], "#16191e", "le fond de Pacevo Nuit n'est plus sombre");
+  assert.equal(nuit.label_city["text-color"], "#d4d4d8", "les noms de Pacevo Nuit ne sont plus en clair");
+  // La clé n'est jamais écrite en dur.
   for (const f of ["src/components/ghost-runner/CarteDirect.tsx", "src/lib/courses/fondsCarte.ts", "src/components/ghost-runner/GhostRunner.tsx"]) {
     assert.ok(!/key=[A-Za-z0-9]{8,}/.test(readFileSync(f, "utf8")), `une clé MapTiler est écrite en dur dans ${f}`);
   }
+});
+
+test("changer de modèle ne recharge JAMAIS le style : le tracé de la course resterait effacé", () => {
+  const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
+  assert.ok(!/setStyle\(/.test(carte), "un changement de modèle recharge le style : tracé, point bleu et sorties disparaissent");
+  // Un fond « dessus » se glisse SOUS nos sorties et notre tracé, jamais par-dessus.
+  assert.match(carte, /const avant = f\.place === "dessus" \? "parcours"/, "un fond complet passe par-dessus le tracé du jour");
+  assert.match(carte, /m\.addLayer\(\{ id, type: "raster", source: id, paint: \{ "raster-opacity"[^}]*\} \}, "parcours"\)/, "un calque passe par-dessus le tracé du jour");
+  // Un modèle qui n'existe plus ici retombe sur Pacevo, jamais sur une carte vide.
+  const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
+  assert.match(gr, /const fondChoisi: FondCarte = fondsDispo\.find\(\(f\) => f\.id === fondCarte\) \?\? fondsDispo\[0\];/, "un modèle absent ici laisserait la carte sans fond");
+  // Le 3D reste conditionné au relief (clé) : pas de carte inclinée déguisée.
+  assert.match(gr, /const avec3d = groupe === "relief" && RELIEF_DISPO;/, "le 3D apparaît dans les calques sans relief disponible");
+  assert.match(gr, /const RELIEF_DISPO = avecCle\(RELIEF\.url, process\.env\.NEXT_PUBLIC_MAPTILER_KEY[^)]*\) !== null;/, "le bouton 3D n'est plus conditionné à la clé");
 });
 
 test("la carte interactive n'est pas masquée à l'assistance vocale", () => {
@@ -340,9 +388,14 @@ test("« Mes parcours » : ses traces, allégées, jamais inventées", () => {
   assert.deepEqual(allegerParcours([]), [], "sans trace, la couche doit rester vide");
   // Côté page : SES traces (user_id), avec GPS, plafonnées ; une panne de lecture se dit.
   const page = codeNu("src/app/dashboard/ghost-runner/page.tsx");
-  assert.match(page, /\.select\("polyline"\)\s*\n?\s*\.eq\("user_id", user!\.id\)\.eq\("has_gps", true\)/, "les parcours ne sont plus filtrés sur l'athlète et le GPS");
+  assert.match(page, /\.select\("polyline, workout_id"\)\s*\n?\s*\.eq\("user_id", user!\.id\)\.eq\("has_gps", true\)/, "les parcours ne sont plus filtrés sur l'athlète et le GPS");
+  // Leurs dates : lues À PART, sur SES séances ; une sortie sans date n'entre pas dans « 30 jours ».
+  assert.match(page, /from\("workouts"\)\.select\("id, date"\)\.eq\("user_id", user!\.id\)\.in\("id"/, "les dates des sorties ne sont plus lues sur les séances de l'athlète");
+  const pd = parcoursDates([{ polyline: longue, date: "2026-11-20" }, { polyline: longue, date: null }, { polyline: longue, date: "pas une date" }]);
+  assert.deepEqual(pd.map((p) => p.date), ["2026-11-20", null, null], "une date est inventée pour une sortie qui n'en a pas");
+  assert.equal(sortiesDepuis(pd, "2026-10-28").length, 1, "« 30 derniers jours » garde des sorties sans date ou trop anciennes");
   assert.match(page, /\.limit\(MAX_PARCOURS\)/, "le nombre de parcours lus n'est plus plafonné");
-  assert.match(page, /\["parcours", \{ error: parcoursRes\.error \}\]/, "une panne de lecture des parcours passerait sous silence");
+  assert.match(page, /\["parcours", \{ error: parcoursRes\.error \?\? datesRes\.error \}\]/, "une panne de lecture des parcours ou de leurs dates passerait sous silence");
   // Côté carte : sous le tracé du jour et sous les étiquettes, masquée par défaut.
   const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
   assert.match(carte, /m\.addLayer\(\{ id: "parcours"[\s\S]{0,200}visibility: "none"/, "la couche des parcours s'affiche avant qu'on la demande");
@@ -353,7 +406,10 @@ test("les mots des commandes existent dans les cinq langues", () => {
   const src = readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8");
   for (const k of ["map.plan", "map.satellite", "map.recentrer", "map.reglages", "map.details", "map.fc",
     "map.gpsOk", "map.gpsCherche", "map.vueChiffres", "map.vueCarte", "map.3d", "map.calques", "map.fond",
-    "map.mesParcours", "map.mesParcoursAide", "map.mesParcoursVide", "map.fermer", "ct.terminer", "lv.enPause"]) {
+    "map.mesParcours", "map.mesParcoursAide", "map.mesParcoursVide", "map.fermer", "ct.terminer", "lv.enPause",
+    "map.panneau", "map.secSorties", "map.secItineraires", "map.secRelief", "map.secAffichage", "f.plan", "f.nuit", "f.hybride",
+    "f.topo", "f.ignPlan", "f.ignPhoto", "f.swisstopo", "f.bkgDe", "f.ignEs", "f.usTopo", "s.toutes", "s.recentes", "s.aucune",
+    "c.rando", "c.vtt", "c.velo", "c.ombrage", "c.pentes", "c.courbes", "c.poi"]) {
     const n = [...src.matchAll(new RegExp(`"${k.replace(/\./g, "\\.")}":`, "g"))].length;
     assert.equal(n, 5, `« ${k} » présent ${n} fois, attendu 5`);
   }

@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
-  ATTRIBUTION_PLAN, REPLI_PLAN, STYLE_PLAN_URL, satelliteDisponible, stylePacevo, type IdFond,
+  ATTRIBUTION_PLAN, REPLI_PLAN, STYLE_PLAN_URL, peinturesNuit, stylePacevo, type CalqueCarte, type FondCarte,
 } from "@/lib/courses/fondsCarte";
 import { RELIEF, avecCle } from "@/lib/trail/couches";
 
@@ -38,7 +38,6 @@ import { RELIEF, avecCle } from "@/lib/trail/couches";
  */
 if (typeof window !== "undefined") maplibregl.setWorkerUrl("/maplibre-gl-worker.mjs");
 
-const SATELLITE = satelliteDisponible(process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined);
 /**
  * Le relief 3D (bouton « 3D », comme Strava). ⚠️ SANS CLÉ MAPTILER, PAS DE RELIEF : on ne
  * propose pas une carte simplement inclinée en la faisant passer pour du relief (même
@@ -46,6 +45,8 @@ const SATELLITE = satelliteDisponible(process.env.NEXT_PUBLIC_MAPTILER_KEY || un
  */
 const URL_RELIEF = avecCle(RELIEF.url, process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined);
 export const RELIEF_DISPO = URL_RELIEF !== null;
+
+const FOND_PLAN: FondCarte = { id: "plan", cle: "f.plan", type: "vecteur", couverture: "monde" };
 
 /** Ligne vide : la forme qu'attendent les sources GeoJSON avant le premier point. */
 const VIDE = { type: "Feature" as const, properties: {}, geometry: { type: "LineString" as const, coordinates: [] as [number, number][] } };
@@ -77,7 +78,7 @@ async function stylePlan(): Promise<maplibregl.StyleSpecification> {
 }
 
 export function CarteDirect({
-  position, track, centre, fond = "plan", suivre = true, onDeplacement, recentrer = 0, etiquette, className = "",
+  position, track, centre, fond = FOND_PLAN, calques = [], suivre = true, onDeplacement, recentrer = 0, etiquette, className = "",
   parcours = [], voirParcours = false, relief = false,
 }: {
   position: [number, number] | null;
@@ -91,7 +92,10 @@ export function CarteDirect({
    * 5 — un rectangle qui ne dit rien de personne (Cyprien, 23/09/2026 : « ça rend pas »).
    */
   centre?: [number, number] | null;
-  fond?: IdFond;
+  /** Le modèle de carte choisi dans le tiroir (`fondsDisponibles`). */
+  fond?: FondCarte;
+  /** Les calques allumés (`calquesDisponibles`), posés par-dessus le fond. */
+  calques?: CalqueCarte[];
   /** Tant que c'est vrai, la carte reste collée à la position. */
   suivre?: boolean;
   /** Appelé quand la main prend la carte : au parent de couper le suivi. */
@@ -131,6 +135,12 @@ export function CarteDirect({
   useEffect(() => { positionRef.current = position; }, [position]);
   useEffect(() => { traceRef.current = track; }, [track]);
   useEffect(() => { fondRef.current = fond; }, [fond]);
+  const calquesRef = useRef(calques);
+  useEffect(() => { calquesRef.current = calques; }, [calques]);
+  /** Les couleurs de jour, gardées pour revenir de Pacevo Nuit. */
+  const jour = useRef<Record<string, Record<string, unknown>>>({});
+  const nuit = useRef<Record<string, Record<string, unknown>>>({});
+  const enNuit = useRef(false);
 
   /** Le point bleu, avec son halo — posé ou déplacé. */
   function poserPoint(m: maplibregl.Map, p: [number, number]) {
@@ -176,9 +186,72 @@ export function CarteDirect({
     } catch { /* style pas encore prêt : le prochain appui réessaiera */ }
   }
 
-  function appliquerFond(m: maplibregl.Map, f: IdFond) {
-    if (!m.getLayer("satellite")) return;
-    m.setLayoutProperty("satellite", "visibility", f === "satellite" ? "visible" : "none");
+  /** Le premier calque d'un type ou d'un préfixe — là où l'on glisse une image. */
+  const premierCalque = (m: maplibregl.Map, test: (c: { id: string; type: string }) => boolean) =>
+    m.getStyle().layers.find(test)?.id;
+
+  /**
+   * LE MODÈLE DE CARTE. ⚠️ JAMAIS DE `setStyle` : il effacerait le tracé de la course en
+   * cours, le point bleu et « Mes sorties ». On repeint (Nuit) ou on glisse une couche
+   * d'image à la bonne hauteur, créée au premier choix et ensuite seulement montrée :
+   *   · « dessus » (Topo, IGN Plan…) : la carte a ses noms, elle couvre notre style ;
+   *   · « sous-noms » (Satellite, IGN Photo) : la photo, nos noms par-dessus ;
+   *   · « sous-routes » (Hybride) : la photo, nos rues et nos noms par-dessus.
+   */
+  function appliquerFond(m: maplibregl.Map, f: FondCarte) {
+    try {
+      // Les couleurs : Nuit, ou retour au jour.
+      const cible = f.id === "nuit" ? nuit.current : enNuit.current ? jour.current : null;
+      if (cible) {
+        for (const [id, peinture] of Object.entries(cible)) {
+          if (!m.getLayer(id)) continue;
+          for (const [prop, val] of Object.entries(peinture)) { try { m.setPaintProperty(id, prop as never, val as never); } catch { /* propriété absente de cette couche */ } }
+        }
+        enNuit.current = f.id === "nuit";
+      }
+      // Les images : une seule visible à la fois.
+      for (const c of m.getStyle().layers) if (c.id.startsWith("fond-")) m.setLayoutProperty(c.id, "visibility", "none");
+      if (f.type === "image" && f.urls?.length) {
+        const id = `fond-${f.id}`;
+        if (!m.getLayer(id)) {
+          if (!m.getSource(id)) m.addSource(id, { type: "raster", tiles: f.urls, tileSize: f.taille ?? 256, maxzoom: f.zoomMax ?? 19, attribution: f.attribution });
+          const avant = f.place === "dessus" ? "parcours"
+            : f.place === "sous-routes" ? premierCalque(m, (c) => /^(tunnel|road|bridge)_/.test(c.id))
+            : premierCalque(m, (c) => c.type === "symbol");
+          m.addLayer({ id, type: "raster", source: id }, avant);
+        }
+        m.setLayoutProperty(id, "visibility", "visible");
+      }
+      // En hybride, les bâtiments gris cacheraient la photo.
+      if (m.getLayer("building")) m.setLayoutProperty("building", "visibility", f.place === "sous-routes" ? "none" : "visible");
+    } catch { /* style pas encore prêt : le prochain choix réessaiera */ }
+  }
+
+  /**
+   * LES CALQUES. Images transparentes (itinéraires, pentes, courbes) sous nos tracés ;
+   * ombrage calculé du relief MapTiler, sous les routes ; points d'intérêt = une partie
+   * de notre style, montrée ou cachée.
+   */
+  function appliquerCalques(m: maplibregl.Map, actifs: CalqueCarte[]) {
+    try {
+      const ids = new Set(actifs.map((c) => c.id));
+      for (const c of actifs) {
+        const id = `calque-${c.id}`;
+        if (m.getLayer(id)) continue;
+        if (c.type === "image" && c.urls?.length) {
+          m.addSource(id, { type: "raster", tiles: c.urls, tileSize: 256, maxzoom: c.zoomMax ?? 18, attribution: c.attribution });
+          m.addLayer({ id, type: "raster", source: id, paint: { "raster-opacity": c.groupe === "relief" ? 0.7 : 1 } }, "parcours");
+        } else if (c.type === "ombrage" && URL_RELIEF) {
+          m.addSource(id, { type: "raster-dem", tiles: [URL_RELIEF], tileSize: RELIEF.taille, maxzoom: RELIEF.zoomMax, attribution: RELIEF.attribution });
+          m.addLayer({ id, type: "hillshade", source: id, paint: { "hillshade-exaggeration": 0.4, "hillshade-shadow-color": "#3f4a3a", "hillshade-highlight-color": "#ffffff" } },
+            premierCalque(m, (x) => /^(tunnel|road|bridge)_/.test(x.id)));
+        }
+      }
+      for (const c of m.getStyle().layers) {
+        if (c.id.startsWith("calque-")) m.setLayoutProperty(c.id, "visibility", ids.has(c.id.slice(7) as CalqueCarte["id"]) ? "visible" : "none");
+        if (/^poi/.test(c.id)) m.setLayoutProperty(c.id, "visibility", ids.has("poi") ? "visible" : "none");
+      }
+    } catch { /* style pas encore prêt */ }
   }
 
   useEffect(() => {
@@ -203,7 +276,17 @@ export function CarteDirect({
       // bas de la carte et la recouvraient. Pas à gauche non plus depuis le 27/11/2026 : la
       // flèche ⌄ de sortie du grand écran y est posée. Une attribution cachée vaut une
       // attribution absente — c'est-à-dire une carte utilisée sans droit. Jamais repliée.
-      m.addControl(new maplibregl.AttributionControl({ compact: false }), "top-right");
+      //
+      // ⚠️ 27/11/2026 (« la bande © OpenFreeMap… fait pas pro ») : REPLIÉE EN ⓘ, PAS
+      // SUPPRIMÉE. Les données d'OpenStreetMap (ODbL) et d'OpenMapTiles l'exigent, quelle
+      // que soit la carte qu'on en tire — fabriquer « notre » carte n'y changerait rien.
+      // Comme Strava : le crédit s'affiche EN ENTIER à l'ouverture, puis se replie en ⓘ
+      // au premier geste (MapLibre) ou au bout de 5 s ; un appui sur ⓘ le rouvre.
+      const credit = new maplibregl.AttributionControl({ compact: true });
+      m.addControl(credit, "top-right");
+      setTimeout(() => {
+        conteneur.current?.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
+      }, 5000);
       m.on("dragstart", () => deplacementRef.current?.());
       m.on("zoomstart", (e) => { if ((e as { originalEvent?: unknown }).originalEvent) deplacementRef.current?.(); });
       /**
@@ -222,24 +305,25 @@ export function CarteDirect({
       cadre.addEventListener("touchcancel", leves, { passive: true });
       cadre.addEventListener("wheel", () => { if (suivreRef.current) deplacementRef.current?.(); }, { passive: true });
       m.on("load", () => {
-        // Le satellite (si la clé existe) : une couche SOUS les étiquettes, masquée par
-        // défaut. On bascule sa visibilité au lieu de changer de style — un `setStyle`
-        // effacerait le tracé de la course en cours.
-        const premiereEtiquette = m.getStyle().layers.find((c) => c.type === "symbol")?.id;
-        if (SATELLITE) {
-          m.addSource("satellite", { type: "raster", tiles: [SATELLITE.url], tileSize: SATELLITE.taille, maxzoom: SATELLITE.zoomMax, attribution: SATELLITE.attribution });
-          m.addLayer({ id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } }, premiereEtiquette);
-        }
-        // « Mes parcours » : sous le tracé du jour, bleu translucide comme une carte de
-        // chaleur — là où les lignes se superposent, le bleu fonce.
+        // Pacevo Nuit : les couleurs de nuit, et celles de jour pour en revenir.
+        const style = m.getStyle() as unknown as { layers: { id: string; type: string; paint?: Record<string, unknown> }[] };
+        nuit.current = peinturesNuit(style);
+        jour.current = Object.fromEntries(Object.entries(nuit.current).map(([id, p]) => {
+          const c = style.layers.find((x) => x.id === id);
+          return [id, Object.fromEntries(Object.keys(p).map((k) => [k, c?.paint?.[k] ?? null]))];
+        }));
+        // « Mes sorties » : au-dessus de tout le plan (et des fonds « dessus », glissés
+        // juste avant elle), sous le tracé du jour — bleu translucide comme une carte de
+        // chaleur : là où les lignes se superposent, le bleu fonce.
         m.addSource("parcours", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "MultiLineString", coordinates: [] } } });
         m.addLayer({ id: "parcours", type: "line", source: "parcours", layout: { "line-cap": "round", "line-join": "round", visibility: "none" },
-          paint: { "line-color": "#2563eb", "line-opacity": 0.45, "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 16, 3.5] } }, premiereEtiquette);
+          paint: { "line-color": "#2563eb", "line-opacity": 0.45, "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 16, 3.5] } });
         m.addSource("trace", { type: "geojson", data: VIDE });
         m.addLayer({ id: "trace-bord", type: "line", source: "trace", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ffffff", "line-width": 7 } });
         m.addLayer({ id: "trace", type: "line", source: "trace", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#059669", "line-width": 4 } });
         pret.current = true;
         appliquerFond(m, fondRef.current);
+        appliquerCalques(m, calquesRef.current);
         poserTrace(m, traceRef.current);
         poserParcours(m, parcoursRef.current);
         montrerParcours(m, voirParcoursRef.current);
@@ -253,11 +337,19 @@ export function CarteDirect({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Le fond change (plan ↔ satellite) : on montre ou cache la couche, pas la carte.
+  // Le modèle change : on repeint ou on montre une couche, jamais un nouveau style.
   useEffect(() => {
     const m = carte.current;
     if (m && pret.current) appliquerFond(m, fond);
-  }, [fond]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fond.id]);
+
+  const cleCalques = calques.map((c) => c.id).join(",");
+  useEffect(() => {
+    const m = carte.current;
+    if (m && pret.current) appliquerCalques(m, calques);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cleCalques]);
 
   useEffect(() => {
     const m = carte.current;
