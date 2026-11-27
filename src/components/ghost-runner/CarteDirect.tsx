@@ -137,6 +137,8 @@ export function CarteDirect({
     if (!point.current) {
       const el = document.createElement("div");
       el.className = "pacevo-point";
+      // Le point ne prend pas le doigt : un pincement qui commence dessus doit zoomer la carte.
+      el.style.pointerEvents = "none";
       point.current = new maplibregl.Marker({ element: el }).setLngLat(versLngLat(p)).addTo(m);
     } else point.current.setLngLat(versLngLat(p));
   }
