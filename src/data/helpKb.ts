@@ -174,7 +174,12 @@ export const HELP_FACTS: string[] = [
 /** Problèmes fréquents → la cause RÉELLE et la marche à suivre. */
 export const HELP_PROBLEMS: { q: string; a: string }[] = [
   { q: "Mes séances n'arrivent pas sur ma montre",
-    a: "Trois causes possibles, dans l'ordre : (1) la synchronisation Garmin passe par le Bluetooth du téléphone — ouvre Garmin Connect, montre à proximité ; (2) seuls les 5 premiers jours du plan sont poussés, une séance dans 6 jours n'y est pas encore ; (3) les identifiants intervals.icu sont absents ou périmés — vérifie dans Sync Montre." },
+    a: "Quatre causes possibles, dans l'ordre : (1) la synchronisation Garmin passe par le Bluetooth du téléphone — ouvre Garmin Connect, montre à proximité ; (2) seuls les 5 premiers jours du plan sont poussés, une séance dans 6 jours n'y est pas encore ; (3) les identifiants intervals.icu sont absents ou périmés — vérifie dans Sync Montre ; (4) la séance est dans Garmin Connect mais pas sur la montre : retire la montre dans Garmin Connect (Appareils › ta montre › Retirer l'appareil), oublie-la dans le Bluetooth du téléphone, puis rajoute-la depuis Garmin Connect." },
+  // 27/11/2026, vécu par Cyprien sur une Forerunner 165 : séances visibles dans Garmin
+  // Connect, rien sur la montre — même une séance créée dans Garmin Connect. Résolu en
+  // retirant puis en rajoutant la montre. Arrive souvent : l'assistant doit le savoir.
+  { q: "Mes séances sont dans Garmin Connect mais pas sur ma montre",
+    a: "C'est la liaison entre le téléphone et la montre, côté Garmin, qui est bloquée : Pacevo a bien fait sa part, puisque la séance est dans Garmin Connect. Vérifie d'abord sur la montre : Course à pied › maintenir le bouton UP › Entraînement › Entraînements. Si elle n'y est pas, ce qui marche : (1) dans l'app Garmin Connect › Appareils › ta montre › Retirer l'appareil ; (2) dans les réglages Bluetooth du téléphone, oublie la montre ; (3) rajoute-la depuis Garmin Connect (Ajouter un appareil). Tes données restent sur ton compte Garmin, et les séances arrivent à la synchronisation suivante." },
   { q: "Ma séance Apple Watch n'arrive pas dans l'app",
     a: "Elle passe par l'app iPhone Intervals.icu Companion, qui ne peut lire Santé que sur un iPhone déverrouillé : ouvre l'app après la séance, c'est à ce moment qu'elle l'envoie. Pour ne plus y penser : app Raccourcis › Automatisation › + › « Exercice Apple Watch » › « Fin » › « Exécuter immédiatement », puis l'action « Ouvrir l'app » › Intervals.icu Companion. Vérifie aussi, dans l'onglet Apple Health de l'app, que l'envoi des séances est activé." },
   { q: "Mes activités n'apparaissent pas dans l'app",
