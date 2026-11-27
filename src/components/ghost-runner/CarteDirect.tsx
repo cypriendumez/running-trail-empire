@@ -48,6 +48,16 @@ export const RELIEF_DISPO = URL_RELIEF !== null;
 
 const FOND_PLAN: FondCarte = { id: "plan", cle: "f.plan", type: "vecteur", couverture: "monde" };
 
+/** Le crédit a-t-il déjà été montré en entier AUJOURD'HUI sur cet appareil ? */
+const CLE_CREDIT = "pacevo_credit_carte";
+const aujourdhuiLocal = () => new Date().toLocaleDateString("sv");
+function creditDejaMontre(): boolean {
+  try { return localStorage.getItem(CLE_CREDIT) === aujourdhuiLocal(); } catch { return false; }
+}
+function noterCreditMontre() {
+  try { localStorage.setItem(CLE_CREDIT, aujourdhuiLocal()); } catch { /* navigation privée : il sera montré à chaque fois */ }
+}
+
 /** Ligne vide : la forme qu'attendent les sources GeoJSON avant le premier point. */
 const VIDE = { type: "Feature" as const, properties: {}, geometry: { type: "LineString" as const, coordinates: [] as [number, number][] } };
 
@@ -243,11 +253,26 @@ export function CarteDirect({
           m.addLayer({ id, type: "raster", source: id, paint: { "raster-opacity": c.groupe === "relief" ? 0.7 : 1 } }, "parcours");
         } else if (c.type === "ombrage" && URL_RELIEF) {
           m.addSource(id, { type: "raster-dem", tiles: [URL_RELIEF], tileSize: RELIEF.taille, maxzoom: RELIEF.zoomMax, attribution: RELIEF.attribution });
-          m.addLayer({ id, type: "hillshade", source: id, paint: { "hillshade-exaggeration": 0.4, "hillshade-shadow-color": "#3f4a3a", "hillshade-highlight-color": "#ffffff" } },
+          // 0,4 était trop discret en Normandie (audit du 27/11/2026) ; une lumière
+          // translucide plutôt que blanche, pour ne pas éblouir Pacevo Nuit.
+          m.addLayer({ id, type: "hillshade", source: id, paint: { "hillshade-exaggeration": 0.65, "hillshade-shadow-color": "rgba(24,30,22,0.85)", "hillshade-highlight-color": "rgba(255,255,255,0.35)" } },
             premierCalque(m, (x) => /^(tunnel|road|bridge)_/.test(x.id)));
+        } else if (c.id === "eau" && m.getSource("openmaptiles")) {
+          // Les points d'eau (anneau cyan) et les toilettes (violet, « WC ») du plan, en gros.
+          const filtre = (classe: string) => ["==", ["get", "class"], classe] as unknown as maplibregl.FilterSpecification;
+          m.addLayer({ id: "calque-eau", type: "circle", source: "openmaptiles", "source-layer": "poi", minzoom: 12, filter: filtre("drinking_water"),
+            // ⚠️ UN ANNEAU, PAS UN POINT PLEIN : un rond bleu plein se confondait avec le
+            // point GPS de l'athlète (vu sur la carte le 27/11/2026).
+            paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 3, 16, 6], "circle-color": "#ffffff", "circle-stroke-color": "#0891b2", "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12, 2, 16, 3.5] } }, "parcours");
+          m.addLayer({ id: "calque-eau-wc", type: "circle", source: "openmaptiles", "source-layer": "poi", minzoom: 12, filter: filtre("toilets"),
+            paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 3.5, 16, 8], "circle-color": "#7c3aed", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } }, "parcours");
+          m.addLayer({ id: "calque-eau-wc-texte", type: "symbol", source: "openmaptiles", "source-layer": "poi", minzoom: 15, filter: filtre("toilets"),
+            layout: { "text-field": "WC", "text-font": ["Noto Sans Bold"], "text-size": 8, "text-allow-overlap": true },
+            paint: { "text-color": "#ffffff" } }, "parcours");
         }
       }
       for (const c of m.getStyle().layers) {
+        if (c.id.startsWith("calque-eau")) { m.setLayoutProperty(c.id, "visibility", ids.has("eau") ? "visible" : "none"); continue; }
         if (c.id.startsWith("calque-")) m.setLayoutProperty(c.id, "visibility", ids.has(c.id.slice(7) as CalqueCarte["id"]) ? "visible" : "none");
         if (/^poi/.test(c.id)) m.setLayoutProperty(c.id, "visibility", ids.has("poi") ? "visible" : "none");
       }
@@ -280,13 +305,25 @@ export function CarteDirect({
       // ⚠️ 27/11/2026 (« la bande © OpenFreeMap… fait pas pro ») : REPLIÉE EN ⓘ, PAS
       // SUPPRIMÉE. Les données d'OpenStreetMap (ODbL) et d'OpenMapTiles l'exigent, quelle
       // que soit la carte qu'on en tire — fabriquer « notre » carte n'y changerait rien.
-      // Comme Strava : le crédit s'affiche EN ENTIER à l'ouverture, puis se replie en ⓘ
-      // au premier geste (MapLibre) ou au bout de 5 s ; un appui sur ⓘ le rouvre.
+      //
+      // ⚠️ CE QUE DIT LA RÈGLE (OSMF, « Attribution Guidelines », 25/06/2021, lue le
+      // 27/11/2026) : le crédit peut se replier en ⓘ au premier geste ou après 5 s, mais il
+      // ne doit pas EXIGER un geste pour être vu ; et « s'il est présenté au démarrage de
+      // l'application, il n'a pas besoin de l'être à chaque fois ». D'où : en entier 5 s à
+      // la PREMIÈRE ouverture du jour, puis la carte s'ouvre directement sur le seul ⓘ
+      // (Cyprien : « il faut d'abord cliquer sur le i… comme ça ça ne dérange pas »).
       const credit = new maplibregl.AttributionControl({ compact: true });
       m.addControl(credit, "top-right");
-      setTimeout(() => {
-        conteneur.current?.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
-      }, 5000);
+      const replier = () => conteneur.current?.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
+      if (creditDejaMontre()) { replier(); m.once("load", replier); }
+      else { noterCreditMontre(); setTimeout(replier, 5000); }
+      // ⚠️ 5 S EST LE MINIMUM DE LA RÈGLE pour un repli AUTOMATIQUE (« after five
+      // seconds ») — on ne descend pas en dessous. Mais elle permet aussi le repli « sur
+      // interaction avec la carte : glisser, toucher, zoomer » : dès le premier geste de
+      // l'athlète, sans attendre (Cyprien, 27/11/2026 : « moins que 7 secondes »).
+      // `originalEvent` : seuls les gestes de la MAIN, pas nos recentrages GPS.
+      m.on("click", replier);
+      m.on("movestart", (e) => { if ((e as { originalEvent?: unknown }).originalEvent) replier(); });
       m.on("dragstart", () => deplacementRef.current?.());
       m.on("zoomstart", (e) => { if ((e as { originalEvent?: unknown }).originalEvent) deplacementRef.current?.(); });
       /**

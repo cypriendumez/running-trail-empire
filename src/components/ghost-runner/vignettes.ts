@@ -75,6 +75,11 @@ const DESSINS: Record<string, string> = {
     `<path d="M42 14 L46 20 L40 22 Z M18 26 L21 31 L16 32 Z" fill="#ffffff"/>` +
     `<path d="M-2 66 L70 52 V70 H-2 Z" fill="#bfe3a3"/>`,
   poi: plan(JOUR),
+  // Eau & toilettes : des anneaux cyan (jamais un rond bleu plein : c'est le point GPS) et un « WC » violet.
+  eau: plan(JOUR) +
+    `<circle cx="18" cy="40" r="5" fill="#fff" stroke="#0891b2" stroke-width="3"/><circle cx="50" cy="22" r="5" fill="#fff" stroke="#0891b2" stroke-width="3"/>` +
+    `<rect x="36" y="38" width="15" height="11" rx="3" fill="#7c3aed" stroke="#fff" stroke-width="1.6"/>` +
+    `<text x="43.5" y="46.3" text-anchor="middle" font-family="Arial, sans-serif" font-size="7" font-weight="700" fill="#fff">WC</text>`,
 };
 
 /** Les rues seules, posées sur la photo satellite pour la vignette « Hybride ». */

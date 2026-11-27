@@ -15,7 +15,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { fondsCarteDirecte, satelliteDisponible, stylePacevo, fondsDisponibles, calquesDisponibles, tuileDe, peinturesNuit, REPLI_PLAN, ATTRIBUTION_PLAN, STYLE_PLAN_URL } from "../src/lib/courses/fondsCarte";
+import { fondsCarteDirecte, satelliteDisponible, stylePacevo, fondsDisponibles, calquesDisponibles, tuileDe, peinturesNuit, paysDe, REPLI_PLAN, ATTRIBUTION_PLAN, STYLE_PLAN_URL } from "../src/lib/courses/fondsCarte";
 import { FONDS, avecCle } from "../src/lib/trail/couches";
 import { allegerParcours, parcoursDates, sortiesDepuis, MAX_POINTS } from "../src/lib/courses/mesParcours";
 import { encodePolyline } from "../src/lib/segments/geo";
@@ -111,7 +111,16 @@ test("chaque fond porte son attribution — c'est une obligation de licence", ()
   // EXPOSÉE EN ENTIER À L'OUVERTURE, et le repli se fait seulement après 5 s (ou au
   // premier geste) : jamais une carte qui s'ouvre sans dire d'où viennent ses données.
   assert.match(carte, /const credit = new maplibregl\.AttributionControl\(\{ compact: true \}\);\s*\n\s*m\.addControl\(credit, "top-right"\);/, "l'attribution n'est plus en haut à droite");
-  assert.match(carte, /setTimeout\(\(\) => \{\s*\n\s*conteneur\.current\?\.querySelector\("\.maplibregl-ctrl-attrib"\)\?\.classList\.remove\("maplibregl-compact-show"\);\s*\n\s*\}, 5000\);/, "l'attribution se replie avant d'avoir été montrée (ou ne se replie plus)");
+  // La règle de l'OSMF : en entier au démarrage (5 s), puis repliée ; jamais un crédit
+  // qu'il faudrait toucher pour voir la première fois. Une fois par jour et par appareil.
+  assert.match(carte, /if \(creditDejaMontre\(\)\) \{ replier\(\); m\.once\("load", replier\); \}\s*\n\s*else \{ noterCreditMontre\(\); setTimeout\(replier, 5000\); \}/, "le crédit n'est plus montré 5 s à la première ouverture du jour, ou plus replié ensuite");
+  assert.match(carte, /return localStorage\.getItem\(CLE_CREDIT\) === aujourdhuiLocal\(\);/, "le crédit n'est plus montré une fois PAR JOUR");
+  // Repli immédiat au premier geste de la main (toucher, glisser, zoomer) — jamais sur nos
+  // propres recentrages GPS, qui le replieraient avant que l'athlète l'ait vu.
+  assert.match(carte, /m\.on\("click", replier\);\s*\n\s*m\.on\("movestart", \(e\) => \{ if \(\(e as \{ originalEvent\?: unknown \}\)\.originalEvent\) replier\(\); \}\);/, "le crédit ne se replie plus au premier geste, ou se replie sur un recentrage GPS");
+  assert.ok(!/setTimeout\(replier, [0-4]\d{0,3}\)/.test(carte), "le repli automatique descend sous les 5 s exigées par la règle de l'OSMF");
+  // ODbL : « OpenStreetMap » renvoie à sa page de licence.
+  assert.match(ATTRIBUTION_PLAN, /<a href="https:\/\/www\.openstreetmap\.org\/copyright"[^>]*>OpenStreetMap<\/a>/, "le crédit ne renvoie plus à la licence d'OpenStreetMap");
 });
 
 test("si le style vectoriel ne vient pas, la carte retombe sur OpenStreetMap", () => {
@@ -199,6 +208,27 @@ test("les modèles de carte : selon la clé et le PAYS, jamais une tuile 403 ni 
   const itin = (c: [number, number]) => calquesDisponibles("CLE_TEST_123", c).filter((x) => x.groupe === "itineraires").map((x) => x.id);
   for (const id of ["rando", "vtt", "velo", "ski"]) assert.ok(itin(paris).includes(id as never), `${id} manque en France`);
   assert.ok(!itin(paris).includes("rando-ch") && itin(zurich).includes("rando-ch"), "la rando suisse n'est pas réservée à la Suisse");
+  // ⚠️ LES FRONTIÈRES (audit du 27/11/2026) : des boîtes proposaient swisstopo et la rando
+  // suisse à Chamonix (vides), l'IGN à Barcelone et à Genève (blanc), TopPlus à Strasbourg.
+  const p = (lat: number, lon: number) => paysDe(lat, lon);
+  assert.ok(p(45.9237, 6.8694).includes("fr") && !p(45.9237, 6.8694).includes("ch"), "Chamonix n'est plus en France seulement");
+  assert.ok(p(45.899, 6.129).includes("fr") && !p(45.899, 6.129).includes("ch"), "Annecy est pris pour la Suisse");
+  assert.ok(p(46.204, 6.143).includes("ch") && !p(46.204, 6.143).includes("fr"), "Genève est prise pour la France");
+  assert.ok(p(41.387, 2.170).includes("es") && !p(41.387, 2.170).includes("fr"), "Barcelone est prise pour la France");
+  assert.ok(p(48.583, 7.746).includes("fr") && !p(48.583, 7.746).includes("de"), "Strasbourg est prise pour l'Allemagne");
+  assert.ok(p(52.52, 13.40).includes("de"), "Berlin n'est plus en Allemagne");
+  assert.ok(p(42.70, 9.45).includes("fr"), "la Corse n'est plus en France");
+  assert.ok(!p(43.65, -79.38).includes("us") && p(40.71, -74.0).includes("us"), "Toronto est prise pour les États-Unis, ou New York ne l'est plus");
+  const chamonix: [number, number] = [45.9237, 6.8694];
+  assert.ok(!ids("CLE_TEST_123", chamonix).includes("swisstopo"), "swisstopo est proposé à Chamonix : la carte serait vide");
+  assert.ok(!itin(chamonix).includes("rando-ch"), "la rando suisse est proposée à Chamonix : le calque serait vide");
+  // Les fonds historiques de l'IGN : en France seulement.
+  assert.ok(fr.includes("ign-1950") && fr.includes("etat-major"), "les fonds historiques de l'IGN manquent en France");
+  assert.ok(!ids("CLE_TEST_123", zurich).includes("ign-1950"), "un fond historique de l'IGN est proposé hors de France");
+  // Eau & toilettes : partout, sans clé (c'est notre propre plan).
+  assert.ok(calquesDisponibles(undefined, ny).some((c) => c.id === "eau"), "le calque Eau & toilettes a disparu");
+  // Les points d'eau sont des ANNEAUX : un rond bleu plein se confondait avec le point GPS.
+  assert.match(codeNu("src/components/ghost-runner/CarteDirect.tsx"), /id: "calque-eau", type: "circle"[\s\S]{0,400}"circle-color": "#ffffff", "circle-stroke-color": "#0891b2"/, "les points d'eau redeviennent des ronds pleins, qu'on prend pour sa position");
   assert.ok(!fr.includes("swisstopo") && !fr.includes("us-topo"), "une carte nationale est proposée hors de son pays");
   assert.ok(ids("CLE_TEST_123", zurich).includes("swisstopo"), "swisstopo n'est pas proposé en Suisse");
   assert.ok(!ids("CLE_TEST_123", ny).includes("ign-plan"), "l'IGN est proposé à New York");
@@ -432,7 +462,7 @@ test("les mots des commandes existent dans les cinq langues", () => {
     "map.panneau", "map.secSorties", "map.secItineraires", "map.secRelief", "map.secAffichage", "f.plan", "f.nuit", "f.hybride",
     "f.topo", "f.ignPlan", "f.ignPhoto", "f.swisstopo", "f.bkgDe", "f.ignEs", "f.usTopo", "s.toutes", "s.recentes", "s.aucune",
     "c.rando", "c.vtt", "c.velo", "c.ombrage", "c.pentes", "c.courbes", "c.poi",
-    "f.outdoor", "f.hiver", "f.cyclosm", "c.ski", "c.randoCh", "s.semaine", "c.pentesAide"]) {
+    "f.outdoor", "f.hiver", "f.cyclosm", "c.ski", "c.randoCh", "s.semaine", "c.pentesAide", "c.eau", "f.ign1950", "f.etatMajor"]) {
     const n = [...src.matchAll(new RegExp(`"${k.replace(/\./g, "\\.")}":`, "g"))].length;
     assert.equal(n, 5, `« ${k} » présent ${n} fois, attendu 5`);
   }
