@@ -27,7 +27,7 @@ import { fondsCarteDirecte, type IdFond } from "@/lib/courses/fondsCarte";
 /** ⚠️ Le satellite n'existe QUE si la clé MapTiler existe : sans elle les tuiles
  *  répondent 403 et la carte reste grise sans la moindre erreur. On ne propose donc
  *  pas le bouton plutôt que de le proposer cassé (cf. lib/courses/fondsCarte). */
-const SATELLITE_DISPO = fondsCarteDirecte(process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined).some((f) => f.id === "satellite");
+const SATELLITE_DISPO = fondsCarteDirecte(process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined).includes("satellite");
 
 /**
  * ⚠️ `title`, `detail` et `tags` sont en FRANÇAIS, et doivent le rester :
@@ -203,7 +203,18 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   const [seanceChargee, setSeanceChargee] = useState<string | null>(null);
   /** Le bas de l'écran : réglages avant le départ, chiffres géants pendant. */
   const detailsRef = useRef<HTMLDivElement | null>(null);
-  const versDetails = () => detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  /** Vrai quand c'est NOUS qui avons ouvert le grand écran (téléphone), pas la main. */
+  const pleinAuto = useRef(false);
+  // Les réglages et détails vivent SOUS la carte : en grand écran, on en sort d'abord,
+  // sinon le défilement se fait derrière la couverture et rien ne bouge à l'écran.
+  const versDetails = () => {
+    const aller = () => detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!plein) { aller(); return; }
+    pleinAuto.current = false;
+    setPlein(false);
+    if (typeof document !== "undefined" && document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+    setTimeout(aller, 60);
+  };
   const derniereSauvegardeRef = useRef(0);
   const demarreeARef = useRef(0);
   const [distance, setDistance] = useState(10);
@@ -904,11 +915,33 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
    */
   function basculerPlein() {
     const suivant = !plein;
+    pleinAuto.current = false;
     setPlein(suivant);
     if (typeof document === "undefined") return;
     if (suivant) void sectionCarte.current?.requestFullscreen?.().catch(() => {});
     else if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
   }
+
+  /**
+   * ── SUR TÉLÉPHONE, L'ÉCRAN S'OUVRE EN GRAND (Cyprien, 27/11/2026) ──────────
+   * « Mets-le en grand écran directement, comme sur Strava. » Sous 768 px, la carte
+   * couvre tout l'écran dès l'arrivée (couverture CSS seulement : l'API plein écran
+   * exige un geste et n'existe pas sur iPhone). Le bouton « réduire » ou « Réglages »
+   * rend la page, avec les séances du coach dessous.
+   *
+   * ⚠️ AU DÉPART DE LA COURSE, LA PAGE REVIENT. Le lien de suivi à envoyer au contact
+   * et la limite de la veille de choc s'affichent HORS de la carte : sous une couverture
+   * plein écran, l'athlète partirait sans les voir. Seul le grand écran que NOUS avons
+   * ouvert se referme ; celui qu'il a demandé lui-même reste.
+   */
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia?.("(max-width: 767px)").matches) return;
+    pleinAuto.current = true;
+    setPlein(true);
+  }, []);
+  useEffect(() => {
+    if (phase !== "setup" && pleinAuto.current) { pleinAuto.current = false; setPlein(false); }
+  }, [phase]);
 
   // Échap sort du grand écran, et sortir du plein écran natif (Échap du navigateur)
   // referme la couverture : les deux doivent rester d'accord.

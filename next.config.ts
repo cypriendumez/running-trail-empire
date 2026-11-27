@@ -128,6 +128,7 @@ const nextConfig: NextConfig = {
     // `lib/courses/fondsCarte.ts`, `components/trail`, `components/races`, `components/segments`.
     const tuiles = [
       "https://api.maptiler.com",
+      "https://tiles.openfreemap.org",
       "https://*.mapbox.com",
       "https://tile.openstreetmap.org",
       "https://*.tile.openstreetmap.org",
