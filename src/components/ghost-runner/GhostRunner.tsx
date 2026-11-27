@@ -845,7 +845,15 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         body: JSON.stringify(payload),
       });
       const j = await res.json();
-      if (j.ok) toast.success(j.message ?? d["t.watchSent"], { duration: 7000 });
+      // La séance est dans le calendrier intervals.icu : on dit OÙ la retrouver sur la
+      // montre, selon la marque réelle (`marque`, renvoyée par la route), dans sa langue.
+      if (j.ok) {
+        const m = typeof j.marque === "string" ? j.marque : null;
+        const ou = m === "Garmin" ? d["w.ou.garmin"] : m === "Coros" ? d["w.ou.coros"] : m ? tg("w.ou.autre", { m }) : d["w.ou.aucune"];
+        // Court et dit comme on le dirait (Cyprien, 27/11/2026 : « ça fait trop IA ») : la
+        // marque dans le titre, UNE ligne pour savoir où la trouver — ni émoji, ni majuscules.
+        toast.success(m ? tg("w.envoye", { m }) : d["w.envoyeSans"], { description: ou, duration: 8000 });
+      }
       else if (j.needsSetup) toast.error(j.message ?? d["t.watchSetup"], { duration: 5000 });
       else toast.error(j.error ?? d["t.watchErr"]);
     } catch {

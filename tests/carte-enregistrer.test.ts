@@ -468,6 +468,26 @@ test("« Mes sorties » sont masquées à l'ouverture (27/11/2026)", () => {
   assert.match(gr, /const \[modeSorties, setModeSorties\] = useState<[^>]*>\("aucune"\);/, "« Mes sorties » s'affichent de nouveau d'office à l'ouverture");
 });
 
+test("l'envoi vers la montre nomme la VRAIE marque et dit où trouver la séance (27/11/2026)", () => {
+  // Le message disait « via Garmin » à tous, porteurs de COROS ou de Suunto compris, et en
+  // français seulement ; un envoi raté ne laissait aucune trace (Vercel garde une heure).
+  const route = codeNu("src/app/api/watch/push/route.ts");
+  assert.ok(!/via Garmin/.test(route), "le message d'envoi parle de nouveau de Garmin à tout le monde");
+  assert.match(route, /marque = montreDe\(await a\.json\(\)\)\?\.nom \?\? null;/, "la route ne dit plus quelle montre recevra la séance");
+  assert.match(route, /await journaliserEchec\(null, \{ source: "montre-envoi"/, "un envoi raté vers la montre n'est plus journalisé");
+  const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
+  // Court : la marque dans le titre, une ligne dessous, ni émoji ni majuscules (« ça fait trop IA »).
+  assert.match(gr, /toast\.success\(m \? tg\("w\.envoye", \{ m \}\) : d\["w\.envoyeSans"\], \{ description: ou, duration: 8000 \}\)/, "le message d'envoi n'est plus le message court");
+  const fr = readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8");
+  for (const k of ["w.envoye", "w.envoyeSans", "w.ou.garmin", "w.ou.coros", "w.ou.autre", "w.ou.aucune"]) {
+    const v = fr.match(new RegExp(`"${k.replace(/\./g, "\\.")}": "([^"]*)"`))![1];
+    assert.ok(v.length <= 115, `« ${k} » fait ${v.length} caractères : le message redevient un paragraphe`);
+    // Les noms de marque s'écrivent comme les marques les écrivent (COROS) : hors contrôle.
+    assert.ok(!/[✅🎯]|[A-ZÀ-Ý]{4,}/u.test(v.replace(/COROS/g, "")), `« ${k} » remet un émoji ou des MAJUSCULES : « ${v} »`);
+  }
+  assert.match(gr, /m === "Garmin" \? d\["w\.ou\.garmin"\] : m === "Coros" \? d\["w\.ou\.coros"\] : m \? tg\("w\.ou\.autre", \{ m \}\) : d\["w\.ou\.aucune"\]/, "l'écran ne dit plus où trouver la séance selon la marque");
+});
+
 test("les mots des commandes existent dans les cinq langues", () => {
   const src = readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8");
   for (const k of ["map.plan", "map.satellite", "map.recentrer", "map.reglages", "map.details", "map.fc",
@@ -476,7 +496,7 @@ test("les mots des commandes existent dans les cinq langues", () => {
     "map.panneau", "map.secSorties", "map.secItineraires", "map.secRelief", "map.secAffichage", "f.plan", "f.nuit", "f.hybride",
     "f.topo", "f.ignPlan", "f.ignPhoto", "f.swisstopo", "f.bkgDe", "f.ignEs", "f.usTopo", "s.toutes", "s.recentes", "s.aucune",
     "c.rando", "c.vtt", "c.velo", "c.ombrage", "c.pentes", "c.courbes", "c.poi",
-    "f.outdoor", "f.hiver", "f.cyclosm", "c.ski", "c.randoCh", "s.semaine", "c.pentesAide", "c.eau", "f.ign1950", "f.etatMajor"]) {
+    "f.outdoor", "f.hiver", "f.cyclosm", "c.ski", "c.randoCh", "s.semaine", "c.pentesAide", "c.eau", "f.ign1950", "f.etatMajor", "w.envoye", "w.envoyeSans", "w.ou.garmin", "w.ou.coros", "w.ou.autre", "w.ou.aucune"]) {
     const n = [...src.matchAll(new RegExp(`"${k.replace(/\./g, "\\.")}":`, "g"))].length;
     assert.equal(n, 5, `« ${k} » présent ${n} fois, attendu 5`);
   }
