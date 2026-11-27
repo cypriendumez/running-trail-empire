@@ -125,7 +125,15 @@ test("le suivi automatique se coupe à la main et se reprend au bouton", () => {
   // Glisser la carte prévient le parent…
   assert.match(carte, /m\.on\("dragstart", \(\) => deplacementRef\.current\?\.\(\)\)/, "déplacer la carte ne coupe plus le suivi : la position suivante la ramène");
   // …et le recentrage automatique est conditionné à ce suivi.
-  assert.match(carte, /if \(!suivreRef\.current\) return;\s*\n\s*m\.easeTo\(\{ center: versLngLat\(position\)/, "la carte se recentre encore à chaque point GPS, suivi coupé ou non");
+  assert.match(carte, /if \(!suivreRef\.current \|\| doigts\.current\) return;/, "la carte se recentre encore à chaque point GPS, suivi coupé ou doigts posés");
+  // ⚠️ DÉZOOM IMPOSSIBLE (Cyprien, 27/11/2026, sur téléphone) : chaque point GPS remontait
+  // le zoom à 15. Le suivi garde le zoom de l'athlète ; seule la première position zoome.
+  const suivi = carte.slice(carte.indexOf("if (!suivreRef.current || doigts.current) return;"), carte.indexOf("// Recentrage demandé"));
+  assert.ok(!/zoom: Math\.max\(m\.getZoom\(\), 15\)(?!.*premiere)/.test(suivi.replace(/premiere \? Math\.max\(m\.getZoom\(\), 15\)/, "")), "le suivi remonte de nouveau le zoom à 15 à chaque point GPS : on ne peut plus dézoomer");
+  assert.match(suivi, /zoom: premiere \? Math\.max\(m\.getZoom\(\), 15\) : m\.getZoom\(\)/, "le suivi ne garde plus le zoom choisi par l'athlète");
+  // Les doigts eux-mêmes coupent le suivi : `zoomstart` ne part pas pendant un glissement.
+  assert.match(carte, /cadre\.addEventListener\("touchmove", \(\) => \{ if \(suivreRef\.current\) deplacementRef\.current\?\.\(\); \}/, "un pincement sur téléphone ne coupe plus le suivi");
+  assert.match(carte, /cadre\.addEventListener\("touchstart", \(\) => \{ doigts\.current = true; \}/, "un recentrage peut de nouveau partir sous les doigts");
   // ⚠️ `zoomstart` est aussi émis par NOS `easeTo` : seul un geste porte `originalEvent`.
   // Sans ce filtre, le premier recentrage automatique couperait le suivi lui-même.
   assert.match(carte, /m\.on\("zoomstart", \(e\) => \{ if \(\(e as \{ originalEvent\?: unknown \}\)\.originalEvent\) deplacementRef\.current\?\.\(\); \}\)/, "le zoom ne distingue plus la main de nos propres recentrages");

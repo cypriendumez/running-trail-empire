@@ -111,6 +111,10 @@ export function CarteDirect({
   const point = useRef<maplibregl.Marker | null>(null);
   /** Vrai une fois le style chargé : avant, on ne peut ni poser de couche ni de tracé. */
   const pret = useRef(false);
+  /** Des doigts sont posés sur la carte : aucun recentrage automatique pendant ce temps. */
+  const doigts = useRef(false);
+  /** La carte a déjà été centrée sur une VRAIE position : le zoom 15 n'est imposé qu'une fois. */
+  const dejaCentree = useRef(false);
   const suivreRef = useRef(suivre);
   const deplacementRef = useRef(onDeplacement);
   const positionRef = useRef(position);
@@ -200,6 +204,21 @@ export function CarteDirect({
       m.addControl(new maplibregl.AttributionControl({ compact: false }), "top-right");
       m.on("dragstart", () => deplacementRef.current?.());
       m.on("zoomstart", (e) => { if ((e as { originalEvent?: unknown }).originalEvent) deplacementRef.current?.(); });
+      /**
+       * ⚠️ LE PINCEMENT NE COUPAIT PAS TOUJOURS LE SUIVI (Cyprien, 27/11/2026, sur
+       * téléphone : « le dézoom ne fonctionne pas »). `zoomstart` n'est émis qu'au DÉBUT
+       * d'un zoom : si la carte glissait déjà vers la position GPS, le pincement ne
+       * l'émettait pas, le suivi restait actif, et le point suivant la ramenait au zoom 15.
+       * On écoute donc les DOIGTS eux-mêmes : un doigt qui bouge sur la carte coupe le
+       * suivi, et tant qu'un doigt est posé, aucun recentrage ne part.
+       */
+      const cadre = m.getCanvasContainer();
+      cadre.addEventListener("touchstart", () => { doigts.current = true; }, { passive: true });
+      cadre.addEventListener("touchmove", () => { if (suivreRef.current) deplacementRef.current?.(); }, { passive: true });
+      const leves = (e: TouchEvent) => { if (e.touches.length === 0) doigts.current = false; };
+      cadre.addEventListener("touchend", leves, { passive: true });
+      cadre.addEventListener("touchcancel", leves, { passive: true });
+      cadre.addEventListener("wheel", () => { if (suivreRef.current) deplacementRef.current?.(); }, { passive: true });
       m.on("load", () => {
         // Le satellite (si la clé existe) : une couche SOUS les étiquettes, masquée par
         // défaut. On bascule sa visibilité au lieu de changer de style — un `setStyle`
@@ -225,6 +244,7 @@ export function CarteDirect({
         if (reliefRef.current) appliquerRelief(m, true);
         if (positionRef.current) poserPoint(m, positionRef.current);
       });
+      if (positionRef.current) dejaCentree.current = true;
       carte.current = m;
     })();
     return () => { annule = true; pret.current = false; point.current = null; carte.current?.remove(); carte.current = null; };
@@ -256,8 +276,13 @@ export function CarteDirect({
   useEffect(() => {
     const m = carte.current; if (!m || !position) return;
     poserPoint(m, position);
-    if (!suivreRef.current) return;
-    m.easeTo({ center: versLngLat(position), zoom: Math.max(m.getZoom(), 15), pitch: m.getPitch() });
+    if (!suivreRef.current || doigts.current) return;
+    // ⚠️ LE ZOOM DE L'ATHLÈTE EST GARDÉ. Il était remonté de force à 15 à chaque point GPS
+    // (`Math.max(zoom, 15)`) : impossible de dézoomer en suivant sa position. Seule la
+    // PREMIÈRE position zoome sur lui, comme Strava ; ensuite, on ne fait que le suivre.
+    const premiere = !dejaCentree.current;
+    dejaCentree.current = true;
+    m.easeTo({ center: versLngLat(position), zoom: premiere ? Math.max(m.getZoom(), 15) : m.getZoom(), pitch: m.getPitch() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position]);
 
@@ -265,7 +290,8 @@ export function CarteDirect({
   useEffect(() => {
     const m = carte.current;
     if (!m || !position || recentrer === 0) return;
-    m.easeTo({ center: versLngLat(position), zoom: Math.max(m.getZoom(), 15) });
+    // Le recentrage garde le zoom choisi, sauf si l'on voit toute une région (< 13).
+    m.easeTo({ center: versLngLat(position), zoom: m.getZoom() < 13 ? 15 : m.getZoom() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recentrer]);
 
