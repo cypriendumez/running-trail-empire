@@ -4,6 +4,66 @@
 demande. Fichier PUBLIC : aucune donnée personnelle, aucun chiffre non sourcé, aucune faille non corrigée.
 Ce qui est privé est désigné par son dossier dans `~/Desktop/Pacevo/`, jamais recopié.*
 
+## Semaine du 20/11/2026 au 27/11/2026
+
+Passage de `@Atlas` dans la routine Direction du 27/11. Verdict d'ensemble : **RENVOYÉ**.
+- Aucune PR de la semaine (#63 à #72) ne porte de visa de directeur au format exigé (tag, verdict, grille, « Ce que je n'ai pas pu vérifier ») : #63, #64, #67, #68 et #70 citent `@HeadCoach` en mention résumée ; #65 et #66 sont des brouillons « [Sans visa] » qui recopient les verdicts les ayant renvoyés ; #69, #71 et #72 n'en citent aucun.
+- La PR #72 ajoute un hébergeur de fonds de carte (`tiles.openfreemap.org`, `next.config.ts`) absent de la liste des destinataires de la politique de confidentialité (`src/app/legalI18n.ts`, qui ne cite que MapTiler et OpenStreetMap) ; neuf autres hôtes de tuiles de `next.config.ts` y manquent aussi, manque antérieur à #72 (grep du 27/11). À faire vérifier par `@Trésorier`, puis à corriger en 5 langues.
+- Visa `@Trésorier` sur `ops/greffier/API-MONTRES.md` : **BLOQUÉ** (sa lecture des quatre pages officielles a été refusée par ses permissions) ; à lever par Cyprien. Visa `@Strategos` du 27/11 : ACCORDÉ avant l'ajout de deux leçons par la routine (raisons de la Gazette ; CSP et confidentialité), visa redemandé ensuite : RENVOYÉ, leçons corrigées, nouveau visa à redemander.
+- Le passage Direction du 20/11 n'a laissé ni PR, ni commit, ni synthèse. Règle candidate de `@Strategos` : « un passage Direction se termine toujours par une PR, même RAS », à confirmer par une 2ᵉ occurrence.
+
+Sources : API REST GitHub (PR #63 à #72, corps, runs Actions), `git log`, https://pacevo.fr/version.json (relu le 27/11 : `87a983e8`, tête de `main`).
+
+### PR de la semaine
+
+8 fusionnées (#63, #64, #67 à #72), 2 ouvertes en brouillon (#65 Gazette depuis le 22/11, #66 Coach depuis le 23/11, aucune de plus de 7 jours), aucune fermée sans fusion.
+
+| PR | Pôle | Directeur | Visa au format | Remarque |
+|---|---|---|---|---|
+| #63 | C | `@HeadCoach` | NON (mention résumée) | Touche aussi `src/lib/watch/intervals.ts` (`@Architect`) et l'i18n (`@Maestro`) |
+| #64 | C | `@HeadCoach` | NON (mention résumée) | `autoPlan.ts`, `reasonsI18n.ts` |
+| #65 | E | `@Maestro` | NON (brouillon, renvoyé 2 fois) | Le verdict recopié n'a pas de ligne « Pour @Atlas » |
+| #66 | C | `@HeadCoach` | NON (brouillon, renvoyé 2 fois) | Verdict recopié au format complet |
+| #67 | C | `@HeadCoach` | NON (mention résumée) | `autoPlan.ts`, `reasonsI18n.ts` |
+| #68 | C | `@HeadCoach` | NON (mention résumée) | Routes d'IA : aussi `@Conductor` ; i18n : `@Maestro` |
+| #69 | A | `@Strategos` | NON | `ops/STATE.md` seul |
+| #70 | C | `@HeadCoach` | NON (mention résumée) | Une phrase retirée après la relecture finale, sans nouvelle relecture |
+| #71 | A | `@Strategos` | NON | `ops/STATE.md` seul |
+| #72 | E | `@Maestro` (+ `@Architect`, `@Trésorier`) | NON | CSP élargie, nouvel hébergeur de tuiles absent de la politique de confidentialité |
+
+### Renvoyé à un pôle
+
+- **Pôle H (`@Trésorier`), #72** : politique de confidentialité à compléter (OpenFreeMap reçoit l'adresse IP du navigateur).
+- **Pôle A (`@PostMortem`)** : causes des deux refus de #65 et #66 à porter au fichier de leçons ; la leçon « `auth.crash` sans DNS dans le cloud » existe déjà (09/11), à ne pas dupliquer ; celle sur la lecture de `noHistory` sur 60 séances tous sports rejoint la leçon du 19/11.
+- **Pôle E (`@Gazette`)** : ligne « Pour @Atlas » manquante dans le verdict recopié de #65.
+- **PR de session** : décision « visas des PR de session » toujours attendue de Cyprien.
+
+### Dépendances entre pôles
+
+- `@Architect` absent de #63, #64, #66, #67, #68, #70 (touchent `autoPlan.ts`) et de #72 (CSP).
+- `@Maestro` absent des PR qui touchent les fichiers i18n (#63, #64, #66, #67, #68, #70) et de #72.
+- `@Conductor` absent de #68 (routes d'IA).
+- Garmin : la correction 6 de `ops/CONSTITUTION.md` et `.claude/agents/maestro.md` disent encore « suspendu » ; la page officielle ne le dit plus depuis le 13/11 (texte de Cyprien, signalé sans modification).
+- Strava → Gemini : toujours non vérifié (STATE.md, BLOQUÉES, point 4).
+
+### Passages de routines suspects
+
+- Journaux des routines cloud non lus (illisibles depuis une routine) : aucun passage sans PR ne se classe « refus » ou « RAS ». À lire : Direction du 20/11, Bugs depuis le 20/11 (aucune PR « Bugs »), Blog sujets du 23/11.
+- Gazette (22/11) et Coach (23/11) : passages réels, prouvés par #65 et #66.
+- Tâches du Mac (`@Concierge`, `@TimeMachine`) : invisibles depuis le cloud.
+- GitHub Actions : tous les passages relevés réussis ; sauvegarde publique le 22/11 ; `@Vigie` le 27/11 à 02:18 UTC.
+
+### Ce qui attend le GO de Cyprien
+
+- PR #65 (Gazette, brouillon sans visa) : fermer ou garder comme trace. PR #66 (Coach, brouillon sans visa) : trois corrections de `@HeadCoach` restent à faire.
+- PR Direction du 27/11 : à fusionner sur GO.
+- Visa `@Trésorier` : lire les quatre pages officielles, ou accorder la lecture réseau au sous-agent.
+- Politique de confidentialité (hébergeur de tuiles de #72) ; correction 6 sur Garmin ; visas des PR de session ; PR #43 (corps à relire) ; offre Pro de Supabase au lancement.
+
+### Pour @Nexus (une ligne)
+
+Semaine du 20 au 27/11, RENVOYÉ : aucun visa au format sur #63 à #72, #65 et #66 renvoyés deux fois, #72 sans mention du nouvel hébergeur de tuiles dans la confidentialité, visa `@Trésorier` BLOQUÉ, passage Direction du 20/11 sans trace ; la production est à jour (`87a983e8`).
+
 ## Semaine du 06/11/2026 au 13/11/2026
 
 Premier passage de `@Atlas` (routine Direction du 13/11). Verdict d'ensemble : **RENVOYÉ**.

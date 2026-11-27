@@ -1,6 +1,6 @@
 # État de l'équipe d'agents Pacevo
 
-*Tenu par `@Nexus`. Mis à jour le 13/11/2026 à 7 h (routine Direction) ; retouché en session le 16/11/2026 (production, PR #47, #51, #54, #55 et #56) et le 19/11/2026 (contrôle des agents : journaux des routines, tâches du Mac, GitHub Actions). Chaque ligne dit ce qui TOURNE VRAIMENT,
+*Tenu par `@Nexus`. Mis à jour le 27/11/2026 (routine Direction : relevé par commandes, synthèse de `@Atlas`, état de `@Nexus`) ; auparavant le 13/11/2026 à 7 h ; retouché en session le 16/11/2026 (production, PR #47, #51, #54, #55 et #56) et le 19/11/2026 (contrôle des agents : journaux des routines, tâches du Mac, GitHub Actions). Chaque ligne dit ce qui TOURNE VRAIMENT,
 pas ce qui est prévu : un agent écrit dans la constitution mais sans routine planifiée n'existe pas.*
 
 > ⚠️ **Dépôt PUBLIC** (`cypriendumez/running-trail-empire`). Rien de personnel, de comptable ni
@@ -34,8 +34,8 @@ les premières à tomber quand les sessions de la semaine ont consommé la limit
 | Blog Pacevo, un article sourcé | `@Plume` (+ visa `@Mercator` depuis le 09/11, à prouver) | le 1er et le 15, 3 h | Opus 5 |
 | Blog Pacevo, sujets | `@Plume` (+ visa `@Mercator` depuis le 09/11, à prouver) | lundi 3 h 30 | Sonnet 5 |
 | Coach Pacevo | `@Sparring`, `@SafeRun` (+ visa `@HeadCoach` depuis le 09/11, à prouver) | lundi 5 h | Opus 5.5 |
-| Direction Pacevo | `@Nexus`, `@PostMortem`, `@Greffier` (+ `@Atlas`, `@Strategos`, `@Trésorier`, appelés le 13/11) | vendredi 6 h | Sonnet 5.5 |
-| Gazette Pacevo, édition de la lettre (demandée le 10/11, 1er passage le 15/11 à prouver) | `@Gazette` (+ visa `@Maestro`) : une PR, Cyprien fusionne | dimanche 22 h 30 | Opus 5.5 |
+| Direction Pacevo | `@Nexus`, `@PostMortem`, `@Greffier` (+ `@Atlas`, `@Strategos`, `@Trésorier`, appelés le 13/11 et le 27/11) | vendredi 6 h | Sonnet 5.5 |
+| Gazette Pacevo, édition de la lettre (demandée le 10/11 ; passages prouvés par les PR #51 du 15/11 et #65 du 22/11) | `@Gazette` (+ visa `@Maestro`) : une PR, Cyprien fusionne | dimanche 22 h 30 | Opus 5.5 |
 | Sécurité et veille Pacevo | `@Bunker`, `@Vault`, `@Radar` (+ contrôle de la sauvegarde publique ; + visas `@Architect` et `@Mercator` depuis le 09/11, à prouver) | le 5 du mois, 4 h | Sonnet 5.5 |
 
 **Tâches locales (Mac de Cyprien, app Claude)** : elles écrivent dans `~/Desktop/Pacevo/`, ce
@@ -71,24 +71,34 @@ pacevo.fr sert `04b650c0`, qui contient #67 (suites du long arrêt et petites se
 des coureurs exemptés) et #70 (suites de la reprise : footings à la longueur habituelle, espacés, lignes droites une
 fois la règle finie). Aucune fusion de retard.
 
+**Relevé du 27/11 (routine Direction, par commandes)** : pacevo.fr sert `87a983e8` = tête de `main` (PR #72, plein écran
+de l'enregistrement). Aucune fusion de retard. PR ouvertes : #65 (Gazette, édition du 23/11, brouillon « sans visa » : `@Maestro`
+a renvoyé deux fois, ouverte depuis le 22/11) et #66 (Coach du 23/11, brouillon « sans visa » : `@HeadCoach` a renvoyé deux
+fois, ouverte depuis le 23/11) : toutes deux attendent Cyprien depuis moins de 7 jours. Fermée sans fusion depuis le 20/11 :
+aucune. Fusionnées depuis le 20/11 : #63, #64, #67 à #72. Aucune PR « Direction » depuis #47 (13/11) : le passage du 20/11 n'a
+laissé ni PR ni trace dans le dépôt. GitHub Actions : les 60 derniers passages réussis ; sauvegarde publique réussie le 22/11
+(dimanche), lettre du lundi partie le 23/11, `@Vigie` réussie le 27/11 à 02:18 UTC. `npm test` échoue seulement sur `auth.crash`
+dans le cloud (pas de DNS), comme avant (leçon du 09/11).
+**Passage Direction du 27/11** : branche `direction/2026-11-27` (synthèse de `@Atlas` dans `ops/ATLAS_SYNC.md`, verdict RENVOYÉ ; en-tête de `ops/greffier/API-MONTRES.md` relu par `@Greffier` ; deux leçons ajoutées par `@PostMortem`). Faits du relevé revérifiés par `@Nexus` (PR, production, Actions, CSP). Fusion sur GO de Cyprien.
+
 ## Vague 1 : 12 agents sur 12 en place
 
 | # | Agent | État | Preuve / remarque |
 |---|---|---|---|
-| 1 | `@Nexus` | **EXÉCUTÉ** | 13/11 (Direction, 1er passage) : ce fichier et le point de 2 minutes, à partir de `ops/ATLAS_SYNC.md`. |
-| 3 | `@Sparring` | **EXÉCUTÉ** | 09/11 (5 h) : profil marathonien sub-3 h ajouté ; 2 défauts du plan trouvés (« /km/km », seuil 3 jours après un marathon), PR #4 fusionnée et en ligne (1e2173c). 16/11 (5 h) : profil 7 (emploi du temps chaotique) éprouvé, PR #54 (tests et matrice seuls) ; les 8 profils de la matrice ont un test (`ops/sparring/PROFILS.md`) ; un défaut de reprise trouvé, corrigé par la PR #57, en ligne au 19/11 (voir « BLOQUÉES », point 8). |
+| 1 | `@Nexus` | **EXÉCUTÉ** | 13/11 (Direction, 1er passage) : ce fichier et le point de 2 minutes, à partir de `ops/ATLAS_SYNC.md`. 27/11 (Direction) : ce fichier et le point, faits du relevé revérifiés par commandes. Aucune trace d'un passage le 20/11. |
+| 3 | `@Sparring` | **EXÉCUTÉ** | 09/11 (5 h) : profil marathonien sub-3 h ajouté ; 2 défauts du plan trouvés (« /km/km », seuil 3 jours après un marathon), PR #4 fusionnée et en ligne (1e2173c). 16/11 (5 h) : profil 7 (emploi du temps chaotique) éprouvé, PR #54 (tests et matrice seuls) ; les 8 profils de la matrice ont un test (`ops/sparring/PROFILS.md`) ; un défaut de reprise trouvé, corrigé par la PR #57, en ligne au 19/11 (voir « BLOQUÉES », point 8). 23/11 (5 h) : PR #66 en brouillon sans visa (voir « BLOQUÉES », point 11). |
 | 7 | `@SafeRun` | **EXÉCUTÉ** | 16/11 (Coach) : `kine.crash`, `douleurs-course` et `sante` verts ; Kiné IA toujours retiré ; aucun diagnostic dans les textes servis après une douleur ; rien à corriger (PR #54). |
-| 8 | `@Sweeper` | **EXÉCUTÉ** | 08/11 : pacevo.fr joignable depuis le cloud (version lue), aucun défaut sur 24 h. Filtre `localhost` en place à la source depuis le 06/11. Depuis le 09/11 à 23 h : aucune PR « Bugs ». Journal du 16/11 à 23 h lu le 19/11 : vrai RAS (`error_logs` vide hors source `reseau` sur 24 h, aucune PR ouverte). Du 17/11 à 23 h au 19/11 à 6 h : quatre passages refusés par la limite hebdomadaire. |
+| 8 | `@Sweeper` | **EXÉCUTÉ** | 08/11 : pacevo.fr joignable depuis le cloud (version lue), aucun défaut sur 24 h. Filtre `localhost` en place à la source depuis le 06/11. Depuis le 09/11 à 23 h : aucune PR « Bugs ». Journal du 16/11 à 23 h lu le 19/11 : vrai RAS (`error_logs` vide hors source `reseau` sur 24 h, aucune PR ouverte). Du 17/11 à 23 h au 19/11 à 6 h : quatre passages refusés par la limite hebdomadaire. Depuis le 20/11 : aucune PR « Bugs », journaux non lus. |
 | 9 | `@Bunker` | **EXÉCUTÉ** | 08/11 : 23 → 9 failles de dépendances, Next.js 16.4.5, déployé. Restent `zod` (importé nulle part) et la chaîne ESLint (non utilisée). |
 | 10 | `@Vault` | PLANIFIÉ | Sécurité, le 5/12. Lecture seule ; une faille non corrigée ne va jamais dans le dépôt. |
-| 21 | `@Plume` | **EXÉCUTÉ** | 09/11 : PR #6 « Courir dans le froid et la nuit » (p16) fusionnée et en ligne (e738e78), née de la relance manuelle du 07/11, avant le visa `@Mercator`. 15/11 (3 h) : PR #50 « Le sommeil », double relecture `verificateur-sources` et visa `@Mercator` ACCORDÉ, fusionnée. Blog sujets du 16/11 (journal lu le 19/11) : 6 sujets, RENVOYÉ par `@Mercator` (doublon de p17, chiffre « 14 000 courses » périmé, sujet contraire à `repriseArret.ts`), puis VISA ACCORDÉ à 5 sujets ; rapport rendu dans le journal, pas de PR (normal pour cette routine). |
+| 21 | `@Plume` | **EXÉCUTÉ** | 09/11 : PR #6 « Courir dans le froid et la nuit » (p16) fusionnée et en ligne (e738e78), née de la relance manuelle du 07/11, avant le visa `@Mercator`. 15/11 (3 h) : PR #50 « Le sommeil », double relecture `verificateur-sources` et visa `@Mercator` ACCORDÉ, fusionnée. Blog sujets du 16/11 (journal lu le 19/11) : 6 sujets, RENVOYÉ par `@Mercator` (doublon de p17, chiffre « 14 000 courses » périmé, sujet contraire à `repriseArret.ts`), puis VISA ACCORDÉ à 5 sujets ; rapport rendu dans le journal, pas de PR (normal pour cette routine). Blog sujets du 23/11 : journal non lu. |
 | 26 | `@Radar` | PLANIFIÉ | Sécurité et veille, le 5/12. Sites des concurrents autorisés dans le réseau cloud. |
-| 34 | `@Greffier` | **EXÉCUTÉ** | 13/11 (Direction, 1er passage) : `ops/greffier/API-MONTRES.md` mis à jour (Strava : interdiction IA confirmée par l'API Policy 2026 ; Garmin : la page officielle ne dit plus « suspendu », reprise non confirmée). Visa `@Trésorier` RENVOYÉ, corrigé, à redemander. |
-| 48 | `@TimeMachine` | **EXÉCUTÉ** | 08/11 : 1re sauvegarde chiffrée complète de la base, relue et recomptée. Tâche locale chaque dimanche. **Le passage du 15/11 n'a rien produit** (aucune archive, aucune trace de passage dans l'app, cause inconnue) : 11 jours sans sauvegarde privée. Relancé en session le 19/11 : archive du 19/11 VALIDE (51 tables, 20 184 lignes, 12 comptes, 8,9 Mo), 2 archives gardées ; `journal.md` créé dans le dossier des sauvegardes (hors dépôt) pour voir un dimanche manqué. |
-| 61 | `@Concierge` | **EXÉCUTÉ** | 09/11 (8 h 05, 1er passage) : 9 fils classés, 1 brouillon propre (trou « à compléter » au lieu d'inventer), 0 envoi, briefing écrit dans `~/Desktop/Pacevo/`. Du 09/11 au 19/11 (relevé sur le Mac) : 8 passages réussis sur 11 jours ; échecs les 11/11 et 19/11 (limite hebdomadaire), aucun passage les 14, 15 et 18/11, plusieurs passages tardifs (Mac éteint ou en veille à 8 h, probablement). Courrier du 19/11 relancé en session. Le connecteur ne voit pas le Spam. |
-| 64 | `@PostMortem` | **EXÉCUTÉ** | 13/11 (Direction) : leçons de la semaine ajoutées à `ops/memory/LESSONS_LEARNED.md` (rechute FC max datée du 12/11, clause incorporée par renvoi, visa = bloc tagué). Visa `@Strategos` RENVOYÉ, corrigé, à redemander. |
+| 34 | `@Greffier` | **EXÉCUTÉ** | 13/11 (Direction, 1er passage) : `ops/greffier/API-MONTRES.md` mis à jour (Strava : interdiction IA confirmée par l'API Policy 2026 ; Garmin : la page officielle ne dit plus « suspendu », reprise non confirmée). Visa `@Trésorier` RENVOYÉ, puis ACCORDÉ le 16/11. 27/11 (Direction) : en-tête relu par mots-clés (Garmin, Strava, Suunto, Polar ; COROS refusé par le réseau, HTTP 403) ; visa `@Trésorier` BLOQUÉ (voir « BLOQUÉES », point 9). |
+| 48 | `@TimeMachine` | **EXÉCUTÉ** | 08/11 : 1re sauvegarde chiffrée complète de la base, relue et recomptée. Tâche locale chaque dimanche. **Le passage du 15/11 n'a rien produit** (aucune archive, aucune trace de passage dans l'app, cause inconnue) : 11 jours sans sauvegarde privée. Relancé en session le 19/11 : archive du 19/11 VALIDE (51 tables, 20 184 lignes, 12 comptes, 8,9 Mo), 2 archives gardées ; `journal.md` créé dans le dossier des sauvegardes (hors dépôt) pour voir un dimanche manqué. Passage du 22/11 non constaté (Mac, invisible depuis le cloud). |
+| 61 | `@Concierge` | **EXÉCUTÉ** | 09/11 (8 h 05, 1er passage) : 9 fils classés, 1 brouillon propre (trou « à compléter » au lieu d'inventer), 0 envoi, briefing écrit dans `~/Desktop/Pacevo/`. Du 09/11 au 19/11 (relevé sur le Mac) : 8 passages réussis sur 11 jours ; échecs les 11/11 et 19/11 (limite hebdomadaire), aucun passage les 14, 15 et 18/11, plusieurs passages tardifs (Mac éteint ou en veille à 8 h, probablement). Courrier du 19/11 relancé en session. Le connecteur ne voit pas le Spam. Depuis le 20/11 : non constaté (Mac). |
+| 64 | `@PostMortem` | **EXÉCUTÉ** | 13/11 (Direction) : leçons de la semaine ajoutées à `ops/memory/LESSONS_LEARNED.md` (rechute FC max datée du 12/11, clause incorporée par renvoi, visa = bloc tagué). Visa `@Strategos` RENVOYÉ, puis ACCORDÉ le 16/11. 27/11 (Direction) : deux leçons ajoutées (raisons de la Gazette ; CSP et destinataires de la confidentialité) ; visa `@Strategos` redemandé (voir « BLOQUÉES », point 13). |
 
-## Direction (créée le 09/11/2026) : 11 unités définies, 7 branchées dans les routines, 1er passage Direction le 13/11
+## Direction (créée le 09/11/2026) : 11 unités définies, 7 branchées dans les routines, passages Direction le 13/11 et le 27/11
 
 Organigramme, rattachements et statuts : `ops/direction/README.md` (source unique, gardée par
 `tests/organigramme.test.ts`) ; fiches : `.claude/agents/` (sous-agents en lecture seule, modèle `opus`) ; textes à
@@ -102,18 +112,20 @@ aucun visa de directeur au format exigé (tag, verdict, grille, « Ce que je n'a
 portent qu'une mention résumée. Seules #4 (Coach) et #6 (Blog p16) viennent de routines, avant le branchement ;
 toutes les autres viennent de sessions de Cyprien, qui ne sont pas tenues au visa aujourd'hui.
 
+**Deuxième bilan (`ops/ATLAS_SYNC.md`, semaine du 20 au 27/11) : RENVOYÉ.** Aucune PR de #63 à #72 n'a de visa au format ; #65 et #66 sont des brouillons renvoyés deux fois ; #72 ajoute un hébergeur de fonds de carte absent de la politique de confidentialité (qui omet aussi neuf autres hébergeurs de tuiles déjà appelés par le code) ; visa `@Trésorier` BLOQUÉ ; passage Direction du 20/11 sans trace.
+
 | # | Agent | Rôle | État | Routine (premier passage à prouver) |
 |---|---|---|---|---|
-| 1 | `@Nexus` | directeur général délégué, bras droit | ACTIF | Direction ; 1er passage comme sous-agent `nexus` le 13/11 |
-| 71 | `@Atlas` | directeur adjoint des opérations, bras gauche | DÉFINI, branché le 09/11 ; appelé le 13/11 (synthèse rendue, RENVOYÉ) | Direction (vendredi) ; ACTIF après lecture du journal du 13/11 |
-| 72 | `@Strategos` | pôle A, stratégie et qualité des agents | DÉFINI, branché le 09/11 ; appelé le 13/11 (RENVOYÉ sur les leçons) | Direction ; ACTIF après lecture du journal du 13/11 |
+| 1 | `@Nexus` | directeur général délégué, bras droit | ACTIF | Direction ; passages comme sous-agent `nexus` le 13/11 et le 27/11 |
+| 71 | `@Atlas` | directeur adjoint des opérations, bras gauche | DÉFINI, branché le 09/11 ; appelé le 13/11 et le 27/11 (synthèses rendues, RENVOYÉ les deux fois) | Direction (vendredi) ; ACTIF après lecture du journal du 13/11 |
+| 72 | `@Strategos` | pôle A, stratégie et qualité des agents | DÉFINI, branché le 09/11 ; appelé le 13/11 (RENVOYÉ sur les leçons) et le 27/11 (ACCORDÉ avant l'ajout des deux leçons du 27/11, redemandé) | Direction ; ACTIF après lecture du journal du 13/11 |
 | 73 | `@Chancelier` | pôle B, secrétaire général | DÉFINI, branché le 09/11 | Courrier (Mac, 8 h), après `@Concierge` ; non visible depuis le cloud |
-| 74 | `@HeadCoach` | pôle C, directeur scientifique | DÉFINI, branché le 09/11 ; appelé le 16/11 (deux visas RENVOYÉ recopiés dans la PR #54 de la routine, puis VISA ACCORDÉ en session le 16/11) | Coach (lundi 5 h), avant la PR ; ACTIF après lecture du journal du 16/11 |
+| 74 | `@HeadCoach` | pôle C, directeur scientifique | DÉFINI, branché le 09/11 ; appelé le 16/11 (deux visas RENVOYÉ recopiés dans la PR #54 de la routine, puis VISA ACCORDÉ en session le 16/11) et le 23/11 (deux RENVOYÉ recopiés dans la PR #66) | Coach (lundi 5 h), avant la PR ; ACTIF après lecture du journal du 16/11 |
 | 75 | `@Architect` | pôle D, technique et sécurité | DÉFINI, branché le 09/11 | Bugs (6 h, 23 h) et Sécurité et veille (le 5) ; aucun visa prouvé |
-| 76 | `@Maestro` | pôle E, produit et design | DÉFINI | Gazette (15/11) ; à la demande sur toute PR d'interface |
+| 76 | `@Maestro` | pôle E, produit et design | DÉFINI ; appelé dans la Gazette (PR #51 du 15/11, BLOQUÉ ; PR #65 du 22/11, deux RENVOYÉ) | Gazette (dimanche 22 h 30) ; à la demande sur toute PR d'interface |
 | 77 | `@Mercator` | pôle F, marketing | ACTIF (Blog) : visa dans la PR #50 (15/11) et dans le journal des sujets du 16/11, lu le 19/11 (RENVOYÉ puis VISA ACCORDÉ) | Blog (le 1er et le 15, lundi) et Sécurité et veille (rapport de `@Radar`, le 5/12) |
 | 78 | `@Alliance` | pôle G, commercial et partenariats | DÉFINI | avec son pôle (en attente) ; à la demande |
-| 79 | `@Trésorier` | pôle H, finance et juridique | DÉFINI, branché le 09/11 ; appelé le 13/11 (RENVOYÉ sur `API-MONTRES.md`) | Direction ; ACTIF après lecture du journal du 13/11 |
+| 79 | `@Trésorier` | pôle H, finance et juridique | DÉFINI, branché le 09/11 ; appelé le 13/11 (RENVOYÉ sur `API-MONTRES.md`) et le 27/11 (BLOQUÉ : lecture des pages officielles refusée par ses permissions) | Direction ; ACTIF après lecture du journal du 13/11 |
 | 80 | `@Oracle` | pôle I, données | DÉFINI | avec son pôle (en attente) ; à la demande |
 | 81 | `@Conductor` | pôle J, fonctions de l'application | DÉFINI | avec la Vague 2 (audit des 6 fonctions) ; à la demande |
 
@@ -137,9 +149,9 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
   d'usage. Décision de Cyprien.
 - **Veille des concurrents** (tâche locale unique prévue le 16/11) : jamais démarrée, son dossier de travail est
   introuvable (`start_failed, folder_missing`). À re-dater avec le bon dossier, ou à abandonner : décision de Cyprien.
-- `@TimeMachine` : constater le passage automatique du dimanche 22/11 (une ligne de plus dans `journal.md`).
-- Journaux encore à lire (`get_run_log`) : Direction du 13/11, Coach du 16/11 (pour passer `@Atlas`,
-  `@Strategos`, `@Trésorier` et `@HeadCoach` en ACTIF).
+- `@TimeMachine` : constater les passages automatiques des dimanches 22/11 et 29/11 (une ligne de plus chacun dans `journal.md`, hors dépôt). `@Concierge` : passages depuis le 20/11 non constatés. Invisibles depuis le cloud.
+- **Passage Direction du 20/11** : ni PR, ni commit, ni synthèse. Refus pour limite d'usage, passage avorté ou sans écriture : seul son journal le dira. Règle candidate de `@Strategos` : « un passage Direction se termine toujours par une PR, même RAS » (à confirmer par une 2ᵉ occurrence).
+- Journaux encore à lire (`get_run_log`) : Direction du 13/11, 20/11 et 27/11 ; Coach du 16/11 et 23/11 ; Bugs depuis le 20/11 ; Blog sujets du 23/11 (pour classer les passages sans PR et passer `@Atlas`, `@Strategos`, `@Trésorier`, `@HeadCoach` en ACTIF).
 
 ## BLOQUÉES ou en cours
 
@@ -210,6 +222,16 @@ d'usage. Les 6 fonctions « APP » sont à auditer : certaines existent déjà e
    courte pendant la reprise d'un long arrêt fait perdre les protections du long arrêt.
    **Fusionné (PR #57, le 17/11) et EN LIGNE** : pacevo.fr sert `24637bab` le 19/11, qui contient #57 à #61.
    Restent ouverts les deux points ci-dessus.
+
+9. **Visa `@Trésorier` sur `ops/greffier/API-MONTRES.md` : BLOQUÉ** (Direction du 27/11). Le sous-agent n'a pas pu relire les pages officielles (lecture refusée par ses permissions) ; le visa du 16/11 ne couvre pas l'en-tête réécrit le 27/11. COROS : HTTP 403 les 13/11 et 27/11, dernière vérification le 08/11. Pour lever : Cyprien relit les quatre pages, ou accorde la lecture réseau au sous-agent (réglage de Cyprien seul).
+10. **PR #72 : politique de confidentialité incomplète, EN LIGNE.** La CSP autorise `https://tiles.openfreemap.org` (`next.config.ts`) et le navigateur charge le style de carte chez OpenFreeMap, qui reçoit l'adresse IP ; `src/app/legalI18n.ts` (section 5, 5 langues) ne cite que MapTiler et OpenStreetMap. Neuf autres hôtes de tuiles appelés par le code en sont absents (OpenTopoMap, CyclOSM, Waymarked Trails, IGN, swisstopo, IGN Espagne, BKG, Esri, USGS), manque antérieur à #72. Correctif à écrire (lignes en 5 langues, visa `@Trésorier`, `@Maestro` pour les traductions), puis GO de fusion et de déploiement. Aucun correctif prêt.
+11. **PR #65 et #66, brouillons sans visa, en attente de Cyprien** (moins de 7 jours). #66 (Coach du 23/11) : le bloquant du 2ᵉ RENVOYÉ de `@HeadCoach` n'est pas corrigé (`noHistory` lu sur les 60 dernières séances tous sports : un cycliste qui a couru il y a plus de 8 à 9 semaines lirait « aucune sortie de course n'est encore enregistrée ») ; à reprendre en session ou à fermer. #65 (Gazette du 23/11) : deux RENVOYÉ de `@Maestro` sur les `raisons` ; selon le relevé de la routine la lettre est partie dans son ordre automatique (non revu ici) ; fermer ou garder comme trace ; ligne « Pour @Atlas » manquante au verdict recopié.
+12. **Passage Direction du 20/11 sans trace** : voir « À RATTRAPER ».
+13. **Leçons du 27/11 : visa `@Strategos` RENVOYÉ au second passage** (écart de confidentialité mesuré en entier, erreur de classement Trail retirée, nom d'un tiers retiré, `autresTitres` ajouté) ; leçons corrigées dans la même PR, nouveau visa à redemander (deux tours au plus dans la routine, le troisième est à Cyprien).
+
+## Résolues le 27/11/2026
+
+- Production à jour : pacevo.fr sert `87a983e8`, la tête de `main` (#63, #64 et #67 à #72 en ligne). Aucune PR fermée sans fusion du 20 au 27/11.
 
 ## Résolues le 13/11/2026
 
