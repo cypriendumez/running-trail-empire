@@ -1143,8 +1143,13 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
    * ⚠️ LA SÉCURITÉ RESTE À L'ÉCRAN, DANS LA COUVERTURE. Le lien de suivi à envoyer au
    * contact et la limite de la veille de choc vivaient sous la carte : en grand écran,
    * l'athlète partait sans les voir. Ils sont posés ici, dans les DEUX vues.
+   *
+   * ⚠️ SUR LA CARTE, LE LIEN DE SUIVI SEULEMENT (Cyprien, 27/11/2026 : « enlève l'encadré
+   * blanc »). Le texte de la veille couvrait le haut de la carte pendant toute la course.
+   * Il reste en entier — promesse ET limite, jamais repliées — dans la vue chiffres, celle
+   * qui s'ouvre au départ : l'athlète le lit en partant.
    */
-  const alertesSecurite = (departPret || ((veilleActive || capteursIndispo) && phase === "running")) ? (
+  const alertesSecurite = (avecVeille: boolean) => (departPret || (avecVeille && (veilleActive || capteursIndispo) && phase === "running")) ? (
     <div className="space-y-2">
       {/* Le lien de suivi, proposé au départ — un geste, puis il disparaît. */}
       {departPret && (
@@ -1173,7 +1178,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
       {/* L'état de la veille, dit sans emphase — et sa LIMITE, dans le même regard.
           ⚠️ « Veille active » est une promesse ; la phrase qui la borne ne doit pas être
           repliée dessous : quelqu'un qui part en montagne en se croyant surveillé. */}
-      {(veilleActive || capteursIndispo) && phase === "running" && (
+      {avecVeille && (veilleActive || capteursIndispo) && phase === "running" && (
         <div className="rounded-2xl border border-zinc-100 bg-white/95 px-4 py-2 shadow-sm">
           <div className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-500">
             <ShieldCheck className={`mt-0.5 h-3.5 w-3.5 flex-shrink-0 ${veilleActive ? "text-emerald-600" : "text-zinc-300"}`} aria-hidden />
@@ -1404,23 +1409,30 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
           </button>
         )}
 
-        {/* La sécurité, en haut de la carte pendant la course. */}
-        {vue === "carte" && alertesSecurite && (
-          <div className={`absolute inset-x-3 z-[600] mx-auto max-w-md ${plein ? "top-[4.25rem]" : "top-3"}`}>{alertesSecurite}</div>
+        {/* Le lien de suivi à envoyer, en haut de la carte — un geste, puis il disparaît. */}
+        {vue === "carte" && departPret && (
+          <div className={`absolute inset-x-3 z-[600] mx-auto max-w-md ${plein ? "top-[4.25rem]" : "top-3"}`}>{alertesSecurite(false)}</div>
         )}
 
         {/* Le bas de la carte. ⚠️ IL EST HORS DE LA CARTE dans le DOM, posé dessus : à
             l'intérieur, la carte capterait le doigt et un appui sur « Démarrer » la
-            déplacerait. */}
+            déplacerait.
+            ⚠️ ET SEULS LES ÉLÉMENTS VISIBLES PRENNENT LE DOIGT (27/11/2026, « le dézoom ne
+            fonctionne toujours pas »). Ce bloc était `pointer-events-auto` sur toute la
+            largeur : la bande TRANSPARENTE qui porte la colonne de boutons ronds — 200 px
+            de haut, d'un bord à l'autre — avalait les doigts. Un pincement dont un doigt y
+            tombait n'atteignait jamais la carte. Les enveloppes sont donc
+            `pointer-events-none`, et seuls les boutons, l'avertissement GPS, le bloc de
+            chiffres et le tiroir reprennent le doigt. */}
         {vue === "carte" && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col">
-            <div className="pointer-events-auto mx-auto w-full max-w-md px-3">
+            <div className="pointer-events-none mx-auto w-full max-w-md px-3">
               <div className="mb-2.5 flex flex-col items-end gap-2">{commandesCarte}</div>
               {/* ⚠️ UN REFUS DE LOCALISATION SE DIT. Sans cette ligne, la carte reste sur son
                   cadrage et l'athlète ne comprend ni pourquoi il ne se voit pas dessus, ni
                   comment revenir en arrière. */}
               {geoRefusee && (
-                <div className="mb-2.5 flex items-center justify-center gap-2 rounded-full bg-zinc-900 px-3 py-1.5 text-[12px] font-semibold text-white">
+                <div className="pointer-events-auto mb-2.5 flex items-center justify-center gap-2 rounded-full bg-zinc-900 px-3 py-1.5 text-[12px] font-semibold text-white">
                   <MapPin className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
                   <span className="truncate">{d["map.geoOff"]}</span>
                   <button type="button" onClick={demanderPosition} className="ml-1 flex-shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-900">
@@ -1430,7 +1442,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               )}
               {/* Le bloc de chiffres : ce qu'on va faire, ou ce qu'on fait. Le chiffre du
                   milieu en plus grand, comme Strava. */}
-              <div className="mb-3 overflow-hidden rounded-2xl border border-black/5 bg-white shadow-[0_18px_40px_-18px_rgba(9,9,11,0.55)]">
+              <div className="pointer-events-auto mb-3 overflow-hidden rounded-2xl border border-black/5 bg-white shadow-[0_18px_40px_-18px_rgba(9,9,11,0.55)]">
                 <div className={`relative flex h-9 items-center justify-center px-11 text-[13px] font-semibold transition-colors ${statutGps === "ok" ? "bg-emerald-50 text-emerald-700" : statutGps === "cherche" ? "bg-amber-50 text-amber-700" : "text-zinc-700"}`}>
                   <span className="truncate">{statutGps === "ok" ? d["map.gpsOk"] : statutGps === "cherche" ? d["map.gpsCherche"] : titreCarte}</span>
                   {phase !== "setup" && (
@@ -1524,8 +1536,8 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
                 <Minimize2 className="h-5 w-5" />
               </button>
             </div>
-            {(alertesSecurite || pastillesCourse) && (
-              <div className="mx-auto w-full max-w-md space-y-2 px-3 pt-1">{alertesSecurite}{pastillesCourse}</div>
+            {(alertesSecurite(true) || pastillesCourse) && (
+              <div className="mx-auto w-full max-w-md space-y-2 px-3 pt-1">{alertesSecurite(true)}{pastillesCourse}</div>
             )}
             <div className="flex flex-1 flex-col items-center justify-center gap-7 overflow-y-auto px-6 py-4 text-center">
               {contenuChiffres}
@@ -2045,7 +2057,7 @@ function BtnCarte({ actif, titre, onClick, children }: { actif?: boolean; titre:
   return (
     <button
       type="button" onClick={onClick} title={titre} aria-label={titre} aria-pressed={!!actif}
-      className={`flex h-11 w-11 items-center justify-center rounded-full shadow-[0_8px_18px_-8px_rgba(9,9,11,0.6)] ring-1 transition-colors ${actif ? "bg-zinc-900 text-white ring-zinc-900" : "bg-white/95 text-zinc-600 ring-black/5 hover:bg-white"}`}
+      className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full shadow-[0_8px_18px_-8px_rgba(9,9,11,0.6)] ring-1 transition-colors ${actif ? "bg-zinc-900 text-white ring-zinc-900" : "bg-white/95 text-zinc-600 ring-black/5 hover:bg-white"}`}
     >
       {children}
     </button>

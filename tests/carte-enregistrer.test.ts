@@ -163,9 +163,15 @@ test("le bloc de chiffres et le tiroir sont POSÉS sur la carte, pas dedans — 
   // Les chiffres, et LE bouton de départ.
   assert.match(gr, /chiffresCarte\.map/, "les chiffres ont disparu du bloc posé sur la carte");
   assert.match(gr, /<GrosBouton label=\{d\["start"\]\}/, "le gros bouton « Démarrer » a quitté le tiroir");
-  // ⚠️ `pointer-events-none` sur l'enveloppe, `auto` sur ce qu'elle contient : sans cela,
-  // la bande transparente entre les boutons ronds bloquerait la carte au doigt.
-  assert.ok((gr.match(/pointer-events-auto/g) ?? []).length >= 2, "le contenu du bas ne reprend plus le doigt : les boutons seraient morts");
+  // ⚠️ LE DÉZOOM QUI NE MARCHAIT PAS (Cyprien, 27/11/2026, deux fois). L'enveloppe des
+  // boutons ronds était `pointer-events-auto` sur toute la largeur : une bande transparente
+  // de 200 px avalait les doigts, et le pincement n'atteignait pas la carte. Les deux
+  // enveloppes sont transparentes au doigt ; seuls les éléments visibles le reprennent.
+  assert.match(gr, /<div className="pointer-events-none absolute inset-x-0 bottom-0 z-\[500\] flex flex-col">\s*\n\s*<div className="pointer-events-none mx-auto w-full max-w-md px-3">/, "l'enveloppe des boutons ronds reprend le doigt sur toute la largeur : la carte ne se pince plus");
+  assert.match(gr, /function BtnCarte[\s\S]{0,400}className=\{`pointer-events-auto flex h-11 w-11/, "les boutons ronds ne reprennent plus le doigt : ils seraient morts");
+  assert.match(gr, /"pointer-events-auto mb-3 overflow-hidden rounded-2xl/, "le bloc de chiffres ne reprend plus le doigt : son bouton ⤡ serait mort");
+  assert.match(gr, /"pointer-events-auto rounded-t-\[28px\] bg-white px-6/, "le tiroir ne reprend plus le doigt : « Démarrer » serait mort");
+  assert.match(codeNu("src/components/ghost-runner/CarteDirect.tsx"), /el\.className = "pacevo-point";\s*\n\s*el\.style\.pointerEvents = "none";/, "le point bleu avale de nouveau le doigt qui commence un pincement sur lui");
 });
 
 test("le satellite n'est proposé que si la clé existe", () => {
@@ -280,11 +286,16 @@ test("sur téléphone, l'écran s'ouvre en grand — et la sécurité reste à l
   assert.match(gr, /setVue\(phase === "setup" \? "carte" : "chiffres"\);/, "le départ n'ouvre plus la vue chiffres");
   // ⚠️ Le lien de suivi et la limite de la veille sont DANS la couverture, dans les deux
   // vues : sinon l'athlète part sans les voir (le défaut qui faisait refermer le grand écran).
-  assert.match(gr, /\{vue === "carte" && alertesSecurite && \(/, "la sécurité n'apparaît plus sur la carte pendant la course");
-  assert.match(gr, /\{alertesSecurite\}\{pastillesCourse\}/, "la sécurité n'apparaît plus dans la vue chiffres");
+  // Sur la carte : le lien de suivi seul (l'encadré de la veille couvrait la carte —
+  // Cyprien, 27/11/2026). Dans la vue chiffres, ouverte au départ : tout, veille comprise.
+  assert.match(gr, /\{vue === "carte" && departPret && \(/, "le lien de suivi n'apparaît plus sur la carte au départ");
+  assert.match(gr, /\{alertesSecurite\(false\)\}/, "la carte affiche de nouveau l'encadré de la veille par-dessus le parcours");
+  assert.match(gr, /\{alertesSecurite\(true\)\}\{pastillesCourse\}/, "la sécurité n'apparaît plus dans la vue chiffres");
   const alertes = gr.slice(gr.indexOf("const alertesSecurite"), gr.indexOf("const pastillesCourse"));
   assert.match(alertes, /\{departPret && \(/, "le lien de suivi au départ a quitté l'écran de course");
   assert.match(alertes, /d\["veille\.limite"\]/, "la limite de la veille de choc a quitté l'écran de course");
+  // Promesse et limite restent ENSEMBLE : la limite n'est jamais montrée sans la promesse, ni l'inverse.
+  assert.match(alertes, /\{avecVeille && \(veilleActive \|\| capteursIndispo\) && phase === "running" && \(/, "la veille n'est plus conditionnée à la vue qui l'affiche en entier");
   // « Réglages » sort du grand écran avant de défiler, sinon rien ne bouge à l'écran.
   const vers = gr.slice(gr.indexOf("const versDetails = () =>"), gr.indexOf("const versDetails = () =>") + 500);
   assert.match(vers, /setPlein\(false\);/, "« Réglages » défile derrière la couverture : rien ne bouge à l'écran");
