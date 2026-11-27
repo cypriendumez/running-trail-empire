@@ -63,6 +63,9 @@ const VIDE = { type: "Feature" as const, properties: {}, geometry: { type: "Line
 
 const versLngLat = (p: [number, number]): [number, number] => [p[1], p[0]];
 
+/** Une seule liste vide : un `[]` par défaut, neuf à chaque rendu, relancerait `setData` à chaque fois. */
+const AUCUNE_PROPOSITION: { id: number; lat: number; lng: number; couleur: string }[] = [];
+
 /** Le style de repli : les tuiles d'OpenStreetMap, si le style vectoriel ne vient pas. */
 function styleRepli(): maplibregl.StyleSpecification {
   return {
@@ -91,6 +94,7 @@ export function CarteDirect({
   position, track, centre, fond = FOND_PLAN, calques = [], suivre = true, onDeplacement, recentrer = 0, etiquette, className = "",
   parcours = [], voirParcours = false, relief = false,
   onClic, reperes = [], couleurTrace = "#059669", vue, creditPlus,
+  propositions = AUCUNE_PROPOSITION, onProposition, onVue,
 }: {
   position: [number, number] | null;
   track: [number, number][];
@@ -135,6 +139,12 @@ export function CarteDirect({
   vue?: { n: number; centre?: [number, number]; zoom?: number; emprise?: [number, number][] };
   /** Un crédit de plus, en HTML (le calcul d'itinéraire de FOSSGIS l'exige). */
   creditPlus?: string;
+  /** Les départs des parcours proposés (pastilles de la couleur du sport). */
+  propositions?: { id: number; lat: number; lng: number; couleur: string }[];
+  /** Une pastille de parcours touchée : elle prend le tap, aucun point n'est posé. */
+  onProposition?: (id: number) => void;
+  /** Le centre regardé [lat, lng], après chaque déplacement de la carte. */
+  onVue?: (centre: [number, number]) => void;
 }) {
   const conteneur = useRef<HTMLDivElement>(null);
   const carte = useRef<maplibregl.Map | null>(null);
@@ -162,6 +172,12 @@ export function CarteDirect({
   useEffect(() => { traceRef.current = track; }, [track]);
   useEffect(() => { fondRef.current = fond; }, [fond]);
   const vueRef = useRef(vue);
+  const propositionsRef = useRef(propositions);
+  useEffect(() => { propositionsRef.current = propositions; }, [propositions]);
+  const propositionRef = useRef(onProposition);
+  useEffect(() => { propositionRef.current = onProposition; }, [onProposition]);
+  const onVueRef = useRef(onVue);
+  useEffect(() => { onVueRef.current = onVue; }, [onVue]);
   const clicRef = useRef(onClic);
   useEffect(() => { clicRef.current = onClic; }, [onClic]);
   const reperesRef = useRef(reperes);
@@ -191,6 +207,11 @@ export function CarteDirect({
     src?.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: t.map(versLngLat) } });
   }
 
+  function poserPropositions(m: maplibregl.Map, p: { id: number; lat: number; lng: number; couleur: string }[]) {
+    const src = m.getSource("propositions") as maplibregl.GeoJSONSource | undefined;
+    src?.setData({ type: "FeatureCollection", features: p.map((x) => ({ type: "Feature", properties: { id: x.id, couleur: x.couleur }, geometry: { type: "Point", coordinates: [x.lng, x.lat] } })) });
+  }
+
   function poserReperes(m: maplibregl.Map, r: { lat: number; lng: number; couleur: string }[]) {
     const src = m.getSource("reperes") as maplibregl.GeoJSONSource | undefined;
     src?.setData({ type: "FeatureCollection", features: r.map((p) => ({ type: "Feature", properties: { couleur: p.couleur }, geometry: { type: "Point", coordinates: [p.lng, p.lat] } })) });
@@ -206,7 +227,9 @@ export function CarteDirect({
       // Marges : la colonne de boutons à droite et le bloc du bas couvrent la carte.
       // Bornées à la hauteur de la carte : une marge plus grande qu'elle annule le cadrage.
       m.fitBounds([[o, s], [e, n]],
-        { padding: { top: Math.min(70, h * 0.1), bottom: Math.min(250, h * 0.4), left: 30, right: 70 }, maxZoom: 16, duration: 900 });
+        // ⚠️ 380 px en bas : bloc de chiffres + tiroir. À 250, l'arrivée d'un parcours chargé
+        // tombait SOUS le bloc de chiffres (banc d'essai à 375 × 812, 27/11/2026).
+        { padding: { top: Math.min(80, h * 0.1), bottom: Math.min(380, h * 0.5), left: 30, right: 70 }, maxZoom: 16, duration: 900 });
     } else if (v.centre) {
       m.flyTo({ center: versLngLat(v.centre), zoom: v.zoom ?? m.getZoom(), duration: 1400 });
     }
@@ -372,7 +395,17 @@ export function CarteDirect({
       m.on("click", replier);
       m.on("movestart", (e) => { if ((e as { originalEvent?: unknown }).originalEvent) replier(); });
       // Un tap (MapLibre n'émet pas `click` après un glissé) : le constructeur y pose un point.
-      m.on("click", (e) => clicRef.current?.(e.lngLat.lat, e.lngLat.lng));
+      // ⚠️ SAUF SUR UNE PASTILLE DE PARCOURS PROPOSÉ : elle prend le tap. Zone de 14 px
+      // autour du doigt — une pastille de 8 px de rayon se rate au pouce.
+      m.on("click", (e) => {
+        if (propositionRef.current && m.getLayer("propositions") && e.point) {
+          const { x, y } = e.point;
+          const f = m.queryRenderedFeatures([[x - 14, y - 14], [x + 14, y + 14]], { layers: ["propositions"] })[0];
+          if (f) { propositionRef.current(Number(f.properties?.id)); return; }
+        }
+        clicRef.current?.(e.lngLat.lat, e.lngLat.lng);
+      });
+      m.on("moveend", () => { const c = m.getCenter(); onVueRef.current?.([c.lat, c.lng]); });
       if (onClic) m.getCanvas().style.cursor = "crosshair";
       m.on("dragstart", () => deplacementRef.current?.());
       m.on("zoomstart", (e) => { if ((e as { originalEvent?: unknown }).originalEvent) deplacementRef.current?.(); });
@@ -408,6 +441,10 @@ export function CarteDirect({
         m.addSource("trace", { type: "geojson", data: VIDE });
         m.addLayer({ id: "trace-bord", type: "line", source: "trace", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ffffff", "line-width": 7 } });
         m.addLayer({ id: "trace", type: "line", source: "trace", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": couleurRef.current, "line-width": 4 } });
+        // Les départs des parcours proposés, sous les points posés.
+        m.addSource("propositions", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        m.addLayer({ id: "propositions", type: "circle", source: "propositions",
+          paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 5, 14, 9], "circle-color": ["get", "couleur"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 2.5 } });
         // Les points posés du constructeur, au-dessus du tracé.
         m.addSource("reperes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         m.addLayer({ id: "reperes", type: "circle", source: "reperes",
@@ -417,7 +454,9 @@ export function CarteDirect({
         appliquerCalques(m, calquesRef.current);
         poserTrace(m, traceRef.current);
         poserReperes(m, reperesRef.current);
+        poserPropositions(m, propositionsRef.current);
         poserParcours(m, parcoursRef.current);
+        { const c = m.getCenter(); onVueRef.current?.([c.lat, c.lng]); }
         montrerParcours(m, voirParcoursRef.current);
         if (reliefRef.current) appliquerRelief(m, true);
         if (positionRef.current) poserPoint(m, positionRef.current);
@@ -492,6 +531,11 @@ export function CarteDirect({
     const m = carte.current;
     if (m && pret.current) poserReperes(m, reperes);
   }, [reperes]);
+
+  useEffect(() => {
+    const m = carte.current;
+    if (m && pret.current) poserPropositions(m, propositions);
+  }, [propositions]);
 
   useEffect(() => {
     const m = carte.current;

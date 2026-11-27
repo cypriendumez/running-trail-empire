@@ -171,3 +171,16 @@ export function assemblerTrace(reperes: (PointLL & { id: number })[], troncons: 
 export function estDoubleTap(avant: { t: number; lat: number; lng: number } | null, apres: { t: number; lat: number; lng: number }): boolean {
   return !!avant && apres.t - avant.t < 400 && distanceM(avant, apres) < 25;
 }
+
+/**
+ * Au-delà de cette distance entre l'endroit TOUCHÉ et le chemin le plus proche, le calcul
+ * d'itinéraire n'a plus de sens. Crash-test du 27/11/2026 dans les Calanques : deux points
+ * posés à 421 m et 569 m de tout sentier, accrochés par le serveur à des chemins lointains,
+ * donnaient 18,6 km de tracé pour 1,9 km à vol d'oiseau. Loin de tout chemin (hors-piste,
+ * sommet, champ), on relie en ligne droite — et on le dit.
+ */
+export const LOIN_CHEMIN_M = 150;
+
+export function loinDuChemin(depart: PointLL, arrivee: PointLL, t: Troncon): boolean {
+  return distanceM(depart, t.depart) > LOIN_CHEMIN_M || distanceM(arrivee, t.arrivee) > LOIN_CHEMIN_M;
+}

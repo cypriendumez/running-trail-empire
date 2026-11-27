@@ -128,9 +128,17 @@ export type Profil = { altitudes: number[]; gain: number; perte: number; min: nu
  * (D+ 0 m, difficulté facile, durée sans pénalité de montée). Mieux vaut dire « je ne
  * sais pas » — c'est ce que l'interface affiche.
  */
+/** Une pause qu'un abandon interrompt (le tracé a changé entre-temps). */
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((ok, ko) => {
+    const t = setTimeout(ok, ms);
+    signal?.addEventListener("abort", () => { clearTimeout(t); ko(new Error("abandon")); }, { once: true });
+  });
+}
+
 export async function chargerProfil(
   pts: Point[],
-  opts: { fetch?: typeof fetch; signal?: AbortSignal; pasM?: number; max?: number } = {},
+  opts: { fetch?: typeof fetch; signal?: AbortSignal; pasM?: number; max?: number; reessai?: boolean; pauseMs?: number } = {},
 ): Promise<Profil | null> {
   if (pts.length < 2) return null;
   const f = opts.fetch ?? fetch;
@@ -141,7 +149,15 @@ export async function chargerProfil(
     const lat = lot.map((p) => p.lat.toFixed(5)).join(",");
     const lng = lot.map((p) => p.lng.toFixed(5)).join(",");
     try {
-      const r = await f(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`, { signal: opts.signal });
+      const url = `https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`;
+      let r = await f(url, { signal: opts.signal });
+      // ⚠️ UN REFUS PASSAGER N'EST PAS UNE ALTITUDE INCONNUE (crash-test du 27/11/2026 :
+      // 13 lectures sur 34 refusées en 429 après quelques points posés, et le D+ passait à
+      // « — »). Un seul nouvel essai, après une pause, pour 429 et 503 seulement.
+      if ((r.status === 429 || r.status === 503) && (opts.reessai ?? true)) {
+        await pause(opts.pauseMs ?? 1500, opts.signal);
+        r = await f(url, { signal: opts.signal });
+      }
       if (!r.ok) return null;
       const j = await r.json() as { elevation?: unknown };
       // ⚠️ ON VÉRIFIE LE TYPE BRUT, PAS `Number(v)` : `Number(null)` vaut 0, et

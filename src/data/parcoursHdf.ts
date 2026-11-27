@@ -52,7 +52,7 @@ export const DIFF_META: Record<DiffHdf, { label: string; color: string }> = {
 };
 
 // Discipline du planificateur Trail Builder (clés stables, jamais traduites).
-export type TrailActivity = "course" | "marche" | "trail" | "velo";
+export type TrailActivity = "course" | "marche" | "trail" | "velo" | "vtt";
 // Sport (valeur canonique des données) → activité du Trail Builder.
 // Co-localisé avec les sports : le mapping ne dépend d'aucun libellé d'affichage,
 // donc l'event « te:loadRoute » transporte directement l'activité (pas une chaîne FR à re-décoder).
@@ -61,7 +61,8 @@ export const SPORT_ACTIVITY: Record<SportHdf, TrailActivity> = {
   "Trail":        "trail",
   "Randonnée":    "marche",
   "Vélo (Route)": "velo",
-  "VTT":          "velo",
+  // VTT : sa propre activité depuis le 27/11/2026 (allure et dénivelé d'un VTT, pas d'un vélo de route).
+  "VTT":          "vtt",
 };
 
 // ─── Position de repli (déterministe) si un parcours n'a ni lat/lng ni géométrie ─
