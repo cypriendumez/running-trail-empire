@@ -32,7 +32,7 @@ import { FONDS, CALQUES, TRACES, avecCle, type Couverture } from "@/lib/trail/co
  * styles à nous : Pacevo (clair) et Pacevo Nuit (sombre, pour courir le soir).
  * Les cartes nationales (IGN, swisstopo…) ne sont proposées que dans LEUR pays.
  */
-export type IdFond = "plan" | "nuit" | "satellite" | "hybride" | "outdoor" | "topo" | "hiver" | "cyclosm" | "ign-plan" | "ign-photo" | "swisstopo" | "bkg-de" | "ign-es" | "us-topo";
+export type IdFond = "plan" | "nuit" | "satellite" | "hybride" | "outdoor" | "topo" | "hiver" | "cyclosm" | "ign-plan" | "ign-photo" | "ign-1950" | "etat-major" | "swisstopo" | "bkg-de" | "ign-es" | "us-topo";
 
 /**
  * Trois fonds de plus (27/11/2026), INTERROGÉS POUR DE VRAI ce jour-là sur une tuile de
@@ -45,10 +45,25 @@ const EN_PLUS: { id: IdFond; cle: string; url: string; attribution: string; tail
   { id: "cyclosm", cle: "f.cyclosm", url: "https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png", attribution: "CyclOSM — © OpenStreetMap contributors", taille: 256, zoomMax: 19 },
 ];
 
+/**
+ * Deux fonds historiques de l'IGN (licence ouverte Etalab), interrogés le 27/11/2026 sur
+ * Rouen (z14) : 200 et une vraie image. France seulement. Courir « dans » son quartier de
+ * 1950, ou sur la carte d'état-major du XIXᵉ siècle.
+ */
+const HISTORIQUES: { id: IdFond; cle: string; url: string; zoomMax: number; place: Place }[] = [
+  { id: "ign-1950", cle: "f.ign1950", url: "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS.1950-1965&STYLE=BDORTHOHISTORIQUE&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}", zoomMax: 18, place: "sous-noms" },
+  { id: "etat-major", cle: "f.etatMajor", url: "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.ETATMAJOR40&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}", zoomMax: 15, place: "dessus" },
+];
+
 /** Le style vectoriel de départ — OpenFreeMap « Liberty », repeint par `stylePacevo`. */
 export const STYLE_PLAN_URL = "https://tiles.openfreemap.org/styles/liberty";
-/** Obligatoire par licence (OpenStreetMap ODbL, OpenMapTiles). Jamais vide. */
-export const ATTRIBUTION_PLAN = "© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors";
+/**
+ * Obligatoire par licence (OpenStreetMap ODbL, OpenMapTiles). Jamais vide.
+ * ⚠️ « OpenStreetMap » est un LIEN vers sa page de licence : la règle de l'OSMF exige que
+ * le crédit dise que les données sont sous ODbL, « par exemple en faisant du texte
+ * OpenStreetMap un lien vers openstreetmap.org/copyright » (manquait jusqu'au 27/11/2026).
+ */
+export const ATTRIBUTION_PLAN = '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
 
 /**
  * ⚠️ LE REPLI SI LE STYLE NE SE CHARGE PAS (réseau, OpenFreeMap en panne). Une carte
@@ -191,15 +206,56 @@ function sousDomaines(url: string): string[] {
 
 const SOURCE = (id: string) => FONDS.find((f) => f.id === id);
 
-/** Le pays (ou les pays) d'un point — boîtes larges, assez pour choisir quelles cartes proposer. */
+/**
+ * Les contours (simplifiés) des pays dont on propose les cartes nationales.
+ *
+ * ⚠️ DES BOÎTES NE SUFFISAIENT PAS (audit du 27/11/2026) : la boîte de la Suisse contenait
+ * Chamonix et Annecy (swisstopo et « Rando Suisse » proposés en France, vides), celle de
+ * la France contenait Barcelone et Genève (cartes IGN blanches), celle de l'Allemagne
+ * contenait Strasbourg. Des polygones grossiers (quelques kilomètres près des frontières)
+ * suffisent à choisir quelles cartes PROPOSER — jamais à dire où l'on est.
+ */
+const CONTOURS: Partial<Record<Couverture, [number, number][][]>> = {
+  fr: [
+    [[-4.8, 48.5], [-1.9, 48.7], [-1.3, 49.7], [1.6, 50.2], [2.55, 51.1], [4.2, 49.95], [5.8, 49.5], [8.2, 49.0], [7.6, 47.6], [6.9, 47.4],
+      // Autour du canton de Genève, puis la rive française du Léman (Évian, Thonon).
+      [6.1, 46.6], [6.05, 46.4], [5.96, 46.2], [6.0, 46.13], [6.25, 46.22], [6.3, 46.38], [6.79, 46.42], [6.85, 46.15],
+      [7.0, 45.92], [6.6, 45.1], [7.1, 44.2], [7.5, 43.8], [6.2, 43.05], [4.6, 43.4], [3.1, 43.0], [3.2, 42.4], [1.7, 42.5],
+      [-0.7, 42.8], [-1.73, 43.29], [-1.8, 43.38], [-1.25, 44.6], [-1.2, 46.2], [-2.3, 47.2], [-4.6, 47.8]],
+    [[8.5, 41.3], [9.6, 41.3], [9.6, 43.05], [8.5, 43.05]], // Corse
+  ],
+  // Même tracé que la France entre le Jura et le Valais (sommets partagés) : Genève et
+  // Lausanne en Suisse, Évian et Thonon en France.
+  ch: [[[6.05, 46.4], [5.96, 46.2], [6.0, 46.13], [6.25, 46.22], [6.3, 46.38], [6.79, 46.42], [6.85, 46.15], [7.0, 45.92], [7.85, 45.92], [8.45, 46.25], [8.9, 45.83], [9.05, 45.9],
+    [9.3, 46.5], [10.15, 46.23], [10.47, 46.55], [10.45, 46.95], [9.55, 47.53], [8.55, 47.8], [7.6, 47.6], [6.9, 47.4], [6.1, 46.6]]],
+  de: [[[5.9, 50.8], [6.2, 51.9], [7.0, 52.2], [7.1, 53.3], [8.6, 53.9], [8.9, 54.9], [10.0, 54.8], [11.0, 54.0], [13.0, 54.6], [14.2, 53.9],
+    [14.6, 52.6], [15.0, 51.1], [14.3, 50.9], [12.2, 50.3], [13.8, 48.8], [13.0, 47.5], [10.2, 47.3], [9.6, 47.55], [7.6, 47.6], [8.2, 49.0],
+    [6.4, 49.5], [6.1, 50.2]]],
+  es: [[[-9.3, 43.2], [-1.8, 43.38], [-1.73, 43.29], [-0.7, 42.8], [1.7, 42.5], [3.3, 42.3], [3.2, 41.85], [2.3, 41.3], [1.0, 41.0], [0.5, 40.5], [0.0, 39.8], [-0.3, 39.4], [0.2, 38.7],
+    [-0.7, 37.6], [-2.1, 36.7], [-5.4, 36.0], [-6.4, 36.8], [-7.4, 37.2], [-7.0, 38.0], [-7.3, 39.4], [-7.0, 40.2], [-6.9, 41.0], [-6.2, 41.6],
+    [-8.2, 41.9], [-8.9, 42.1]]],
+  us: [[[-124.7, 48.4], [-123.0, 49.0], [-95.2, 49.0], [-89.6, 48.0], [-84.8, 46.5], [-82.4, 45.3], [-82.5, 42.6], [-83.1, 42.0], [-79.0, 42.5],
+    [-79.0, 43.3], [-76.3, 44.2], [-74.7, 45.0], [-71.5, 45.0], [-69.2, 47.4], [-67.0, 44.8], [-70.0, 41.5], [-74.0, 40.5], [-75.5, 35.2],
+    [-81.0, 31.0], [-80.0, 25.2], [-82.0, 24.5], [-82.8, 27.8], [-84.0, 30.0], [-89.5, 29.0], [-94.0, 29.5], [-97.4, 26.0], [-99.5, 27.5],
+    [-103.0, 29.0], [-106.5, 31.8], [-111.0, 31.3], [-114.7, 32.5], [-117.1, 32.5], [-120.6, 34.6], [-124.4, 40.4]]],
+};
+
+/** Point dans un polygone (lancer de rayon), en [longitude, latitude]. */
+function dans(poly: [number, number][], lon: number, lat: number): boolean {
+  let dedans = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) dedans = !dedans;
+  }
+  return dedans;
+}
+
+/** Le pays (ou les pays) d'un point — assez pour choisir quelles cartes proposer. */
 export function paysDe(lat: number, lon: number): Couverture[] {
-  const dans = (s: number, n: number, o: number, e: number) => lat >= s && lat <= n && lon >= o && lon <= e;
   const p: Couverture[] = ["monde"];
-  if (dans(41.2, 51.2, -5.3, 9.7)) p.push("fr");
-  if (dans(45.8, 47.9, 5.9, 10.6)) p.push("ch");
-  if (dans(47.2, 55.1, 5.8, 15.1)) p.push("de");
-  if (dans(35.9, 43.9, -9.4, 3.4)) p.push("es");
-  if (dans(24.4, 49.4, -125, -66.9)) p.push("us");
+  for (const [pays, polys] of Object.entries(CONTOURS) as [Couverture, [number, number][][]][]) {
+    if (polys.some((poly) => dans(poly, lon, lat))) p.push(pays);
+  }
   return p;
 }
 
@@ -229,6 +285,9 @@ export function fondsDisponibles(cleMapTiler: string | undefined, centre: [numbe
     plus("cyclosm"),
     image("ign-plan", "ign-plan", "f.ignPlan", "dessus"),
     image("ign-photo", "ign-ortho", "f.ignPhoto", "sous-noms"),
+    ...HISTORIQUES.map((h): FondCarte | null => pays.includes("fr")
+      ? { id: h.id, cle: h.cle, type: "image", urls: [h.url], attribution: "© IGN — Géoplateforme", taille: 256, zoomMax: h.zoomMax, place: h.place, couverture: "fr" }
+      : null),
     image("swisstopo", "swisstopo", "f.swisstopo", "dessus"),
     image("bkg-de", "bkg-de", "f.bkgDe", "dessus"),
     image("ign-es", "ign-es", "f.ignEs", "dessus"),
@@ -237,7 +296,7 @@ export function fondsDisponibles(cleMapTiler: string | undefined, centre: [numbe
   return liste.filter((f): f is FondCarte => !!f);
 }
 
-export type IdCalque = "rando" | "rando-ch" | "vtt" | "velo" | "ski" | "ombrage" | "pentes-fr" | "courbes-fr" | "poi";
+export type IdCalque = "rando" | "rando-ch" | "vtt" | "velo" | "ski" | "ombrage" | "pentes-fr" | "courbes-fr" | "eau" | "poi";
 
 export type CalqueCarte = {
   id: IdCalque;
@@ -272,6 +331,10 @@ export function calquesDisponibles(cleMapTiler: string | undefined, centre: [num
     cleMapTiler ? { id: "ombrage", cle: "c.ombrage", groupe: "relief", type: "ombrage", couverture: "monde" } : null,
     depuis("pentes-fr", "c.pentes", "relief", CALQUES.find((c) => c.id === "pentes-fr")),
     depuis("courbes-fr", "c.courbes", "relief", CALQUES.find((c) => c.id === "courbes-fr")),
+    // Eau potable et toilettes : les points d'OpenStreetMap déjà présents dans notre plan
+    // (couche `poi` d'OpenMapTiles), mis en évidence pour le coureur. Mesuré le 27/11/2026 :
+    // 15 points d'eau et 19 toilettes dans le centre de Rouen, 12 et 13 autour du Luxembourg.
+    { id: "eau", cle: "c.eau", groupe: "affichage", type: "style", couverture: "monde" },
     { id: "poi", cle: "c.poi", groupe: "affichage", type: "style", couverture: "monde" },
   ];
   return liste.filter((c): c is CalqueCarte => !!c);
