@@ -103,44 +103,6 @@ const HR_ZONES = [
   { z: 5, lo: 0.90, hi: 1.00 },
 ];
 
-// Profil de dénivelé — courbe procédurale stable qui reflète le D+ choisi (plat si 0).
-// Pas de données de parcours réelles ici (écran de configuration) : l'amplitude suit le
-// D+/km demandé, ce qui donne un aperçu honnête de la difficulté du terrain.
-function ElevationProfile({ elevation, distance }: { elevation: number; distance: number }) {
-  const W = 800, H = 110, n = 72;
-  const amp = Math.max(0, Math.min(1, elevation / Math.max(distance, 1) / 55));
-  const pts: string[] = [];
-  for (let i = 0; i <= n; i++) {
-    const t = i / n;
-    const noise = Math.sin(t * 9.3) * 0.5 + Math.sin(t * 23.7 + 1.5) * 0.3 + Math.sin(t * 41.2 + 0.7) * 0.2;
-    const h = amp * (0.5 + 0.5 * noise);
-    const x = t * W, y = H - 7 - h * (H - 22);
-    pts.push(`${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`);
-  }
-  const line = pts.join(" ");
-  const area = `${line} L${W},${H} L0,${H} Z`;
-  return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-24 w-full" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="ghost-elev" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {[0.25, 0.5, 0.75].map((tk) => (
-          <line key={tk} x1="0" x2={W} y1={H * tk} y2={H * tk} stroke="#f1f5f4" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-        ))}
-        <path d={area} fill="url(#ghost-elev)" />
-        <path d={line} fill="none" stroke="#059669" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      </svg>
-      <div className="mt-1 flex justify-between text-[11px] text-zinc-400">
-        <span>0 km</span><span>{(distance / 2).toFixed(0)} km</span><span>{distance.toFixed(0)} km</span>
-      </div>
-    </div>
-  );
-}
-
 /**
  * Comment NOMMER la source quand aucune montre ne peut recevoir.
  *
@@ -214,8 +176,10 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
    */
   const [vue, setVue] = useState<"carte" | "chiffres">("carte");
   const [calquesOuverts, setCalquesOuverts] = useState(false);
-  /** « Mes sorties » : toutes, les 30 derniers jours, ou masquées. */
-  const [modeSorties, setModeSorties] = useState<"toutes" | "recents" | "semaine" | "aucune">(mesParcours.length ? "toutes" : "aucune");
+  /** « Mes sorties » : toutes, les 30 derniers jours, ou masquées.
+   *  ⚠️ MASQUÉES À L'OUVERTURE (Cyprien, 27/11/2026) : trente traces bleues superposées
+   *  couvraient la carte dès l'arrivée. Elles s'allument dans les calques, à la demande. */
+  const [modeSorties, setModeSorties] = useState<"toutes" | "recents" | "semaine" | "aucune">("aucune");
   /** Les calques allumés. Les points d'intérêt le sont d'office, comme sur le plan d'origine. */
   const [calquesActifs, setCalquesActifs] = useState<IdCalque[]>(["poi"]);
   const [relief3d, setRelief3d] = useState(false);
@@ -1833,16 +1797,10 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               </div>
             </div>
 
-            {/* Dénivelé — profil de parcours (reflète le D+ choisi) + réglage du total */}
-            <div className="mb-6 rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
-              <div className="mb-3 flex items-center justify-between">
-                <label htmlFor={`${cid}-r0`} className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase"><TrendingUp className="h-3.5 w-3.5 text-orange-500" /> {d["lb.elev"]}</label>
-                <span className="text-lg font-semibold tabular-nums text-zinc-900">{elevation}<span className="ml-0.5 text-xs font-semibold text-zinc-400">m D+</span></span>
-              </div>
-              <ElevationProfile elevation={elevation} distance={distance} />
-              <input id={`${cid}-r0`} type="range" min={0} max={3000} step={50} value={Math.min(elevation, 3000)} onChange={(e) => setElevation(parseInt(e.target.value))} className="mt-3 w-full accent-orange-500" />
-            </div>
-
+            {/* ⚠️ LE RÉGLAGE « DÉNIVELÉ D+ » A ÉTÉ RETIRÉ (Cyprien, 27/11/2026 : « il ne sert à
+                rien, ça fait trop de modes sur cet onglet »). Il ne mesurait rien : le D+ CHOISI
+                ici était même enregistré comme celui de la sortie. Le dénivelé réel vient de la
+                montre, à l'import. */}
             {/* Pace zones reference */}
             <div className="mb-6 rounded-2xl border border-zinc-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-26px_rgba(16,24,40,0.2)]">
               <div className="mb-3.5 flex items-center justify-between">
