@@ -13,7 +13,7 @@ const ICONES = {
   // Clés du catalogue de parcours (SportHdf)…
   "Running": Footprints, "Trail": Mountain, "Randonnée": TreePine, "Vélo (Route)": Bike, "VTT": Bike,
   // …et celles du sélecteur d'activité de la carte.
-  course: Footprints, trail: Mountain, marche: TreePine, velo: Bike,
+  course: Footprints, trail: Mountain, marche: TreePine, velo: Bike, vtt: Bike,
 } as const;
 
 export type CleSport = keyof typeof ICONES;

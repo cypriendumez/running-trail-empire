@@ -4,12 +4,15 @@ import { useState, useRef, useCallback, useEffect, useMemo, type ReactNode } fro
 import dynamic from "next/dynamic";
 import {
   Undo2, Trash2, Download, Save, Loader2, ChevronDown, X, MapPin, Mountain, Layers, Bookmark, Heart,
-  SlidersHorizontal, Gauge, Navigation, Share2, Lock, LocateFixed, Maximize2,
+  SlidersHorizontal, Gauge, Navigation, Share2, Lock, LocateFixed, Maximize2, Route as RouteIcon,
 } from "lucide-react";
+import { SPORTS, SPORT_META, type ParcoursHdf, type SportHdf } from "@/data/parcoursHdf";
+import { PX } from "@/components/parcours/parcoursI18n";
 import Link from "next/link";
 import { IconeSport } from "@/components/parcours/IconeSport";
 import { chargerProfil, type Profil } from "@/lib/trail/altitude";
-import { calculerTroncon, raccorder, accroche, estEchec, cleTroncon, assemblerTrace, estDoubleTap } from "@/lib/trail/itineraire";
+import { calculerTroncon, raccorder, accroche, estEchec, cleTroncon, assemblerTrace, estDoubleTap, loinDuChemin } from "@/lib/trail/itineraire";
+import { profilOsrm } from "@/lib/trail/altitude";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -68,11 +71,15 @@ const FAMOUS_ROUTES: FamousRoute[] = [
 ];
 
 // ─── Activity profiles (flat speed km/h + climb penalty min per +100 m) ───────
+// ⚠️ 27/11/2026 (Cyprien : « course à pied, VTT, vélo, trail, randonnée ») : le VTT
+// n'existait pas (un parcours VTT se chargeait en vélo de route, à 19 km/h), et « marche »
+// est affichée « Randonnée » — c'est ce que les parcours du catalogue y rangent.
 const ACTIVITIES = {
-  course: { label: "Course", emoji: "", flat: 11,  climb: 6,  primary: "pace"  },
-  marche: { label: "Marche", emoji: "", flat: 4.8, climb: 10, primary: "speed" },
-  trail:  { label: "Trail",  emoji: "", flat: 8.5, climb: 9,  primary: "pace"  },
-  velo:   { label: "Vélo",   emoji: "", flat: 19,  climb: 3,  primary: "speed" },
+  course: { label: "Course",    emoji: "", flat: 11,  climb: 6,  primary: "pace"  },
+  trail:  { label: "Trail",     emoji: "", flat: 8.5, climb: 9,  primary: "pace"  },
+  marche: { label: "Randonnée", emoji: "", flat: 4.5, climb: 10, primary: "speed" },
+  velo:   { label: "Vélo",      emoji: "", flat: 19,  climb: 3,  primary: "speed" },
+  vtt:    { label: "VTT",       emoji: "", flat: 13,  climb: 5,  primary: "speed" },
 } as const;
 type ActivityKey = keyof typeof ACTIVITIES;
 
@@ -194,10 +201,27 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const [fondCarte, setFondCarte] = useState<IdFond>("plan");
   const [calquesActifs, setCalquesActifs] = useState<IdCalque[]>(["poi"]);
   const [relief3d, setRelief3d] = useState(false);
-  const [feuille, setFeuille] = useState<null | "modeles" | "reglages" | "parcours" | "lieux">(null);
+  const [feuille, setFeuille] = useState<null | "modeles" | "reglages" | "parcours" | "propositions" | "choisi">(null);
   /** Compteur + destination : chaque nouveau `n` déplace la carte (voir `CarteDirect`). */
   const [vue, setVue] = useState<{ n: number; centre?: [number, number]; zoom?: number; emprise?: [number, number][] }>({ n: 0 });
   const fermerFeuille = useCallback(() => setFeuille(null), []);
+
+  /**
+   * ── LES PARCOURS PROPOSÉS, DANS LA CARTE (Cyprien, 27/11/2026) ───────────────
+   * « Pourquoi ça ne propose plus les parcours comme avant ? Trouve un moyen de les
+   * proposer, et en même temps ne pas être perdu. » La liste « Parcours · France » vit SOUS
+   * la carte ; depuis que la carte s'ouvre en grand sur téléphone, on ne la voyait plus.
+   * Les parcours du catalogue autour de l'endroit regardé sont donc DANS la carte : leurs
+   * départs en pastilles (carte vide seulement — pas pendant un tracé), et un bouton
+   * « Parcours » qui ouvre la liste, triée par distance. Un parcours touché se charge par la
+   * liste du dessous (même code, mêmes contrôles : `te:chargerParcours`).
+   */
+  const [centreVu, setCentreVu] = useState<[number, number] | null>(null);
+  const [sportPropose, setSportPropose] = useState<"all" | SportHdf>("all");
+  const [propositions, setPropositions] = useState<ParcoursHdf[]>([]);
+  const [etatPropositions, setEtatPropositions] = useState<"attente" | "ok" | "erreur">("attente");
+  const [choisi, setChoisi] = useState<ParcoursHdf | null>(null);
+  const dernierePropo = useRef<{ lat: number; lng: number; sport: string } | null>(null);
   const allerA = useCallback((v: Omit<typeof vue, "n">) => setVue((x) => ({ ...v, n: x.n + 1 })), []);
 
   const [followPaths, setFollowPaths] = useState(true);
@@ -342,6 +366,13 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
       setTroncons((x) => ({ ...x, [cle]: [{ lat: vers.lat, lng: vers.lng }] }));
       return;
     }
+    if (loinDuChemin(depuis, vers, t)) {
+      // Hors de tout chemin (champ, sommet, hors-piste) : le serveur accrocherait le point à
+      // un chemin lointain et ferait des kilomètres de détour. Ligne droite, annoncée.
+      toast(d["t.loinChemin"], { id: "itineraire" });
+      setTroncons((x) => ({ ...x, [cle]: [{ lat: vers.lat, lng: vers.lng }] }));
+      return;
+    }
     const { points, repere } = raccorder(depuis, vers, t);
     setTroncons((x) => ({ ...x, [cle]: points }));
     // Le repère se pose SUR le chemin (s'il était tout près) ; le départ aussi, au premier tronçon.
@@ -375,22 +406,52 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
     setDistance(d);
 
     if (allPoints.length >= 2) {
+      setProfilEnCours(true);
+      /**
+       * ⚠️ L'ALTITUDE N'EST LUE QUE SUR UN TRACÉ STABLE (crash-test du 27/11/2026). Elle était
+       * relue à CHAQUE changement — ligne droite provisoire, tronçon arrivé, repère accroché —
+       * soit une dizaine de lectures pour quelques points : le service répondait « trop de
+       * requêtes » (13 refus sur 34) et le D+ passait à « — ». On attend la fin des calculs
+       * d'itinéraire, puis 700 ms sans changement.
+       */
+      if (routeLoading) return;
       // Annulable : chaque clic ajoute un point, et sans cela les réponses d'une
       // ancienne requête écrasaient celles de la nouvelle (profil d'un tracé précédent).
       const ctrl = new AbortController();
-      setProfilEnCours(true);
-      chargerProfil(allPoints, { signal: ctrl.signal }).then((p) => {
-        if (ctrl.signal.aborted) return;
-        setProfil(p);
-        setAltitudeIndispo(p === null);
-        setProfilEnCours(false);
-      });
-      return () => ctrl.abort();
+      const minuterie = setTimeout(() => {
+        chargerProfil(allPoints, { signal: ctrl.signal }).then((p) => {
+          if (ctrl.signal.aborted) return;
+          setProfil(p);
+          setAltitudeIndispo(p === null);
+          setProfilEnCours(false);
+        });
+      }, 700);
+      return () => { clearTimeout(minuterie); ctrl.abort(); };
     }
     setProfil(null);
     setAltitudeIndispo(false);
     setProfilEnCours(false);
-  }, [allPoints]);
+  }, [allPoints, routeLoading]);
+
+  /**
+   * ── CHANGER D'ACTIVITÉ RECALCULE LE TRACÉ DÉJÀ POSÉ (crash-test du 27/11/2026) ──
+   * Passer de « Course » à « Vélo » laissait les tronçons déjà posés sur les chemins
+   * piétons (même tracé, point pour point) : le vélo empruntait des escaliers. Quand le
+   * PROFIL change (à pied ↔ à vélo) ou que « suivre les chemins » se rallume, chaque
+   * tronçon est recalculé — sauf ceux d'un parcours chargé, dont le tracé GPS est le vrai.
+   */
+  const tronconsFixes = useRef<Set<string>>(new Set());
+  const profilTrace = followPaths ? profilOsrm(activity) : "droit";
+  const profilPrecedent = useRef(profilTrace);
+  useEffect(() => {
+    if (profilPrecedent.current === profilTrace) return;
+    profilPrecedent.current = profilTrace;
+    if (profilTrace === "droit") return; // les tronçons déjà calculés restent ; les suivants seront droits
+    const rs = reperesRef.current;
+    for (let i = 1; i < rs.length; i++) {
+      if (!tronconsFixes.current.has(cleTroncon(rs[i - 1], rs[i]))) void relier(rs[i - 1], rs[i]);
+    }
+  }, [profilTrace, relier]);
 
   // ── Undo last waypoint (precise — drops exactly the last leg) ───────────────
   const handleUndo = useCallback(() => {
@@ -419,6 +480,11 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
     reperesRef.current = [];
     setReperes([]);
     setTroncons({});
+    // ⚠️ Le nom d'un parcours chargé s'en va avec lui (crash-test du 27/11/2026 : après
+    // « REV 6 » puis « Effacer », le nouveau tracé s'appelait encore « REV 6 », et se serait
+    // sauvegardé sous ce nom).
+    setRouteName("");
+    tronconsFixes.current = new Set();
     setRedoStack([]);
     setProfil(null);
     setDistance(0);
@@ -532,6 +598,8 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
     reperesRef.current = [a, b];
     setReperes([a, b]);
     setTroncons({ [cleTroncon(a, b)]: pts.slice(1) });
+    // Le tracé GPS d'un parcours chargé est le VRAI : changer d'activité ne le recalcule pas.
+    tronconsFixes.current = new Set([cleTroncon(a, b)]);
     setRedoStack([]);
     setRouteName(route.name);
     // La carte cadre le parcours entier.
@@ -764,6 +832,53 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   }, [userPos, sharing, navRemainingKm]);
 
   const hasRoute = allPoints.length > 1;
+  const P = PX[lang] ?? PX.fr;
+  /** Les pastilles ne s'affichent que sur une carte vide : pendant un tracé, elles gêneraient le doigt. */
+  const montrerPropositions = !navMode && reperes.length === 0;
+  const besoinPropositions = montrerPropositions || feuille === "propositions";
+  useEffect(() => {
+    if (!besoinPropositions || !centreVu) return;
+    const [lat, lng] = centreVu;
+    const avant = dernierePropo.current;
+    // On ne relit pas pour un déplacement de moins de 2 km avec le même sport.
+    if (avant && avant.sport === sportPropose && distanceKm({ lat, lng }, avant) < 2) return;
+    const ctrl = new AbortController();
+    const minuterie = setTimeout(async () => {
+      try {
+        const q = new URLSearchParams({ near: `${lat.toFixed(3)},${lng.toFixed(3)}`, sort: "proche", sport: sportPropose, pageSize: "20", page: "1" });
+        const r = await fetch(`/api/parcours?${q}`, { signal: ctrl.signal });
+        const j = await r.json() as { items?: ParcoursHdf[] };
+        if (ctrl.signal.aborted) return;
+        // ⚠️ UNE PANNE SE DIT : sans réponse lisible, la liste dit « ne se charge pas », jamais
+        // « aucun parcours ici » (ce serait faux).
+        if (!r.ok || !Array.isArray(j.items)) { setEtatPropositions("erreur"); return; }
+        dernierePropo.current = { lat, lng, sport: sportPropose };
+        setPropositions(j.items);
+        setEtatPropositions("ok");
+      } catch {
+        if (!ctrl.signal.aborted) setEtatPropositions("erreur");
+      }
+    }, 600);
+    return () => { clearTimeout(minuterie); ctrl.abort(); };
+  }, [besoinPropositions, centreVu, sportPropose]);
+
+  /** Distance d'un parcours au centre regardé (km), pour la liste. */
+  const aDistance = (p: ParcoursHdf) => (centreVu && typeof p.lat === "number" && typeof p.lng === "number"
+    ? distanceKm({ lat: centreVu[0], lng: centreVu[1] }, { lat: p.lat, lng: p.lng }) : null);
+  /** Les pastilles : seulement les parcours à moins de 40 km, avec un départ connu. */
+  const pastilles = useMemo(() => (montrerPropositions ? propositions : [])
+    .filter((p) => typeof p.lat === "number" && typeof p.lng === "number" && (!centreVu || distanceKm({ lat: centreVu[0], lng: centreVu[1] }, { lat: p.lat!, lng: p.lng! }) < 40))
+    .map((p) => ({ id: p.id, lat: p.lat!, lng: p.lng!, couleur: SPORT_META[p.sport]?.color ?? "#059669" })),
+  [montrerPropositions, propositions, centreVu]);
+  const toucherProposition = useCallback((id: number) => {
+    const p = propositions.find((x) => x.id === id);
+    if (p) { setChoisi(p); setFeuille("choisi"); }
+  }, [propositions]);
+  /** Charge un parcours proposé, par la liste du dessous (mêmes contrôles qu'un clic dans la liste). */
+  const chargerPropose = (p: ParcoursHdf) => {
+    window.dispatchEvent(new CustomEvent("te:chargerParcours", { detail: p }));
+    setFeuille(null);
+  };
 
   // Annuler / rétablir au clavier (ordinateur) : Ctrl+Z, Ctrl+Maj+Z.
   useEffect(() => {
@@ -830,6 +945,9 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
         couleurTrace={difficultyColor(difficulty)}
         vue={vue}
         creditPlus={d["credit"]}
+        propositions={pastilles}
+        onProposition={toucherProposition}
+        onVue={setCentreVu}
         className="h-full w-full"
       />
 
@@ -868,8 +986,11 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
                 <span className="text-[15px] font-bold">3D</span>
               </BtnCarte>
             )}
-            <BtnCarte actif={feuille === "lieux"} titre={d["lieux"]} onClick={() => setFeuille((f) => (f === "lieux" ? null : "lieux"))}>
-              <Mountain className="h-5 w-5" />
+            <BtnCarte actif={feuille === "propositions"} titre={d["parcoursProches"]} onClick={() => setFeuille((f) => (f === "propositions" ? null : "propositions"))}>
+              <RouteIcon className="h-5 w-5" />
+              {montrerPropositions && pastilles.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">{pastilles.length}</span>
+              )}
             </BtnCarte>
             {/* Suivre le parcours en direct (point bleu, distance restante, partage). */}
             {hasRoute && !navMode && (
@@ -928,6 +1049,16 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
               </div>
             </div>
             {altitudeIndispo && <p className="px-3 pb-2 text-center text-[11px] leading-snug text-amber-700">{d["altIndispo"]}</p>}
+            {/* Carte vide : les parcours d'à côté sont PROPOSÉS ici, en clair. Les pastilles
+                seules ne suffisaient pas — le plus proche était à 2,6 km, hors de la vue. */}
+            {montrerPropositions && propositions.length > 0 && (
+              <button type="button" onClick={() => setFeuille("propositions")}
+                className="flex w-full items-center justify-center gap-2 border-t border-zinc-100 px-3 py-2.5 text-[13px] font-semibold text-emerald-700 hover:bg-emerald-50">
+                <RouteIcon className="h-4 w-4" />
+                {tb("parcoursVoir", { n: propositions.length })}
+                <ChevronDown className="h-4 w-4 -rotate-90" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -990,7 +1121,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
             <LigneReglage label={d["tg.elev"]}><Toggle id="tg-elev-m" checked={showElevation} onChange={setShowElevation} label="" /></LigneReglage>
           </div>
           <p className="mt-4 text-[15px] font-bold text-zinc-900">{d["activite"]}</p>
-          <div className="mt-2 grid grid-cols-4 gap-2">
+          <div className="mt-2 grid grid-cols-5 gap-1.5">
             {(Object.keys(ACTIVITIES) as ActivityKey[]).map((k) => (
               <button key={k} type="button" onClick={() => { setActivity(k); setManualSpeed(null); }} aria-pressed={activity === k}
                 className={`flex flex-col items-center gap-1 rounded-2xl px-2 py-2.5 text-[11px] font-semibold ${activity === k ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700"}`}>
@@ -1085,10 +1216,51 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
         </Feuille>
       )}
 
-      {/* ══ GRANDS PARCOURS DE FRANCE ══ */}
-      {feuille === "lieux" && (
-        <Feuille titre={d["famousTitle"]} fermer={d["fermer"]} onFermer={() => setFeuille(null)}>
-          <div className="space-y-1">
+      {/* ══ PARCOURS AUTOUR D'ICI : la liste, par sport, triée par distance ══ */}
+      {feuille === "propositions" && (
+        <Feuille titre={d["parcoursProches"]} fermer={d["fermer"]} onFermer={() => setFeuille(null)}>
+          <p className="text-[13px] text-zinc-500">{d["parcoursAide"]}</p>
+          <div className="-mx-5 mt-3 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {/* `concat` et pas `...SPORTS` : tests/bundle lit `.SPORTS` comme une variable d'environnement. */}
+            {(["all"] as ("all" | SportHdf)[]).concat(SPORTS).map((s) => (
+              <button key={s} type="button" onClick={() => setSportPropose(s)} aria-pressed={sportPropose === s}
+                className={`flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold ${sportPropose === s ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700"}`}>
+                <IconeSport sport={s} className="h-3.5 w-3.5" />
+                {s === "all" ? d["parcoursTous"] : P[`sport.${s}`] ?? s}
+              </button>
+            ))}
+          </div>
+          {etatPropositions === "erreur" ? (
+            <p className="py-6 text-center text-sm text-amber-700">{d["parcoursErreur"]}</p>
+          ) : etatPropositions === "attente" ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-zinc-400" /></div>
+          ) : propositions.length === 0 ? (
+            <p className="py-6 text-center text-sm text-zinc-500">{d["parcoursAucun"]}</p>
+          ) : (
+            <div className="mt-2 space-y-1">
+              {propositions.map((p) => {
+                const km = aDistance(p);
+                return (
+                  <button key={p.id} type="button" onClick={() => chargerPropose(p)}
+                    className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition-colors hover:bg-zinc-50">
+                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: SPORT_META[p.sport]?.color ?? "#059669" }}>
+                      <IconeSport sport={p.sport} className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-zinc-900">{p.nom}</span>
+                      <span className="block truncate text-[12px] text-zinc-500">
+                        {fmtKm(p.distance_km, lang, 1)} · +{Math.round(p.denivele_positif_m)} m · {P[`diff.${p.difficulte}`] ?? p.difficulte}
+                        {km != null && <> · {tb("parcoursA", { d: fmtKm(km, lang, km < 10 ? 1 : 0) })}</>}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {/* Les grands parcours de France, au même endroit : un seul bouton pour trouver un parcours. */}
+          <p className="mt-5 text-[15px] font-bold text-zinc-900">{d["famousTitle"]}</p>
+          <div className="mt-1 space-y-1">
             {FAMOUS_ROUTES.map((r) => (
               <button key={r.name} type="button" onClick={() => flyToPlace(r)}
                 className="group flex w-full items-center gap-2.5 rounded-2xl p-2.5 text-left transition-colors hover:bg-zinc-100">
@@ -1102,6 +1274,39 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
           </div>
         </Feuille>
       )}
+
+      {/* ══ UN PARCOURS TOUCHÉ SUR LA CARTE : sa fiche, et le charger ══ */}
+      {feuille === "choisi" && choisi && (
+        <Feuille titre={choisi.nom} fermer={d["fermer"]} onFermer={() => setFeuille(null)}>
+          <div className="flex items-center gap-2 text-[13px] text-zinc-600">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full text-white" style={{ backgroundColor: SPORT_META[choisi.sport]?.color ?? "#059669" }}>
+              <IconeSport sport={choisi.sport} className="h-3.5 w-3.5" />
+            </span>
+            <span className="font-semibold text-zinc-900">{P[`sport.${choisi.sport}`] ?? choisi.sport}</span>
+            <span>· {P[`diff.${choisi.difficulte}`] ?? choisi.difficulte}</span>
+            {choisi.localisation?.region && <span className="truncate">· {choisi.localisation.region}</span>}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl bg-zinc-50 p-3 text-center">
+              <div className="text-[20px] font-bold tabular-nums text-zinc-900">{fmtKm(choisi.distance_km, lang, 1)}</div>
+              <div className="text-[11px] font-semibold text-zinc-500 first-letter:uppercase">{d["st.distance"]}</div>
+            </div>
+            <div className="rounded-2xl bg-zinc-50 p-3 text-center">
+              <div className="text-[20px] font-bold tabular-nums text-zinc-900">+{Math.round(choisi.denivele_positif_m)} m</div>
+              <div className="text-[11px] font-semibold text-zinc-500">D+</div>
+            </div>
+          </div>
+          <button type="button" onClick={() => chargerPropose(choisi)}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-[15px] font-semibold text-white">
+            <RouteIcon className="h-4 w-4" /> {d["parcoursCharger"]}
+          </button>
+          <button type="button" onClick={() => setFeuille("propositions")}
+            className="mt-2 w-full rounded-2xl border border-zinc-200 px-4 py-3 text-[15px] font-semibold text-zinc-700">
+            {d["parcoursListe"]}
+          </button>
+        </Feuille>
+      )}
+
     </section>
   );
 }
@@ -1228,4 +1433,9 @@ function ElevationProfile({
       </svg>
     </div>
   );
+}
+
+/** Distance à vol d'oiseau, en km. */
+function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  return haversine(a, b);
 }

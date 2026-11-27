@@ -162,6 +162,18 @@ export function ParcoursBrowser({ initialSearch = "", exportGpx = false }: { ini
     }
   }, [loadingId, L, pr]);
 
+  // La carte en grand propose aussi des parcours (pastilles, liste « autour d'ici ») : elle
+  // demande le chargement ICI, pour passer par les mêmes contrôles (tracé partiel, panne,
+  // parcours retiré) et dire les mêmes choses qu'un clic dans cette liste.
+  useEffect(() => {
+    const demande = (e: Event) => {
+      const p = (e as CustomEvent).detail as ParcoursHdf | undefined;
+      if (p && typeof p.id === "number") void loadOnMap(p);
+    };
+    window.addEventListener("te:chargerParcours", demande);
+    return () => window.removeEventListener("te:chargerParcours", demande);
+  }, [loadOnMap]);
+
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
 
