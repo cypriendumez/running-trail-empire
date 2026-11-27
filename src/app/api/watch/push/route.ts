@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { identifiantsDe } from "@/lib/intervals/identifiants";
 import { enteteIntervals } from "@/lib/intervals/auth";
+import { montreDe } from "@/lib/watch/intervals";
+import { journaliserEchec } from "@/lib/journal/echecServeur";
 
 const BASE = "https://intervals.icu/api/v1";
 
@@ -161,6 +163,9 @@ export async function POST(req: Request) {
 
   if (!res.ok) {
     const detail = (await res.text().catch(() => "")).slice(0, 200);
+    // ⚠️ UN ENVOI RATÉ SE JOURNALISE (règle du projet, constat du 27/11/2026) : il ne
+    // laissait aucune trace, et les journaux de Vercel ne gardent qu'une heure.
+    await journaliserEchec(null, { source: "montre-envoi", userId: user.id, message: `intervals.icu HTTP ${res.status} à l'envoi d'une séance`, meta: { detail } });
     return NextResponse.json({
       ok: false,
       error: `Envoi vers la montre impossible (intervals.icu HTTP ${res.status}).`,
@@ -169,11 +174,21 @@ export async function POST(req: Request) {
   }
 
   const created = await res.json().catch(() => ({}));
+  // ⚠️ LA MARQUE RÉELLE, PAS « GARMIN » POUR TOUT LE MONDE (27/11/2026) : le message disait
+  // « via Garmin » à un porteur de COROS ou de Suunto, et seulement en français. On renvoie
+  // la montre qui recevra la séance (`montreDe`, la table qui décide aussi du format) ; le
+  // TEXTE, lui, est composé côté écran dans la langue de l'athlète, avec où la trouver.
+  let marque: string | null = null;
+  try {
+    const a = await fetch(`${BASE}/athlete/${ATHLETE_ID}`, { headers: authHeader(API_KEY), cache: "no-store" });
+    if (a.ok) marque = montreDe(await a.json())?.nom ?? null;
+  } catch { /* sans marque, l'écran donne la consigne générale */ }
   return NextResponse.json({
     ok: true,
     eventId: created?.id ?? null,
     date,
     summary,
-    message: `✅ « ${name} » envoyée ! Elle se synchronise sur ta montre via Garmin (quelques minutes, en différé). Pour l'allure EN DIRECT tout de suite, utilise « Démarrer » (GPS du téléphone).`,
+    name,
+    marque,
   });
 }
