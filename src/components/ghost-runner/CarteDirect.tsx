@@ -161,6 +161,7 @@ export function CarteDirect({
   useEffect(() => { positionRef.current = position; }, [position]);
   useEffect(() => { traceRef.current = track; }, [track]);
   useEffect(() => { fondRef.current = fond; }, [fond]);
+  const vueRef = useRef(vue);
   const clicRef = useRef(onClic);
   useEffect(() => { clicRef.current = onClic; }, [onClic]);
   const reperesRef = useRef(reperes);
@@ -193,6 +194,20 @@ export function CarteDirect({
   function poserReperes(m: maplibregl.Map, r: { lat: number; lng: number; couleur: string }[]) {
     const src = m.getSource("reperes") as maplibregl.GeoJSONSource | undefined;
     src?.setData({ type: "FeatureCollection", features: r.map((p) => ({ type: "Feature", properties: { couleur: p.couleur }, geometry: { type: "Point", coordinates: [p.lng, p.lat] } })) });
+  }
+
+  function appliquerVue(m: maplibregl.Map, v: typeof vue) {
+    if (!v || v.n === 0) return;
+    if (v.emprise && v.emprise.length > 1) {
+      const lats = v.emprise.map((p) => p[0]), lngs = v.emprise.map((p) => p[1]);
+      const h = m.getContainer().clientHeight || 600;
+      // Marges : la colonne de boutons à droite et le bloc du bas couvrent la carte.
+      // Bornées à la hauteur de la carte : une marge plus grande qu'elle annule le cadrage.
+      m.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        { padding: { top: Math.min(70, h * 0.1), bottom: Math.min(250, h * 0.4), left: 30, right: 70 }, maxZoom: 16, duration: 900 });
+    } else if (v.centre) {
+      m.flyTo({ center: versLngLat(v.centre), zoom: v.zoom ?? m.getZoom(), duration: 1400 });
+    }
   }
 
   function poserParcours(m: maplibregl.Map, p: [number, number][][]) {
@@ -401,6 +416,7 @@ export function CarteDirect({
         montrerParcours(m, voirParcoursRef.current);
         if (reliefRef.current) appliquerRelief(m, true);
         if (positionRef.current) poserPoint(m, positionRef.current);
+        appliquerVue(m, vueRef.current);
       });
       if (positionRef.current) dejaCentree.current = true;
       carte.current = m;
@@ -478,20 +494,13 @@ export function CarteDirect({
   }, [couleurTrace]);
 
   // Aller voir un lieu, ou cadrer un parcours entier (chargé depuis la liste).
+  // ⚠️ La demande peut arriver AVANT la carte (un parcours ouvert depuis une autre page, au
+  // montage) : elle est gardée et rejouée au chargement, sinon le cadrage serait perdu.
   const vueN = vue?.n ?? 0;
+  useEffect(() => { vueRef.current = vue; }, [vue]);
   useEffect(() => {
     const m = carte.current;
-    if (!m || !vue || vueN === 0) return;
-    if (vue.emprise && vue.emprise.length > 1) {
-      const lats = vue.emprise.map((p) => p[0]), lngs = vue.emprise.map((p) => p[1]);
-      const h = m.getContainer().clientHeight || 600;
-      // Marges : la colonne de boutons à droite et le bloc du bas couvrent la carte.
-      m.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-        // Bornées à la hauteur de la carte : une marge plus grande qu'elle annule le cadrage.
-        { padding: { top: Math.min(70, h * 0.1), bottom: Math.min(250, h * 0.4), left: 30, right: 70 }, maxZoom: 16, duration: 900 });
-    } else if (vue.centre) {
-      m.flyTo({ center: versLngLat(vue.centre), zoom: vue.zoom ?? m.getZoom(), duration: 1400 });
-    }
+    if (m && pret.current) appliquerVue(m, vueRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vueN]);
 
