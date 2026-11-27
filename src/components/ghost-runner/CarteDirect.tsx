@@ -199,11 +199,13 @@ export function CarteDirect({
   function appliquerVue(m: maplibregl.Map, v: typeof vue) {
     if (!v || v.n === 0) return;
     if (v.emprise && v.emprise.length > 1) {
-      const lats = v.emprise.map((p) => p[0]), lngs = v.emprise.map((p) => p[1]);
+      // Une boucle et pas `Math.min(...)` : étaler 100 000 points dépasserait la pile d'appel.
+      let s = 90, n = -90, o = 180, e = -180;
+      for (const [la, lo] of v.emprise) { if (la < s) s = la; if (la > n) n = la; if (lo < o) o = lo; if (lo > e) e = lo; }
       const h = m.getContainer().clientHeight || 600;
       // Marges : la colonne de boutons à droite et le bloc du bas couvrent la carte.
       // Bornées à la hauteur de la carte : une marge plus grande qu'elle annule le cadrage.
-      m.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+      m.fitBounds([[o, s], [e, n]],
         { padding: { top: Math.min(70, h * 0.1), bottom: Math.min(250, h * 0.4), left: 30, right: 70 }, maxZoom: 16, duration: 900 });
     } else if (v.centre) {
       m.flyTo({ center: versLngLat(v.centre), zoom: v.zoom ?? m.getZoom(), duration: 1400 });

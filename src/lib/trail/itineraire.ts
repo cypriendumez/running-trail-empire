@@ -54,6 +54,17 @@ function enFile<T>(tache: () => Promise<T>, encoreUtile: () => boolean): Promise
   return suite;
 }
 
+/**
+ * Un signal qui abandonne après `ms`. ⚠️ `AbortSignal.timeout` manque aux anciens Safari
+ * iOS : l'appeler lèverait une erreur, avalée en « serveur en panne » pour CHAQUE tronçon.
+ */
+function delai(ms: number): AbortSignal {
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") return AbortSignal.timeout(ms);
+  const c = new AbortController();
+  setTimeout(() => c.abort(), ms);
+  return c.signal;
+}
+
 export type Troncon = {
   /** Les points du chemin, du départ accroché à l'arrivée accrochée. */
   points: PointLL[];
@@ -82,7 +93,7 @@ export function calculerTroncon(
 ): Promise<Troncon | EchecTroncon> {
   return enFile(async () => {
     try {
-      const res = await fetcher(urlItineraire(a, b, activite), { signal: AbortSignal.timeout(8000) });
+      const res = await fetcher(urlItineraire(a, b, activite), { signal: delai(8000) });
       if (!res.ok) return { echec: "panne" as const };
       const data = await res.json() as {
         code?: string;

@@ -103,6 +103,9 @@ function formatDuration(min: number) {
   return h > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${m} min`;
 }
 
+/** Un nom de parcours avec « & » ou « < » rendait le fichier GPX invalide. */
+const echapperXml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
 function buildGPX(name: string, pts: LatLng[], elevations: number[]): string {
   const trk = pts.map((p, i) =>
     `      <trkpt lat="${p.lat.toFixed(6)}" lon="${p.lng.toFixed(6)}">${elevations[i] != null ? `<ele>${elevations[i].toFixed(1)}</ele>` : ""}</trkpt>`
@@ -111,7 +114,7 @@ function buildGPX(name: string, pts: LatLng[], elevations: number[]): string {
 <gpx version="1.1" creator="Pacevo"
      xmlns="http://www.topografix.com/GPX/1/1">
   <trk>
-    <name>${name}</name>
+    <name>${echapperXml(name)}</name>
     <trkseg>
 ${trk}
     </trkseg>
@@ -220,6 +223,8 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
    */
   const [reperes, setReperes] = useState<Repere[]>([]);
   const reperesRef = useRef<Repere[]>([]);
+  const monte = useRef(true);
+  useEffect(() => { monte.current = true; return () => { monte.current = false; }; }, []);
   useEffect(() => { reperesRef.current = reperes; }, [reperes]);
   const idSuivant = useRef(1);
   const [troncons, setTroncons] = useState<Record<string, LatLng[]>>({});
@@ -320,7 +325,9 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const relier = useCallback(async (depuis: Repere, vers: Repere) => {
     const cle = cleTroncon(depuis, vers);
     if (!followPaths) { setTroncons((t) => ({ ...t, [cle]: [{ lat: vers.lat, lng: vers.lng }] })); return; }
-    const utile = () => reperesRef.current.some((r) => r.id === vers.id);
+    // Utile tant que le point existe ET que l'écran est encore là : en quittant l'onglet,
+    // les requêtes encore en file ne partent pas.
+    const utile = () => monte.current && reperesRef.current.some((r) => r.id === vers.id);
     setEnCalcul((n) => n + 1);
     // `utile` est relu quand vient le tour de la requête : annulé entre-temps, il ne part pas.
     const t = await calculerTroncon(depuis, vers, activity, fetch, utile);
@@ -330,7 +337,8 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
     if (estEchec(t)) {
       // ⚠️ UNE LIGNE DROITE SE DIT, ET POURQUOI. L'ancien code la posait en silence à chaque
       // échec : le parcours traversait des immeubles et personne ne savait pourquoi.
-      toast.error(t.echec === "panne" ? d["t.routeDown"] : d["t.routeFail"]);
+      // Un seul message à la fois (`id`) : serveur en panne + cinq points posés = un toast, pas cinq.
+      toast.error(t.echec === "panne" ? d["t.routeDown"] : d["t.routeFail"], { id: "itineraire" });
       setTroncons((x) => ({ ...x, [cle]: [{ lat: vers.lat, lng: vers.lng }] }));
       return;
     }
@@ -1060,7 +1068,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
                   <div className="w-1.5 flex-shrink-0 self-stretch rounded-full" style={{ backgroundColor: difficultyColor(r.difficulty) }} />
                   <button type="button" className="min-w-0 flex-1 text-left" onClick={() => { handleLoadRoute(r); setFeuille(null); }}>
                     <div className="truncate text-sm font-semibold text-zinc-900">{r.name}</div>
-                    <div className="text-xs text-zinc-500">{fmtKm(r.distance_km, lang, 1)} · +{r.elevation_gain_m}m</div>
+                    <div className="text-xs text-zinc-500">{fmtKm(r.distance_km, lang, 1)}{r.elevation_gain_m != null && ` · +${r.elevation_gain_m}m`}</div>
                   </button>
                   <button type="button" onClick={() => handleToggleFavorite(r)}
                     aria-label={tb(r.is_favorite ? "unfavRoute" : "favRoute", { name: r.name })} aria-pressed={!!r.is_favorite}

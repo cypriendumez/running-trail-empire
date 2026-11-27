@@ -89,7 +89,10 @@ const reponse = (coords: [number, number][], wps: [number, number][]) =>
     const fake = (async () => { departs.push(Date.now()); return reponse([[A.lng, A.lat], [B.lng, B.lat]], [[A.lng, A.lat], [B.lng, B.lat]]); }) as unknown as typeof fetch;
     await Promise.all([calculerTroncon(A, B, "course", fake), calculerTroncon(B, A, "course", fake)]);
     assert.equal(departs.length, 2);
-    assert.ok(departs[1] - departs[0] >= ECART_REQUETES_MS - 5, `écart ${departs[1] - departs[0]} ms`);
+    // ⚠️ Comparé à 1 000 ms ÉCRITS ICI, pas à la constante importée : sinon passer la
+    // constante à 300 ms laisserait le test vert (seconde relecture, 27/11/2026).
+    assert.ok(ECART_REQUETES_MS >= 1000, `ECART_REQUETES_MS = ${ECART_REQUETES_MS} : moins d'une seconde entre deux requêtes`);
+    assert.ok(departs[1] - departs[0] >= 995, `écart ${departs[1] - departs[0]} ms entre deux requêtes`);
   });
 
   await test("un point posé à côté d'une rue se pose SUR la rue ; loin de tout chemin, il reste où il est", () => {
@@ -152,7 +155,7 @@ const reponse = (coords: [number, number][], wps: [number, number][]) =>
   });
 
   await test("un échec du calcul se DIT (ligne droite annoncée)", () => {
-    assert.match(tb, /if \(estEchec\(t\)\) \{\s*toast\.error\(t\.echec === "panne" \? d\["t\.routeDown"\] : d\["t\.routeFail"\]\);/);
+    assert.match(tb, /if \(estEchec\(t\)\) \{\s*toast\.error\(t\.echec === "panne" \? d\["t\.routeDown"\] : d\["t\.routeFail"\], \{ id: "itineraire" \}\);/);
     const i18n = readFileSync("src/components/trail/trailI18n.ts", "utf8");
     assert.equal((i18n.match(/"t\.routeFail":/g) ?? []).length, 5, "t.routeFail manque dans une langue");
     assert.equal((i18n.match(/"t\.routeDown":/g) ?? []).length, 5, "t.routeDown manque dans une langue");
