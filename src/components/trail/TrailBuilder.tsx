@@ -201,10 +201,11 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const [fondCarte, setFondCarte] = useState<IdFond>("plan");
   const [calquesActifs, setCalquesActifs] = useState<IdCalque[]>(["poi"]);
   const [relief3d, setRelief3d] = useState(false);
-  const [feuille, setFeuille] = useState<null | "modeles" | "reglages" | "parcours" | "propositions" | "choisi">(null);
+  const [feuille, setFeuille] = useState<null | "modeles" | "reglages" | "parcours" | "choisi">(null);
   /** Compteur + destination : chaque nouveau `n` déplace la carte (voir `CarteDirect`). */
   const [vue, setVue] = useState<{ n: number; centre?: [number, number]; zoom?: number; emprise?: [number, number][] }>({ n: 0 });
   const fermerFeuille = useCallback(() => setFeuille(null), []);
+  const fermerTiroir = useCallback(() => setTiroirOuvert(false), []);
 
   /**
    * ── LES PARCOURS PROPOSÉS, DANS LA CARTE (Cyprien, 27/11/2026) ───────────────
@@ -221,7 +222,23 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const [propositions, setPropositions] = useState<ParcoursHdf[]>([]);
   const [etatPropositions, setEtatPropositions] = useState<"attente" | "ok" | "erreur">("attente");
   const [choisi, setChoisi] = useState<ParcoursHdf | null>(null);
-  const dernierePropo = useRef<{ lat: number; lng: number; sport: string } | null>(null);
+  const dernierePropo = useRef<{ lat: number; lng: number; sport: string; q: string } | null>(null);
+  /**
+   * ── LE TIROIR DU BAS S'OUVRE SUR LES PARCOURS (Cyprien, 27/11/2026, capture à l'appui) ──
+   * « Enlève le bouton "Voir les 20 parcours autour d'ici" ; quand on appuie sur la petite
+   * barre au-dessus de "Mes parcours", en dessous on accède à tous les parcours de France,
+   * en priorité ceux autour de nous. » La poignée du tiroir s'ouvre au toucher ou au glissé
+   * vers le haut : recherche, sports, les plus proches d'abord, puis la suite (« Afficher
+   * plus ») jusqu'au bout du catalogue.
+   */
+  const [tiroirOuvert, setTiroirOuvert] = useState(false);
+  const [recherche, setRecherche] = useState("");
+  const [rechercheDiff, setRechercheDiff] = useState("");
+  useEffect(() => { const t = setTimeout(() => setRechercheDiff(recherche.trim()), 300); return () => clearTimeout(t); }, [recherche]);
+  const [pagePropo, setPagePropo] = useState(1);
+  const [totalPropo, setTotalPropo] = useState(0);
+  const [plusEnCours, setPlusEnCours] = useState(false);
+  const departGlisse = useRef<number | null>(null);
   /** Le centre regardé ne change l'état qu'au-delà de 200 m : pas un rendu par mouvement de carte. */
   const changerCentreVu = useCallback((c: [number, number]) => setCentreVu((avant) =>
     avant && distanceKm({ lat: avant[0], lng: avant[1] }, { lat: c[0], lng: c[1] }) < 0.2 ? avant : c), []);
@@ -677,6 +694,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
     allerA({ centre: [r.lat, r.lng], zoom: r.zoom });
     montrerSentiers(); // reveal GR/PR markings at the destination
     setFeuille(null);
+    setTiroirOuvert(false);
     toast.success(`${r.emoji} ${r.name}`, { description: d["t.flyHint"] });
   }, [d, allerA, montrerSentiers]);
 
@@ -841,32 +859,53 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const P = PX[lang] ?? PX.fr;
   /** Les pastilles ne s'affichent que sur une carte vide : pendant un tracé, elles gêneraient le doigt. */
   const montrerPropositions = !navMode && reperes.length === 0;
-  const besoinPropositions = montrerPropositions || feuille === "propositions";
+  const besoinPropositions = montrerPropositions || tiroirOuvert;
   useEffect(() => {
     if (!besoinPropositions || !centreVu) return;
     const [lat, lng] = centreVu;
     const avant = dernierePropo.current;
-    // On ne relit pas pour un déplacement de moins de 2 km avec le même sport.
-    if (avant && avant.sport === sportPropose && distanceKm({ lat, lng }, avant) < 2) return;
+    // On ne relit pas pour un déplacement de moins de 2 km avec le même sport et la même recherche.
+    if (avant && avant.sport === sportPropose && avant.q === rechercheDiff && distanceKm({ lat, lng }, avant) < 2) return;
     const ctrl = new AbortController();
     const minuterie = setTimeout(async () => {
       try {
-        const q = new URLSearchParams({ near: `${lat.toFixed(3)},${lng.toFixed(3)}`, sort: "proche", sport: sportPropose, pageSize: "20", page: "1" });
+        const q = new URLSearchParams({ near: `${lat.toFixed(3)},${lng.toFixed(3)}`, sort: "proche", sport: sportPropose, q: rechercheDiff, pageSize: "20", page: "1" });
         const r = await fetch(`/api/parcours?${q}`, { signal: ctrl.signal });
-        const j = await r.json() as { items?: ParcoursHdf[] };
+        const j = await r.json() as { items?: ParcoursHdf[]; total?: number };
         if (ctrl.signal.aborted) return;
         // ⚠️ UNE PANNE SE DIT : sans réponse lisible, la liste dit « ne se charge pas », jamais
         // « aucun parcours ici » (ce serait faux).
         if (!r.ok || !Array.isArray(j.items)) { setEtatPropositions("erreur"); return; }
-        dernierePropo.current = { lat, lng, sport: sportPropose };
+        dernierePropo.current = { lat, lng, sport: sportPropose, q: rechercheDiff };
         setPropositions(j.items);
+        setPagePropo(1);
+        setTotalPropo(typeof j.total === "number" ? j.total : j.items.length);
         setEtatPropositions("ok");
       } catch {
         if (!ctrl.signal.aborted) setEtatPropositions("erreur");
       }
     }, 600);
     return () => { clearTimeout(minuterie); ctrl.abort(); };
-  }, [besoinPropositions, centreVu, sportPropose]);
+  }, [besoinPropositions, centreVu, sportPropose, rechercheDiff]);
+
+  /** La page suivante, toujours triée par distance : on finit par parcourir toute la France. */
+  const afficherPlus = async () => {
+    const avant = dernierePropo.current;
+    if (!avant || plusEnCours) return;
+    setPlusEnCours(true);
+    try {
+      const q = new URLSearchParams({ near: `${avant.lat.toFixed(3)},${avant.lng.toFixed(3)}`, sort: "proche", sport: avant.sport, q: avant.q, pageSize: "20", page: String(pagePropo + 1) });
+      const r = await fetch(`/api/parcours?${q}`);
+      const j = await r.json() as { items?: ParcoursHdf[] };
+      if (!r.ok || !Array.isArray(j.items)) { toast.error(d["parcoursErreur"]); return; }
+      setPropositions((x) => [...x, ...j.items!.filter((p) => !x.some((y) => y.id === p.id))]);
+      setPagePropo((n) => n + 1);
+    } catch {
+      toast.error(d["parcoursErreur"]);
+    } finally {
+      setPlusEnCours(false);
+    }
+  };
 
   /** Distance d'un parcours au centre regardé (km), pour la liste. */
   const aDistance = (p: ParcoursHdf) => (centreVu && typeof p.lat === "number" && typeof p.lng === "number"
@@ -884,6 +923,19 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const chargerPropose = (p: ParcoursHdf) => {
     window.dispatchEvent(new CustomEvent("te:chargerParcours", { detail: p }));
     setFeuille(null);
+    setTiroirOuvert(false);
+  };
+  /** La poignée : un toucher bascule, un glissé vers le haut ouvre, vers le bas ferme. */
+  const poignee = {
+    onClick: () => setTiroirOuvert((o) => !o),
+    onTouchStart: (e: React.TouchEvent) => { departGlisse.current = e.touches[0].clientY; },
+    onTouchEnd: (e: React.TouchEvent) => {
+      const dep = departGlisse.current; departGlisse.current = null;
+      if (dep === null) return;
+      const dy = e.changedTouches[0].clientY - dep;
+      if (dy < -25) { e.preventDefault(); setTiroirOuvert(true); }
+      else if (dy > 25) { e.preventDefault(); setTiroirOuvert(false); }
+    },
   };
 
   // Annuler / rétablir au clavier (ordinateur) : Ctrl+Z, Ctrl+Maj+Z.
@@ -946,7 +998,8 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
         etiquette={d["mapAria"]}
         relief={relief3d}
         // Une feuille ouverte : un tap sur la carte la ferme, il ne pose pas un point caché dessous.
-        onClic={feuille ? fermerFeuille : navMode ? undefined : handleMapClick}
+        // Tiroir ouvert : un tap sur la carte le referme (il ne pose pas de point).
+        onClic={feuille ? fermerFeuille : tiroirOuvert ? fermerTiroir : navMode ? undefined : handleMapClick}
         reperes={reperesCarte}
         couleurTrace={difficultyColor(difficulty)}
         vue={vue}
@@ -979,7 +1032,8 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
           PAS le doigt (sinon la bande transparente des boutons avalerait les pincements),
           seuls les boutons, le bloc de chiffres et le tiroir le reprennent. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col">
-        <div className="pointer-events-none mx-auto w-full max-w-md px-3">
+        {/* Tiroir ouvert : la colonne et le bloc de chiffres s'effacent, la liste prend la place. */}
+        <div className={`pointer-events-none mx-auto w-full max-w-md px-3 ${tiroirOuvert ? "hidden" : ""}`}>
           <div className="mb-2.5 flex flex-col items-end gap-2">
             <BtnCarte actif={feuille === "modeles"} titre={g["map.calques"]} onClick={() => setFeuille((f) => (f === "modeles" ? null : "modeles"))}>
               <Layers className="h-5 w-5" />
@@ -992,12 +1046,6 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
                 <span className="text-[15px] font-bold">3D</span>
               </BtnCarte>
             )}
-            <BtnCarte actif={feuille === "propositions"} titre={d["parcoursProches"]} onClick={() => setFeuille((f) => (f === "propositions" ? null : "propositions"))}>
-              <RouteIcon className="h-5 w-5" />
-              {montrerPropositions && pastilles.length > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">{pastilles.length}</span>
-              )}
-            </BtnCarte>
             {/* Suivre le parcours en direct (point bleu, distance restante, partage). */}
             {hasRoute && !navMode && (
               <BtnCarte titre={d["followLive"]} onClick={() => { setSuiviNav(true); setNavMode(true); }}>
@@ -1055,22 +1103,16 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
               </div>
             </div>
             {altitudeIndispo && <p className="px-3 pb-2 text-center text-[11px] leading-snug text-amber-700">{d["altIndispo"]}</p>}
-            {/* Carte vide : les parcours d'à côté sont PROPOSÉS ici, en clair. Les pastilles
-                seules ne suffisaient pas — le plus proche était à 2,6 km, hors de la vue. */}
-            {montrerPropositions && propositions.length > 0 && (
-              <button type="button" onClick={() => setFeuille("propositions")}
-                className="flex w-full items-center justify-center gap-2 border-t border-zinc-100 px-3 py-2.5 text-[13px] font-semibold text-emerald-700 hover:bg-emerald-50">
-                <RouteIcon className="h-4 w-4" />
-                {tb("parcoursVoir", { n: propositions.length })}
-                <ChevronDown className="h-4 w-4 -rotate-90" />
-              </button>
-            )}
           </div>
         </div>
 
         {/* Le tiroir du bas, blanc, avec sa poignée — comme Enregistrer. */}
-        <div className="pointer-events-auto rounded-t-[28px] bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_30px_-18px_rgba(9,9,11,0.45)]">
-          <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-zinc-200" aria-hidden />
+        <div className={`pointer-events-auto rounded-t-[28px] bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_-18px_rgba(9,9,11,0.45)] ${tiroirOuvert ? "max-h-[85dvh] overflow-y-auto overscroll-contain" : ""}`}>
+          {/* La poignée : toute la largeur se touche (une barre de 6 px se rate au pouce). */}
+          <button type="button" {...poignee} aria-expanded={tiroirOuvert} aria-label={tiroirOuvert ? d["tiroirFermer"] : d["tiroirOuvrir"]}
+            className={`${tiroirOuvert ? "sticky top-0 z-10 bg-white" : ""} -mx-4 flex w-[calc(100%+2rem)] justify-center pb-3 pt-2`}>
+            <span className={`h-1.5 w-10 rounded-full transition-colors ${tiroirOuvert ? "bg-zinc-400" : "bg-zinc-300"}`} aria-hidden />
+          </button>
           {showElevation && hasRoute && elevations.length > 2 && !navMode && (
             <div className="mx-auto mb-3 max-w-xl">
               <ElevationProfile points={allPoints} elevations={elevations} totalKm={distance} gain={elevGain} loss={elevLoss}
@@ -1090,7 +1132,8 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
               </ActionCarte>
             </div>
           ) : (
-            <div className="mx-auto flex max-w-md items-start justify-around">
+            // Tiroir ouvert : la poignée devient collante, le gros bouton (-mt-3) passait dessous.
+            <div className={`mx-auto flex max-w-md items-start justify-around ${tiroirOuvert ? "mt-3" : ""}`}>
               <ActionCarte etroit label={d["undo"]} disabled={!reperes.length} onClick={handleUndo}>
                 <Undo2 className="h-6 w-6 text-zinc-700" />
               </ActionCarte>
@@ -1103,6 +1146,76 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
               <ActionCarte etroit label={g["map.reglages"]} onClick={() => setFeuille("reglages")}>
                 <SlidersHorizontal className="h-6 w-6 text-zinc-600" />
               </ActionCarte>
+            </div>
+          )}
+          {/* ══ TIROIR OUVERT : TOUS LES PARCOURS DE FRANCE, LES PLUS PROCHES D'ABORD ══ */}
+          {tiroirOuvert && (
+            <div className="mx-auto mt-5 max-w-xl border-t border-zinc-100 pt-4">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-[17px] font-bold text-zinc-900">{d["parcoursProches"]}</p>
+                {etatPropositions === "ok" && totalPropo > 0 && <span className="text-[12px] text-zinc-500">{tb("parcoursTotal", { n: fmtNombre(totalPropo, lang, 0) })}</span>}
+              </div>
+              <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder={d["parcoursRecherche"]} aria-label={d["parcoursRecherche"]}
+                type="search" className="mt-3 w-full rounded-2xl border border-zinc-200 px-4 py-2.5 text-[15px] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" />
+              <p className="mt-2 text-[13px] text-zinc-500">{d["parcoursAide"]}</p>
+              <div className="-mx-5 mt-3 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {/* `concat` et pas `...SPORTS` : tests/bundle lit `.SPORTS` comme une variable d'environnement. */}
+                {(["all"] as ("all" | SportHdf)[]).concat(SPORTS).map((s) => (
+                  <button key={s} type="button" onClick={() => { if (s !== sportPropose) { setSportPropose(s); setEtatPropositions("attente"); } }} aria-pressed={sportPropose === s}
+                    className={`flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold ${sportPropose === s ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700"}`}>
+                    <IconeSport sport={s} className="h-3.5 w-3.5" />
+                    {s === "all" ? d["parcoursTous"] : P[`sport.${s}`] ?? s}
+                  </button>
+                ))}
+              </div>
+              {etatPropositions === "erreur" ? (
+                <p className="py-6 text-center text-sm text-amber-700">{d["parcoursErreur"]}</p>
+              ) : etatPropositions === "attente" ? (
+                <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-zinc-400" /></div>
+              ) : propositions.length === 0 ? (
+                <p className="py-6 text-center text-sm text-zinc-500">{d["parcoursAucun"]}</p>
+              ) : (
+                <div className="mt-2 space-y-1">
+                  {propositions.map((p) => {
+                    const km = aDistance(p);
+                    return (
+                      <button key={p.id} type="button" onClick={() => chargerPropose(p)}
+                        className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition-colors hover:bg-zinc-50">
+                        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: SPORT_META[p.sport]?.color ?? "#059669" }}>
+                          <IconeSport sport={p.sport} className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-zinc-900">{p.nom}</span>
+                          <span className="block truncate text-[12px] text-zinc-500">
+                            {fmtKm(p.distance_km, lang, 1)} · +{Math.round(p.denivele_positif_m)} m · {P[`diff.${p.difficulte}`] ?? p.difficulte}
+                            {km != null && <> · {tb("parcoursA", { d: fmtKm(km, lang, km < 10 ? 1 : 0) })}</>}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {propositions.length < totalPropo && (
+                    <button type="button" onClick={afficherPlus} disabled={plusEnCours}
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 px-4 py-2.5 text-[14px] font-semibold text-zinc-700 disabled:opacity-60">
+                      {plusEnCours && <Loader2 className="h-4 w-4 animate-spin" />} {d["parcoursPlus"]}
+                    </button>
+                  )}
+                </div>
+              )}
+              {/* Les grands parcours de France, au même endroit : un seul bouton pour trouver un parcours. */}
+              <p className="mt-5 text-[15px] font-bold text-zinc-900">{d["famousTitle"]}</p>
+              <div className="mt-1 space-y-1">
+                {FAMOUS_ROUTES.map((r) => (
+                  <button key={r.name} type="button" onClick={() => flyToPlace(r)}
+                    className="group flex w-full items-center gap-2.5 rounded-2xl p-2.5 text-left transition-colors hover:bg-zinc-100">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-zinc-900">{r.name}</div>
+                      <div className="truncate text-[12px] text-zinc-500">{r.region} · {tbDesc(r.distance)} · {tbDesc(r.elevation)}</div>
+                    </div>
+                    <MapPin className="h-4 w-4 flex-shrink-0 text-zinc-300 group-hover:text-emerald-500" />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -1222,65 +1335,6 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
         </Feuille>
       )}
 
-      {/* ══ PARCOURS AUTOUR D'ICI : la liste, par sport, triée par distance ══ */}
-      {feuille === "propositions" && (
-        <Feuille titre={d["parcoursProches"]} fermer={d["fermer"]} onFermer={() => setFeuille(null)}>
-          <p className="text-[13px] text-zinc-500">{d["parcoursAide"]}</p>
-          <div className="-mx-5 mt-3 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {/* `concat` et pas `...SPORTS` : tests/bundle lit `.SPORTS` comme une variable d'environnement. */}
-            {(["all"] as ("all" | SportHdf)[]).concat(SPORTS).map((s) => (
-              <button key={s} type="button" onClick={() => { if (s !== sportPropose) { setSportPropose(s); setEtatPropositions("attente"); } }} aria-pressed={sportPropose === s}
-                className={`flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold ${sportPropose === s ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700"}`}>
-                <IconeSport sport={s} className="h-3.5 w-3.5" />
-                {s === "all" ? d["parcoursTous"] : P[`sport.${s}`] ?? s}
-              </button>
-            ))}
-          </div>
-          {etatPropositions === "erreur" ? (
-            <p className="py-6 text-center text-sm text-amber-700">{d["parcoursErreur"]}</p>
-          ) : etatPropositions === "attente" ? (
-            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-zinc-400" /></div>
-          ) : propositions.length === 0 ? (
-            <p className="py-6 text-center text-sm text-zinc-500">{d["parcoursAucun"]}</p>
-          ) : (
-            <div className="mt-2 space-y-1">
-              {propositions.map((p) => {
-                const km = aDistance(p);
-                return (
-                  <button key={p.id} type="button" onClick={() => chargerPropose(p)}
-                    className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition-colors hover:bg-zinc-50">
-                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: SPORT_META[p.sport]?.color ?? "#059669" }}>
-                      <IconeSport sport={p.sport} className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-zinc-900">{p.nom}</span>
-                      <span className="block truncate text-[12px] text-zinc-500">
-                        {fmtKm(p.distance_km, lang, 1)} · +{Math.round(p.denivele_positif_m)} m · {P[`diff.${p.difficulte}`] ?? p.difficulte}
-                        {km != null && <> · {tb("parcoursA", { d: fmtKm(km, lang, km < 10 ? 1 : 0) })}</>}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {/* Les grands parcours de France, au même endroit : un seul bouton pour trouver un parcours. */}
-          <p className="mt-5 text-[15px] font-bold text-zinc-900">{d["famousTitle"]}</p>
-          <div className="mt-1 space-y-1">
-            {FAMOUS_ROUTES.map((r) => (
-              <button key={r.name} type="button" onClick={() => flyToPlace(r)}
-                className="group flex w-full items-center gap-2.5 rounded-2xl p-2.5 text-left transition-colors hover:bg-zinc-100">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-zinc-900">{r.name}</div>
-                  <div className="truncate text-[12px] text-zinc-500">{r.region} · {tbDesc(r.distance)} · {tbDesc(r.elevation)}</div>
-                </div>
-                <MapPin className="h-4 w-4 flex-shrink-0 text-zinc-300 group-hover:text-emerald-500" />
-              </button>
-            ))}
-          </div>
-        </Feuille>
-      )}
-
       {/* ══ UN PARCOURS TOUCHÉ SUR LA CARTE : sa fiche, et le charger ══ */}
       {feuille === "choisi" && choisi && (
         <Feuille titre={choisi.nom} fermer={d["fermer"]} onFermer={() => setFeuille(null)}>
@@ -1306,7 +1360,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-[15px] font-semibold text-white">
             <RouteIcon className="h-4 w-4" /> {d["parcoursCharger"]}
           </button>
-          <button type="button" onClick={() => setFeuille("propositions")}
+          <button type="button" onClick={() => { setFeuille(null); setTiroirOuvert(true); }}
             className="mt-2 w-full rounded-2xl border border-zinc-200 px-4 py-3 text-[15px] font-semibold text-zinc-700">
             {d["parcoursListe"]}
           </button>

@@ -181,31 +181,42 @@ test("l'avertissement est repliable, et sa phrase clé reste visible repliée", 
     "la phrase clé se répète juste au-dessus du texte complet une fois déplié");
 });
 
-test("le « pourquoi ce plan » est replié, mais garde la ligne actionnable visible", () => {
+test("le « pourquoi ce plan » est replié d'office : le calendrier suit directement le bloc vert", () => {
   const src = readFileSync("src/components/training/CalendarView.tsx", "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
-  // 123 mots de raisonnement dépliés en permanence, alors qu'on vient chercher CE QUI
-  // EST PRÉVU. Le résumé doit porter cette réponse-là, repliée comme dépliée.
-  const i = src.indexOf('t("cal.why.title")');
-  assert.ok(i > 0, "l'en-tête du bloc a disparu");
-  const entete = src.slice(Math.max(0, i - 400), i + 900);
-  assert.ok(entete.includes("<details"), "le bloc est de nouveau déplié en permanence");
-  assert.ok(entete.includes('t("cal.why.plannedQuality")'),
-    "la ligne « qualité prévue » n'est plus dans le résumé : replié, le bloc ne dit plus rien d'utile");
+  // 27/11/2026 (Cyprien, capture à l'appui) : « le bloc vert, puis directement le calendrier ;
+  // pas "Pourquoi ce plan" et tout l'encadré orange — il s'affiche quand on clique sur la
+  // flèche ». Remplace la règle du 30/10 (ligne de motifs visible repliée).
+  const i = src.indexOf("function CoachWhy(");
+  assert.ok(i > 0, "le bloc « pourquoi ce plan » a disparu");
+  const corps = src.slice(i, src.indexOf("\nfunction RappelPremium", i));
+  assert.match(corps, /const \[ouvert, setOuvert\] = useState\(false\);/, "le bloc s'ouvre de nouveau d'office");
+  assert.match(corps, /onClick=\{\(\) => setOuvert\(\(o\) => !o\)\} aria-expanded=\{ouvert\}/, "la ligne « Pourquoi ce plan » n'ouvre plus le bloc");
+  // L'encadré coloré (et ses motifs) n'existe QU'OUVERT.
+  const iEncadre = corps.indexOf("rounded-2xl border ${tone.border} ${tone.bg}");
+  assert.ok(iEncadre > 0, "l'encadré du raisonnement a disparu");
+  assert.ok(/\{ouvert && \(\s*<div className=\{`mt-1 rounded-2xl border \$\{tone\.border\}/.test(corps), "l'encadré orange s'affiche de nouveau sans qu'on l'ouvre");
+  // Ouvert, il garde la ligne actionnable et l'avis sur la semaine.
+  assert.ok(corps.includes('t("cal.why.plannedQuality")'), "la ligne « qualité prévue » a disparu du bloc");
+  assert.ok(/<AvisCoach week=\{semaine\}/.test(corps), "« Un avis sur ma semaine » a disparu");
+  // Une semaine sans rien de notable : la même ligne repliée, l'avis seulement à l'ouverture.
+  assert.ok(/\{bouton\}\s*\{ouvert && \(\s*<div className="mt-1">\s*\{rappel/.test(corps), "une semaine ordinaire affiche de nouveau l'avis sans qu'on ouvre");
 });
 
 test("l'avertissement de réalisme n'est PAS enfermé dans ce repli", () => {
-  // Replier les faits est une économie de lecture ; replier une mise en garde DANS un
-  // autre repli la rendrait invisible en deux clics. Elle doit rester au premier niveau.
+  // Replier les faits est une économie de lecture ; replier une mise en garde la rendrait
+  // invisible. Elle reste HORS de l'encadré qui ne s'ouvre qu'au toucher (21/09/2026).
   const src = readFileSync("src/components/training/CalendarView.tsx", "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
-  const finRepli = src.indexOf("</details>");
-  const avertissement = src.indexOf("warnings.length > 0");
-  assert.ok(finRepli > 0 && avertissement > 0, "structure introuvable");
-  assert.ok(avertissement > finRepli,
-    "l'avertissement de réalisme est passé À L'INTÉRIEUR du bloc repliable : il faut deux clics pour le lire");
+  const i = src.indexOf("function CoachWhy(");
+  const corps = src.slice(i, src.indexOf("\nfunction RappelPremium", i));
+  const finEncadre = corps.indexOf("<AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} />\n    </div>\n      )}");
+  const avertissement = corps.indexOf("warnings.length > 0 && !realismeCache");
+  assert.ok(finEncadre > 0 && avertissement > 0, "structure introuvable");
+  assert.ok(avertissement > finEncadre,
+    "l'avertissement de réalisme est passé À L'INTÉRIEUR du bloc qui ne s'ouvre qu'au toucher : il ne se verrait plus");
 });
 
 test("l'intro d'allègement n'est pas répétée au dépliage", () => {

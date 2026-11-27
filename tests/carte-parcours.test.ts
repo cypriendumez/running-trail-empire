@@ -116,12 +116,24 @@ const lire = (p: string) => sansCommentaires(readFileSync(p, "utf8"));
   await test("les parcours sont PROPOSÉS dans la carte : pastilles, ligne « voir », liste par sport", () => {
     assert.match(tb, /const montrerPropositions = !navMode && reperes\.length === 0;/, "les pastilles s'affichent pendant un tracé, ou jamais");
     assert.match(tb, /propositions=\{pastilles\}\s*\n\s*onProposition=\{toucherProposition\}\s*\n\s*onVue=\{changerCentreVu\}/);
-    assert.match(tb, /\{montrerPropositions && propositions\.length > 0 && \(\s*<button type="button" onClick=\{\(\) => setFeuille\("propositions"\)\}/, "plus de ligne « voir les parcours autour d'ici »");
+    // 27/11/2026 (Cyprien) : plus de ligne « Voir les N parcours » ni de bouton rond. La
+    // POIGNÉE du tiroir ouvre tous les parcours de France, les plus proches d'abord.
+    assert.ok(!/tb\("parcoursVoir"/.test(tb), "la ligne « Voir les N parcours autour d'ici » est revenue");
+    assert.ok(!/titre=\{d\["parcoursProches"\]\}/.test(tb), "le bouton rond « Parcours » est revenu (doublon du tiroir)");
+    assert.match(tb, /<button type="button" \{\.\.\.poignee\} aria-expanded=\{tiroirOuvert\}/, "la poignée du tiroir n'ouvre plus les parcours");
+    assert.match(tb, /if \(dy < -25\) \{ e\.preventDefault\(\); setTiroirOuvert\(true\); \}\s*\n\s*else if \(dy > 25\) \{ e\.preventDefault\(\); setTiroirOuvert\(false\); \}/, "la poignée ne s'ouvre plus d'un glissé vers le haut");
+    assert.match(tb, /const besoinPropositions = montrerPropositions \|\| tiroirOuvert;/);
+    // Toute la France, triée par distance : recherche, puis pages suivantes.
+    assert.match(tb, /sort: "proche", sport: sportPropose, q: rechercheDiff, pageSize: "20", page: "1"/);
+    assert.match(tb, /page: String\(pagePropo \+ 1\)/, "« Afficher plus » ne lit plus la page suivante");
+    assert.match(tb, /\{propositions\.length < totalPropo && \(/, "« Afficher plus » a disparu");
+    // Tiroir ouvert, un tap sur la carte le referme au lieu de poser un point dessous.
+    assert.match(tb, /onClic=\{feuille \? fermerFeuille : tiroirOuvert \? fermerTiroir : navMode \? undefined : handleMapClick\}/);
     assert.match(tb, /new URLSearchParams\(\{ near: `\$\{lat\.toFixed\(3\)\},\$\{lng\.toFixed\(3\)\}`, sort: "proche", sport: sportPropose/);
     // Une panne n'est pas « aucun parcours ici ».
     assert.match(tb, /if \(!r\.ok \|\| !Array\.isArray\(j\.items\)\) \{ setEtatPropositions\("erreur"\); return; \}/);
     const i18n = readFileSync("src/components/trail/trailI18n.ts", "utf8");
-    for (const k of ["parcoursProches", "parcoursAucun", "parcoursErreur", "parcoursCharger", "parcoursVoir", "t.loinChemin"]) {
+    for (const k of ["parcoursProches", "parcoursAucun", "parcoursErreur", "parcoursCharger", "parcoursRecherche", "parcoursPlus", "parcoursTotal", "tiroirOuvrir", "tiroirFermer", "t.loinChemin"]) {
       assert.equal((i18n.match(new RegExp(`"${k.replace(".", "\\.")}":`, "g")) ?? []).length, 5, `« ${k} » manque dans une langue`);
     }
   });
