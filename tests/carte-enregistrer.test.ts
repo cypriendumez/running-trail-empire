@@ -110,7 +110,8 @@ test("chaque fond porte son attribution — c'est une obligation de licence", ()
   // gauche par la flèche ⌄). Repliée en ⓘ depuis le 27/11/2026, comme Strava — mais
   // EXPOSÉE EN ENTIER À L'OUVERTURE, et le repli se fait seulement après 5 s (ou au
   // premier geste) : jamais une carte qui s'ouvre sans dire d'où viennent ses données.
-  assert.match(carte, /const credit = new maplibregl\.AttributionControl\(\{ compact: true \}\);\s*\n\s*m\.addControl\(credit, "top-right"\);/, "l'attribution n'est plus en haut à droite");
+  // (`customAttribution` : le crédit du calcul d'itinéraire, quand la carte sert à construire.)
+  assert.match(carte, /const credit = new maplibregl\.AttributionControl\(\{ compact: true, customAttribution: creditPlus \}\);\s*\n\s*m\.addControl\(credit, "top-right"\);/, "l'attribution n'est plus en haut à droite");
   // La règle de l'OSMF : en entier au démarrage (5 s), puis repliée ; jamais un crédit
   // qu'il faudrait toucher pour voir la première fois. Une fois par jour et par appareil.
   assert.match(carte, /if \(creditDejaMontre\(\)\) \{ replier\(\); m\.once\("load", replier\); \}\s*\n\s*else \{ noterCreditMontre\(\); setTimeout\(replier, 5000\); \}/, "le crédit n'est plus montré 5 s à la première ouverture du jour, ou plus replié ensuite");
@@ -165,7 +166,7 @@ test("la carte change de hauteur en cours de vie : elle se remesure", () => {
   const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
   assert.match(carte, /new ResizeObserver\(\(\) => carte\.current\?\.resize\(\)\)/, "la carte ne se remesure plus quand sa hauteur change : la moitié reste vide");
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
-  assert.match(gr, /: "relative -mx-3 -mt-3 h-\[calc\(100dvh-8\.5rem\)\] min-h-\[560px\] overflow-hidden/, "hors grand écran, la carte ne prend plus la hauteur de la fenêtre");
+  assert.match(gr, /: "relative isolate -mx-3 -mt-3 h-\[calc\(100dvh-8\.5rem\)\] min-h-\[560px\] overflow-hidden/, "hors grand écran, la carte ne prend plus la hauteur de la fenêtre");
   assert.match(gr, /<CarteDirect[\s\S]{0,600}className="h-full w-full"/, "la carte ne remplit plus sa section");
 });
 
@@ -182,7 +183,8 @@ test("le bloc de chiffres et le tiroir sont POSÉS sur la carte, pas dedans — 
   // de 200 px avalait les doigts, et le pincement n'atteignait pas la carte. Les deux
   // enveloppes sont transparentes au doigt ; seuls les éléments visibles le reprennent.
   assert.match(gr, /<div className="pointer-events-none absolute inset-x-0 bottom-0 z-\[500\] flex flex-col">\s*\n\s*<div className="pointer-events-none mx-auto w-full max-w-md px-3">/, "l'enveloppe des boutons ronds reprend le doigt sur toute la largeur : la carte ne se pince plus");
-  assert.match(gr, /function BtnCarte[\s\S]{0,400}className=\{`pointer-events-auto relative flex h-11 w-11/, "les boutons ronds ne reprennent plus le doigt : ils seraient morts");
+  // Les boutons ronds vivent dans le module partagé avec l'onglet Carte (27/11/2026).
+  assert.match(codeNu("src/components/carte/commandesCarte.tsx"), /function BtnCarte[\s\S]{0,500}className=\{`pointer-events-auto relative flex h-11 w-11/, "les boutons ronds ne reprennent plus le doigt : ils seraient morts");
   assert.match(gr, /"pointer-events-auto mb-3 overflow-hidden rounded-2xl/, "le bloc de chiffres ne reprend plus le doigt : son bouton ⤡ serait mort");
   assert.match(gr, /"pointer-events-auto rounded-t-\[28px\] bg-white px-6/, "le tiroir ne reprend plus le doigt : « Démarrer » serait mort");
   assert.match(codeNu("src/components/ghost-runner/CarteDirect.tsx"), /el\.className = "pacevo-point";\s*\n\s*el\.style\.pointerEvents = "none";/, "le point bleu avale de nouveau le doigt qui commence un pincement sur lui");
@@ -270,7 +272,8 @@ test("chaque calque a sa vignette DESSINÉE — jamais un dégradé muet (27/11/
     assert.match(dessins, new RegExp(`(^|\\n)\\s*"?${id.replace("-", "\\-")}"?: `), `le calque ou fond « ${id} » n'a pas de vignette dessinée : il retomberait sur le plan nu`);
   }
   // Le titre du tiroir reste DEVANT les vignettes qui défilent (vu sur iPhone).
-  assert.match(codeNu("src/components/ghost-runner/GhostRunner.tsx"), /className="sticky top-0 z-10 -mx-5 bg-white/, "les vignettes défilent de nouveau par-dessus le titre du tiroir");
+  // Le tiroir est partagé avec l'onglet Carte depuis le 27/11/2026 (components/carte).
+  assert.match(codeNu("src/components/carte/commandesCarte.tsx"), /className="sticky top-0 z-10 -mx-5 bg-white/, "les vignettes défilent de nouveau par-dessus le titre du tiroir");
 });
 
 test("changer de modèle ne recharge JAMAIS le style : le tracé de la course resterait effacé", () => {
@@ -283,7 +286,9 @@ test("changer de modèle ne recharge JAMAIS le style : le tracé de la course re
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
   assert.match(gr, /const fondChoisi: FondCarte = fondsDispo\.find\(\(f\) => f\.id === fondCarte\) \?\? fondsDispo\[0\];/, "un modèle absent ici laisserait la carte sans fond");
   // Le 3D reste conditionné au relief (clé) : pas de carte inclinée déguisée.
-  assert.match(gr, /const avec3d = groupe === "relief" && RELIEF_DISPO;/, "le 3D apparaît dans les calques sans relief disponible");
+  // Le tiroir est partagé (components/carte) : il reçoit la disponibilité du relief.
+  assert.match(codeNu("src/components/carte/commandesCarte.tsx"), /const avec3d = groupe === "relief" && reliefDispo;/, "le 3D apparaît dans les calques sans relief disponible");
+  assert.match(gr, /reliefDispo=\{RELIEF_DISPO\}/, "Enregistrer ne dit plus au tiroir si le relief existe");
   assert.match(gr, /const RELIEF_DISPO = avecCle\(RELIEF\.url, process\.env\.NEXT_PUBLIC_MAPTILER_KEY[^)]*\) !== null;/, "le bouton 3D n'est plus conditionné à la clé");
 });
 

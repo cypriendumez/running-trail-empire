@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 
-// TrailBuilder embarque mapbox-gl + leaflet (très lourd). On le charge à la demande côté client
+// TrailBuilder embarque MapLibre (la carte d'Enregistrer, lourde). On le charge à la demande côté client
 // pour que la page Trail s'affiche immédiatement (la carte arrive juste après).
 const TrailBuilder = dynamic(() => import("./TrailBuilder").then((m) => m.TrailBuilder), {
   ssr: false,
