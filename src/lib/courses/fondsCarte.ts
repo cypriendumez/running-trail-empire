@@ -32,7 +32,18 @@ import { FONDS, CALQUES, TRACES, avecCle, type Couverture } from "@/lib/trail/co
  * styles à nous : Pacevo (clair) et Pacevo Nuit (sombre, pour courir le soir).
  * Les cartes nationales (IGN, swisstopo…) ne sont proposées que dans LEUR pays.
  */
-export type IdFond = "plan" | "nuit" | "satellite" | "hybride" | "topo" | "ign-plan" | "ign-photo" | "swisstopo" | "bkg-de" | "ign-es" | "us-topo";
+export type IdFond = "plan" | "nuit" | "satellite" | "hybride" | "outdoor" | "topo" | "hiver" | "cyclosm" | "ign-plan" | "ign-photo" | "swisstopo" | "bkg-de" | "ign-es" | "us-topo";
+
+/**
+ * Trois fonds de plus (27/11/2026), INTERROGÉS POUR DE VRAI ce jour-là sur une tuile de
+ * Rouen (z14) : 200 et une vraie image pour chacun. Outdoor et Hiver sont des styles
+ * MapTiler (clé requise, quota compté) ; CyclOSM est le plan cycliste libre d'OpenStreetMap.
+ */
+const EN_PLUS: { id: IdFond; cle: string; url: string; attribution: string; taille: 256 | 512; zoomMax: number }[] = [
+  { id: "outdoor", cle: "f.outdoor", url: "https://api.maptiler.com/maps/outdoor-v2/{z}/{x}/{y}.png?key={cleMapTiler}", attribution: "© MapTiler © OpenStreetMap contributors", taille: 512, zoomMax: 20 },
+  { id: "hiver", cle: "f.hiver", url: "https://api.maptiler.com/maps/winter-v2/{z}/{x}/{y}.png?key={cleMapTiler}", attribution: "© MapTiler © OpenStreetMap contributors", taille: 512, zoomMax: 20 },
+  { id: "cyclosm", cle: "f.cyclosm", url: "https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png", attribution: "CyclOSM — © OpenStreetMap contributors", taille: 256, zoomMax: 19 },
+];
 
 /** Le style vectoriel de départ — OpenFreeMap « Liberty », repeint par `stylePacevo`. */
 export const STYLE_PLAN_URL = "https://tiles.openfreemap.org/styles/liberty";
@@ -202,12 +213,20 @@ export function fondsDisponibles(cleMapTiler: string | undefined, centre: [numbe
     if (!src || !url || !pays.includes(src.couverture)) return null;
     return { id, cle, type: "image", urls: sousDomaines(url), attribution: src.attribution, taille: src.taille, zoomMax: src.zoomMax, place, couverture: src.couverture };
   };
+  const plus = (id: IdFond): FondCarte | null => {
+    const e = EN_PLUS.find((x) => x.id === id);
+    const url = e ? avecCle(e.url, cleMapTiler) : null;
+    return e && url ? { id, cle: e.cle, type: "image", urls: sousDomaines(url), attribution: e.attribution, taille: e.taille, zoomMax: e.zoomMax, place: "dessus", couverture: "monde" } : null;
+  };
   const liste: (FondCarte | null)[] = [
     { id: "plan", cle: "f.plan", type: "vecteur", couverture: "monde" },
     { id: "nuit", cle: "f.nuit", type: "vecteur", couverture: "monde" },
     sat && { id: "satellite", cle: "map.satellite", type: "image", urls: [sat.url], attribution: sat.attribution, taille: sat.taille, zoomMax: sat.zoomMax, place: "sous-noms", couverture: "monde" },
     sat && { id: "hybride", cle: "f.hybride", type: "image", urls: [sat.url], attribution: sat.attribution, taille: sat.taille, zoomMax: sat.zoomMax, place: "sous-routes", couverture: "monde" },
+    plus("outdoor"),
     image("topo", "opentopo", "f.topo", "dessus"),
+    plus("hiver"),
+    plus("cyclosm"),
     image("ign-plan", "ign-plan", "f.ignPlan", "dessus"),
     image("ign-photo", "ign-ortho", "f.ignPhoto", "sous-noms"),
     image("swisstopo", "swisstopo", "f.swisstopo", "dessus"),
@@ -218,7 +237,7 @@ export function fondsDisponibles(cleMapTiler: string | undefined, centre: [numbe
   return liste.filter((f): f is FondCarte => !!f);
 }
 
-export type IdCalque = "rando" | "vtt" | "velo" | "ombrage" | "pentes-fr" | "courbes-fr" | "poi";
+export type IdCalque = "rando" | "rando-ch" | "vtt" | "velo" | "ski" | "ombrage" | "pentes-fr" | "courbes-fr" | "poi";
 
 export type CalqueCarte = {
   id: IdCalque;
@@ -248,6 +267,8 @@ export function calquesDisponibles(cleMapTiler: string | undefined, centre: [num
     depuis("vtt", "c.vtt", "itineraires", TRACES.find((t) => t.id === "vtt")),
     // Vélo : même service que la randonnée (Waymarked Trails), interrogé le 27/11/2026 → 200.
     rando ? { id: "velo", cle: "c.velo", groupe: "itineraires", type: "image", urls: [rando.url.replace("/hiking/", "/cycling/")], attribution: rando.attribution, zoomMax: rando.zoomMax, couverture: "monde" } : null,
+    depuis("ski", "c.ski", "itineraires", TRACES.find((t) => t.id === "ski")),
+    depuis("rando-ch", "c.randoCh", "itineraires", TRACES.find((t) => t.id === "rando-ch")),
     cleMapTiler ? { id: "ombrage", cle: "c.ombrage", groupe: "relief", type: "ombrage", couverture: "monde" } : null,
     depuis("pentes-fr", "c.pentes", "relief", CALQUES.find((c) => c.id === "pentes-fr")),
     depuis("courbes-fr", "c.courbes", "relief", CALQUES.find((c) => c.id === "courbes-fr")),
