@@ -1051,7 +1051,7 @@ export function ShoppingHub() {
       <div className="flex gap-6">
         {/* ── LEFT SIDEBAR ── */}
         <aside className="hidden lg:block w-52 shrink-0 space-y-0">
-          <div className="sticky top-4 bg-white border border-zinc-200 rounded-2xl p-4">
+          <div className="sticky top-20 bg-white border border-zinc-200 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
                 <SlidersHorizontal className="w-4 h-4" /> {d["filters"]}

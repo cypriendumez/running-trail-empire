@@ -121,7 +121,7 @@ export function GearHub({ catalogue, profil, offres = {} }: {
   return (
     <div className="grid gap-6 lg:grid-cols-[248px_1fr]">
       {/* ── FILTRES ─────────────────────────────────────────────────────────────── */}
-      <aside className="space-y-5 lg:sticky lg:top-4 lg:self-start">
+      <aside className="space-y-5 lg:sticky lg:top-20 lg:self-start">
         <input
           value={f.q ?? ""} onChange={(e) => setF({ ...f, q: e.target.value })}
           placeholder={tx("shop.rechercher")}

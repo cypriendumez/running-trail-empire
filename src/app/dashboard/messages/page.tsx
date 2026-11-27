@@ -51,7 +51,11 @@ export default async function MessagesPage() {
     .eq("user_id", user.id).in("type", ["coach_message", "athlete_message"]).eq("read", false);
 
   return (
-    <div className="flex h-full flex-col">
+    // Hauteur de la fenêtre moins l'entête (4 rem), les marges de <main> et, sur téléphone,
+    // la barre d'onglets : la page défile désormais d'un bloc (27/11/2026), `h-full` ne
+    // mesurait plus rien et le fil perdait sa hauteur.
+    <div className="flex h-[var(--hauteur-messages)] flex-col md:h-[calc(100dvh-7rem)]"
+      style={{ "--hauteur-messages": "calc(100dvh - 9.5rem - env(safe-area-inset-bottom))" } as React.CSSProperties}>
       <div className="mb-3">
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-zinc-900">
           <MessagesSquare className="h-5 w-5 text-emerald-600" aria-hidden />{l.title}

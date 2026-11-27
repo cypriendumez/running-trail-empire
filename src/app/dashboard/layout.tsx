@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import TirerPourActualiser from "@/components/layout/TirerPourActualiser";
 import { stripProfileSecrets } from "@/lib/profile/safe";
 import { T, normLang } from "@/lib/i18n/translations";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -83,7 +84,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
           React le recréerait à chaque arrivée sans rechargement, sans jamais l'exécuter). */}
       <DecorLancement langue={langue} />
       <EcranLancement />
-      <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
+      {/* ⚠️ C'EST LA PAGE QUI DÉFILE, PAS UNE ZONE INTÉRIEURE (27/11/2026, Cyprien : « pourquoi
+          je peux pas actualiser sur mon téléphone quand je suis sur le dashboard »). La page
+          était figée à la hauteur de l'écran (`h-screen overflow-hidden`) et seul <main>
+          défilait : Safari et Chrome ne lancent le « tirer pour actualiser » que sur la page
+          elle-même, le geste ne faisait donc rien. La barre latérale et l'entête restent en
+          place par `sticky`. `overflow-x-clip` et non `overflow-hidden` : ce dernier ferait
+          de ce bloc une zone de défilement, et plus rien ne collerait. */}
+      <div data-tableau-de-bord className="flex min-h-screen bg-[#FAFAFA] overflow-x-clip">
+        {/* L'application installée n'a pas ce geste (iPhone, Android) : il est refait ici. */}
+        <TirerPourActualiser />
         <AutoSync />
         {/* Un onglet resté ouvert pendant une mise en ligne passe à la nouvelle version. */}
         <MiseAJour />
@@ -93,7 +103,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <Sidebar profile={stripProfileSecrets(profile)} unreadMessages={unreadMessages ?? 0} estEditeur={estAdmin(user.email)} />
         <div className="flex-1 flex flex-col min-w-0">
           <TopBar profile={stripProfileSecrets(profile)} avatarColor={avatarColor} notifsMasquees={notifsMasquees} niveau={niveau} />
-          <main className="flex-1 overflow-auto p-3 md:p-6">
+          <main className="flex-1 p-3 md:p-6">
             {children}
             {/* ⚠️ EN FIN DE CONTENU, PLUS FIXÉ SOUS L'ÉCRAN (30/09/2026). Cyprien : « ce qu'il y
                 a en bas, on perd trop de place ». Fixé hors de la zone qui défile, ce pied

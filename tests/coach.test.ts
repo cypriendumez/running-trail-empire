@@ -6571,7 +6571,9 @@ test("le rail de droite ne peut plus laisser de trou blanc", () => {
   // il accompagne la lecture quel que soit le nombre de cartes — plusieurs sont
   // conditionnelles, donc aucune hauteur fixe ne réglerait le problème durablement.
   const aside = src.slice(src.indexOf("<aside"), src.indexOf("<aside") + 260);
-  for (const cls of ["lg:sticky", "lg:top-6", "lg:max-h-[calc(100vh-3rem)]", "lg:overflow-y-auto"]) {
+  // 27/11/2026 : la PAGE défile désormais (« tirer pour actualiser », tests/tirer-actualiser) ;
+  // l'entête collant (4 rem) couvre le haut de la fenêtre, le rail se colle donc dessous.
+  for (const cls of ["lg:sticky", "lg:top-[5.5rem]", "lg:max-h-[calc(100vh-7rem)]", "lg:overflow-y-auto"]) {
     assert.ok(aside.includes(cls), `le rail a perdu ${cls} : le trou blanc de droite revient`);
   }
   // `overscroll-contain` bloquerait la molette dans le rail une fois son bas atteint.

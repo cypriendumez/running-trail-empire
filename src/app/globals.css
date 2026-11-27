@@ -271,6 +271,16 @@
    pied de la fiche ouverte à droite. Drapeau posé par `usePleinEcran` (lib/ui/pleinEcran). */
 html[data-plein-ecran] [data-bulle-aide] { display: none !important; }
 
+/* Pendant une vue plein écran (Enregistrer, carte des courses), la page derrière ne bouge
+   plus : depuis que la PAGE défile (27/11/2026), un glissé sur la couverture pouvait faire
+   défiler le tableau de bord en dessous, voire déclencher « tirer pour actualiser » en
+   pleine course. */
+html[data-plein-ecran], html[data-plein-ecran] body { overflow: hidden; overscroll-behavior: none; }
+
+/* L'entête du tableau de bord colle en haut (4 rem) : un saut vers une ancre s'arrête
+   sous lui, pas derrière. */
+html:has([data-tableau-de-bord]) { scroll-padding-top: 4.5rem; }
+
 /* ── ÉCRAN DE LANCEMENT (refait le 02/10/2026) — les verts et le crème du logo ──────
    Le démarrage natif de l'application installée prend le même vert (manifest :
    background_color #074A32) : l'un s'enchaîne sur l'autre sans flash blanc. */

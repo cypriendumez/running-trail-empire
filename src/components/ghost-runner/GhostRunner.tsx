@@ -1,5 +1,6 @@
 "use client";
 
+import { usePleinEcran } from "@/lib/ui/pleinEcran";
 import { useState, useEffect, useRef, useCallback, useMemo, useId, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -166,6 +167,8 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   const [geoRefusee, setGeoRefusee] = useState(false);
   /** Carte en grand, comme le bouton plein écran d'une vidéo (Cyprien, 23/09/2026). */
   const [plein, setPlein] = useState(false);
+  // Plein écran : la page derrière se fige et la bulle d'aide se retire (lib/ui/pleinEcran).
+  usePleinEcran(plein);
   const sectionCarte = useRef<HTMLElement | null>(null);
   /**
    * ── LA VUE, COMME STRAVA (Cyprien, 27/11/2026, vidéo de Strava à l'appui) ──
