@@ -1,21 +1,33 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo, type ReactNode } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
 import {
-  Undo2, Redo2, Trash2, Download, Save, Loader2,
-  ChevronDown, X, MapPin, Mountain, Search, Layers, Bookmark, Heart,
-  SlidersHorizontal, Gauge, Navigation, Share2, Lock
+  Undo2, Trash2, Download, Save, Loader2, ChevronDown, X, MapPin, Mountain, Layers, Bookmark, Heart,
+  SlidersHorizontal, Gauge, Navigation, Share2, Lock, LocateFixed, Maximize2,
 } from "lucide-react";
 import Link from "next/link";
 import { IconeSport } from "@/components/parcours/IconeSport";
-import { chargerProfil, profilOsrm, type Profil } from "@/lib/trail/altitude";
+import { chargerProfil, type Profil } from "@/lib/trail/altitude";
+import { calculerTroncon, raccorder, accroche } from "@/lib/trail/itineraire";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { TB, fillT } from "./trailI18n";
+import { GX } from "@/components/ghost-runner/ghostI18n";
 import { fmtNombre, fmtKm } from "@/lib/i18n/nombres";
 import { idPartage } from "@/lib/courses/veille";
+import { usePleinEcran } from "@/lib/ui/pleinEcran";
+import { calquesDisponibles, fondsDisponibles, type CalqueCarte, type FondCarte, type IdCalque, type IdFond } from "@/lib/courses/fondsCarte";
+import { RELIEF, avecCle } from "@/lib/trail/couches";
+import { BtnCarte, ActionCarte, GrosBouton, TiroirModeles } from "@/components/carte/commandesCarte";
+
+// La même carte qu'« Enregistrer » (vectorielle, MapLibre), chargée seulement côté navigateur.
+const CarteDirect = dynamic(() => import("@/components/ghost-runner/CarteDirect").then((m) => m.CarteDirect), { ssr: false });
+/** La clé MapTiler (publique) : elle décide quels modèles existent (satellite, relief). */
+const CLE_MAPTILER = process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined;
+/** Le relief 3D n'existe qu'avec la clé (cf. lib/trail/couches). */
+const RELIEF_DISPO = avecCle(RELIEF.url, CLE_MAPTILER) !== null;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface LatLng { lat: number; lng: number }
@@ -32,65 +44,6 @@ interface SavedRoute {
    *  avant la migration 024 n'a pas la colonne, et vaut alors « non favori ». */
   is_favorite?: boolean;
 }
-
-// ─── Tile layers ──────────────────────────────────────────────────────────────
-// MapTiler "Outdoor" = the premium relief + yellow dashed paths + POI look.
-// Set NEXT_PUBLIC_MAPTILER_KEY in .env.local to enable it (free tier is plenty).
-const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY || "";
-
-// Metropolitan France (incl. Corsica). The map is locked inside these bounds so
-// the user can only explore France — no panning off into the rest of the world.
-const FRANCE_BOUNDS: [[number, number], [number, number]] = [
-  [41.0, -5.6],  // SW corner
-  [51.6, 9.8],   // NE corner
-];
-
-const LAYERS = {
-  outdoor: {
-    label: "Plein air",
-    url: `https://api.maptiler.com/maps/outdoor-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
-    attribution: "© MapTiler © OpenStreetMap",
-    maxZoom: 20,
-    maxNativeZoom: 20,
-    subdomains: false,
-  },
-  paths: {
-    label: "Chemins",
-    url: "https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png",
-    attribution: "© CyclOSM · OpenStreetMap",
-    maxZoom: 20,
-    maxNativeZoom: 20,
-  },
-  topo: {
-    label: "Topo",
-    url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-    attribution: "© OpenTopoMap",
-    maxZoom: 19,
-    maxNativeZoom: 17,
-  },
-  street: {
-    label: "Plan",
-    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution: "© OpenStreetMap",
-    maxZoom: 19,
-    maxNativeZoom: 19,
-  },
-  satellite: {
-    label: "Satellite",
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "© Esri World Imagery",
-    maxZoom: 20,
-    maxNativeZoom: 19,
-    subdomains: false,
-  },
-};
-
-// ─── Hiking trails overlay (Waymarked Trails — shows GR/PR sentiers) ──────────
-const HIKING_OVERLAY = {
-  url: "https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png",
-  attribution: "© Waymarked Trails",
-  maxZoom: 18,
-};
 
 // ─── Famous French trails (fly-to presets) ───────────────────────────────────
 interface FamousRoute {
@@ -166,23 +119,6 @@ ${trk}
 </gpx>`;
 }
 
-// ─── OSRM routing (follows real paths) ───────────────────────────────────────
-async function fetchRoute(a: LatLng, b: LatLng, activite: string): Promise<LatLng[] | null> {
-  try {
-    // ⚠️ LE PROFIL SUIT L'ACTIVITÉ (22/09/2026). `foot` était écrit en dur : un parcours
-    // à vélo était calculé sur les sentiers piétons — distance, temps et itinéraire faux.
-    const url = `https://router.project-osrm.org/route/v1/${profilOsrm(activite)}/${a.lng},${a.lat};${b.lng},${b.lat}?geometries=geojson&overview=full`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const coords = data.routes?.[0]?.geometry?.coordinates as [number, number][] | undefined;
-    if (!coords) return null;
-    return coords.map(([lng, lat]) => ({ lat, lng }));
-  } catch {
-    return null;
-  }
-}
-
 // ─── City search / geocoding (restricted to France) ──────────────────────────
 // (Recherche de ville supprimée — la recherche globale de la barre du haut s'en charge.)
 
@@ -212,6 +148,11 @@ function speedRange(activity: ActivityKey): { min: number; max: number; step: nu
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 // ─── Component ───────────────────────────────────────────────────────────────
+/** Un point posé sur la carte. L'`id` relie chaque tronçon à SES deux points. */
+type Repere = LatLng & { id: number };
+const cleTroncon = (a: Repere, b: Repere) => `${a.id}>${b.id}`;
+const COULEUR_DEPART = "#22c55e", COULEUR_ETAPE = "#3b82f6", COULEUR_ARRIVEE = "#ef4444";
+
 export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   centre?: { lat: number; lon: number } | null;
   /** Remonte la trace construite, pour que la vue relief l'affiche telle quelle. */
@@ -222,33 +163,72 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
 } = {}) {
   const { lang } = useT();
   const d = TB[lang] ?? TB.fr;
+  const g = GX[lang] ?? GX.fr;
   const tb = (k: string, p?: Record<string, string | number>) => fillT(d[k] ?? k, p);
   // Traduit les descripteurs de relief des presets (« vallonné »/« plat »/« variable »), garde le reste (distances) intact.
   const tbDesc = (s: string) => d[`desc.${s}`] ?? s;
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<unknown>(null);
-  const polylineRef = useRef<unknown>(null);
-  const markersRef = useRef<unknown[]>([]);
-  const baseLayerRef = useRef<unknown>(null);
-  const overlayRef = useRef<unknown>(null);
-  const initRef = useRef(false); // synchronous guard against React Strict Mode double-init
+  const sectionCarte = useRef<HTMLElement>(null);
 
-  const [layer, setLayer] = useState<keyof typeof LAYERS>(MAPTILER_KEY ? "outdoor" : "topo");
-  const [showLayers, setShowLayers] = useState(false);
-  const [showTrails, setShowTrails] = useState(!MAPTILER_KEY); // GR/PR overlay (off when Outdoor already shows paths)
+  /**
+   * ── LA CARTE EN GRAND, COMME « ENREGISTRER » (Cyprien, 27/11/2026) ────────────
+   * « Fais comme dans Enregistrer, exactement la même chose, pareil pour la carte en
+   * grand. » Même carte vectorielle (`CarteDirect`), même colonne de boutons ronds, même
+   * bloc de chiffres, même tiroir du bas et même tiroir des modèles. Sur téléphone, elle
+   * s'ouvre en grand ; la flèche ⌄ rend la page (vue relief, parcours de France dessous).
+   */
+  const [plein, setPlein] = useState(false);
+  usePleinEcran(plein);
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia?.("(max-width: 767px)").matches) setPlein(true);
+  }, []);
+  useEffect(() => {
+    if (!plein) return;
+    const echap = (e: KeyboardEvent) => { if (e.key === "Escape") setPlein(false); };
+    window.addEventListener("keydown", echap);
+    return () => window.removeEventListener("keydown", echap);
+  }, [plein]);
+
+  // Les modèles de carte, comme dans Enregistrer (selon la clé et le pays).
+  const [fondCarte, setFondCarte] = useState<IdFond>("plan");
+  const [calquesActifs, setCalquesActifs] = useState<IdCalque[]>(["poi"]);
+  const [relief3d, setRelief3d] = useState(false);
+  const [feuille, setFeuille] = useState<null | "modeles" | "reglages" | "parcours" | "lieux">(null);
+  /** Compteur + destination : chaque nouveau `n` déplace la carte (voir `CarteDirect`). */
+  const [vue, setVue] = useState<{ n: number; centre?: [number, number]; zoom?: number; emprise?: [number, number][] }>({ n: 0 });
+  const allerA = useCallback((v: Omit<typeof vue, "n">) => setVue((x) => ({ ...v, n: x.n + 1 })), []);
+
   const [followPaths, setFollowPaths] = useState(true);
-  const [showElevation, setShowElevation] = useState(true); // elevation profile panel below the map
-  const [mounted, setMounted] = useState(false);
-  const [showFamous, setShowFamous] = useState(false);
-  const [showSavePanel, setShowSavePanel] = useState(false);
-  const [showRoutesPanel, setShowRoutesPanel] = useState(false);
-  const [activityMenuOpen, setActivityMenuOpen] = useState(false);
+  /**
+   * Le profil altimétrique, dans le tiroir du bas. ⚠️ REPLIÉ D'OFFICE SUR TÉLÉPHONE : ouvert,
+   * le bloc du bas montait à mi-écran et cachait la moitié de la carte sur laquelle on trace
+   * (banc d'essai à 375 × 812, 27/11/2026). Toucher le D+ l'ouvre ou le replie.
+   */
+  const [showElevation, setShowElevation] = useState(true);
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia?.("(max-width: 767px)").matches) setShowElevation(false);
+  }, []);
 
-  // Route state — segments[] enables precise undo (each leg kept separate)
-  const [waypoints, setWaypoints] = useState<LatLng[]>([]);
-  const [segments, setSegments] = useState<LatLng[][]>([]); // [ [p0], legPts, legPts… ]
-  const [redoStack, setRedoStack] = useState<{ wp: LatLng; seg: LatLng[] }[]>([]); // for "Retour" (redo)
-  const allPoints = useMemo(() => segments.flat(), [segments]);
+  /**
+   * ── LES POINTS ET LEURS TRONÇONS ──────────────────────────────────────────
+   * ⚠️ UN TRONÇON EST RANGÉ SOUS LES DEUX POINTS QU'IL RELIE, PAS EMPILÉ. Avant, chaque
+   * réponse du calcul d'itinéraire était AJOUTÉE à la liste dans l'ordre où elle
+   * arrivait : en posant vite deux points, le second tronçon pouvait arriver le premier,
+   * et le tracé reliait les mauvais points (Cyprien, vidéo du 27/11/2026 : « des fois ça
+   * relie pas du tout ce que je voulais »). Rangé sous `cleTroncon(a, b)`, chaque tronçon
+   * prend sa place quel que soit son ordre d'arrivée ; un point annulé pendant le calcul
+   * laisse sa réponse sans effet.
+   */
+  const [reperes, setReperes] = useState<Repere[]>([]);
+  const reperesRef = useRef<Repere[]>([]);
+  useEffect(() => { reperesRef.current = reperes; }, [reperes]);
+  const idSuivant = useRef(1);
+  const [troncons, setTroncons] = useState<Record<string, LatLng[]>>({});
+  const [redoStack, setRedoStack] = useState<{ repere: Repere; depuis: number | null; troncon?: LatLng[] }[]>([]);
+  const [enCalcul, setEnCalcul] = useState(0);
+  const allPoints = useMemo<LatLng[]>(() => reperes.flatMap((r, i) => i === 0
+    ? [{ lat: r.lat, lng: r.lng }]
+    // Tant que le tronçon n'est pas calculé, une ligne droite le remplace À L'ÉCRAN.
+    : (troncons[cleTroncon(reperes[i - 1], r)] ?? [{ lat: r.lat, lng: r.lng }])), [reperes, troncons]);
   // ⚠️ REMONTÉE DANS UN EFFET, PAS PENDANT LE RENDU. Appeler `onTrace` directement dans
   // le corps du composant déclencherait un `setState` du parent au milieu du rendu de
   // l'enfant — React le refuse, et la carte cesserait de se mettre à jour.
@@ -256,16 +236,12 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const [profil, setProfil] = useState<Profil | null>(null);
   /** Vrai quand la lecture d'altitude a ÉCHOUÉ : l'écran le dit au lieu d'afficher 0 m. */
   const [altitudeIndispo, setAltitudeIndispo] = useState(false);
-  /** La feuille de réglages du téléphone (suivre les chemins, sentiers, activité, fonds). */
-  const [reglagesOuverts, setReglagesOuverts] = useState(false);
   const elevations = profil?.altitudes ?? [];
   const [distance, setDistance] = useState(0);
-  const [routeLoading, setRouteLoading] = useState(false);
+  const routeLoading = enCalcul > 0;
   const [activity, setActivity] = useState<ActivityKey>("course");
   // Manual target speed in km/h. null = automatic (terrain-based) estimate.
   const [manualSpeed, setManualSpeed] = useState<number | null>(null);
-  const [speedEditorOpen, setSpeedEditorOpen] = useState(false);
-  const speedEditorRef = useRef<HTMLDivElement>(null);
 
   // Derived metrics (declared early so map effects can use them)
   const elevGain = profil?.gain ?? 0, elevLoss = profil?.perte ?? 0;
@@ -294,14 +270,9 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   /**
    * PREMIÈRE VUE : LA ZONE DE L'ATHLÈTE, PAS LA FRANCE ENTIÈRE.
    *
-   * La carte s'ouvrait sur `[46.85, 2.35]` au zoom 6 — le pays vu de haut. Personne ne
-   * trace un parcours à cette échelle : il fallait chercher sa ville et zoomer une
-   * dizaine de fois avant de pouvoir cliquer le premier point.
-   *
-   * On se recentre sur le DERNIER parcours enregistré, qui est déjà chargé pour la
-   * liste : aucune requête de plus, et aucune demande de géolocalisation — un athlète
-   * qui ouvre l'outil ne devrait pas avoir à accorder une permission pour voir sa
-   * région.
+   * Sans centre donné par la page (aucune trace GPS), on se recentre sur le DERNIER
+   * parcours enregistré, déjà chargé pour la liste : aucune requête de plus, et aucune
+   * demande de géolocalisation.
    *
    * ⚠️ TROIS GARDES. On ne le fait qu'UNE fois (`vueAutoFaite`), jamais si un tracé est
    * déjà commencé, et jamais si les coordonnées sont hors bornes — `coordinates` est
@@ -310,15 +281,14 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const vueAutoFaite = useRef(false);
   useEffect(() => {
     if (vueAutoFaite.current || centre) return;   // la page a déjà donné un centre
-    const map = mapRef.current as L.Map | null;
-    if (!map || waypoints.length > 0 || savedRoutes.length === 0) return;
+    if (reperes.length > 0 || savedRoutes.length === 0) return;
     const premier = savedRoutes[0]?.coordinates?.[0];
     if (!premier) return;
     const [lng, lat] = premier;
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
     vueAutoFaite.current = true;
-    map.setView([lat, lng], 12, { animate: false });
-  }, [savedRoutes, waypoints.length]);
+    allerA({ centre: [lat, lng], zoom: 12 });
+  }, [savedRoutes, reperes.length, centre, allerA]);
   const [loadingRoutes, setLoadingRoutes] = useState(false);
 
   // ── Navigation GPS en direct (point bleu qui se déplace) ──────────────────────
@@ -326,7 +296,11 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const [userPos, setUserPos] = useState<LatLng | null>(null);
   const [navAccuracy, setNavAccuracy] = useState<number | null>(null);
   const watchIdRef = useRef<number | null>(null);
-  const userMarkerRef = useRef<unknown>(null);
+  /** La main a pris la carte pendant le suivi : on ne la ramène plus de force. */
+  const [suiviNav, setSuiviNav] = useState(true);
+  const [recentrages, setRecentrages] = useState(0);
+  /** « Ma position » demandée une fois (sans suivi) : le point bleu, sans recentrer en boucle. */
+  const [maPosition, setMaPosition] = useState<LatLng | null>(null);
 
   // Partage live (Supabase Realtime broadcast)
   const [sharing, setSharing] = useState(false);
@@ -334,204 +308,41 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const shareChanRef = useRef<any>(null);
 
-  // ── Init Leaflet ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (typeof window === "undefined" || !mapContainer.current || initRef.current) return;
-    initRef.current = true; // set synchronously so Strict Mode's 2nd run bails out
-
-    import("leaflet").then((L) => {
-      // Fix default icon issue
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-        iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-        shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-      });
-
-      const cfg = LAYERS[layer];
-      const map = L.map(mapContainer.current!, {
-        // Les bornes de la dernière trace GPS si on les a (voir la page), la France sinon.
-        center: centre ? [centre.lat, centre.lon] : [46.85, 2.35],
-        zoom: centre ? 12 : 6,
-        minZoom: 5,
-        zoomControl: false,
-        maxBounds: L.latLngBounds(FRANCE_BOUNDS[0], FRANCE_BOUNDS[1]),
-        maxBoundsViscosity: 1.0, // map stays solidly within France
-      });
-      L.control.zoom({ position: "bottomright" }).addTo(map);
-
-      // Tile layer
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cfgAny = cfg as any;
-      const base = L.tileLayer(cfg.url, {
-        attribution: cfg.attribution,
-        maxZoom: cfg.maxZoom,
-        maxNativeZoom: cfgAny.maxNativeZoom ?? cfg.maxZoom,
-        subdomains: "abc", // safe default; URLs without {s} simply ignore it
-      }).addTo(map);
-      baseLayerRef.current = base;
-
-      // Scale control
-      L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
-
-      // Geolocation button
-      const GeoBtn = L.Control.extend({
-        onAdd() {
-          const btn = L.DomUtil.create("button", "leaflet-bar leaflet-control bg-white hover:bg-gray-50 p-2 rounded shadow cursor-pointer border border-gray-300");
-          btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>`;
-          btn.title = d["myPosition"];
-          btn.setAttribute("aria-label", d["centerOnMe"]);
-          btn.setAttribute("type", "button");
-          L.DomEvent.on(btn, "click", () => {
-            map.locate({ setView: true, maxZoom: 14 });
-          });
-          return btn;
-        },
-      });
-      new GeoBtn({ position: "bottomright" }).addTo(map);
-
-      mapRef.current = map;
-      setMounted(true);
-
-      // The container may not have its final size yet (flex/animation race) →
-      // recompute once ready and shortly after, so tiles fill the viewport.
-      map.whenReady(() => map.invalidateSize());
-      setTimeout(() => map.invalidateSize(), 250);
-    }).catch((err) => {
-      console.error("[TrailBuilder] Leaflet init failed:", err);
-      initRef.current = false; // allow a retry on next render
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ── Keep the map sized to its (flex) container ───────────────────────────────
-  useEffect(() => {
-    if (!mounted || !mapContainer.current) return;
-    const el = mapContainer.current;
-    const ro = new ResizeObserver(() => {
-      (mapRef.current as { invalidateSize?: () => void } | null)?.invalidateSize?.();
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [mounted]);
-
-  // ── Switch base tile layer (keeps overlay + route intact) ───────────────────
-  useEffect(() => {
-    if (!mapRef.current || !mounted) return;
-    import("leaflet").then((L) => {
-      const map = mapRef.current as L.Map;
-      if (baseLayerRef.current) map.removeLayer(baseLayerRef.current as L.TileLayer);
-      const cfg = LAYERS[layer];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cfgAny = cfg as any;
-      const base = L.tileLayer(cfg.url, {
-        attribution: cfg.attribution,
-        maxZoom: cfg.maxZoom,
-        maxNativeZoom: cfgAny.maxNativeZoom ?? cfg.maxZoom,
-        subdomains: "abc", // safe default; URLs without {s} simply ignore it
-      }).addTo(map);
-      base.bringToBack();
-      baseLayerRef.current = base;
-    });
-  }, [layer, mounted]);
-
-  // ── Hiking trails overlay (GR/PR sentiers) toggle ───────────────────────────
-  useEffect(() => {
-    if (!mapRef.current || !mounted) return;
-    import("leaflet").then((L) => {
-      const map = mapRef.current as L.Map;
-      if (showTrails && !overlayRef.current) {
-        const ov = L.tileLayer(HIKING_OVERLAY.url, {
-          attribution: HIKING_OVERLAY.attribution,
-          maxZoom: HIKING_OVERLAY.maxZoom,
-          opacity: 0.7,
-        }).addTo(map);
-        overlayRef.current = ov;
-      } else if (!showTrails && overlayRef.current) {
-        map.removeLayer(overlayRef.current as L.TileLayer);
-        overlayRef.current = null;
-      }
-    });
-  }, [showTrails, mounted]);
-
-  // ── Update polyline on the map (white casing + colored core) ────────────────
-  useEffect(() => {
-    if (!mapRef.current || !mounted) return;
-    import("leaflet").then((L) => {
-      const map = mapRef.current as L.Map;
-      if (polylineRef.current) map.removeLayer(polylineRef.current as L.Layer);
-      if (!allPoints.length) { polylineRef.current = null; return; }
-      const latlngs = allPoints.map(p => [p.lat, p.lng] as [number, number]);
-      const color = difficultyColor(difficulty);
-      // Casing underneath for crisp contrast on any base map
-      const casing = L.polyline(latlngs, {
-        color: "#ffffff", weight: 8, opacity: 0.95, lineJoin: "round", lineCap: "round",
-      });
-      const core = L.polyline(latlngs, {
-        color, weight: 4.5, opacity: 1, lineJoin: "round", lineCap: "round",
-      });
-      const group = L.layerGroup([casing, core]).addTo(map);
-      polylineRef.current = group;
-    });
-  }, [allPoints, mounted, difficulty]);
-
-  // ── Redraw waypoint markers ────────────────────────────────────────────────
-  useEffect(() => {
-    if (!mapRef.current || !mounted) return;
-    import("leaflet").then((L) => {
-      const map = mapRef.current as L.Map;
-      markersRef.current.forEach(m => map.removeLayer(m as L.Marker));
-      markersRef.current = [];
-      waypoints.forEach((p, i) => {
-        const isFirst = i === 0;
-        const isLast = i === waypoints.length - 1 && waypoints.length > 1;
-        const color = isFirst ? "#22c55e" : isLast ? "#ef4444" : "#3b82f6";
-        const icon = L.divIcon({
-          className: "",
-          html: `<div style="width:14px;height:14px;background:${color};border:2.5px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
-          iconAnchor: [7, 7],
-        });
-        const marker = L.marker([p.lat, p.lng], { icon }).addTo(map);
-        markersRef.current.push(marker);
-      });
-    });
-  }, [waypoints, mounted]);
-
-  // ── Click handler for draw mode ────────────────────────────────────────────
-  // segments stay aligned with waypoints: segments[i] is the leg arriving at
-  // waypoints[i] (segments[0] = [start]). This makes undo perfectly precise.
-  const handleMapClick = useCallback(async (latlng: LatLng) => {
-    const prev = waypoints[waypoints.length - 1];
-    setRedoStack([]); // a fresh point invalidates the redo history
-    setWaypoints(wp => [...wp, latlng]);
-
-    if (!prev) {
-      setSegments([[latlng]]);
+  // ── Relier deux points par le vrai chemin (lib/trail/itineraire) ──────────────
+  const relier = useCallback(async (depuis: Repere, vers: Repere) => {
+    const cle = cleTroncon(depuis, vers);
+    if (!followPaths) { setTroncons((t) => ({ ...t, [cle]: [{ lat: vers.lat, lng: vers.lng }] })); return; }
+    setEnCalcul((n) => n + 1);
+    const t = await calculerTroncon(depuis, vers, activity);
+    setEnCalcul((n) => n - 1);
+    // Le point a pu être annulé ou effacé pendant le calcul : la réponse ne sert plus.
+    if (!reperesRef.current.some((r) => r.id === vers.id)) return;
+    if (!t) {
+      // ⚠️ UNE LIGNE DROITE SE DIT. L'ancien code la posait en silence à chaque échec :
+      // le parcours traversait des immeubles et personne ne savait pourquoi.
+      toast.error(d["t.routeFail"]);
+      setTroncons((x) => ({ ...x, [cle]: [{ lat: vers.lat, lng: vers.lng }] }));
       return;
     }
+    const { points, repere } = raccorder(depuis, vers, t);
+    setTroncons((x) => ({ ...x, [cle]: points }));
+    // Le repère se pose SUR le chemin (s'il était tout près) ; le départ aussi, au premier tronçon.
+    setReperes((rs) => rs.map((r, i) => r.id === vers.id ? { ...r, ...repere }
+      : i === 0 && r.id === depuis.id ? { ...r, ...accroche(depuis, t.depart) } : r));
+  }, [followPaths, activity, d]);
 
-    if (followPaths) {
-      setRouteLoading(true);
-      const routed = await fetchRoute(prev, latlng, activity);
-      setRouteLoading(false);
-      const leg = routed ?? [prev, latlng];
-      setSegments(s => [...s, leg.slice(1)]);
-    } else {
-      setSegments(s => [...s, [latlng]]);
-    }
-  }, [waypoints, followPaths, activity]);
-
-  // Attach click handler — drawing is always on (click adds a point, drag pans)
-  useEffect(() => {
-    if (!mapRef.current || !mounted) return;
-    const map = mapRef.current as { on: (e: string, fn: (e: { latlng: { lat: number; lng: number } }) => void) => void; off: (e: string) => void };
-    const fn = (e: { latlng: { lat: number; lng: number } }) => {
-      handleMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
-    };
-    map.on("click", fn);
-    return () => map.off("click");
-  }, [mounted, handleMapClick]);
+  // ── Tap sur la carte : un point de plus ───────────────────────────────────────
+  const handleMapClick = useCallback((lat: number, lng: number) => {
+    const r: Repere = { id: idSuivant.current++, lat, lng };
+    const prev = reperesRef.current[reperesRef.current.length - 1];
+    // La liste est mise à jour TOUT DE SUITE (et pas au prochain rendu) : un second tap
+    // rapide doit se relier à ce point-ci, pas à l'avant-dernier.
+    reperesRef.current = [...reperesRef.current, r];
+    // Fonctionnel : un tronçon qui vient d'arriver a pu déplacer un repère sur le chemin.
+    setReperes((rs) => [...rs, r]);
+    setRedoStack([]); // a fresh point invalidates the redo history
+    if (prev) void relier(prev, r);
+  }, [relier]);
 
   // ── Update distance + elevation ────────────────────────────────────────────
   useEffect(() => {
@@ -555,45 +366,35 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
 
   // ── Undo last waypoint (precise — drops exactly the last leg) ───────────────
   const handleUndo = useCallback(() => {
-    if (!waypoints.length) return;
-    const lastWp = waypoints[waypoints.length - 1];
-    const lastSeg = segments[segments.length - 1] ?? [];
-    setRedoStack(r => [...r, { wp: lastWp, seg: lastSeg }]);
-    setWaypoints(wp => wp.slice(0, -1));
-    setSegments(s => s.slice(0, -1));
-  }, [waypoints, segments]);
+    const rs = reperesRef.current;
+    if (!rs.length) return;
+    const dernier = rs[rs.length - 1], avant = rs[rs.length - 2] ?? null;
+    setRedoStack((r) => [...r, { repere: dernier, depuis: avant?.id ?? null, troncon: avant ? troncons[cleTroncon(avant, dernier)] : undefined }]);
+    reperesRef.current = rs.slice(0, -1);
+    setReperes((x) => x.slice(0, -1));
+  }, [troncons]);
 
   // ── Redo ("Retour") — re-add the last undone leg ────────────────────────────
   const handleRedo = useCallback(() => {
-    setRedoStack(r => {
-      if (!r.length) return r;
-      const last = r[r.length - 1];
-      setWaypoints(wp => [...wp, last.wp]);
-      setSegments(s => [...s, last.seg]);
-      return r.slice(0, -1);
-    });
-  }, []);
+    const last = redoStack[redoStack.length - 1];
+    if (!last) return;
+    setRedoStack((r) => r.slice(0, -1));
+    const prev = reperesRef.current[reperesRef.current.length - 1];
+    reperesRef.current = [...reperesRef.current, last.repere];
+    setReperes((x) => [...x, last.repere]);
+    if (!prev) return;
+    if (last.troncon && last.depuis === prev.id) setTroncons((t) => ({ ...t, [cleTroncon(prev, last.repere)]: last.troncon! }));
+    else void relier(prev, last.repere);
+  }, [redoStack, relier]);
 
   const handleClear = useCallback(() => {
-    setWaypoints([]);
-    setSegments([]);
+    reperesRef.current = [];
+    setReperes([]);
+    setTroncons({});
     setRedoStack([]);
     setProfil(null);
     setDistance(0);
-    setSpeedEditorOpen(false);
   }, []);
-
-  // Close the speed editor when clicking outside of it
-  useEffect(() => {
-    if (!speedEditorOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (speedEditorRef.current && !speedEditorRef.current.contains(e.target as Node)) {
-        setSpeedEditorOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [speedEditorOpen]);
 
   // ── GPX export ────────────────────────────────────────────────────────────
   const handleExportGPX = useCallback(() => {
@@ -695,20 +496,19 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   // ── Load a saved route onto map ────────────────────────────────────────────
   const handleLoadRoute = useCallback((route: SavedRoute) => {
     const pts = route.coordinates.map(([lng, lat]) => ({ lat, lng }));
-    setWaypoints([pts[0], pts[pts.length - 1]]);
-    setSegments([[pts[0]], pts.slice(1)]);
+    if (pts.length < 2) return;
+    const a: Repere = { id: idSuivant.current++, ...pts[0] };
+    const b: Repere = { id: idSuivant.current++, ...pts[pts.length - 1] };
+    reperesRef.current = [a, b];
+    setReperes([a, b]);
+    setTroncons({ [cleTroncon(a, b)]: pts.slice(1) });
     setRedoStack([]);
     setRouteName(route.name);
-    // Pan map to route
-    if (mapRef.current && mounted) {
-      import("leaflet").then(L => {
-        const map = mapRef.current as L.Map;
-        const bounds = L.latLngBounds(pts.map(p => [p.lat, p.lng] as [number, number]));
-        map.fitBounds(bounds, { padding: [40, 40] });
-      });
-    }
+    // La carte cadre le parcours entier.
+    allerA({ emprise: pts.map((p) => [p.lat, p.lng] as [number, number]) });
     toast.success(tb("t.loaded", { name: route.name }));
-  }, [mounted, d]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d, allerA]);
 
   // ── Delete saved route ─────────────────────────────────────────────────────
   const handleDeleteRoute = useCallback(async (id: string) => {
@@ -765,24 +565,23 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
     }
   }, [d]);
 
+  /** Allume les sentiers balisés (calque « Randonnée » du tiroir), sans éteindre le reste. */
+  const montrerSentiers = useCallback(() => setCalquesActifs((a) => (a.includes("rando") ? a : [...a, "rando"])), []);
+
   // ── Fly to a famous French trail ───────────────────────────────────────────
   const flyToPlace = useCallback((r: FamousRoute) => {
-    if (!mapRef.current) return;
-    const map = mapRef.current as {
-      flyTo: (latlng: [number, number], zoom: number, opts?: { duration?: number }) => void;
-    };
-    map.flyTo([r.lat, r.lng], r.zoom, { duration: 1.4 });
-    setShowTrails(true); // reveal GR/PR markings at the destination
-    setShowFamous(false);
+    allerA({ centre: [r.lat, r.lng], zoom: r.zoom });
+    montrerSentiers(); // reveal GR/PR markings at the destination
+    setFeuille(null);
     toast.success(`${r.emoji} ${r.name}`, { description: d["t.flyHint"] });
-  }, [d]);
+  }, [d, allerA, montrerSentiers]);
 
   // ── Handoff depuis la page « Découvrir des parcours » (sessionStorage) ───────
   // Soit on charge le tracé d'un parcours communautaire, soit on centre la carte
   // sur un parcours du catalogue pour que l'utilisateur le retrace facilement.
   const handoffDone = useRef(false);
   useEffect(() => {
-    if (!mounted || handoffDone.current) return;
+    if (handoffDone.current) return;
     let raw: string | null = null;
     try { raw = sessionStorage.getItem("te:openRoute"); } catch { raw = null; }
     if (!raw) return;
@@ -808,22 +607,16 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
         created_at: new Date().toISOString(),
       });
     } else if (payload.kind === "focus" && typeof payload.lat === "number" && typeof payload.lng === "number") {
-      const lat = payload.lat, lng = payload.lng, zoom = payload.zoom ?? 12, name = payload.name;
-      import("leaflet").then(() => {
-        const map = mapRef.current as {
-          flyTo: (latlng: [number, number], zoom: number, opts?: { duration?: number }) => void;
-        } | null;
-        map?.flyTo([lat, lng], zoom, { duration: 1.4 });
-      });
-      setShowTrails(true); // révèle les sentiers balisés autour du point
-      if (name) toast.success(`${name}`, { description: d["t.focusHint"] });
+      allerA({ centre: [payload.lat, payload.lng], zoom: payload.zoom ?? 12 });
+      montrerSentiers(); // révèle les sentiers balisés autour du point
+      if (payload.name) toast.success(`${payload.name}`, { description: d["t.focusHint"] });
     }
-  }, [mounted, handleLoadRoute]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleLoadRoute]);
 
   // ── Chargement d'un parcours depuis le browser « Parcours » (même page) ──────
-  // Le browser sous la carte génère un vrai tracé (OSRM) puis émet cet événement.
+  // Le browser sous la carte génère un vrai tracé puis émet cet événement.
   useEffect(() => {
-    if (!mounted) return;
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as
         { id?: number; name?: string; activity?: string; coordinates?: [number, number][] } | undefined;
@@ -839,13 +632,30 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
         distance_km: 0, elevation_gain_m: 0, duration_min: 0,
         difficulty: "green", created_at: new Date().toISOString(),
       });
-      mapContainer.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Sur téléphone, le parcours choisi s'ouvre directement en grand, comme une carte.
+      if (window.matchMedia?.("(max-width: 767px)").matches) setPlein(true);
+      else sectionCarte.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
     window.addEventListener("te:loadRoute", handler);
     return () => window.removeEventListener("te:loadRoute", handler);
-  }, [mounted, handleLoadRoute]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleLoadRoute]);
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  /** « Ma position » : une seule lecture, la carte y va, le point bleu s'y pose. */
+  const allerAMaPosition = useCallback(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) { toast.error(d["t.geoUnavailable"]); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setMaPosition(p);
+        allerA({ centre: [p.lat, p.lng], zoom: 15 });
+      },
+      () => toast.error(d["t.gpsDenied"]),
+      { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 },
+    );
+  }, [d, allerA]);
+
+  // ── Navigation en direct ───────────────────────────────────────────────────
   // Distance restante = point du tracé le plus proche de l'utilisateur → arrivée.
   const navRemainingKm = useMemo(() => {
     if (!userPos || allPoints.length < 2) return null;
@@ -878,29 +688,6 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
     watchIdRef.current = id;
     return () => { if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; };
   }, [navMode]);
-
-  // Dessine / déplace le point bleu et recentre la carte sur l'utilisateur.
-  useEffect(() => {
-    if (!mapRef.current || !mounted) return;
-    import("leaflet").then((L) => {
-      const map = mapRef.current as L.Map;
-      if (!userPos) {
-        if (userMarkerRef.current) { map.removeLayer(userMarkerRef.current as L.Layer); userMarkerRef.current = null; }
-        return;
-      }
-      if (userMarkerRef.current) {
-        (userMarkerRef.current as L.Marker).setLatLng([userPos.lat, userPos.lng]);
-      } else {
-        const icon = L.divIcon({
-          className: "",
-          html: `<div style="width:18px;height:18px;background:#2563eb;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 3px rgba(37,99,235,.35),0 1px 6px rgba(0,0,0,.45)"></div>`,
-          iconAnchor: [9, 9],
-        });
-        userMarkerRef.current = L.marker([userPos.lat, userPos.lng], { icon, zIndexOffset: 1000 }).addTo(map);
-      }
-      if (navMode) map.panTo([userPos.lat, userPos.lng], { animate: true, duration: 0.5 });
-    });
-  }, [userPos, navMode, mounted]);
 
   // ── Partage live : diffuse la position via Supabase Realtime ───────────────────
   const startShare = useCallback(() => {
@@ -945,590 +732,377 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
     }
   }, [userPos, sharing, navRemainingKm]);
 
-  const hasRoute = allPoints.length > 0;
-  /** Une ligne de la feuille de réglages : libellé à gauche, interrupteur à droite. */
-  const LigneReglage = ({ label, children }: { label: string; children: ReactNode }) => (
-    <div className="flex min-h-[44px] items-center justify-between rounded-xl px-1">
-      <span className="text-sm font-medium text-zinc-800">{label}</span>{children}
-    </div>
-  );
+  const hasRoute = allPoints.length > 1;
 
-  // ⚠️ PLEIN ÉCRAN SUR TÉLÉPHONE (22/09/2026, Cyprien : « trouve des techniques pour que
-  // la carte soit très facile à utiliser sur téléphone malgré sa taille »). La carte
-  // vivait dans une boîte de 68 % de la hauteur, avec les marges de la page de chaque
-  // côté : il restait 325 × 420 px pour tracer, et toutes les commandes flottaient
-  // PAR-DESSUS. Désormais elle prend la largeur entière (les marges négatives annulent
-  // le `p-6` du <main>) et toute la hauteur libre entre l'entête et la barre d'onglets ;
-  // les réglages passent dans une feuille, et les actions dans une barre à portée du pouce.
-  // ⚠️ 16rem retirés, MESURÉ : entête 64 + bascule Construire/Vue relief 56 + ligne
-  // Garmin 34 + barre d'onglets 64 + marges. À 11,5rem, le bas de la carte — donc la
-  // barre du pouce — passait SOUS la barre d'onglets (29 px de chevauchement mesurés).
+  // Annuler / rétablir au clavier (ordinateur) : Ctrl+Z, Ctrl+Maj+Z.
+  useEffect(() => {
+    const touche = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
+      const cible = e.target as HTMLElement | null;
+      if (cible && (cible.tagName === "INPUT" || cible.tagName === "TEXTAREA")) return;
+      e.preventDefault();
+      if (e.shiftKey) handleRedo(); else handleUndo();
+    };
+    window.addEventListener("keydown", touche);
+    return () => window.removeEventListener("keydown", touche);
+  }, [handleUndo, handleRedo]);
+
+  // ── LES MODÈLES PROPOSÉS ICI : selon la clé et le PAYS regardé ──────────────
+  const centreModeles: [number, number] | null = reperes[0] ? [reperes[0].lat, reperes[0].lng]
+    : maPosition ? [maPosition.lat, maPosition.lng] : centre ? [centre.lat, centre.lon] : null;
+  const cleCentre = centreModeles ? `${centreModeles[0].toFixed(1)},${centreModeles[1].toFixed(1)}` : "";
+  const fondsDispo = useMemo(() => fondsDisponibles(CLE_MAPTILER, centreModeles), [cleCentre]); // eslint-disable-line react-hooks/exhaustive-deps
+  const calquesDispo = useMemo(() => calquesDisponibles(CLE_MAPTILER, centreModeles), [cleCentre]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Un fond qui n'existe plus ici (on a changé de pays) retombe sur Pacevo, jamais sur du vide.
+  const fondChoisi: FondCarte = fondsDispo.find((f) => f.id === fondCarte) ?? fondsDispo[0];
+  const calquesAllumes: CalqueCarte[] = calquesDispo.filter((c) => calquesActifs.includes(c.id));
+  /** Ce qui est allumé en plus du plan : la pastille du bouton des calques, comme Strava. */
+  const nbCalques = calquesAllumes.filter((c) => c.id !== "poi").length + (relief3d ? 1 : 0);
+
+  const reperesCarte = useMemo(() => reperes.map((r, i) => ({
+    lat: r.lat, lng: r.lng,
+    couleur: i === 0 ? COULEUR_DEPART : i === reperes.length - 1 ? COULEUR_ARRIVEE : COULEUR_ETAPE,
+  })), [reperes]);
+  const traceCarte = useMemo(() => allPoints.map((p) => [p.lat, p.lng] as [number, number]), [allPoints]);
+  const positionCarte: [number, number] | null = userPos ? [userPos.lat, userPos.lng] : maPosition ? [maPosition.lat, maPosition.lng] : null;
+
+  /** La ligne du haut du bloc de chiffres : ce qu'il faut faire maintenant. */
+  const titreCarte = navMode
+    ? (userPos ? d["live"] : d["searchingGps"]) + (navRemainingKm != null ? ` · ${fmtKm(navRemainingKm, lang, 1)} ${d["remaining"]}` : "") + (navAccuracy != null ? ` · ±${Math.round(navAccuracy)} m` : "")
+    : routeLoading ? d["computing"]
+    : reperes.length === 0 ? d["emptyHint"]
+    : reperes.length === 1 ? d["hint.suivant"]
+    : routeName.trim() || d["titreParcours"];
+
   return (
-    <div className="-mx-3 flex h-[calc(100dvh-16rem)] min-h-[380px] flex-col gap-3 sm:mx-0 sm:h-[80vh]">
-      {/* ── MAP ───────────────────────────────────────────────────────────── */}
-      {/* ⚠️ `isolate` : la carte est son PROPRE contexte d'empilement. Ses commandes
-          (barre d'outils z-1000, Leaflet z-1000) passaient PAR-DESSUS le menu Profil et le
-          panneau de notifications de l'entête (z-30/50) — vu sur téléphone le 21/09/2026.
-          Isolées, elles ne se comparent plus qu'entre elles, à l'intérieur de la carte. */}
-      <div className="flex-1 relative isolate overflow-hidden border-y border-zinc-200 shadow-sm min-h-0 sm:rounded-2xl sm:border">
-        <div
-          ref={mapContainer}
-          className="w-full h-full"
-          style={{ cursor: "crosshair" }}
-          role="application"
-          aria-label={d["mapAria"]}
-        />
+    <section
+      ref={sectionCarte}
+      style={plein ? { margin: 0 } : undefined}
+      className={plein
+        ? "fixed inset-0 z-[2000] overflow-hidden bg-white"
+        : "relative isolate -mx-3 h-[calc(100dvh-12rem)] min-h-[520px] overflow-hidden md:mx-0 md:rounded-2xl md:border md:border-zinc-200"}
+    >
+      <CarteDirect
+        position={positionCarte}
+        track={traceCarte}
+        centre={centre ? [centre.lat, centre.lon] : null}
+        fond={fondChoisi}
+        calques={calquesAllumes}
+        suivre={navMode && suiviNav}
+        onDeplacement={() => setSuiviNav(false)}
+        recentrer={recentrages}
+        etiquette={d["mapAria"]}
+        relief={relief3d}
+        onClic={navMode ? undefined : handleMapClick}
+        reperes={reperesCarte}
+        couleurTrace={difficultyColor(difficulty)}
+        vue={vue}
+        creditPlus={d["credit"]}
+        className="h-full w-full"
+      />
 
-        {!mounted && (
-          <div className="absolute inset-0 flex items-center justify-center bg-zinc-50">
-            <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
+      {/* En grand écran, la flèche ⌄ en haut à gauche en sort — comme dans Enregistrer. */}
+      {plein && (
+        <button type="button" onClick={() => setPlein(false)} aria-label={d["reduire"]} title={d["reduire"]}
+          className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-[600] flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-zinc-700 shadow-[0_8px_18px_-8px_rgba(9,9,11,0.6)] ring-1 ring-black/5">
+          <ChevronDown className="h-6 w-6" />
+        </button>
+      )}
+
+      {/* Le calcul du chemin est en cours : on le dit, en haut, sans cacher la carte. */}
+      {routeLoading && (
+        <div className="pointer-events-none absolute left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] z-[600] -translate-x-1/2">
+          <div className="flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-zinc-700 shadow-[0_8px_18px_-8px_rgba(9,9,11,0.6)] ring-1 ring-black/5">
+            <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+            {d["computing"]}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ── TOP TOOLBAR (map-planner style) ──────────────────────────── */}
-        {/* ⚠️ SUR TÉLÉPHONE, LA BARRE D'OUTILS NE S'EMPILE PLUS SUR LA CARTE (Cyprien,
-            21/09/2026 : « ne rend pas sur téléphone »). En retour à la ligne, les cinq
-            commandes formaient une colonne de 190 px qui recouvrait le tiers de la carte,
-            l'indice « Cliquez sur la carte » s'y superposait et le troisième bouton de
-            droite sortait de l'écran. Sous sm : les boutons de droite sur une première
-            ligne, puis la barre sur UNE ligne qui défile ; à partir de sm, comme avant. */}
-        {/* Sur téléphone, ces commandes passent dans la feuille « Réglages » (bouton en
-            bas) : en bandeau, elles mangeaient le tiers haut de la carte. */}
-        <div className="pointer-events-none absolute left-3 right-3 top-3 z-[1000] hidden items-start justify-between gap-3 sm:flex">
-          {/* Main controls */}
-          <div className="pointer-events-auto bg-white/95 rounded-2xl shadow-lg border border-zinc-100 px-3 py-2 flex items-center gap-2.5 flex-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-w-full sm:flex-wrap sm:overflow-visible sm:max-w-[calc(100%-1rem)]">
-            <Toggle id="tg-follow" checked={followPaths} onChange={setFollowPaths} label={d["tg.follow"]} />
-            <span className="w-px h-6 bg-zinc-200" />
-            <Toggle id="tg-trails" checked={showTrails} onChange={setShowTrails} label={d["tg.trails"]} />
-            <span className="w-px h-6 bg-zinc-200" />
-            <Toggle id="tg-elev" checked={showElevation} onChange={setShowElevation} label={d["tg.elev"]} />
-            <span className="w-px h-6 bg-zinc-200" />
+      {/* Le bas de la carte. ⚠️ Mêmes règles qu'Enregistrer : les enveloppes ne prennent
+          PAS le doigt (sinon la bande transparente des boutons avalerait les pincements),
+          seuls les boutons, le bloc de chiffres et le tiroir le reprennent. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col">
+        <div className="pointer-events-none mx-auto w-full max-w-md px-3">
+          <div className="mb-2.5 flex flex-col items-end gap-2">
+            <BtnCarte actif={feuille === "modeles"} titre={g["map.calques"]} onClick={() => setFeuille((f) => (f === "modeles" ? null : "modeles"))}>
+              <Layers className="h-5 w-5" />
+              {nbCalques > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">{nbCalques}</span>
+              )}
+            </BtnCarte>
+            {RELIEF_DISPO && (
+              <BtnCarte actif={relief3d} titre={g["map.3d"]} onClick={() => setRelief3d((r) => !r)}>
+                <span className="text-[15px] font-bold">3D</span>
+              </BtnCarte>
+            )}
+            <BtnCarte actif={feuille === "lieux"} titre={d["lieux"]} onClick={() => setFeuille((f) => (f === "lieux" ? null : "lieux"))}>
+              <Mountain className="h-5 w-5" />
+            </BtnCarte>
+            {/* Suivre le parcours en direct (point bleu, distance restante, partage). */}
+            {hasRoute && !navMode && (
+              <BtnCarte titre={d["followLive"]} onClick={() => { setSuiviNav(true); setNavMode(true); }}>
+                <Navigation className="h-5 w-5 text-blue-600" />
+              </BtnCarte>
+            )}
+            {navMode ? (
+              <BtnCarte actif={suiviNav} titre={g["map.recentrer"]} onClick={() => { setSuiviNav(true); setRecentrages((n) => n + 1); }}>
+                <LocateFixed className="h-5 w-5" />
+              </BtnCarte>
+            ) : (
+              <BtnCarte titre={d["myPosition"]} onClick={allerAMaPosition}>
+                <LocateFixed className="h-5 w-5" />
+              </BtnCarte>
+            )}
+            {!plein && (
+              <BtnCarte titre={d["plein"]} onClick={() => setPlein(true)}>
+                <Maximize2 className="h-5 w-5" />
+              </BtnCarte>
+            )}
+          </div>
 
-            {/* Activity dropdown */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setActivityMenuOpen(o => !o)}
-                aria-haspopup="listbox"
-                aria-expanded={activityMenuOpen}
-                aria-label={tb("activityType", { label: tb(`act.${activity}`) })}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 text-sm font-medium text-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-              >
-                <IconeSport sport={activity} className="h-4 w-4" />
-                {tb(`act.${activity}`)}
-                <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${activityMenuOpen ? "rotate-180" : ""}`} />
-              </button>
-              <AnimatePresence>
-                {activityMenuOpen && (
-                  <motion.ul
-                    role="listbox"
-                    aria-label={d["selectType"]}
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    className="absolute top-full left-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-zinc-100 p-1.5 z-[1001]"
-                  >
-                    <li className="px-2.5 py-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">
-                      {d["selectType"]}
-                    </li>
-                    {(Object.entries(ACTIVITIES) as [ActivityKey, typeof ACTIVITIES[ActivityKey]][]).map(([key, cfg]) => (
-                      <li key={key} role="option" aria-selected={activity === key}>
-                        <button
-                          type="button"
-                          onClick={() => { setActivity(key); setManualSpeed(null); setActivityMenuOpen(false); }}
-                          className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
-                            activity === key ? "bg-emerald-50 text-emerald-700 font-semibold" : "text-zinc-700 hover:bg-zinc-100"
-                          }`}
-                        >
-                          <IconeSport sport={key} className="h-4 w-4" />
-                          {tb(`act.${key}`)}
-                        </button>
-                      </li>
-                    ))}
-                  </motion.ul>
-                )}
-              </AnimatePresence>
+          {/* Le bloc de chiffres : ce que l'on construit. Le chiffre du milieu en grand. */}
+          <div className="pointer-events-auto mb-3 overflow-hidden rounded-2xl border border-black/5 bg-white shadow-[0_18px_40px_-18px_rgba(9,9,11,0.55)]">
+            <div className={`flex h-9 items-center justify-center px-4 text-[13px] font-semibold ${navMode ? "bg-blue-50 text-blue-700" : routeLoading ? "bg-emerald-50 text-emerald-700" : "text-zinc-700"}`}>
+              <span className="truncate">{titreCarte}</span>
             </div>
+            <div className="grid grid-cols-3 items-end px-3 pb-3 pt-1">
+              {/* Toucher le D+ ouvre (ou replie) le profil altimétrique. */}
+              <button type="button" onClick={() => setShowElevation((v) => !v)} disabled={!hasRoute} aria-expanded={showElevation}
+                aria-label={d["tg.elev"]} className="min-w-0 text-center">
+                {/* ⚠️ « — » ET PAS « 0 m » quand l'altitude n'a pas pu être lue : un parcours
+                    de montagne annoncé plat ferait partir quelqu'un sans s'attendre à 800 m. */}
+                <div className={`text-[22px] font-bold leading-none tabular-nums ${altitudeIndispo ? "text-amber-600" : "text-zinc-900"}`}>
+                  {altitudeIndispo ? "—" : elevGain}{!altitudeIndispo && <span className="ml-0.5 text-[11px] font-semibold text-zinc-400">m</span>}
+                </div>
+                <div className="mt-1 flex items-center justify-center gap-0.5 truncate text-[11px] font-semibold text-zinc-500">
+                  D+{hasRoute && <ChevronDown className={`h-3 w-3 transition-transform ${showElevation ? "rotate-180" : ""}`} />}
+                </div>
+              </button>
+              <div className="min-w-0 text-center">
+                {/* Le chiffre en grand, l'unité en petit, sur UNE ligne : « 1,03 km » passait
+                    à la ligne en 34 px dans le tiers de l'écran (banc d'essai, 27/11/2026). */}
+                <div className="whitespace-nowrap text-[34px] font-bold leading-none tabular-nums text-zinc-900">
+                  {distance < 1 ? Math.round(distance * 1000) : fmtNombre(distance, lang, 2)}
+                  <span className="ml-0.5 text-[13px] font-semibold text-zinc-400">{distance < 1 ? "m" : "km"}</span>
+                </div>
+                <div className="mt-1 truncate text-[11px] font-semibold text-zinc-500 first-letter:uppercase">{d["st.distance"]}</div>
+              </div>
+              <div className="min-w-0 text-center">
+                <div className="text-[22px] font-bold leading-none tabular-nums text-zinc-900">{formatDuration(durationMin)}</div>
+                <div className="mt-1 flex items-center justify-center gap-1 truncate text-[11px] font-semibold text-zinc-500 first-letter:uppercase">
+                  <IconeSport sport={activity} className="h-3 w-3" />{d["st.time"]}
+                </div>
+              </div>
+            </div>
+            {altitudeIndispo && <p className="px-3 pb-2 text-center text-[11px] leading-snug text-amber-700">{d["altIndispo"]}</p>}
+          </div>
+        </div>
 
-            <span className="w-px h-6 bg-zinc-200" />
+        {/* Le tiroir du bas, blanc, avec sa poignée — comme Enregistrer. */}
+        <div className="pointer-events-auto rounded-t-[28px] bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_30px_-18px_rgba(9,9,11,0.45)]">
+          <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-zinc-200" aria-hidden />
+          {showElevation && hasRoute && elevations.length > 2 && !navMode && (
+            <div className="mx-auto mb-3 max-w-xl">
+              <ElevationProfile points={allPoints} elevations={elevations} totalKm={distance} gain={elevGain} loss={elevLoss}
+                minAlt={elevMin} maxAlt={elevMax} difficulty={difficulty} />
+            </div>
+          )}
+          {navMode ? (
+            <div className="mx-auto flex max-w-md items-start justify-around">
+              <ActionCarte etroit label={sharing ? d["shared"] : d["share"]} coche={sharing} onClick={() => { if (!sharing) startShare(); }}>
+                <Share2 className="h-6 w-6 text-blue-600" />
+              </ActionCarte>
+              <GrosBouton label={d["stop"]} teinte="rouge" onClick={() => { setNavMode(false); setSharing(false); }}>
+                <X className="h-8 w-8" />
+              </GrosBouton>
+              <ActionCarte etroit label={g["map.recentrer"]} onClick={() => { setSuiviNav(true); setRecentrages((n) => n + 1); }}>
+                <LocateFixed className="h-6 w-6 text-zinc-600" />
+              </ActionCarte>
+            </div>
+          ) : (
+            <div className="mx-auto flex max-w-md items-start justify-around">
+              <ActionCarte etroit label={d["undo"]} disabled={!reperes.length} onClick={handleUndo}>
+                <Undo2 className="h-6 w-6 text-zinc-700" />
+              </ActionCarte>
+              <GrosBouton label={hasRoute ? d["save"] : d["mesParcours"]} teinte="emerald" onClick={() => setFeuille("parcours")}>
+                {hasRoute ? <Save className="h-8 w-8" /> : <Bookmark className="h-8 w-8" />}
+              </GrosBouton>
+              <ActionCarte etroit label={d["clear"]} danger disabled={!reperes.length} onClick={handleClear}>
+                <Trash2 className="h-6 w-6 text-red-600" />
+              </ActionCarte>
+              <ActionCarte etroit label={g["map.reglages"]} onClick={() => setFeuille("reglages")}>
+                <SlidersHorizontal className="h-6 w-6 text-zinc-600" />
+              </ActionCarte>
+            </div>
+          )}
+        </div>
+      </div>
 
-            {/* Export GPX : formules payantes. Sans le droit, le bouton mène aux formules
-                au lieu de disparaître — l'athlète doit savoir que la fonction existe. */}
+      {/* ══ LE TIROIR DES MODÈLES : le même qu'Enregistrer (components/carte) ══ */}
+      {feuille === "modeles" && (
+        <TiroirModeles
+          fonds={fondsDispo} calques={calquesDispo} fondChoisi={fondChoisi} onFond={setFondCarte}
+          calquesActifs={calquesActifs}
+          onCalque={(id) => setCalquesActifs((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]))}
+          relief3d={relief3d} onRelief={() => setRelief3d((r) => !r)} reliefDispo={RELIEF_DISPO}
+          coin={centreModeles ?? [48.8566, 2.3522]} onFermer={() => setFeuille(null)}
+        />
+      )}
+
+      {/* ══ RÉGLAGES : chemins, profil, activité, allure visée, export ══ */}
+      {feuille === "reglages" && (
+        <Feuille titre={d["reglages"]} fermer={d["fermer"]} onFermer={() => setFeuille(null)}>
+          <div className="space-y-1">
+            <LigneReglage label={d["tg.follow"]}><Toggle id="tg-follow-m" checked={followPaths} onChange={setFollowPaths} label="" /></LigneReglage>
+            <LigneReglage label={d["tg.elev"]}><Toggle id="tg-elev-m" checked={showElevation} onChange={setShowElevation} label="" /></LigneReglage>
+          </div>
+          <p className="mt-4 text-[15px] font-bold text-zinc-900">{d["activite"]}</p>
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {(Object.keys(ACTIVITIES) as ActivityKey[]).map((k) => (
+              <button key={k} type="button" onClick={() => { setActivity(k); setManualSpeed(null); }} aria-pressed={activity === k}
+                className={`flex flex-col items-center gap-1 rounded-2xl px-2 py-2.5 text-[11px] font-semibold ${activity === k ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700"}`}>
+                <IconeSport sport={k} className="h-4 w-4" />
+                {d[`act.${k}`]}
+              </button>
+            ))}
+          </div>
+          <div className="mt-5 flex items-center justify-between">
+            <p className="text-[15px] font-bold text-zinc-900">{speedCfg.mode === "pace" ? d["paceTarget"] : d["speedTarget"]}</p>
+            <button type="button" onClick={() => setManualSpeed(null)} disabled={manualSpeed === null}
+              className="flex items-center gap-1 rounded-md px-1 text-[12px] font-semibold text-emerald-600 disabled:text-zinc-300">
+              <Gauge className="h-3.5 w-3.5" /> {d["auto"]}
+            </button>
+          </div>
+          <div className="mt-1 text-center">
+            <div className="text-3xl font-semibold tabular-nums text-zinc-900">
+              {speedCfg.mode === "pace"
+                ? <>{formatPace(paceMinPerKm)}<span className="text-base font-semibold text-zinc-400"> /km</span></>
+                : <>{fmtNombre(speedKmh, lang, 1)}<span className="text-base font-semibold text-zinc-400"> km/h</span></>}
+            </div>
+            <div className="text-[11px] text-zinc-400">
+              {manualSpeed === null ? d["autoEstimate"]
+                : speedCfg.mode === "pace" ? tb("soitKmh", { v: fmtNombre(speedKmh, lang, 1) }) : tb("soitPace", { p: formatPace(paceMinPerKm) })}
+            </div>
+          </div>
+          <input type="range" min={speedCfg.min} max={speedCfg.max} step={speedCfg.step}
+            value={clamp(speedKmh, speedCfg.min, speedCfg.max)} onChange={(e) => setManualSpeed(Number(e.target.value))}
+            aria-label={speedCfg.mode === "pace" ? d["paceRangeAria"] : d["speedRangeAria"]}
+            className="mt-2 w-full cursor-pointer accent-emerald-600" />
+          <div className="mt-1 flex justify-between text-[11px] font-medium text-zinc-400">
+            <span>{speedCfg.mode === "pace" ? "7:00 /km" : "1 km/h"}</span>
+            <span>{speedCfg.mode === "pace" ? "2:30 /km" : "50 km/h"}</span>
+          </div>
+          {/* Export GPX : formules payantes. Sans le droit, le bouton mène aux formules
+              au lieu de disparaître — l'athlète doit savoir que la fonction existe. */}
+          <div className="mt-5">
             {exportGpx ? (
-              <button
-                type="button"
-                onClick={handleExportGPX}
-                disabled={!hasRoute}
-                aria-label={d["exportGpx"]}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-              >
-                <Download className="w-4 h-4" />
-                {d["exportGpx"]}
+              <button type="button" onClick={handleExportGPX} disabled={!hasRoute}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 px-4 py-3 text-sm font-semibold text-zinc-800 disabled:opacity-40">
+                <Download className="h-4 w-4" /> {d["exportGpx"]}
               </button>
             ) : (
-              <Link
-                href="/pricing"
-                title={d["gpxVerrou"]}
-                aria-label={d["gpxVerrou"]}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-zinc-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-              >
-                <Lock className="w-4 h-4" />
-                {d["exportGpx"]}
+              <Link href="/pricing" title={d["gpxVerrou"]} aria-label={d["gpxVerrou"]}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 px-4 py-3 text-sm font-semibold text-zinc-500">
+                <Lock className="h-4 w-4" /> {d["exportGpx"]}
               </Link>
             )}
           </div>
+        </Feuille>
+      )}
 
-          {/* Tools (la recherche de ville a été retirée — la recherche globale du haut s'en charge) */}
-          <div className="pointer-events-auto flex flex-col items-end gap-2 w-full max-w-full sm:w-72 sm:max-w-[44%]">
-            {/* Tool chips */}
-            <div className="flex gap-2">
-              <ToolChip active={showLayers} onClick={() => { setShowLayers(s => !s); setShowFamous(false); setShowRoutesPanel(false); }} label={d["tool.layers"]}>
-                <Layers className="w-4 h-4" />
-              </ToolChip>
-              <ToolChip active={showFamous} onClick={() => { setShowFamous(s => !s); setShowLayers(false); setShowRoutesPanel(false); }} label={d["tool.famous"]}>
-                <Mountain className="w-4 h-4" />
-              </ToolChip>
-              <ToolChip active={showRoutesPanel} onClick={() => { setShowRoutesPanel(s => !s); setShowLayers(false); setShowFamous(false); }} label={d["tool.routes"]}>
-                <Bookmark className="w-4 h-4" />
-              </ToolChip>
-            </div>
-
-            {/* Layers panel */}
-            <AnimatePresence>
-              {showLayers && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-                  className="w-full bg-white rounded-2xl shadow-xl border border-zinc-100 p-1.5"
-                >
-                  <div className="px-2 py-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["tool.layers"]}</div>
-                  {(Object.entries(LAYERS) as [keyof typeof LAYERS, typeof LAYERS[keyof typeof LAYERS]][])
-                    .filter(([key]) => key !== "outdoor" || MAPTILER_KEY)
-                    .map(([key, cfg]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setLayer(key)}
-                        aria-pressed={layer === key}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
-                          layer === key ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"
-                        }`}
-                      >
-                        {tb(`layer.${key}`)}
-                      </button>
-                    ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Famous routes panel */}
-            <AnimatePresence>
-              {showFamous && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-                  className="w-full bg-white rounded-2xl shadow-xl border border-zinc-100 p-2 max-h-[320px] overflow-auto"
-                >
-                  <div className="px-2 py-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["famousTitle"]}</div>
-                  <div className="space-y-1">
-                    {FAMOUS_ROUTES.map((r) => (
-                      <button
-                        key={r.name}
-                        type="button"
-                        onClick={() => flyToPlace(r)}
-                        className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-zinc-100 transition-colors text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                      >
-                        <span className="text-xl leading-none flex-shrink-0">{r.emoji}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-zinc-900 truncate">{r.name}</div>
-                          <div className="text-[11px] text-zinc-400 truncate">{r.region}</div>
-                          <div className="text-[11px] text-zinc-500 mt-0.5">{tbDesc(r.distance)} · {tbDesc(r.elevation)}</div>
-                        </div>
-                        <MapPin className="w-4 h-4 text-zinc-300 group-hover:text-emerald-500 flex-shrink-0 transition-colors" />
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Save + my routes panel */}
-            <AnimatePresence>
-              {showRoutesPanel && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-                  className="w-full bg-white rounded-2xl shadow-xl border border-zinc-100 p-3 max-h-[400px] overflow-auto"
-                >
-                  <div className="text-[11px] font-semibold text-zinc-400 mb-2 first-letter:uppercase">{d["save"]}</div>
-                  <input
-                    value={routeName}
-                    onChange={e => setRouteName(e.target.value)}
-                    placeholder={d["routeNamePh"]}
-                    aria-label={d["routeNameAria"]}
-                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 mb-2"
-                  />
-                  <div className="flex gap-2 mb-3">
-                    <button
-                      type="button"
-                      onClick={handleSave}
-                      disabled={saving || !hasRoute || !routeName.trim()}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                    >
-                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                      {d["save"]}
-                    </button>
-                    {exportGpx ? (
-                      <button
-                        type="button"
-                        onClick={handleExportGPX}
-                        disabled={!hasRoute}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-xs font-medium text-zinc-600 disabled:opacity-40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                      >
-                        <Download className="w-3.5 h-3.5" /> GPX
-                      </button>
-                    ) : (
-                      <Link
-                        href="/pricing"
-                        title={d["gpxVerrou"]}
-                        aria-label={d["gpxVerrou"]}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-xs font-medium text-zinc-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                      >
-                        <Lock className="w-3.5 h-3.5" /> GPX
-                      </Link>
-                    )}
-                  </div>
-                  <div className="text-[11px] font-semibold text-zinc-400 mb-1.5 first-letter:uppercase">{tb("myRoutes", { n: savedRoutes.length })}</div>
-                  {loadingRoutes ? (
-                    <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-zinc-400" /></div>
-                  ) : savedRoutes.length === 0 ? (
-                    <p className="text-sm text-zinc-400 text-center py-3">{d["noRoutes"]}</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {savedRoutes.map(r => (
-                        <div key={r.id} className="flex items-center gap-2 p-2 rounded-xl bg-zinc-50 hover:bg-zinc-100 transition-colors group">
-                          <div className="w-1.5 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: difficultyColor(r.difficulty) }} />
-                          <button type="button" className="flex-1 min-w-0 text-left" onClick={() => { handleLoadRoute(r); setShowRoutesPanel(false); }}>
-                            <div className="text-sm font-medium text-zinc-900 truncate">{r.name}</div>
-                            <div className="text-xs text-zinc-400">{fmtKm(r.distance_km, lang, 1)} · +{r.elevation_gain_m}m</div>
-                          </button>
-                          {/* Le cœur reste TOUJOURS visible quand il est plein : le
-                              masquer hors survol cacherait précisément l'information
-                              qu'on est venu chercher — lequel de mes parcours est mon
-                              favori. Vide, il n'apparaît qu'au survol pour ne pas
-                              encombrer la liste. */}
-                          <button type="button" onClick={() => handleToggleFavorite(r)}
-                            aria-label={tb(r.is_favorite ? "unfavRoute" : "favRoute", { name: r.name })}
-                            aria-pressed={!!r.is_favorite}
-                            className={`p-1 transition focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
-                              r.is_favorite
-                                ? "text-rose-500 opacity-100"
-                                : "text-zinc-300 hover:text-rose-400 opacity-0 group-hover:opacity-100"}`}>
-                            <Heart className="w-3.5 h-3.5" fill={r.is_favorite ? "currentColor" : "none"} />
-                          </button>
-                          <button type="button" onClick={() => handleDeleteRoute(r.id)} aria-label={tb("delRoute", { name: r.name })} className="p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* Route loading indicator */}
-        {routeLoading && (
-          <div className="absolute top-32 sm:top-20 left-1/2 -translate-x-1/2 z-[999]">
-            <div className="bg-white/95 rounded-full shadow-lg border border-zinc-100 px-4 py-1.5 flex items-center gap-2 text-sm text-zinc-700">
-              <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
-              {d["computing"]}
-            </div>
-          </div>
-        )}
-
-        {/* Empty-state hint */}
-        {!hasRoute && mounted && !routeLoading && (
-          <div className="pointer-events-none absolute bottom-24 left-1/2 z-[999] w-max max-w-[calc(100%-2rem)] -translate-x-1/2 sm:bottom-auto sm:top-20">
-            <div className="bg-zinc-900/85 text-white rounded-full px-4 py-1.5 text-sm font-medium shadow-lg text-center">
-              {d["emptyHint"]}
-            </div>
-          </div>
-        )}
-
-        {/* Floating stats pill (Distance · Temps · Allure · Vitesse) */}
-        <AnimatePresence>
-          {distance > 0 && (
-            <motion.div
-              ref={speedEditorRef}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 12 }}
-              className="absolute bottom-5 left-1/2 z-[1000] hidden -translate-x-1/2 sm:block"
-            >
-              {/* Target-speed editor popover */}
-              <AnimatePresence>
-                {speedEditorOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    role="dialog"
-                    aria-label={speedCfg.mode === "pace" ? d["setPaceAria"] : d["setSpeedAria"]}
-                    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-72 bg-white rounded-2xl shadow-xl border border-zinc-100 p-4"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">
-                        {speedCfg.mode === "pace" ? d["paceTarget"] : d["speedTarget"]}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setManualSpeed(null)}
-                        disabled={manualSpeed === null}
-                        className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 disabled:text-zinc-300 disabled:cursor-default transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-md px-1"
-                      >
-                        <Gauge className="w-3 h-3" /> {d["auto"]}
-                      </button>
-                    </div>
-                    <div className="text-center mb-2">
-                      <div className="text-3xl font-semibold text-zinc-900 tabular-nums">
-                        {speedCfg.mode === "pace"
-                          ? <>{formatPace(paceMinPerKm)}<span className="text-base font-semibold text-zinc-400"> /km</span></>
-                          : <>{fmtNombre(speedKmh, lang, 1)}<span className="text-base font-semibold text-zinc-400"> km/h</span></>}
-                      </div>
-                      <div className="text-[11px] text-zinc-400">
-                        {manualSpeed === null
-                          ? d["autoEstimate"]
-                          : speedCfg.mode === "pace"
-                            ? tb("soitKmh", { v: fmtNombre(speedKmh, lang, 1) })
-                            : tb("soitPace", { p: formatPace(paceMinPerKm) })}
-                      </div>
-                    </div>
-                    <input
-                      type="range"
-                      min={speedCfg.min}
-                      max={speedCfg.max}
-                      step={speedCfg.step}
-                      value={clamp(speedKmh, speedCfg.min, speedCfg.max)}
-                      onChange={e => setManualSpeed(Number(e.target.value))}
-                      aria-label={speedCfg.mode === "pace" ? d["paceRangeAria"] : d["speedRangeAria"]}
-                      className="w-full accent-emerald-600 cursor-pointer"
-                    />
-                    <div className="flex justify-between text-[11px] font-medium text-zinc-400 mt-1">
-                      <span>{speedCfg.mode === "pace" ? "7:00 /km" : "1 km/h"}</span>
-                      <span>{speedCfg.mode === "pace" ? "2:30 /km" : "50 km/h"}</span>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <div className="bg-white/95 rounded-full shadow-xl border border-zinc-100 px-2 py-2 flex items-center">
-                <PillStat value={fmtKm(distance, lang, 2)} label={d["st.distance"]} />
-                <PillDivider />
-                <PillStat value={formatDuration(durationMin)} label={d["st.time"]} icon={<IconeSport sport={activity} className="h-3 w-3 text-zinc-400" />} />
-                <PillDivider />
-                <button
-                  type="button"
-                  onClick={() => setSpeedEditorOpen(o => !o)}
-                  aria-label={d["setBothAria"]}
-                  aria-expanded={speedEditorOpen}
-                  className="flex items-center rounded-full transition-colors hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                >
-                  <PillStat value={`${formatPace(paceMinPerKm)}/km`} label={d["st.pace"]} manual={manualSpeed !== null} />
-                  <PillDivider />
-                  <PillStat value={`${fmtNombre(speedKmh, lang, 2)} km/h`} label={d["st.speed"]} manual={manualSpeed !== null} />
-                  <SlidersHorizontal className={`w-3.5 h-3.5 mr-1.5 ${manualSpeed !== null ? "text-emerald-600" : "text-zinc-300"}`} />
-                </button>
-              </div>
-            </motion.div>
+      {/* ══ ENREGISTRER + MES PARCOURS ══ */}
+      {feuille === "parcours" && (
+        <Feuille titre={hasRoute ? d["save"] : d["mesParcours"]} fermer={d["fermer"]} onFermer={() => setFeuille(null)}>
+          {hasRoute && (
+            <>
+              <input value={routeName} onChange={(e) => setRouteName(e.target.value)} placeholder={d["routeNamePh"]} aria-label={d["routeNameAria"]}
+                className="w-full rounded-2xl border border-zinc-200 px-4 py-3 text-[15px] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" />
+              <button type="button" onClick={handleSave} disabled={saving || !routeName.trim()}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-[15px] font-semibold text-white disabled:opacity-40">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} {d["save"]}
+              </button>
+            </>
           )}
-        </AnimatePresence>
-
-        {/* Navigation GPS en direct (point bleu qui se déplace sur le tracé) */}
-        {(hasRoute || navMode) && (
-          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[1000]">
-            {!navMode ? (
-              <button
-                type="button"
-                onClick={() => setNavMode(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-sm font-semibold shadow-xl transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-              >
-                <Navigation className="w-4 h-4" /> {d["followLive"]}
-              </button>
-            ) : (
-              <div className="flex items-center gap-3 px-4 py-2 bg-white/95 rounded-full shadow-xl border border-blue-100">
-                <span className="flex items-center gap-1.5 text-sm font-semibold text-blue-700">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600" />
-                  </span>
-                  {userPos ? d["live"] : d["searchingGps"]}
-                </span>
-                {navRemainingKm != null && (
-                  <span className="text-sm text-zinc-700">
-                    <span className="font-semibold">{fmtKm(navRemainingKm, lang, 1)}</span> {d["remaining"]}
-                  </span>
-                )}
-                {navAccuracy != null && <span className="text-[11px] text-zinc-400">±{Math.round(navAccuracy)} m</span>}
-                {!sharing ? (
-                  <button type="button" onClick={startShare} title={d["shareTitle"]}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-full text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
-                    <Share2 className="w-3.5 h-3.5" /> {d["share"]}
+          <p className="mt-5 text-[15px] font-bold text-zinc-900">{tb("myRoutes", { n: savedRoutes.length })}</p>
+          {loadingRoutes ? (
+            <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-zinc-400" /></div>
+          ) : savedRoutes.length === 0 ? (
+            <p className="py-3 text-center text-sm text-zinc-400">{d["noRoutes"]}</p>
+          ) : (
+            <div className="mt-2 space-y-1.5">
+              {savedRoutes.map((r) => (
+                <div key={r.id} className="flex items-center gap-2 rounded-2xl bg-zinc-50 p-2.5">
+                  <div className="w-1.5 flex-shrink-0 self-stretch rounded-full" style={{ backgroundColor: difficultyColor(r.difficulty) }} />
+                  <button type="button" className="min-w-0 flex-1 text-left" onClick={() => { handleLoadRoute(r); setFeuille(null); }}>
+                    <div className="truncate text-sm font-semibold text-zinc-900">{r.name}</div>
+                    <div className="text-xs text-zinc-500">{fmtKm(r.distance_km, lang, 1)} · +{r.elevation_gain_m}m</div>
                   </button>
-                ) : (
-                  <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded-full text-xs font-semibold"><Share2 className="w-3.5 h-3.5" /> {d["shared"]}</span>
-                )}
-                <button
-                  type="button" onClick={() => { setNavMode(false); setSharing(false); }} aria-label={d["stopNavAria"]}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-full text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
-                >
-                  <X className="w-3.5 h-3.5" /> {d["stop"]}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Contrôles d'édition (Annuler · Retour · Effacer)
-
-            ⚠️ ILS N'APPARAISSENT QUE QUAND ILS SERVENT. À l'arrivée sur la page il n'y
-            a aucun tracé : les trois boutons étaient affichés, grisés, au milieu de la
-            carte — un bloc blanc qui occupe le regard sans rien permettre. Ils entrent
-            en fondu dès le premier point posé, et ressortent quand on efface. Les
-            garder MONTÉS (plutôt que de les retirer du DOM) évite un saut de mise en
-            page et laisse la transition se jouer. */}
-        <div className={`absolute top-1/2 -translate-y-1/2 left-3 z-[1000] hidden transition-opacity duration-200 sm:block ${
-          hasRoute || redoStack.length > 0 ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}>
-          <div className="bg-white/95 rounded-2xl shadow-lg border border-zinc-100 p-1.5 flex flex-col gap-1">
-            <EditBtn onClick={handleUndo} disabled={!hasRoute} icon={<Undo2 className="w-5 h-5" />} label={d["undo"]} />
-            <EditBtn onClick={handleRedo} disabled={redoStack.length === 0} icon={<Redo2 className="w-5 h-5" />} label={d["redo"]} />
-            <EditBtn onClick={handleClear} disabled={!hasRoute} icon={<Trash2 className="w-5 h-5" />} label={d["clear"]} danger />
-          </div>
-        </div>
-
-        {/* ══ TÉLÉPHONE : LA BARRE DU POUCE ════════════════════════════════════
-            Tout ce dont on a besoin en traçant, à portée du pouce et en une ligne :
-            les chiffres du tracé, annuler, effacer, et les réglages. Avant, il fallait
-            viser des boutons de 28 px posés au milieu de la carte, et les chiffres
-            vivaient dans une pastille qu'un doigt masquait. */}
-        <div className="absolute inset-x-0 bottom-0 z-[1000] sm:hidden">
-          {/* ⚠️ `bg-white`, PAS `bg-white/97` : 97 n'est pas sur l'échelle d'opacité de
-              Tailwind, la classe ne produit AUCUN CSS et la barre s'affichait
-              transparente PAR-DESSUS la carte (vu à l'écran). Le piège est connu du
-              projet — il se reproduit dès qu'on écrit une valeur « au jugé ». */}
-          <div className="border-t border-zinc-200 bg-white px-3 pb-2 pt-2 shadow-[0_-6px_20px_-12px_rgba(0,0,0,0.25)]">
-            <div className="flex items-center gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
-                <div className="min-w-0">
-                  <div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">{d["st.distance"]}</div>
-                  <div className="text-[15px] font-semibold tabular-nums text-zinc-900">{fmtKm(distance, lang, 2)}</div>
+                  <button type="button" onClick={() => handleToggleFavorite(r)}
+                    aria-label={tb(r.is_favorite ? "unfavRoute" : "favRoute", { name: r.name })} aria-pressed={!!r.is_favorite}
+                    className={`p-2 ${r.is_favorite ? "text-rose-500" : "text-zinc-300"}`}>
+                    <Heart className="h-4 w-4" fill={r.is_favorite ? "currentColor" : "none"} />
+                  </button>
+                  <button type="button" onClick={() => handleDeleteRoute(r.id)} aria-label={tb("delRoute", { name: r.name })} className="p-2 text-zinc-300 hover:text-red-500">
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">D+</div>
-                  {/* ⚠️ « — » ET PAS « 0 m » quand l'altitude n'a pas pu être lue : un
-                      parcours de montagne annoncé plat ferait partir quelqu'un sans
-                      s'attendre à 800 m de dénivelé. */}
-                  <div className={`text-[15px] font-semibold tabular-nums ${altitudeIndispo ? "text-amber-600" : "text-zinc-900"}`}>
-                    {altitudeIndispo ? "—" : `${elevGain} m`}
-                  </div>
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] font-semibold text-zinc-400 first-letter:uppercase">{d["st.time"]}</div>
-                  <div className="text-[15px] font-semibold tabular-nums text-zinc-900">{formatDuration(durationMin)}</div>
-                </div>
-              </div>
-              <button type="button" onClick={handleUndo} disabled={!hasRoute} aria-label={d["undo"]}
-                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-zinc-200 text-zinc-700 disabled:opacity-30">
-                <Undo2 className="h-5 w-5" />
-              </button>
-              <button type="button" onClick={handleClear} disabled={!hasRoute} aria-label={d["clear"]}
-                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-zinc-200 text-red-600 disabled:opacity-30">
-                <Trash2 className="h-5 w-5" />
-              </button>
-              <button type="button" onClick={() => setReglagesOuverts(true)} aria-label={d["reglages"]}
-                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-zinc-900 text-white">
-                <SlidersHorizontal className="h-5 w-5" />
-              </button>
+              ))}
             </div>
-            {altitudeIndispo && (
-              <p className="mt-1.5 text-[11px] leading-snug text-amber-700">{d["altIndispo"]}</p>
-            )}
-          </div>
-        </div>
+          )}
+        </Feuille>
+      )}
 
-        {/* La feuille de réglages du téléphone : les mêmes interrupteurs que la barre du
-            bureau, mais hors de la carte, avec des cibles qu'un pouce atteint. */}
-        {reglagesOuverts && (
-          <div className="absolute inset-0 z-[1002] sm:hidden" role="dialog" aria-modal="true" aria-label={d["reglages"]}>
-            <div className="absolute inset-0 bg-zinc-900/40" onClick={() => setReglagesOuverts(false)} />
-            <div className="absolute inset-x-0 bottom-0 max-h-[80%] overflow-y-auto rounded-t-3xl bg-white p-4 pb-6">
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-semibold text-zinc-900">{d["reglages"]}</span>
-                <button type="button" onClick={() => setReglagesOuverts(false)} aria-label={d["fermer"]}
-                  className="rounded-full p-1.5 text-zinc-500 active:bg-zinc-100"><X className="h-5 w-5" /></button>
-              </div>
-              <div className="space-y-1">
-                <LigneReglage label={d["tg.follow"]}><Toggle id="tg-follow-m" checked={followPaths} onChange={setFollowPaths} label="" /></LigneReglage>
-                <LigneReglage label={d["tg.trails"]}><Toggle id="tg-trails-m" checked={showTrails} onChange={setShowTrails} label="" /></LigneReglage>
-                <LigneReglage label={d["tg.elev"]}><Toggle id="tg-elev-m" checked={showElevation} onChange={setShowElevation} label="" /></LigneReglage>
-              </div>
-              <div className="mt-4">
-                <div className="mb-1.5 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["activite"]}</div>
-                <div className="grid grid-cols-4 gap-2">
-                  {(Object.keys(ACTIVITIES) as ActivityKey[]).map((k) => (
-                    <button key={k} type="button" onClick={() => setActivity(k)}
-                      className={`flex flex-col items-center gap-1 rounded-2xl px-2 py-2.5 text-[11px] font-semibold ${activity === k ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700"}`}>
-                      <IconeSport sport={k} className="h-4 w-4" />
-                      {d[`act.${k}`]}
-                    </button>
-                  ))}
+      {/* ══ GRANDS PARCOURS DE FRANCE ══ */}
+      {feuille === "lieux" && (
+        <Feuille titre={d["famousTitle"]} fermer={d["fermer"]} onFermer={() => setFeuille(null)}>
+          <div className="space-y-1">
+            {FAMOUS_ROUTES.map((r) => (
+              <button key={r.name} type="button" onClick={() => flyToPlace(r)}
+                className="group flex w-full items-center gap-2.5 rounded-2xl p-2.5 text-left transition-colors hover:bg-zinc-100">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-zinc-900">{r.name}</div>
+                  <div className="truncate text-[12px] text-zinc-500">{r.region} · {tbDesc(r.distance)} · {tbDesc(r.elevation)}</div>
                 </div>
-              </div>
-            </div>
+                <MapPin className="h-4 w-4 flex-shrink-0 text-zinc-300 group-hover:text-emerald-500" />
+              </button>
+            ))}
           </div>
-        )}
+        </Feuille>
+      )}
+    </section>
+  );
+}
+
+/** Une feuille du bas, du même dessin que le tiroir des modèles (poignée, titre collé, ✕). */
+function Feuille({ titre, fermer, onFermer, children }: { titre: string; fermer: string; onFermer: () => void; children: ReactNode }) {
+  return (
+    <div role="dialog" aria-label={titre}
+      className="absolute inset-x-0 bottom-0 z-[650] mx-auto max-h-[80%] max-w-xl overflow-y-auto rounded-t-[28px] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_40px_-12px_rgba(9,9,11,0.5)]">
+      <div className="sticky top-0 z-10 -mx-5 mb-2 bg-white px-5 pb-2 pt-0.5">
+        <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-zinc-200" aria-hidden />
+        <div className="flex items-center justify-between">
+          <p className="text-[18px] font-bold text-zinc-900">{titre}</p>
+          <button type="button" onClick={onFermer} aria-label={fermer} className="rounded-full p-1.5 text-zinc-700 hover:bg-zinc-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
+      {children}
+    </div>
+  );
+}
 
-      {/* ── ELEVATION PROFILE (full-width, below the map) ─────────────────── */}
-      <AnimatePresence>
-        {showElevation && hasRoute && elevations.length > 2 && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="flex-shrink-0 overflow-hidden"
-          >
-            <ElevationProfile
-              points={allPoints}
-              elevations={elevations}
-              totalKm={distance}
-              gain={elevGain}
-              loss={elevLoss}
-              minAlt={elevMin}
-              maxAlt={elevMax}
-              difficulty={difficulty}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+/** Une ligne de réglage : libellé à gauche, interrupteur à droite. */
+function LigneReglage({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex min-h-[44px] items-center justify-between rounded-xl px-1">
+      <span className="text-sm font-medium text-zinc-800">{label}</span>{children}
     </div>
   );
 }
 
 // ─── Small UI atoms ───────────────────────────────────────────────────────────
-function PillStat({ value, label, icon, manual }: { value: string; label: string; icon?: React.ReactNode; manual?: boolean }) {
-  return (
-    <div className="px-3 text-center min-w-[58px]">
-      <div className={`flex items-center justify-center gap-1 font-semibold text-sm leading-tight whitespace-nowrap ${manual ? "text-emerald-600" : "text-zinc-900"}`}>
-        {value}{icon && <span className="inline-flex">{icon}</span>}
-      </div>
-      <div className="text-[10px] text-zinc-400">{label}</div>
-    </div>
-  );
-}
-function PillDivider() {
-  return <div className="w-px h-7 bg-zinc-200" />;
-}
 // iOS-style toggle switch (toolbar)
 function Toggle({ id, checked, onChange, label }: { id: string; checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
@@ -1546,43 +1120,6 @@ function Toggle({ id, checked, onChange, label }: { id: string; checked: boolean
       </button>
       <label htmlFor={id} className="text-xs font-medium text-zinc-700 cursor-pointer select-none whitespace-nowrap">{label}</label>
     </div>
-  );
-}
-
-// Round icon button used for the top-right tool cluster
-function ToolChip({ active, onClick, label, children }: { active: boolean; onClick: () => void; label: string; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      aria-pressed={active}
-      title={label}
-      className={`w-10 h-10 flex items-center justify-center rounded-xl shadow-lg border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
-        active ? "bg-zinc-900 text-white border-zinc-900" : "bg-white/95 text-zinc-700 border-zinc-100 hover:bg-zinc-100"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-// Vertical edit control (Annuler / Retour / Effacer)
-function EditBtn({ onClick, disabled, icon, label, danger }: { onClick: () => void; disabled?: boolean; icon: ReactNode; label: string; danger?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-      className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl text-[11px] font-medium transition disabled:opacity-30 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
-        danger ? "text-red-500 hover:bg-red-50" : "text-zinc-600 hover:bg-zinc-100"
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
   );
 }
 

@@ -90,6 +90,7 @@ async function stylePlan(): Promise<maplibregl.StyleSpecification> {
 export function CarteDirect({
   position, track, centre, fond = FOND_PLAN, calques = [], suivre = true, onDeplacement, recentrer = 0, etiquette, className = "",
   parcours = [], voirParcours = false, relief = false,
+  onClic, reperes = [], couleurTrace = "#059669", vue, creditPlus,
 }: {
   position: [number, number] | null;
   track: [number, number][];
@@ -119,6 +120,21 @@ export function CarteDirect({
   voirParcours?: boolean;
   /** Relief 3D : terrain MapTiler + carte inclinée. Ignoré sans clé (`RELIEF_DISPO`). */
   relief?: boolean;
+  /**
+   * ── POUR CONSTRUIRE UN PARCOURS (onglet Carte, 27/11/2026) ─────────────────
+   * Cyprien : « fais comme dans Enregistrer, exactement la même chose ». La même carte sert
+   * donc aux deux écrans ; ces propriétés n'existent que pour le constructeur.
+   * `onClic` : un TAP (pas un glissé) sur la carte, en [latitude, longitude].
+   */
+  onClic?: (lat: number, lng: number) => void;
+  /** Les points posés : vert au départ, bleu entre deux, rouge à l'arrivée. */
+  reperes?: { lat: number; lng: number; couleur: string }[];
+  /** La couleur du tracé (celle de la difficulté dans le constructeur). */
+  couleurTrace?: string;
+  /** Compteur + destination : chaque nouveau `n` déplace la carte (un lieu ou un parcours entier). */
+  vue?: { n: number; centre?: [number, number]; zoom?: number; emprise?: [number, number][] };
+  /** Un crédit de plus, en HTML (le calcul d'itinéraire de FOSSGIS l'exige). */
+  creditPlus?: string;
 }) {
   const conteneur = useRef<HTMLDivElement>(null);
   const carte = useRef<maplibregl.Map | null>(null);
@@ -145,6 +161,12 @@ export function CarteDirect({
   useEffect(() => { positionRef.current = position; }, [position]);
   useEffect(() => { traceRef.current = track; }, [track]);
   useEffect(() => { fondRef.current = fond; }, [fond]);
+  const clicRef = useRef(onClic);
+  useEffect(() => { clicRef.current = onClic; }, [onClic]);
+  const reperesRef = useRef(reperes);
+  useEffect(() => { reperesRef.current = reperes; }, [reperes]);
+  const couleurRef = useRef(couleurTrace);
+  useEffect(() => { couleurRef.current = couleurTrace; }, [couleurTrace]);
   const calquesRef = useRef(calques);
   useEffect(() => { calquesRef.current = calques; }, [calques]);
   /** Les couleurs de jour, gardées pour revenir de Pacevo Nuit. */
@@ -166,6 +188,11 @@ export function CarteDirect({
   function poserTrace(m: maplibregl.Map, t: [number, number][]) {
     const src = m.getSource("trace") as maplibregl.GeoJSONSource | undefined;
     src?.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: t.map(versLngLat) } });
+  }
+
+  function poserReperes(m: maplibregl.Map, r: { lat: number; lng: number; couleur: string }[]) {
+    const src = m.getSource("reperes") as maplibregl.GeoJSONSource | undefined;
+    src?.setData({ type: "FeatureCollection", features: r.map((p) => ({ type: "Feature", properties: { couleur: p.couleur }, geometry: { type: "Point", coordinates: [p.lng, p.lat] } })) });
   }
 
   function poserParcours(m: maplibregl.Map, p: [number, number][][]) {
@@ -312,7 +339,7 @@ export function CarteDirect({
       // l'application, il n'a pas besoin de l'être à chaque fois ». D'où : en entier 5 s à
       // la PREMIÈRE ouverture du jour, puis la carte s'ouvre directement sur le seul ⓘ
       // (Cyprien : « il faut d'abord cliquer sur le i… comme ça ça ne dérange pas »).
-      const credit = new maplibregl.AttributionControl({ compact: true });
+      const credit = new maplibregl.AttributionControl({ compact: true, customAttribution: creditPlus });
       m.addControl(credit, "top-right");
       const replier = () => conteneur.current?.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
       if (creditDejaMontre()) { replier(); m.once("load", replier); }
@@ -324,6 +351,9 @@ export function CarteDirect({
       // `originalEvent` : seuls les gestes de la MAIN, pas nos recentrages GPS.
       m.on("click", replier);
       m.on("movestart", (e) => { if ((e as { originalEvent?: unknown }).originalEvent) replier(); });
+      // Un tap (MapLibre n'émet pas `click` après un glissé) : le constructeur y pose un point.
+      m.on("click", (e) => clicRef.current?.(e.lngLat.lat, e.lngLat.lng));
+      if (onClic) m.getCanvas().style.cursor = "crosshair";
       m.on("dragstart", () => deplacementRef.current?.());
       m.on("zoomstart", (e) => { if ((e as { originalEvent?: unknown }).originalEvent) deplacementRef.current?.(); });
       /**
@@ -357,11 +387,16 @@ export function CarteDirect({
           paint: { "line-color": "#2563eb", "line-opacity": 0.45, "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 16, 3.5] } });
         m.addSource("trace", { type: "geojson", data: VIDE });
         m.addLayer({ id: "trace-bord", type: "line", source: "trace", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ffffff", "line-width": 7 } });
-        m.addLayer({ id: "trace", type: "line", source: "trace", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#059669", "line-width": 4 } });
+        m.addLayer({ id: "trace", type: "line", source: "trace", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": couleurRef.current, "line-width": 4 } });
+        // Les points posés du constructeur, au-dessus du tracé.
+        m.addSource("reperes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        m.addLayer({ id: "reperes", type: "circle", source: "reperes",
+          paint: { "circle-radius": 7, "circle-color": ["get", "couleur"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 2.5 } });
         pret.current = true;
         appliquerFond(m, fondRef.current);
         appliquerCalques(m, calquesRef.current);
         poserTrace(m, traceRef.current);
+        poserReperes(m, reperesRef.current);
         poserParcours(m, parcoursRef.current);
         montrerParcours(m, voirParcoursRef.current);
         if (reliefRef.current) appliquerRelief(m, true);
@@ -431,6 +466,34 @@ export function CarteDirect({
     const m = carte.current;
     if (m && pret.current) poserTrace(m, track);
   }, [track]);
+
+  useEffect(() => {
+    const m = carte.current;
+    if (m && pret.current) poserReperes(m, reperes);
+  }, [reperes]);
+
+  useEffect(() => {
+    const m = carte.current;
+    if (m && pret.current && m.getLayer("trace")) m.setPaintProperty("trace", "line-color", couleurTrace);
+  }, [couleurTrace]);
+
+  // Aller voir un lieu, ou cadrer un parcours entier (chargé depuis la liste).
+  const vueN = vue?.n ?? 0;
+  useEffect(() => {
+    const m = carte.current;
+    if (!m || !vue || vueN === 0) return;
+    if (vue.emprise && vue.emprise.length > 1) {
+      const lats = vue.emprise.map((p) => p[0]), lngs = vue.emprise.map((p) => p[1]);
+      const h = m.getContainer().clientHeight || 600;
+      // Marges : la colonne de boutons à droite et le bloc du bas couvrent la carte.
+      m.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        // Bornées à la hauteur de la carte : une marge plus grande qu'elle annule le cadrage.
+        { padding: { top: Math.min(70, h * 0.1), bottom: Math.min(250, h * 0.4), left: 30, right: 70 }, maxZoom: 16, duration: 900 });
+    } else if (vue.centre) {
+      m.flyTo({ center: versLngLat(vue.centre), zoom: vue.zoom ?? m.getZoom(), duration: 1400 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vueN]);
 
   // ⚠️ LA HAUTEUR CHANGE EN COURS DE VIE : plein écran avant le départ, plus courte
   // pendant la course. La carte garde la taille mesurée à la création et n'occuperait

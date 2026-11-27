@@ -23,9 +23,9 @@ const CarteDirect = dynamic(() => import("./CarteDirect").then((m) => m.CarteDir
 import { sauverEnCours, lireEnCours, effacerEnCours, mettreEnAttente, vautEnregistrement, INTERVALLE_SAUVEGARDE_MS, type CourseEnCours } from "@/lib/courses/horsLigne";
 import { avancer, intensite, idPartage, lienSuivi, lienSms, messageAlerte, messageDepart, type EtatVeille } from "@/lib/courses/veille";
 import { createClient } from "@/lib/supabase/client";
-import { calquesDisponibles, fondsDisponibles, tuileDe, type CalqueCarte, type FondCarte, type IdCalque, type IdFond } from "@/lib/courses/fondsCarte";
+import { calquesDisponibles, fondsDisponibles, type CalqueCarte, type FondCarte, type IdCalque, type IdFond } from "@/lib/courses/fondsCarte";
 import { sortiesDepuis, type ParcoursDate } from "@/lib/courses/mesParcours";
-import { vignetteDessinee, VIGNETTE_RUES } from "./vignettes";
+import { BtnCarte, ActionCarte, GrosBouton, TiroirModeles } from "@/components/carte/commandesCarte";
 import { RELIEF, avecCle } from "@/lib/trail/couches";
 
 /** La clé MapTiler (publique) : elle décide quels modèles existent (satellite, relief). */
@@ -1095,15 +1095,6 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   /** Ce qui est allumé en plus du plan : la pastille du bouton des calques, comme Strava. */
   const nbCalques = calquesAllumes.filter((c) => c.id !== "poi").length + (modeSorties !== "aucune" && mesParcours.length ? 1 : 0) + (relief3d ? 1 : 0);
   const coinVignette = centreModeles ?? [48.8566, 2.3522];
-  // Fonds : la VRAIE tuile du quartier (le dégradé dessous si elle ne répond pas).
-  // Calques : une petite carte DESSINÉE — la tuile d'un calque est vide là où il n'y a
-  // rien (VTT, vélo à Rouen), et la vignette n'aurait rien montré (27/11/2026).
-  const vignetteFond = (f: FondCarte) => {
-    if (f.type === "vecteur") return vignetteDessinee(f.id);
-    const img = `url("${tuileDe(f.urls![0], coinVignette[0], coinVignette[1], 14)}") center/cover`;
-    return f.place === "sous-routes" ? `${VIGNETTE_RUES}, ${img}, ${VIGNETTE_PLAN}` : `${img}, ${VIGNETTE_PLAN}`;
-  };
-  const vignetteCalque = (c: CalqueCarte) => vignetteDessinee(c.id === "pentes-fr" ? "pentes" : c.id === "courbes-fr" ? "courbes" : c.id);
 
   const commandesCarte = (
     <>
@@ -1388,9 +1379,11 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         // ⚠️ MÊME COMPOSITION SUR TÉLÉPHONE ET SUR ORDINATEUR (Cyprien, 27/11/2026 :
         // « pareil sur ordinateur ») : carte, bloc de chiffres, tiroir du bas. Seule la
         // hauteur change — l'écran entier en grand, la fenêtre moins l'entête sinon.
+        // ⚠️ `isolate` (27/11/2026) : depuis que la PAGE défile (entête collant), les
+        // commandes de la carte (z-500) passaient par-dessus l'entête et ses menus.
         className={plein
           ? "fixed inset-0 z-[2000] overflow-hidden bg-white"
-          : "relative -mx-3 -mt-3 h-[calc(100dvh-8.5rem)] min-h-[560px] overflow-hidden md:mx-0 md:mt-0 md:rounded-2xl md:border md:border-zinc-200"}
+          : "relative isolate -mx-3 -mt-3 h-[calc(100dvh-8.5rem)] min-h-[560px] overflow-hidden md:mx-0 md:mt-0 md:rounded-2xl md:border md:border-zinc-200"}
       >
         <CarteDirect
           position={positionCarte}
@@ -1501,69 +1494,26 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             coller ». Les vignettes sont de VRAIES images du quartier de l'athlète (la tuile
             de chaque fond à sa position), pas des illustrations. */}
         {vue === "carte" && calquesOuverts && (
-          <div className="absolute inset-x-0 bottom-0 z-[650] mx-auto max-h-[80%] max-w-xl overflow-y-auto rounded-t-[28px] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_40px_-12px_rgba(9,9,11,0.5)]">
-            {/* ⚠️ `z-10` : sans lui, les vignettes (positionnées) défilaient PAR-DESSUS le
-                titre collé en haut — vu sur iPhone le 27/11/2026. */}
-            <div className="sticky top-0 z-10 -mx-5 bg-white px-5 pb-2 pt-0.5">
-              <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-zinc-200" aria-hidden />
-              <div className="flex items-center justify-between">
-                <p className="text-[18px] font-bold text-zinc-900">{d["map.panneau"]}</p>
-                <button type="button" onClick={() => setCalquesOuverts(false)} aria-label={d["map.fermer"]} className="rounded-full p-1.5 text-zinc-700 hover:bg-zinc-100">
-                  <X className="h-5 w-5" />
-                </button>
+          <TiroirModeles
+            fonds={fondsDispo} calques={calquesDispo} fondChoisi={fondChoisi} onFond={setFondCarte}
+            calquesActifs={calquesActifs}
+            onCalque={(id) => setCalquesActifs((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]))}
+            relief3d={relief3d} onRelief={() => setRelief3d((r) => !r)} reliefDispo={RELIEF_DISPO}
+            coin={coinVignette} onFermer={() => setCalquesOuverts(false)}
+            sections={<>
+              <p className="mt-5 text-[15px] font-bold text-zinc-900">{d["map.secSorties"]}</p>
+              <p className="mt-0.5 text-[12px] text-zinc-500">{mesParcours.length ? tg("map.mesParcoursAide", { n: mesParcours.length }) : d["map.mesParcoursVide"]}</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {([["toutes", d["s.toutes"], mesParcours.length], ["recents", d["s.recentes"], sortiesRecentes.length], ["semaine", d["s.semaine"], sortiesSemaine.length], ["aucune", d["s.aucune"], null]] as const).map(([id, nom, n]) => (
+                  <button key={id} type="button" onClick={() => setModeSorties(id)} aria-pressed={modeSorties === id} disabled={id !== "aucune" && !mesParcours.length}
+                    className={`rounded-2xl border px-2 py-2.5 text-center text-[12.5px] font-semibold leading-tight transition disabled:opacity-50 ${modeSorties === id ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-zinc-200 text-zinc-700 hover:border-zinc-300"}`}>
+                    {nom}
+                    {n != null && <span className="mt-0.5 block text-[11px] font-medium text-zinc-500">{n}</span>}
+                  </button>
+                ))}
               </div>
-            </div>
-
-            <p className="mt-2 text-[15px] font-bold text-zinc-900">{d["map.fond"]}</p>
-            <div className="mt-2.5 grid grid-cols-4 gap-x-2 gap-y-3 sm:grid-cols-5">
-              {fondsDispo.map((f) => (
-                <Vignette key={f.id} nom={d[f.cle] ?? f.id} actif={fondChoisi.id === f.id} onClick={() => setFondCarte(f.id)}
-                  etiquette={f.couverture !== "monde" ? f.couverture.toUpperCase() : undefined}
-                  fond={vignetteFond(f)} />
-              ))}
-            </div>
-
-            <p className="mt-5 text-[15px] font-bold text-zinc-900">{d["map.secSorties"]}</p>
-            <p className="mt-0.5 text-[12px] text-zinc-500">{mesParcours.length ? tg("map.mesParcoursAide", { n: mesParcours.length }) : d["map.mesParcoursVide"]}</p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {([["toutes", d["s.toutes"], mesParcours.length], ["recents", d["s.recentes"], sortiesRecentes.length], ["semaine", d["s.semaine"], sortiesSemaine.length], ["aucune", d["s.aucune"], null]] as const).map(([id, nom, n]) => (
-                <button key={id} type="button" onClick={() => setModeSorties(id)} aria-pressed={modeSorties === id} disabled={id !== "aucune" && !mesParcours.length}
-                  className={`rounded-2xl border px-2 py-2.5 text-center text-[12.5px] font-semibold leading-tight transition disabled:opacity-50 ${modeSorties === id ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-zinc-200 text-zinc-700 hover:border-zinc-300"}`}>
-                  {nom}
-                  {n != null && <span className="mt-0.5 block text-[11px] font-medium text-zinc-500">{n}</span>}
-                </button>
-              ))}
-            </div>
-
-            {([["itineraires", d["map.secItineraires"]], ["relief", d["map.secRelief"]], ["affichage", d["map.secAffichage"]]] as const).map(([groupe, titre]) => {
-              const liste = calquesDispo.filter((c) => c.groupe === groupe);
-              const avec3d = groupe === "relief" && RELIEF_DISPO;
-              if (!liste.length && !avec3d) return null;
-              return (
-                <div key={groupe}>
-                  <p className="mt-5 text-[15px] font-bold text-zinc-900">{titre}</p>
-                  {/* Les pentes de l'IGN ne sont dessinées qu'EN MONTAGNE : à Rouen la couche
-                      est vide, et sans cette phrase on la croirait en panne. */}
-                  {groupe === "relief" && liste.some((c) => c.id === "pentes-fr") && <p className="mt-0.5 text-[12px] text-zinc-500">{d["c.pentesAide"]}</p>}
-                  <div className="mt-2.5 grid grid-cols-4 gap-x-2 gap-y-3 sm:grid-cols-5">
-                    {avec3d && (
-                      <Vignette nom={d["map.3d"]} actif={relief3d} onClick={() => setRelief3d((r) => !r)} fond={vignetteDessinee("relief")}>
-                        <span className="absolute bottom-1.5 left-1.5 rounded-md bg-white/90 px-1 text-[11px] font-bold text-zinc-900">3D</span>
-                      </Vignette>
-                    )}
-                    {liste.map((c) => (
-                      <Vignette key={c.id} nom={d[c.cle] ?? c.id} actif={calquesActifs.includes(c.id)}
-                        onClick={() => setCalquesActifs((a) => (a.includes(c.id) ? a.filter((x) => x !== c.id) : [...a, c.id]))}
-                        etiquette={c.couverture !== "monde" ? c.couverture.toUpperCase() : undefined}
-                        fond={vignetteCalque(c)}>
-                        {c.id === "poi" && <MapPin className="h-6 w-6 text-rose-500" fill="#fecdd3" />}
-                      </Vignette>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+            </>}
+          />
         )}
 
         {/* ══ LA VUE CHIFFRES — l'écran qu'on lit en courant (Strava) ══════════════
@@ -2082,69 +2032,6 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
       </AnimatePresence>
       </div>
     </div>
-  );
-}
-
-/**
- * Une commande posée sur la carte : ronde, blanche, 44 px — la taille minimale d'une
- * cible tactile. « Actif » l'inverse en noir plein, pour qu'on sache d'un regard si la
- * voix parle et si la carte suit encore la position.
- */
-function BtnCarte({ actif, titre, onClick, children }: { actif?: boolean; titre: string; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button" onClick={onClick} title={titre} aria-label={titre} aria-pressed={!!actif}
-      className={`pointer-events-auto relative flex h-11 w-11 items-center justify-center rounded-full shadow-[0_8px_18px_-8px_rgba(9,9,11,0.6)] ring-1 transition-colors ${actif ? "bg-zinc-900 text-white ring-zinc-900" : "bg-white/95 text-zinc-600 ring-black/5 hover:bg-white"}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-const VIGNETTE_PLAN = "linear-gradient(135deg,#f2f1ed 0 36%,#bfe3a3 36% 58%,#f2f1ed 58% 66%,#9ccdf2 66%)";
-
-/**
- * Une vignette du tiroir des modèles : l'image, le nom, et la coche de ce qui est choisi.
- * L'image passe en FOND CSS (pas d'<img>) : une tuile qui ne répond pas laisse le dégradé
- * dessous, jamais une icône d'image cassée.
- */
-function Vignette({ nom, actif, onClick, fond, etiquette, children }: { nom: string; actif: boolean; onClick: () => void; fond: string; etiquette?: string; children?: ReactNode }) {
-  return (
-    <button type="button" onClick={onClick} aria-pressed={actif} className="flex flex-col items-center gap-1.5">
-      <span className={`relative h-[68px] w-[68px] overflow-hidden rounded-2xl ring-2 ring-offset-2 transition ${actif ? "ring-emerald-600" : "ring-transparent hover:ring-zinc-200"}`} style={{ background: fond }}>
-        {children && <span className="absolute inset-0 flex items-center justify-center">{children}</span>}
-        {etiquette && <span className="absolute left-1 top-1 rounded bg-white/90 px-1 text-[9px] font-bold text-zinc-700">{etiquette}</span>}
-        {actif && <span className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white ring-2 ring-white"><Check className="h-3 w-3" strokeWidth={3} /></span>}
-      </span>
-      <span className={`w-full text-center text-[11.5px] font-semibold leading-tight ${actif ? "text-emerald-700" : "text-zinc-700"}`}>{nom}</span>
-    </button>
-  );
-}
-
-/** Une action secondaire du bloc du bas : icône ronde + son mot, comme sur Strava. */
-function ActionCarte({ label, onClick, coche, children }: { label: string; onClick: () => void; coche?: boolean; children: ReactNode }) {
-  return (
-    <button type="button" onClick={onClick} className="flex w-24 flex-col items-center gap-1.5">
-      <span className={`relative flex h-14 w-14 items-center justify-center rounded-full transition-colors ${coche ? "bg-emerald-50 hover:bg-emerald-100" : "bg-zinc-100 hover:bg-zinc-200"}`}>
-        {children}
-        {/* La coche dit « c'est ce qui est choisi », comme le sport chez Strava. */}
-        {coche && <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white ring-2 ring-white"><Check className="h-3 w-3" strokeWidth={3} /></span>}
-      </span>
-      <span className="w-full truncate text-center text-[12px] font-semibold text-zinc-700">{label}</span>
-    </button>
-  );
-}
-
-/** LE bouton : celui qu'on cherche du pouce sans regarder, au départ comme à l'arrivée. */
-function GrosBouton({ label, teinte, onClick, children }: { label: string; teinte: "emerald" | "rouge"; onClick: () => void; children: ReactNode }) {
-  const vert = teinte === "emerald";
-  return (
-    <button type="button" onClick={onClick} className="-mt-3 flex w-24 flex-col items-center gap-1.5">
-      <span className={`flex h-[76px] w-[76px] items-center justify-center rounded-full text-white transition-transform active:scale-95 ${vert ? "bg-emerald-600 shadow-[0_10px_24px_-10px_rgba(5,150,105,0.9)]" : "bg-red-600 shadow-[0_2px_8px_rgba(0,0,0,0.15)]"}`}>
-        {children}
-      </span>
-      <span className={`w-full truncate text-center text-[14px] font-bold ${vert ? "text-emerald-700" : "text-red-700"}`}>{label}</span>
-    </button>
   );
 }
 

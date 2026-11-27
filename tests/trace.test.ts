@@ -142,9 +142,11 @@ function ligne(n: number, pasM: number) {
     assert.equal(profilOsrm("marche"), "foot");
     assert.equal(profilOsrm("velo"), "bike");
     assert.equal(profilOsrm("vtt"), "bike");
+    // 27/11/2026 : le calcul vit dans lib/trail/itineraire, qui choisit le SERVEUR selon le
+    // profil (le serveur de démonstration d'OSRM ignorait le profil et roulait en voiture).
     const src = codeNu("src/components/trail/TrailBuilder.tsx");
-    assert.ok(!/route\/v1\/foot\//.test(src), "le profil OSRM « foot » est de nouveau écrit en dur : un parcours vélo suivrait les sentiers piétons");
-    assert.match(src, /route\/v1\/\$\{profilOsrm\(/, "l'itinéraire ne dépend plus de l'activité");
+    assert.match(src, /calculerTroncon\(depuis, vers, activity\)/, "l'itinéraire ne dépend plus de l'activité");
+    assert.match(codeNu("src/lib/trail/itineraire.ts"), /return profilOsrm\(activite\) === "bike"/, "le serveur ne dépend plus du profil : un parcours vélo suivrait les sentiers piétons");
   });
 
   await test("le constructeur utilise ce calcul, et dit quand l'altitude manque", () => {
@@ -169,11 +171,12 @@ function ligne(n: number, pasM: number) {
     const ui = codeNu("src/components/trail/TrailBuilder.tsx");
     // Plein écran : la boîte de 68 % de hauteur avec les marges de la page a disparu.
     assert.ok(!/h-\[68vh\] min-h-\[460px\]/.test(ui), "la carte est revenue dans sa boîte de 68 % de hauteur");
-    assert.match(ui, /-mx-3 flex h-\[calc\(100dvh-16rem\)\]/, "la carte ne prend plus la largeur et la hauteur de l'écran sur téléphone");
-    // Les commandes flottantes sont réservées au bureau ; le téléphone a sa barre.
-    assert.match(ui, /hidden items-start justify-between gap-3 sm:flex/, "la barre d'outils flotte de nouveau sur la carte du téléphone");
-    assert.match(ui, /absolute inset-x-0 bottom-0 z-\[1000\] sm:hidden/, "la barre du pouce a disparu");
-    assert.match(ui, /setReglagesOuverts\(true\)/, "les réglages ne s'ouvrent plus en feuille");
+    // 27/11/2026 (« comme Enregistrer ») : en grand d'office sur téléphone, toute la largeur
+    // et la hauteur de la fenêtre sinon ; commandes en colonne et dans le tiroir du bas.
+    assert.match(ui, /-mx-3 h-\[calc\(100dvh-12rem\)\]/, "la carte ne prend plus la largeur et la hauteur de l'écran");
+    assert.match(ui, /"fixed inset-0 z-\[2000\] overflow-hidden bg-white"/, "la carte ne passe plus en grand");
+    assert.ok(!/absolute left-3 right-3 top-3/.test(ui), "une barre d'outils flotte de nouveau en haut de la carte");
+    assert.match(ui, /setFeuille\("reglages"\)/, "les réglages ne s'ouvrent plus en feuille");
     // ⚠️ Le fond de la barre doit être une classe qui EXISTE : `bg-white/97` ne produit
     // aucun CSS (hors échelle Tailwind) et la barre s'affichait transparente.
     // Le contrôle porte sur le CODE (commentaires retirés) : la phrase qui raconte le

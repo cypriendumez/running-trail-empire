@@ -159,7 +159,7 @@ test("aucun flou d'arrière-plan posé sur une carte qui se déplace, et une seu
   // contenait rien, et le test restait vert pendant qu'un bloc blanc `bg-white/95
   // backdrop-blur` et une pastille floutée s'installaient PAR-DESSUS la carte. On ancre
   // désormais sur la section entière, et on EXIGE de la trouver.
-  const iSection = gr.indexOf(': "relative -mx-3 -mt-3 h-[calc(100dvh-8.5rem)]');
+  const iSection = gr.indexOf(': "relative isolate -mx-3 -mt-3 h-[calc(100dvh-8.5rem)]');
   const iFin = gr.indexOf("</section>", iSection);
   assert.ok(iSection > 0 && iFin > iSection, "la section de la carte est introuvable : ce garde ne vérifierait plus rien");
   const carte = gr.slice(iSection, iFin);
@@ -169,10 +169,13 @@ test("aucun flou d'arrière-plan posé sur une carte qui se déplace, et une seu
   assert.ok(cmd.length > 50 && !/backdrop-blur/.test(cmd), "les commandes posées sur la carte ont retrouvé un flou");
   // Les boutons eux-mêmes sont définis au niveau du module (`BtnCarte`, `ActionCarte`,
   // `GrosBouton`) : leurs classes ne sont ni dans la section ni dans `commandesCarte`.
+  // Ils vivent dans le module partagé avec l'onglet Carte depuis le 27/11/2026.
+  const partage = codeNu("src/components/carte/commandesCarte.tsx");
+  assert.ok(!/backdrop-blur/.test(partage), "les commandes de carte partagées ont retrouvé un flou");
   for (const comp of ["function BtnCarte(", "function ActionCarte(", "function GrosBouton("]) {
-    const i = gr.indexOf(comp);
+    const i = partage.indexOf(comp);
     assert.ok(i > 0, `${comp} introuvable : ce garde ne le vérifierait plus`);
-    assert.ok(!/backdrop-blur/.test(gr.slice(i, gr.indexOf("\n}\n", i))), `${comp.slice(9, -1)} a retrouvé un flou — il est posé sur la carte`);
+    assert.ok(!/backdrop-blur/.test(partage.slice(i, partage.indexOf("\n}\n", i))), `${comp.slice(9, -1)} a retrouvé un flou — il est posé sur la carte`);
   }
   // Les pages qui enchaînaient des vagues de lectures indépendantes n'en font plus qu'une.
   const races = codeNu("src/app/dashboard/races/page.tsx");

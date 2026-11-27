@@ -28,14 +28,15 @@ test("la carte s'ouvre sur la zone de l'athlète, avec ses trois gardes", () => 
   const bloc = src.slice(Math.max(0, i - 700), i + 200);
   assert.ok(/const \[lng, lat\] = premier;/.test(bloc),
     "l'ordre [lng, lat] n'est plus explicite : une inversion passerait inaperçue");
-  assert.ok(/map\.setView\(\[lat, lng\]/.test(bloc),
-    "Leaflet reçoit les coordonnées dans le mauvais ordre : la carte s'ouvrira dans l'océan");
+  // 27/11/2026 : la carte est celle d'Enregistrer (MapLibre) ; on lui donne [lat, lng].
+  assert.ok(/allerA\(\{ centre: \[lat, lng\], zoom: 12 \}\)/.test(bloc),
+    "la carte reçoit les coordonnées dans le mauvais ordre : elle s'ouvrira dans l'océan");
   // Les trois gardes.
   // Le garde s'est ÉTENDU : il coupe court aussi quand la page a déjà fourni un centre
   // (traces GPS). Le repli sur les parcours enregistrés ne sert plus que sans traces.
   assert.ok(/if \(vueAutoFaite\.current \|\| centre\) return;/.test(bloc),
     "le recentrage de repli peut se rejouer, ou écraser le centre venu des traces GPS");
-  assert.ok(/waypoints\.length > 0/.test(bloc), "le recentrage écraserait un tracé déjà commencé");
+  assert.ok(/reperes\.length > 0/.test(bloc), "le recentrage écraserait un tracé déjà commencé");
   assert.ok(/Math\.abs\(lat\) > 90 \|\| Math\.abs\(lng\) > 180/.test(bloc),
     "des coordonnées hors bornes ne sont plus écartées");
 });
@@ -44,8 +45,11 @@ test("les contrôles d'édition n'occupent le regard que s'ils servent", () => {
   // À l'arrivée il n'y a aucun tracé : les trois boutons s'affichaient grisés au milieu
   // de la carte. Ils restent MONTÉS (pas de saut de mise en page) mais transparents.
   const src = codeNu(TB);
-  assert.ok(/hasRoute \|\| redoStack\.length > 0 \? "opacity-100" : "pointer-events-none opacity-0"/.test(src),
-    "le panneau d'édition est de nouveau affiché en permanence, grisé et inutile");
+  // 27/11/2026 : plus de panneau posé AU MILIEU de la carte. Annuler et Effacer sont dans
+  // le tiroir du bas (comme Enregistrer), et inactifs tant qu'aucun point n'est posé.
+  assert.ok(!/top-1\/2 -translate-y-1\/2 left-3/.test(src), "un panneau d'édition est revenu au milieu de la carte");
+  assert.ok(/<ActionCarte etroit label=\{d\["undo"\]\} disabled=\{!reperes\.length\}/.test(src), "Annuler n'est plus dans le tiroir, ou reste actif sans point");
+  assert.ok(/<ActionCarte etroit label=\{d\["clear"\]\} danger disabled=\{!reperes\.length\}/.test(src), "Effacer n'est plus dans le tiroir, ou reste actif sans point");
 });
 
 test("les nombres affichés passent par le formateur de la langue", () => {
@@ -80,9 +84,12 @@ test("le centre de la carte vient des traces GPS, pas des parcours enregistrés"
   assert.ok(/centre=\{centre\}/.test(page), "le centre n'est plus transmis au composant");
 
   const tb = codeNu("src/components/trail/TrailBuilder.tsx");
-  assert.ok(/center: centre \? \[centre\.lat, centre\.lon\] : \[46\.85, 2\.35\]/.test(tb),
+  // 27/11/2026 : la carte d'Enregistrer (CarteDirect) prend [lat, lon] et s'ouvre au
+  // zoom 13 sur ce centre, au zoom 5 (France) sans lui.
+  assert.ok(/centre=\{centre \? \[centre\.lat, centre\.lon\] : null\}/.test(tb),
     "la carte n'utilise plus le centre reçu, ou l'ordre lat/lon a changé");
-  assert.ok(/zoom: centre \? 12 : 6/.test(tb), "le zoom ne s'adapte plus à la présence d'un centre");
+  const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
+  assert.ok(/zoom: positionRef\.current \? 15 : depart \? 13 : 5,/.test(carte), "le zoom ne s'adapte plus à la présence d'un centre");
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
