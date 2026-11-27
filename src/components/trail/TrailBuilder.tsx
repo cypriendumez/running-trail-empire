@@ -222,6 +222,9 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const [etatPropositions, setEtatPropositions] = useState<"attente" | "ok" | "erreur">("attente");
   const [choisi, setChoisi] = useState<ParcoursHdf | null>(null);
   const dernierePropo = useRef<{ lat: number; lng: number; sport: string } | null>(null);
+  /** Le centre regardé ne change l'état qu'au-delà de 200 m : pas un rendu par mouvement de carte. */
+  const changerCentreVu = useCallback((c: [number, number]) => setCentreVu((avant) =>
+    avant && distanceKm({ lat: avant[0], lng: avant[1] }, { lat: c[0], lng: c[1] }) < 0.2 ? avant : c), []);
   const allerA = useCallback((v: Omit<typeof vue, "n">) => setVue((x) => ({ ...v, n: x.n + 1 })), []);
 
   const [followPaths, setFollowPaths] = useState(true);
@@ -346,7 +349,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const shareChanRef = useRef<any>(null);
 
   // ── Relier deux points par le vrai chemin (lib/trail/itineraire) ──────────────
-  const relier = useCallback(async (depuis: Repere, vers: Repere) => {
+  const relier = useCallback(async (depuis: Repere, vers: Repere, recalcul = false) => {
     const cle = cleTroncon(depuis, vers);
     if (!followPaths) { setTroncons((t) => ({ ...t, [cle]: [{ lat: vers.lat, lng: vers.lng }] })); return; }
     // Utile tant que le point existe ET que l'écran est encore là : en quittant l'onglet,
@@ -363,6 +366,9 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
       // échec : le parcours traversait des immeubles et personne ne savait pourquoi.
       // Un seul message à la fois (`id`) : serveur en panne + cinq points posés = un toast, pas cinq.
       toast.error(t.echec === "panne" ? d["t.routeDown"] : d["t.routeFail"], { id: "itineraire" });
+      // Un RECALCUL raté (changement d'activité) garde le tronçon déjà calculé : on ne
+      // remplace pas un vrai chemin par une ligne droite (relecture du 27/11/2026).
+      if (recalcul) return;
       setTroncons((x) => ({ ...x, [cle]: [{ lat: vers.lat, lng: vers.lng }] }));
       return;
     }
@@ -449,7 +455,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
     if (profilTrace === "droit") return; // les tronçons déjà calculés restent ; les suivants seront droits
     const rs = reperesRef.current;
     for (let i = 1; i < rs.length; i++) {
-      if (!tronconsFixes.current.has(cleTroncon(rs[i - 1], rs[i]))) void relier(rs[i - 1], rs[i]);
+      if (!tronconsFixes.current.has(cleTroncon(rs[i - 1], rs[i]))) void relier(rs[i - 1], rs[i], true);
     }
   }, [profilTrace, relier]);
 
@@ -947,7 +953,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
         creditPlus={d["credit"]}
         propositions={pastilles}
         onProposition={toucherProposition}
-        onVue={setCentreVu}
+        onVue={changerCentreVu}
         className="h-full w-full"
       />
 
@@ -1223,7 +1229,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
           <div className="-mx-5 mt-3 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {/* `concat` et pas `...SPORTS` : tests/bundle lit `.SPORTS` comme une variable d'environnement. */}
             {(["all"] as ("all" | SportHdf)[]).concat(SPORTS).map((s) => (
-              <button key={s} type="button" onClick={() => setSportPropose(s)} aria-pressed={sportPropose === s}
+              <button key={s} type="button" onClick={() => { if (s !== sportPropose) { setSportPropose(s); setEtatPropositions("attente"); } }} aria-pressed={sportPropose === s}
                 className={`flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold ${sportPropose === s ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700"}`}>
                 <IconeSport sport={s} className="h-3.5 w-3.5" />
                 {s === "all" ? d["parcoursTous"] : P[`sport.${s}`] ?? s}

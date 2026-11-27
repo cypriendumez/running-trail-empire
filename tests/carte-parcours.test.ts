@@ -87,8 +87,11 @@ const lire = (p: string) => sansCommentaires(readFileSync(p, "utf8"));
 
   await test("changer d'activité recalcule le tracé posé — sauf un parcours chargé (vrai tracé GPS)", () => {
     assert.match(tb, /const profilTrace = followPaths \? profilOsrm\(activity\) : "droit";/);
-    assert.match(tb, /if \(!tronconsFixes\.current\.has\(cleTroncon\(rs\[i - 1\], rs\[i\]\)\)\) void relier\(rs\[i - 1\], rs\[i\]\);/);
+    assert.match(tb, /if \(!tronconsFixes\.current\.has\(cleTroncon\(rs\[i - 1\], rs\[i\]\)\)\) void relier\(rs\[i - 1\], rs\[i\], true\);/);
     assert.match(tb, /tronconsFixes\.current = new Set\(\[cleTroncon\(a, b\)\]\);/, "un parcours chargé serait recalculé, et son vrai tracé perdu");
+    // Un recalcul raté garde le chemin déjà calculé (pas de ligne droite à sa place).
+    assert.match(tb, /void relier\(rs\[i - 1\], rs\[i\], true\);/);
+    assert.match(tb, /if \(recalcul\) return;\s*\n\s*setTroncons\(\(x\) => \(\{ \.\.\.x, \[cle\]: \[\{ lat: vers\.lat, lng: vers\.lng \}\] \}\)\);/);
   });
 
   await test("un point loin de tout chemin est relié en ligne droite, et c'est dit", () => {
@@ -112,7 +115,7 @@ const lire = (p: string) => sansCommentaires(readFileSync(p, "utf8"));
 
   await test("les parcours sont PROPOSÉS dans la carte : pastilles, ligne « voir », liste par sport", () => {
     assert.match(tb, /const montrerPropositions = !navMode && reperes\.length === 0;/, "les pastilles s'affichent pendant un tracé, ou jamais");
-    assert.match(tb, /propositions=\{pastilles\}\s*\n\s*onProposition=\{toucherProposition\}\s*\n\s*onVue=\{setCentreVu\}/);
+    assert.match(tb, /propositions=\{pastilles\}\s*\n\s*onProposition=\{toucherProposition\}\s*\n\s*onVue=\{changerCentreVu\}/);
     assert.match(tb, /\{montrerPropositions && propositions\.length > 0 && \(\s*<button type="button" onClick=\{\(\) => setFeuille\("propositions"\)\}/, "plus de ligne « voir les parcours autour d'ici »");
     assert.match(tb, /new URLSearchParams\(\{ near: `\$\{lat\.toFixed\(3\)\},\$\{lng\.toFixed\(3\)\}`, sort: "proche", sport: sportPropose/);
     // Une panne n'est pas « aucun parcours ici ».

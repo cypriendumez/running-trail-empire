@@ -63,6 +63,9 @@ const VIDE = { type: "Feature" as const, properties: {}, geometry: { type: "Line
 
 const versLngLat = (p: [number, number]): [number, number] => [p[1], p[0]];
 
+/** Une seule liste vide : un `[]` par défaut, neuf à chaque rendu, relancerait `setData` à chaque fois. */
+const AUCUNE_PROPOSITION: { id: number; lat: number; lng: number; couleur: string }[] = [];
+
 /** Le style de repli : les tuiles d'OpenStreetMap, si le style vectoriel ne vient pas. */
 function styleRepli(): maplibregl.StyleSpecification {
   return {
@@ -91,7 +94,7 @@ export function CarteDirect({
   position, track, centre, fond = FOND_PLAN, calques = [], suivre = true, onDeplacement, recentrer = 0, etiquette, className = "",
   parcours = [], voirParcours = false, relief = false,
   onClic, reperes = [], couleurTrace = "#059669", vue, creditPlus,
-  propositions = [], onProposition, onVue,
+  propositions = AUCUNE_PROPOSITION, onProposition, onVue,
 }: {
   position: [number, number] | null;
   track: [number, number][];
