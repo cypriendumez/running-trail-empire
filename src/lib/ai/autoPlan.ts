@@ -648,13 +648,15 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // jour-là ne porte rien de plus qu'un footing : ni sortie longue ni séance dure, sous `espacer` comme sous `etaler`.
   const jourZeroFait = !!(ctx.weekPlan.espacer ?? ctx.weekPlan.etaler)?.aujourdhui;
   const dayZeroDropped = ctx.readiness.level === "rouge" || ctx.lastHardDaysAgo === 0 || jourZeroFait;
-  // SOUS LA GARDE `espacer` (jamais deux jours de course de suite), la sortie du jour faite interdit aussi le LENDEMAIN à la
-  // sortie longue (3ᵉ visa @HeadCoach, 27/11/2026 : couru samedi matin, la sortie longue tombait dimanche). Sous `etaler`
-  // (une préférence), la sortie longue du lendemain reste permise : limite dite dans PROFILS.md.
-  const lendemainEspace = !!ctx.weekPlan.espacer && jourZeroFait;
-  // Jamais le lendemain d'une course C : la course était la séance dure de la veille. Ni, sous `espacer`, le lendemain
-  // d'une sortie déjà faite (`lendemainEspace`).
-  const lendemainInterdit = (i: number) => (courseCIdx >= 0 && i === courseCIdx + 1) || (lendemainEspace && i === 1);
+  // LE LENDEMAIN D'UNE SORTIE FAITE NE PORTE PAS LA SORTIE LONGUE : sous la garde `espacer` (jamais deux jours de course de
+  // suite), dès que la sortie du jour est faite (3ᵉ visa @HeadCoach, 27/11/2026 : couru samedi matin, la sortie longue tombait
+  // dimanche) ; sous `etaler`, quand on a couru hier ET ce matin (réserve du 4ᵉ visa : vendredi et samedi courus, la sortie
+  // longue du dimanche faisait trois jours d'affilée). Elle est déplacée vers un autre jour libre ; quand le lendemain était
+  // le seul, elle n'est pas posée et ses kilomètres vont aux footings (1 plan sur 927 tirés dans ce cas, 27/11/2026).
+  const lendemainProtege = jourZeroFait && (!!ctx.weekPlan.espacer || !!ctx.weekPlan.etaler?.hier);
+  // Jamais le lendemain d'une course C : la course était la séance dure de la veille. Ni le lendemain d'une sortie déjà
+  // faite quand `lendemainProtege` le protège.
+  const lendemainInterdit = (i: number) => (courseCIdx >= 0 && i === courseCIdx + 1) || (lendemainProtege && i === 1);
   const weekend = dates.map((d, i) => ({ i, day: d.getDay() }))
     .filter((x) => (x.day === 0 || x.day === 6) && canRun(x.i) && !(dayZeroDropped && x.i === 0) && !lendemainInterdit(x.i));
   // Une « sortie longue » de moins de 4 km n'est pas une sortie longue. Cas rencontré
@@ -822,7 +824,7 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   // de suite, 3ᵉ visa @HeadCoach) ; sous `etaler`, quand on a couru hier ET ce matin. Chassée du jour 0 (`jourZeroFait`),
   // elle glissait au jour 1 : troisième jour d'affilée sous `etaler` (tirage du 27/11/2026 : 3 plans sur 1 518 où la sortie
   // du jour était faite, et un renforcement perdu), deuxième sous `espacer`.
-  const qualiteAuSurlendemain = jourZeroFait && (lendemainEspace || !!ctx.weekPlan.etaler?.hier);
+  const qualiteAuSurlendemain = lendemainProtege;
   const debutQualite = Math.max(qualiteAuSurlendemain ? 2 : dayZeroDropped ? 1 : 0, Math.min(7, Math.max(0, Math.trunc(wp.qualiteDes ?? 0))));
   // La reprise après une course : séance déjà écrite courte (coachContext), et annoncée.
   // Elle l'emporte sur le « sauvée par le plancher », dont le texte parle de charge et

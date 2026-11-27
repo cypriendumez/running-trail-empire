@@ -2739,7 +2739,7 @@ async function main() {
     assert.ok(pairesDe(courusDe(planDe(sansEtaler(ctx)))) > 0, "précondition : sans l'étalement, la scène type n'avait pas deux jours de suite");
   });
 
-  await test("la sortie du jour faite : le jour 0 ne porte qu'un footing ; sous la garde des longs arrêts, rien le lendemain ; couru hier aussi, ni footing ni séance dure le lendemain (sept jours de la semaine)", async () => {
+  await test("la sortie du jour faite : le jour 0 ne porte qu'un footing ; sous la garde des longs arrêts, rien le lendemain ; couru hier aussi, ni séance dure ni sortie longue le lendemain, et sur ces scènes aucune course (sept jours de la semaine)", async () => {
     // Rejoué sur les SEPT jours de la semaine dans le test même (relecture du 27/11/2026) : la sortie longue ne vise le
     // jour 0 que le dimanche, et un test lancé un autre jour laissait passer le retrait de la garde.
     const DUR = /^(?!Endurance$|R[ée]cup$)/;
@@ -2753,6 +2753,9 @@ async function main() {
       ["20 jours d'arrêt, 2ᵉ jour de reprise, couru hier", scene(30, 5, 20, 2), "etaler", true, 5, false],
       // Seuil posé le jour même dans `main` : couru ce matin seulement.
       ["8 jours d'arrêt, 2ᵉ jour, trois sorties de 12 km, ce matin seulement", scene(36, 3, 8, 2), "etaler", false, 12, false],
+      // Sortie longue posée : un samedi, couru vendredi et ce matin, elle tombait le dimanche, troisième jour d'affilée
+      // (réserve du 4ᵉ visa @HeadCoach, 27/11/2026).
+      ["6 jours d'arrêt, 3ᵉ jour, cinq sorties de 6 km, couru hier", scene(30, 5, 6, 3), "etaler", true, 6, false],
       ["150 jours d'arrêt, 10ᵉ jour, couru hier", longueScene(6, 150, 10, 4, 1), "espacer", true, 5, false],
       ["90 jours d'arrêt, 9ᵉ jour, couru hier", longueScene(4, 90, 9, 5, 1), "espacer", true, 5, false],
       // Feu vert, sortie longue posée : un dimanche, sans la garde du jour 0, elle tombait le jour même (2ᵉ visa @HeadCoach).
@@ -2765,7 +2768,7 @@ async function main() {
       ["12 jours d'arrêt, 3ᵉ jour, couru hier, aujourd'hui indisponible", scene(42, 6, 12, 3), "etaler", true, 5, true],
       ["150 jours d'arrêt, 10ᵉ jour, couru hier, aujourd'hui indisponible", longueScene(6, 150, 10, 4, 1), "espacer", true, 5, true],
     ];
-    let vues = 0, avecDur = 0;
+    let vues = 0, avecDur = 0, avecLongue = 0;
     for (let k = 0; k < 7; k++) {
       const J = plusJours(AUJOURDHUI, k), DEMAIN = plusJours(J, 1);
       for (const [nom0, base, garde, hier, kmJour, indispo] of scenes) {
@@ -2781,15 +2784,28 @@ async function main() {
         // Le jour 0 ne porte rien de plus qu'un footing (rien du tout s'il est indisponible), et jamais « tu as couru hier ».
         assert.deepEqual(courses(J).filter((t) => DUR.test(t) || indispo), [], `${nom} : le jour où la sortie est faite porte ${courses(J).join(", ")} (${trace})`);
         assert.ok(!plan.some((d) => d.date === J && /tu as couru hier/.test(d.detail)), `${nom} : « Repos — tu as couru hier » le jour où la sortie est faite (${trace})`);
-        // Le lendemain : sous la garde des longs arrêts, aucune course ; sous l'étalement, couru hier aussi, ni footing ni séance
-        // dure (la sortie longue d'un dimanche reste permise, préférence et non garde : limite dite dans PROFILS.md).
+        // Le lendemain : sous la garde des longs arrêts, aucune course ; sous l'étalement, couru hier aussi, aucune course non
+        // plus, sortie longue comprise (réserve du 4ᵉ visa @HeadCoach : elle tombait le dimanche d'un samedi couru).
         const demain = courses(DEMAIN);
         if (garde === "espacer") assert.deepEqual(demain, [], `${nom} : ${demain.join(", ")} le lendemain de la sortie faite (${trace})`);
-        else if (hier) assert.deepEqual(demain.filter((t) => t !== "Sortie longue"), [], `${nom} : ${demain.join(", ")} le lendemain, troisième jour d'affilée (${trace})`);
+        else if (hier) assert.deepEqual(demain, [], `${nom} : ${demain.join(", ")} le lendemain, troisième jour d'affilée (${trace})`);
+        if (garde === "etaler" && hier && plan.some((d) => d.type === "Sortie longue")) avecLongue++;
         vues++;
       }
     }
-    assert.equal(vues, 70);
+    assert.equal(vues, 77);
+    // Compté sur les seules scènes « couru hier et ce matin » de l'étalement, celles que la garde du lendemain vise (4ᵉ visa).
+    assert.ok(avecLongue >= 7, `précondition : seulement ${avecLongue} plan(s) « hier + ce matin » avec une sortie longue, la garde du lendemain n'est pas éprouvée`);
+    // CONTRE-POIDS : couru hier mais PAS ce matin, la garde ne joue pas. Un samedi, la sortie longue garde son dimanche
+    // (relecture du 27/11/2026 : retirer « la sortie du jour faite » de la garde laissait la suite verte).
+    const k6 = [0, 1, 2, 3, 4, 5, 6].find((k) => new Date(`${plusJours(AUJOURDHUI, k)}T12:00:00Z`).getUTCDay() === 6)!;
+    const S = plusJours(AUJOURDHUI, k6), base6 = scene(30, 5, 6, 3);
+    const seances6 = [...base6.filter((w) => String(w.date).slice(0, 10) !== AUJOURDHUI), ...(base6.some((w) => String(w.date).slice(0, 10) === ilYa(1)) ? [] : [sortie(1, 6)])]
+      .map((w) => ({ ...w, date: plusJours(String(w.date).slice(0, 10), k6) }));
+    const r6 = await aLaDate(S, async () => { const ctx = await contexte({ seances: seances6 }); return { ctx, plan: buildWeekPlan(ctx, new Date(`${S}T08:00:00Z`)) }; });
+    assert.deepEqual(r6.ctx.weekPlan.etaler, { hier: true, aujourdhui: false }, "contre-poids : l'étalement ne voit pas « couru hier, pas ce matin »");
+    assert.deepEqual(r6.plan.filter((d) => d.date === plusJours(S, 1)).map((d) => d.type), ["Sortie longue"],
+      `contre-poids, samedi ${S} sans sortie ce matin : la sortie longue ne garde pas son dimanche (${r6.plan.map((d) => `${d.date.slice(5)} ${d.type}`).join(", ")})`);
     assert.ok(avecDur >= 7, `précondition : seulement ${avecDur} plan(s) avec une séance dure ou une sortie longue, les gardes ne sont pas éprouvées`);
   });
 
