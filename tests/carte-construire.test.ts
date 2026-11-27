@@ -142,7 +142,7 @@ const reponse = (coords: [number, number][], wps: [number, number][]) =>
     // « … » et pas « 0 m » pendant la lecture d'altitude ; pas d'enregistrement à ce moment.
     assert.match(tb, /altitudeIndispo \? "—" : profilEnCours \? "…" : elevGain/);
     assert.match(tb, /if \(profilEnCours \|\| routeLoading\) return;/);
-    assert.match(tb, /onClic=\{feuille \? fermerFeuille : navMode \? undefined : handleMapClick\}/);
+    assert.match(tb, /onClic=\{feuille \? fermerFeuille : tiroirOuvert \? fermerTiroir : navMode \? undefined : handleMapClick\}/);
   });
 
   await test("les tronçons sont RANGÉS sous leurs deux points, jamais empilés dans l'ordre d'arrivée", () => {

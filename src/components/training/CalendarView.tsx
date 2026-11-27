@@ -713,6 +713,23 @@ function CoachWhy({ state, rappel = null, lang, t, sessions, realismeMasque = nu
   // bloc disparaît tout de suite, sans attendre un rechargement. (Déclaré AVANT le
   // premier `return` : un hook ne se place jamais après une sortie anticipée.)
   const [masqueLocal, setMasqueLocal] = useState<string | null>(null);
+  /**
+   * ⚠️ REPLIÉ PAR DÉFAUT, ET SANS ENCADRÉ (Cyprien, 27/11/2026, capture à l'appui) : « quand
+   * j'ouvre la page calendrier, il y a le bloc vert, et ensuite directement le calendrier ;
+   * pas "Pourquoi ce plan" et tout l'encadré orange. Il s'affiche quand on clique sur
+   * "Pourquoi ce plan" avec la flèche. » L'encadré (raisons, objectif, dernière séance,
+   * avis sur la semaine, rappel Premium) ne s'ouvre qu'au toucher de cette ligne.
+   * L'avertissement de RÉALISME, lui, reste dehors : une mise en garde ne se cache pas
+   * avant d'avoir été lue (21/09/2026) — et elle a son bouton pour l'écarter.
+   */
+  const [ouvert, setOuvert] = useState(false);
+  const bouton = (
+    <button type="button" onClick={() => setOuvert((o) => !o)} aria-expanded={ouvert}
+      className="flex items-center gap-1.5 py-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-800">
+      <Info className="h-3.5 w-3.5" strokeWidth={1.5} /> {t("cal.why.title")}
+      <ChevronDown className={`h-3.5 w-3.5 transition-transform ${ouvert ? "rotate-180" : ""}`} />
+    </button>
+  );
   if (!state) return null;
   const noQuality = (state.qBudget ?? 1) === 0;
   // Qualité maintenue mais RACCOURCIE : cas intermédiaire qui n'existait pas. L'athlète
@@ -758,9 +775,14 @@ function CoachWhy({ state, rappel = null, lang, t, sessions, realismeMasque = nu
   if (!noQuality && !easedQuality && !hasObjective && !warnings.length && !state.lastSession?.label && !(state.qualiteManquee ?? []).length) {
     return semaine.length || rappel
       ? (
-        <div className="mb-4">
-          {rappel && <RappelPremium rappel={rappel} lang={lang} t={t} />}
-          {semaine.length > 0 && <AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} />}
+        <div className="mb-3">
+          {bouton}
+          {ouvert && (
+            <div className="mt-1">
+              {rappel && <RappelPremium rappel={rappel} lang={lang} t={t} />}
+              {semaine.length > 0 && <AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} />}
+            </div>
+          )}
         </div>
       )
       : null;
@@ -783,19 +805,18 @@ function CoachWhy({ state, rappel = null, lang, t, sessions, realismeMasque = nu
   const jourBref = (d: string) => formatDateCivile(d, lang, { day: "numeric", month: "short" });
 
   return (
-    <div className={`mb-4 rounded-2xl border ${tone.border} ${tone.bg} px-4 py-3.5`}>
+    <div className="mb-3">
+      {bouton}
+      {ouvert && (
+    <div className={`mt-1 rounded-2xl border ${tone.border} ${tone.bg} px-4 py-3.5`}>
       {/* ⚠️ 123 MOTS DE FAITS, DÉPLIÉS EN PERMANENCE. Ils sont justes et utiles, mais on
           ne les relit pas : ce qu'on vient chercher chaque jour, c'est CE QUI EST PRÉVU.
           Le raisonnement qui y mène — objectif, dernière séance, motifs d'allègement —
           se consulte une fois, puis encombre. Il se replie donc, et la ligne actionnable
           reste seule visible. L'avertissement de réalisme, lui, reste À L'EXTÉRIEUR de
           ce repli : une mise en garde ne doit pas perdre en visibilité. */}
-      <details className="group">
-        <summary className="cursor-pointer list-none">
-          <span className={`flex items-center gap-1.5 text-xs font-medium ${tone.dot}`}>
-            <Info className="h-3.5 w-3.5" strokeWidth={1.5} /> {t("cal.why.title")}
-            <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
-          </span>
+      <div>
+        <div>
           {/* La ligne actionnable, visible repliée COMME dépliée : c'est la réponse à
               « qu'est-ce que je fais cette semaine ? ». */}
           {quality.length > 0 && !noQuality && !easedQuality && (
@@ -831,7 +852,7 @@ function CoachWhy({ state, rappel = null, lang, t, sessions, realismeMasque = nu
                 : t("cal.why.manqueeSansSuite", { dates: manquees.map(jourBref).join(", ") })}
             </span>
           )}
-        </summary>
+        </div>
 
       {/* L'avis du coach s'affiche SOUS les raisons : il commente une décision déjà
           expliquée, il ne la remplace pas. */}
@@ -878,7 +899,12 @@ function CoachWhy({ state, rappel = null, lang, t, sessions, realismeMasque = nu
           )}
         </div>
       ) : null}
-      </details>
+      </div>
+
+      {rappel && <RappelPremium rappel={rappel} lang={lang} t={t} />}
+      <AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} />
+    </div>
+      )}
 
       {/* Réalisme de l'objectif — encadré à part, en rouge : ce n'est pas une nuance du
           plan de la semaine mais un constat sur la préparation entière. Il ne quittait
@@ -921,10 +947,6 @@ function CoachWhy({ state, rappel = null, lang, t, sessions, realismeMasque = nu
         </div>
       )}
 
-      {/* Hors du repli, comme l'avertissement : il parle de la semaine affichée juste au-dessous. */}
-      {rappel && <RappelPremium rappel={rappel} lang={lang} t={t} />}
-
-      <AvisCoach week={semaine} qBudget={state.qBudget ?? 0} raisons={reasons} />
     </div>
   );
 }

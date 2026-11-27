@@ -8,6 +8,7 @@ export function fillT(s: string, p?: Record<string, string | number>): string {
 
 export const TB: Record<string, Record<string, string>> = {
   fr: {
+    "tiroirOuvrir": "Afficher les parcours", "tiroirFermer": "Masquer les parcours", "parcoursRecherche": "Rechercher un parcours, une ville…", "parcoursPlus": "Afficher plus de parcours", "parcoursTotal": "{n} parcours",
     "parcoursVoir": "Voir les {n} parcours autour d'ici",
     "t.loinChemin": "Ce point est loin de tout chemin : il est relié en ligne droite.", "parcours": "Parcours", "parcoursProches": "Parcours autour d'ici", "parcoursAucun": "Aucun parcours répertorié autour d'ici. Déplace la carte ou change de sport.", "parcoursErreur": "Les parcours ne se chargent pas pour l'instant. Réessaie dans un instant.", "parcoursCharger": "Charger ce parcours", "parcoursA": "à {d}", "parcoursTous": "Tous", "parcoursAide": "Touche un parcours pour l'afficher sur la carte. Tu peux ensuite le modifier ou le sauvegarder.", "parcoursListe": "Voir la liste",
     "act.vtt": "VTT",
@@ -49,6 +50,7 @@ export const TB: Record<string, Record<string, string>> = {
     "t.shareCopied": "Lien de suivi copié ! Envoie-le à qui tu veux", "t.shareLink": "Lien de suivi : {link}",
   },
   en: {
+    "tiroirOuvrir": "Show routes", "tiroirFermer": "Hide routes", "parcoursRecherche": "Search a route, a town…", "parcoursPlus": "Show more routes", "parcoursTotal": "{n} routes",
     "parcoursVoir": "See the {n} routes around here",
     "t.loinChemin": "This point is far from any path: it is joined with a straight line.", "parcours": "Routes", "parcoursProches": "Routes around here", "parcoursAucun": "No route listed around here. Move the map or change sport.", "parcoursErreur": "Routes can't be loaded right now. Try again in a moment.", "parcoursCharger": "Load this route", "parcoursA": "{d} away", "parcoursTous": "All", "parcoursAide": "Tap a route to show it on the map. You can then edit or save it.", "parcoursListe": "See the list",
     "act.vtt": "MTB",
@@ -90,6 +92,7 @@ export const TB: Record<string, Record<string, string>> = {
     "t.shareCopied": "Tracking link copied! Send it to whoever you like", "t.shareLink": "Tracking link: {link}",
   },
   de: {
+    "tiroirOuvrir": "Strecken anzeigen", "tiroirFermer": "Strecken ausblenden", "parcoursRecherche": "Strecke oder Ort suchen…", "parcoursPlus": "Mehr Strecken anzeigen", "parcoursTotal": "{n} Strecken",
     "parcoursVoir": "Die {n} Strecken in der Nähe ansehen",
     "t.loinChemin": "Dieser Punkt liegt weit von jedem Weg: Er wird mit einer geraden Linie verbunden.", "parcours": "Strecken", "parcoursProches": "Strecken in der Nähe", "parcoursAucun": "Keine Strecke in der Nähe erfasst. Verschiebe die Karte oder wechsle die Sportart.", "parcoursErreur": "Die Strecken lassen sich gerade nicht laden. Versuche es gleich noch einmal.", "parcoursCharger": "Diese Strecke laden", "parcoursA": "{d} entfernt", "parcoursTous": "Alle", "parcoursAide": "Tippe auf eine Strecke, um sie auf der Karte zu zeigen. Danach kannst du sie bearbeiten oder speichern.", "parcoursListe": "Liste ansehen",
     "act.vtt": "MTB",
@@ -131,6 +134,7 @@ export const TB: Record<string, Record<string, string>> = {
     "t.shareCopied": "Tracking-Link kopiert! Schick ihn, wem du willst", "t.shareLink": "Tracking-Link: {link}",
   },
   es: {
+    "tiroirOuvrir": "Mostrar rutas", "tiroirFermer": "Ocultar rutas", "parcoursRecherche": "Buscar una ruta, una ciudad…", "parcoursPlus": "Mostrar más rutas", "parcoursTotal": "{n} rutas",
     "parcoursVoir": "Ver las {n} rutas cerca de aquí",
     "t.loinChemin": "Este punto está lejos de cualquier camino: se une con una línea recta.", "parcours": "Rutas", "parcoursProches": "Rutas cerca de aquí", "parcoursAucun": "No hay rutas registradas cerca de aquí. Mueve el mapa o cambia de deporte.", "parcoursErreur": "Las rutas no se cargan ahora mismo. Vuelve a intentarlo en un momento.", "parcoursCharger": "Cargar esta ruta", "parcoursA": "a {d}", "parcoursTous": "Todas", "parcoursAide": "Toca una ruta para verla en el mapa. Después puedes modificarla o guardarla.", "parcoursListe": "Ver la lista",
     "act.vtt": "BTT",
@@ -172,6 +176,7 @@ export const TB: Record<string, Record<string, string>> = {
     "t.shareCopied": "¡Enlace de seguimiento copiado! Envíalo a quien quieras", "t.shareLink": "Enlace de seguimiento: {link}",
   },
   pt: {
+    "tiroirOuvrir": "Mostrar percursos", "tiroirFermer": "Ocultar percursos", "parcoursRecherche": "Procurar um percurso, uma cidade…", "parcoursPlus": "Mostrar mais percursos", "parcoursTotal": "{n} percursos",
     "parcoursVoir": "Ver os {n} percursos por perto",
     "t.loinChemin": "Este ponto está longe de qualquer caminho: é ligado em linha reta.", "parcours": "Percursos", "parcoursProches": "Percursos por perto", "parcoursAucun": "Nenhum percurso registado por perto. Move o mapa ou muda de desporto.", "parcoursErreur": "Os percursos não carregam de momento. Tenta de novo daqui a pouco.", "parcoursCharger": "Carregar este percurso", "parcoursA": "a {d}", "parcoursTous": "Todos", "parcoursAide": "Toca num percurso para o ver no mapa. Depois podes alterá-lo ou guardá-lo.", "parcoursListe": "Ver a lista",
     "act.vtt": "BTT",
