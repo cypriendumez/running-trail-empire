@@ -337,6 +337,9 @@ export function CarteDirect({
         // Pas de rotation : sans boussole à l'écran, une carte tournée par erreur ne se
         // remet pas droite, et le nord perdu désoriente plus qu'il n'aide en courant.
         dragRotate: false, pitchWithRotate: false, touchPitch: false,
+        // Pour construire, un double-tap ne zoome pas : il poserait un point en zoomant
+        // (le premier tap est un `click`). On zoome en pinçant, comme partout ailleurs.
+        doubleClickZoom: !onClic,
       });
       m.touchZoomRotate.disableRotation();
       // ⚠️ EN HAUT À DROITE, PAS EN BAS : le bloc de chiffres et le tiroir occupent tout le

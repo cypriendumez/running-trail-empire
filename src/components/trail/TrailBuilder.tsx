@@ -9,7 +9,7 @@ import {
 import Link from "next/link";
 import { IconeSport } from "@/components/parcours/IconeSport";
 import { chargerProfil, type Profil } from "@/lib/trail/altitude";
-import { calculerTroncon, raccorder, accroche } from "@/lib/trail/itineraire";
+import { calculerTroncon, raccorder, accroche, estEchec, cleTroncon, assemblerTrace, estDoubleTap } from "@/lib/trail/itineraire";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -150,7 +150,6 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 // ─── Component ───────────────────────────────────────────────────────────────
 /** Un point posé sur la carte. L'`id` relie chaque tronçon à SES deux points. */
 type Repere = LatLng & { id: number };
-const cleTroncon = (a: Repere, b: Repere) => `${a.id}>${b.id}`;
 const COULEUR_DEPART = "#22c55e", COULEUR_ETAPE = "#3b82f6", COULEUR_ARRIVEE = "#ef4444";
 
 export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
@@ -195,6 +194,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const [feuille, setFeuille] = useState<null | "modeles" | "reglages" | "parcours" | "lieux">(null);
   /** Compteur + destination : chaque nouveau `n` déplace la carte (voir `CarteDirect`). */
   const [vue, setVue] = useState<{ n: number; centre?: [number, number]; zoom?: number; emprise?: [number, number][] }>({ n: 0 });
+  const fermerFeuille = useCallback(() => setFeuille(null), []);
   const allerA = useCallback((v: Omit<typeof vue, "n">) => setVue((x) => ({ ...v, n: x.n + 1 })), []);
 
   const [followPaths, setFollowPaths] = useState(true);
@@ -225,17 +225,25 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const [troncons, setTroncons] = useState<Record<string, LatLng[]>>({});
   const [redoStack, setRedoStack] = useState<{ repere: Repere; depuis: number | null; troncon?: LatLng[] }[]>([]);
   const [enCalcul, setEnCalcul] = useState(0);
-  const allPoints = useMemo<LatLng[]>(() => reperes.flatMap((r, i) => i === 0
-    ? [{ lat: r.lat, lng: r.lng }]
-    // Tant que le tronçon n'est pas calculé, une ligne droite le remplace À L'ÉCRAN.
-    : (troncons[cleTroncon(reperes[i - 1], r)] ?? [{ lat: r.lat, lng: r.lng }])), [reperes, troncons]);
+  // Assemblé dans l'ORDRE DES POINTS (lib/trail/itineraire, testé avec des réponses
+  // arrivées dans le désordre) ; un tronçon pas encore calculé y est une ligne droite.
+  const allPoints = useMemo<LatLng[]>(() => assemblerTrace(reperes, troncons), [reperes, troncons]);
   // ⚠️ REMONTÉE DANS UN EFFET, PAS PENDANT LE RENDU. Appeler `onTrace` directement dans
   // le corps du composant déclencherait un `setState` du parent au milieu du rendu de
   // l'enfant — React le refuse, et la carte cesserait de se mettre à jour.
   useEffect(() => { onTrace?.(allPoints.map((p) => ({ lat: p.lat, lon: p.lng }))); }, [allPoints, onTrace]);
+  const allPointsRef = useRef(allPoints);
+  useEffect(() => { allPointsRef.current = allPoints; }, [allPoints]);
   const [profil, setProfil] = useState<Profil | null>(null);
   /** Vrai quand la lecture d'altitude a ÉCHOUÉ : l'écran le dit au lieu d'afficher 0 m. */
   const [altitudeIndispo, setAltitudeIndispo] = useState(false);
+  /**
+   * L'altitude du tracé ACTUEL est en cours de lecture. ⚠️ Pendant ce temps, le D+ affiché
+   * était « 0 m » — une valeur par défaut présentée comme une mesure, et un parcours
+   * enregistré à cet instant s'écrivait avec 0 m de dénivelé (relecture du 27/11/2026).
+   * On affiche « … » et l'enregistrement attend.
+   */
+  const [profilEnCours, setProfilEnCours] = useState(false);
   const elevations = profil?.altitudes ?? [];
   const [distance, setDistance] = useState(0);
   const routeLoading = enCalcul > 0;
@@ -312,15 +320,17 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const relier = useCallback(async (depuis: Repere, vers: Repere) => {
     const cle = cleTroncon(depuis, vers);
     if (!followPaths) { setTroncons((t) => ({ ...t, [cle]: [{ lat: vers.lat, lng: vers.lng }] })); return; }
+    const utile = () => reperesRef.current.some((r) => r.id === vers.id);
     setEnCalcul((n) => n + 1);
-    const t = await calculerTroncon(depuis, vers, activity);
+    // `utile` est relu quand vient le tour de la requête : annulé entre-temps, il ne part pas.
+    const t = await calculerTroncon(depuis, vers, activity, fetch, utile);
     setEnCalcul((n) => n - 1);
     // Le point a pu être annulé ou effacé pendant le calcul : la réponse ne sert plus.
-    if (!reperesRef.current.some((r) => r.id === vers.id)) return;
-    if (!t) {
-      // ⚠️ UNE LIGNE DROITE SE DIT. L'ancien code la posait en silence à chaque échec :
-      // le parcours traversait des immeubles et personne ne savait pourquoi.
-      toast.error(d["t.routeFail"]);
+    if (!utile()) return;
+    if (estEchec(t)) {
+      // ⚠️ UNE LIGNE DROITE SE DIT, ET POURQUOI. L'ancien code la posait en silence à chaque
+      // échec : le parcours traversait des immeubles et personne ne savait pourquoi.
+      toast.error(t.echec === "panne" ? d["t.routeDown"] : d["t.routeFail"]);
       setTroncons((x) => ({ ...x, [cle]: [{ lat: vers.lat, lng: vers.lng }] }));
       return;
     }
@@ -332,7 +342,14 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   }, [followPaths, activity, d]);
 
   // ── Tap sur la carte : un point de plus ───────────────────────────────────────
+  const dernierTap = useRef<{ t: number; lat: number; lng: number } | null>(null);
   const handleMapClick = useCallback((lat: number, lng: number) => {
+    // ⚠️ UN DOUBLE-TAP N'EST PAS DEUX POINTS (relecture du 27/11/2026) : MapLibre émet un
+    // `click` par tap, et deux repères se posaient au même endroit (tronçon nul).
+    const tap = { t: Date.now(), lat, lng };
+    const double = estDoubleTap(dernierTap.current, tap);
+    dernierTap.current = tap;
+    if (double) return;
     const r: Repere = { id: idSuivant.current++, lat, lng };
     const prev = reperesRef.current[reperesRef.current.length - 1];
     // La liste est mise à jour TOUT DE SUITE (et pas au prochain rendu) : un second tap
@@ -353,15 +370,18 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
       // Annulable : chaque clic ajoute un point, et sans cela les réponses d'une
       // ancienne requête écrasaient celles de la nouvelle (profil d'un tracé précédent).
       const ctrl = new AbortController();
+      setProfilEnCours(true);
       chargerProfil(allPoints, { signal: ctrl.signal }).then((p) => {
         if (ctrl.signal.aborted) return;
         setProfil(p);
         setAltitudeIndispo(p === null);
+        setProfilEnCours(false);
       });
       return () => ctrl.abort();
     }
     setProfil(null);
     setAltitudeIndispo(false);
+    setProfilEnCours(false);
   }, [allPoints]);
 
   // ── Undo last waypoint (precise — drops exactly the last leg) ───────────────
@@ -416,6 +436,8 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
   const handleSave = useCallback(async () => {
     if (!allPoints.length) { toast.error(d["t.drawFirst"]); return; }
     if (!routeName.trim()) { toast.error(d["t.nameRoute"]); return; }
+    // Pas d'enregistrement pendant un calcul : la distance ou le D+ écrits seraient faux.
+    if (profilEnCours || routeLoading) return;
     setSaving(true);
     try {
       const res = await fetch("/api/routes", {
@@ -465,7 +487,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
     } finally {
       setSaving(false);
     }
-  }, [allPoints, routeName, distance, elevGain, durationMin, difficulty, d]);
+  }, [allPoints, routeName, distance, elevGain, durationMin, difficulty, d, profilEnCours, routeLoading]);
 
   // ── Load saved routes ──────────────────────────────────────────────────────
   const loadSavedRoutes = useCallback(async () => {
@@ -717,7 +739,8 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
     const supabase = createClient();
     const chan = supabase.channel(`run-${shareId}`, { config: { broadcast: { self: false } } });
     chan.on("broadcast", { event: "req" }, () => {
-      chan.send({ type: "broadcast", event: "route", payload: { coordinates: allPoints.map((p) => [p.lng, p.lat]) } });
+      // Le tracé ACTUEL (réf.), pas celui de l'ouverture du partage.
+      chan.send({ type: "broadcast", event: "route", payload: { coordinates: allPointsRef.current.map((p) => [p.lng, p.lat]) } });
     });
     chan.subscribe();
     shareChanRef.current = chan;
@@ -793,7 +816,8 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
         recentrer={recentrages}
         etiquette={d["mapAria"]}
         relief={relief3d}
-        onClic={navMode ? undefined : handleMapClick}
+        // Une feuille ouverte : un tap sur la carte la ferme, il ne pose pas un point caché dessous.
+        onClic={feuille ? fermerFeuille : navMode ? undefined : handleMapClick}
         reperes={reperesCarte}
         couleurTrace={difficultyColor(difficulty)}
         vue={vue}
@@ -872,8 +896,8 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
                 aria-label={d["tg.elev"]} className="min-w-0 text-center">
                 {/* ⚠️ « — » ET PAS « 0 m » quand l'altitude n'a pas pu être lue : un parcours
                     de montagne annoncé plat ferait partir quelqu'un sans s'attendre à 800 m. */}
-                <div className={`text-[22px] font-bold leading-none tabular-nums ${altitudeIndispo ? "text-amber-600" : "text-zinc-900"}`}>
-                  {altitudeIndispo ? "—" : elevGain}{!altitudeIndispo && <span className="ml-0.5 text-[11px] font-semibold text-zinc-400">m</span>}
+                <div className={`text-[22px] font-bold leading-none tabular-nums ${altitudeIndispo ? "text-amber-600" : profilEnCours ? "text-zinc-300" : "text-zinc-900"}`}>
+                  {altitudeIndispo ? "—" : profilEnCours ? "…" : elevGain}{!altitudeIndispo && !profilEnCours && <span className="ml-0.5 text-[11px] font-semibold text-zinc-400">m</span>}
                 </div>
                 <div className="mt-1 flex items-center justify-center gap-0.5 truncate text-[11px] font-semibold text-zinc-500">
                   D+{hasRoute && <ChevronDown className={`h-3 w-3 transition-transform ${showElevation ? "rotate-180" : ""}`} />}
@@ -1018,7 +1042,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
             <>
               <input value={routeName} onChange={(e) => setRouteName(e.target.value)} placeholder={d["routeNamePh"]} aria-label={d["routeNameAria"]}
                 className="w-full rounded-2xl border border-zinc-200 px-4 py-3 text-[15px] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" />
-              <button type="button" onClick={handleSave} disabled={saving || !routeName.trim()}
+              <button type="button" onClick={handleSave} disabled={saving || !routeName.trim() || profilEnCours || routeLoading}
                 className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-[15px] font-semibold text-white disabled:opacity-40">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} {d["save"]}
               </button>

@@ -40,10 +40,13 @@ let file: Promise<unknown> = Promise.resolve();
  * Les requêtes partent UNE PAR UNE, à plus d'une seconde d'écart. Un athlète qui pose
  * cinq points d'affilée ne doit pas déclencher cinq requêtes dans la même seconde.
  */
-function enFile<T>(tache: () => Promise<T>): Promise<T> {
-  const suite = file.then(async () => {
+function enFile<T>(tache: () => Promise<T>, encoreUtile: () => boolean): Promise<T | EchecTroncon> {
+  const suite = file.then(async (): Promise<T | EchecTroncon> => {
     const attente = derniere + ECART_REQUETES_MS - Date.now();
     if (attente > 0) await new Promise((r) => setTimeout(r, attente));
+    // Relu au DERNIER moment : une requête devenue inutile ne part pas, et comme elle ne
+    // touche pas `derniere`, elle ne fait pas attendre la suivante.
+    if (!encoreUtile()) return { echec: "inutile" };
     derniere = Date.now();
     return tache();
   });
@@ -60,22 +63,34 @@ export type Troncon = {
 };
 
 /**
- * Le chemin de `a` à `b`. `null` si le serveur ne répond pas ou ne trouve rien : c'est à
- * l'écran de le DIRE (ligne droite annoncée), jamais de faire passer une ligne droite pour
- * un chemin.
+ * Pourquoi il n'y a pas de tronçon. L'écran ne dit pas la même chose :
+ *  · « aucun » : le serveur a répondu, il n'existe pas de chemin (point dans un lac…) ;
+ *  · « panne » : le serveur n'a pas répondu ou a refusé (429, réseau, délai) ;
+ *  · « inutile » : le point a été annulé ou effacé avant que la requête parte — elle n'est
+ *    pas envoyée du tout (relecture du 27/11/2026 : après « Effacer », les requêtes en
+ *    file partaient quand même, une par seconde, et retardaient les nouveaux points).
  */
-export function calculerTroncon(a: PointLL, b: PointLL, activite: string, fetcher: typeof fetch = fetch): Promise<Troncon | null> {
+export type EchecTroncon = { echec: "aucun" | "panne" | "inutile" };
+
+/**
+ * Le chemin de `a` à `b`, ou la raison de son absence. C'est à l'écran de DIRE l'absence
+ * (ligne droite annoncée), jamais de faire passer une ligne droite pour un chemin.
+ * `encoreUtile` est relu juste avant l'envoi, quand vient le tour de la requête.
+ */
+export function calculerTroncon(
+  a: PointLL, b: PointLL, activite: string, fetcher: typeof fetch = fetch, encoreUtile: () => boolean = () => true,
+): Promise<Troncon | EchecTroncon> {
   return enFile(async () => {
     try {
       const res = await fetcher(urlItineraire(a, b, activite), { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) return null;
+      if (!res.ok) return { echec: "panne" as const };
       const data = await res.json() as {
         code?: string;
         routes?: { geometry?: { coordinates?: [number, number][] } }[];
         waypoints?: { location?: [number, number] }[];
       };
       const coords = data.routes?.[0]?.geometry?.coordinates;
-      if (data.code !== "Ok" || !coords || coords.length < 2) return null;
+      if (data.code !== "Ok" || !coords || coords.length < 2) return { echec: "aucun" as const };
       const points = coords.map(([lng, lat]) => ({ lat, lng }));
       const loc = (i: number, repli: PointLL): PointLL => {
         const l = data.waypoints?.[i]?.location;
@@ -83,10 +98,12 @@ export function calculerTroncon(a: PointLL, b: PointLL, activite: string, fetche
       };
       return { points, depart: loc(0, points[0]), arrivee: loc(1, points[points.length - 1]) };
     } catch {
-      return null;
+      return { echec: "panne" as const };
     }
-  });
+  }, encoreUtile);
 }
+
+export const estEchec = (t: Troncon | EchecTroncon): t is EchecTroncon => "echec" in t;
 
 /**
  * Un point posé à plus de cette distance du chemin le plus proche n'est PAS déplacé
@@ -122,4 +139,24 @@ export function raccorder(depart: PointLL, arrivee: PointLL, t: Troncon): { poin
 /** L'endroit où afficher un point visé : sur le chemin s'il est tout près, sinon là où il a été posé. */
 export function accroche(vise: PointLL, surChemin: PointLL): PointLL {
   return distanceM(vise, surChemin) > ACCROCHE_MAX_M ? vise : surChemin;
+}
+
+/** La clé d'un tronçon : les identifiants des DEUX points qu'il relie, dans l'ordre. */
+export const cleTroncon = (a: { id: number }, b: { id: number }) => `${a.id}>${b.id}`;
+
+/**
+ * LE TRACÉ AFFICHÉ, assemblé dans l'ORDRE DES POINTS — jamais dans l'ordre d'arrivée des
+ * réponses (Cyprien, vidéo du 27/11/2026 : « des fois ça relie pas du tout ce que je
+ * voulais »). Un tronçon pas encore calculé est remplacé, à l'écran seulement, par une
+ * ligne droite jusqu'à son point ; le tronçon d'un point retiré n'est jamais lu.
+ */
+export function assemblerTrace(reperes: (PointLL & { id: number })[], troncons: Record<string, PointLL[]>): PointLL[] {
+  return reperes.flatMap((r, i) => i === 0
+    ? [{ lat: r.lat, lng: r.lng }]
+    : (troncons[cleTroncon(reperes[i - 1], r)] ?? [{ lat: r.lat, lng: r.lng }]));
+}
+
+/** Deux taps au même endroit en moins de 400 ms : le double-tap d'un zoom, pas deux points. */
+export function estDoubleTap(avant: { t: number; lat: number; lng: number } | null, apres: { t: number; lat: number; lng: number }): boolean {
+  return !!avant && apres.t - avant.t < 400 && distanceM(avant, apres) < 25;
 }

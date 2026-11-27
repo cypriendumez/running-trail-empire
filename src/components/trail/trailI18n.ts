@@ -8,6 +8,7 @@ export function fillT(s: string, p?: Record<string, string | number>): string {
 
 export const TB: Record<string, Record<string, string>> = {
   fr: {
+    "t.routeDown": "Le calcul d'itinéraire ne répond pas : ce point est relié en ligne droite. Réessaie dans un instant.",
     "plein": "Plein écran", "reduire": "Réduire", "t.routeFail": "Pas de chemin trouvé jusqu'à ce point : il est relié en ligne droite.", "credit": "Itinéraires <a href=\"https://routing.openstreetmap.de/about.html\" target=\"_blank\" rel=\"noopener\">FOSSGIS</a> · <a href=\"https://www.openstreetmap.org/fixthemap\" target=\"_blank\" rel=\"noopener\">Corriger la carte</a>", "hint.suivant": "Touchez la carte pour ajouter le point suivant", "titreParcours": "Ton parcours", "mesParcours": "Mes parcours", "lieux": "Grands parcours",
     "reglages": "Réglages de la carte", "fermer": "Fermer", "activite": "Activité",
     "altIndispo": "Altitude indisponible pour l'instant — le dénivelé n'est pas affiché plutôt que d'être inventé. Réessaie dans un instant.",
@@ -45,6 +46,7 @@ export const TB: Record<string, Record<string, string>> = {
     "t.shareCopied": "Lien de suivi copié ! Envoie-le à qui tu veux", "t.shareLink": "Lien de suivi : {link}",
   },
   en: {
+    "t.routeDown": "The routing service is not responding: this point is joined with a straight line. Try again in a moment.",
     "plein": "Full screen", "reduire": "Exit full screen", "t.routeFail": "No path found to this point: it is joined with a straight line.", "credit": "Routing <a href=\"https://routing.openstreetmap.de/about.html\" target=\"_blank\" rel=\"noopener\">FOSSGIS</a> · <a href=\"https://www.openstreetmap.org/fixthemap\" target=\"_blank\" rel=\"noopener\">Fix the map</a>", "hint.suivant": "Tap the map to add the next point", "titreParcours": "Your route", "mesParcours": "My routes", "lieux": "Famous trails",
     "reglages": "Map settings", "fermer": "Close", "activite": "Activity",
     "altIndispo": "Elevation unavailable right now — the climb is left blank rather than invented. Try again in a moment.",
@@ -82,6 +84,7 @@ export const TB: Record<string, Record<string, string>> = {
     "t.shareCopied": "Tracking link copied! Send it to whoever you like", "t.shareLink": "Tracking link: {link}",
   },
   de: {
+    "t.routeDown": "Der Routing-Dienst antwortet nicht: Dieser Punkt wird mit einer geraden Linie verbunden. Versuche es gleich noch einmal.",
     "plein": "Vollbild", "reduire": "Vollbild beenden", "t.routeFail": "Kein Weg zu diesem Punkt gefunden: Er wird mit einer geraden Linie verbunden.", "credit": "Routing <a href=\"https://routing.openstreetmap.de/about.html\" target=\"_blank\" rel=\"noopener\">FOSSGIS</a> · <a href=\"https://www.openstreetmap.org/fixthemap\" target=\"_blank\" rel=\"noopener\">Karte verbessern</a>", "hint.suivant": "Tippe auf die Karte, um den nächsten Punkt zu setzen", "titreParcours": "Deine Strecke", "mesParcours": "Meine Strecken", "lieux": "Bekannte Wege",
     "reglages": "Karteneinstellungen", "fermer": "Schließen", "activite": "Aktivität",
     "altIndispo": "Höhendaten gerade nicht verfügbar — der Anstieg bleibt leer, statt erfunden zu werden. Versuche es gleich erneut.",
@@ -119,6 +122,7 @@ export const TB: Record<string, Record<string, string>> = {
     "t.shareCopied": "Tracking-Link kopiert! Schick ihn, wem du willst", "t.shareLink": "Tracking-Link: {link}",
   },
   es: {
+    "t.routeDown": "El cálculo de rutas no responde: este punto se une con una línea recta. Vuelve a intentarlo en un momento.",
     "plein": "Pantalla completa", "reduire": "Salir de pantalla completa", "t.routeFail": "No se encontró camino hasta este punto: se une con una línea recta.", "credit": "Rutas <a href=\"https://routing.openstreetmap.de/about.html\" target=\"_blank\" rel=\"noopener\">FOSSGIS</a> · <a href=\"https://www.openstreetmap.org/fixthemap\" target=\"_blank\" rel=\"noopener\">Corregir el mapa</a>", "hint.suivant": "Toca el mapa para añadir el siguiente punto", "titreParcours": "Tu recorrido", "mesParcours": "Mis recorridos", "lieux": "Grandes rutas",
     "reglages": "Ajustes del mapa", "fermer": "Cerrar", "activite": "Actividad",
     "altIndispo": "Altitud no disponible ahora mismo — el desnivel se deja en blanco en vez de inventarlo. Inténtalo en un momento.",
@@ -156,6 +160,7 @@ export const TB: Record<string, Record<string, string>> = {
     "t.shareCopied": "¡Enlace de seguimiento copiado! Envíalo a quien quieras", "t.shareLink": "Enlace de seguimiento: {link}",
   },
   pt: {
+    "t.routeDown": "O cálculo de percursos não responde: este ponto é ligado em linha reta. Tenta de novo daqui a pouco.",
     "plein": "Ecrã inteiro", "reduire": "Sair do ecrã inteiro", "t.routeFail": "Nenhum caminho encontrado até este ponto: é ligado em linha reta.", "credit": "Rotas <a href=\"https://routing.openstreetmap.de/about.html\" target=\"_blank\" rel=\"noopener\">FOSSGIS</a> · <a href=\"https://www.openstreetmap.org/fixthemap\" target=\"_blank\" rel=\"noopener\">Corrigir o mapa</a>", "hint.suivant": "Toca no mapa para adicionar o ponto seguinte", "titreParcours": "O teu percurso", "mesParcours": "Os meus percursos", "lieux": "Grandes percursos",
     "reglages": "Definições do mapa", "fermer": "Fechar", "activite": "Atividade",
     "altIndispo": "Altitude indisponível de momento — o desnível fica em branco em vez de ser inventado. Tenta daqui a pouco.",

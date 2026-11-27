@@ -145,7 +145,7 @@ function ligne(n: number, pasM: number) {
     // 27/11/2026 : le calcul vit dans lib/trail/itineraire, qui choisit le SERVEUR selon le
     // profil (le serveur de démonstration d'OSRM ignorait le profil et roulait en voiture).
     const src = codeNu("src/components/trail/TrailBuilder.tsx");
-    assert.match(src, /calculerTroncon\(depuis, vers, activity\)/, "l'itinéraire ne dépend plus de l'activité");
+    assert.match(src, /calculerTroncon\(depuis, vers, activity, fetch, utile\)/, "l'itinéraire ne dépend plus de l'activité");
     assert.match(codeNu("src/lib/trail/itineraire.ts"), /return profilOsrm\(activite\) === "bike"/, "le serveur ne dépend plus du profil : un parcours vélo suivrait les sentiers piétons");
   });
 
