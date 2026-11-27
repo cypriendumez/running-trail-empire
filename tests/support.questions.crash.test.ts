@@ -322,6 +322,27 @@ test("aucune bulle de discussion ne salue avec un emoji de main", () => {
   }
 });
 
+// 27/11/2026, vécu par Cyprien sur une Forerunner 165 : la séance était dans Garmin Connect,
+// rien sur la montre. Résolu en retirant la montre dans Garmin Connect, en l'oubliant dans le
+// Bluetooth du téléphone, puis en la rajoutant. Arrive souvent : sans IA aussi, chaque
+// formulation et chaque langue doit mener à ce geste.
+test("séance dans Garmin Connect mais pas sur la montre : le repli donne le réappairage", () => {
+  const cas: [string, string, RegExp][] = [
+    ["La séance est dans Garmin Connect mais pas sur ma montre", "fr", /Retirer l'appareil/],
+    ["je vois la séance dans garmin connect, rien dans le calendrier de ma forerunner", "fr", /Retirer l'appareil/],
+    ["Mes séances n'arrivent pas sur ma montre", "fr", /Retirer l'appareil/],
+    ["The workout is in Garmin Connect but not on my watch", "en", /Remove Device/],
+    ["Das Training ist in Garmin Connect, aber nicht auf meiner Uhr", "de", /Gerät entfernen/],
+    ["la sesión está en Garmin Connect pero no en mi reloj", "es", /Eliminar dispositivo/],
+    ["a sessão está no Garmin Connect mas não no meu relógio", "pt", /Remover dispositivo/],
+  ];
+  for (const [q, lang, attendu] of cas) {
+    const r = fallbackAnswer(q, lang);
+    assert.ok(r && attendu.test(r), `« ${q} » (${lang}) → ${r?.slice(0, 80) ?? "aucune réponse"}`);
+    assert.ok(/Bluetooth/.test(r!), `« ${q} » : oublier la montre dans le Bluetooth manque`);
+  }
+});
+
 console.log(`\n${passed} crash-test(s) de questions passé(s), ${fails.length} échec(s)`);
 console.log(`  corpus : ${QUESTIONS_APP.length} questions app · ${QUESTIONS_COURSE.length} course à pied · ${QUESTIONS_SENSIBLES.length} sensibles`);
 if (fails.length) { for (const f of fails) console.log(`  KO ${f}`); process.exit(1); }
