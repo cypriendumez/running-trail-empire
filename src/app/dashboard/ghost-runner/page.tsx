@@ -10,6 +10,7 @@ import { aujourdhui, FUSEAU_DEFAUT, repereDuJourCoureur } from "@/lib/time/fusea
 import { signalerLectures } from "@/lib/dashboard/lecturesServeur";
 import { BandeauPanne } from "@/components/dashboard/BandeauPanne";
 import { langueEcran } from "@/lib/i18n/serverLang";
+import { allegerParcours, MAX_PARCOURS } from "@/lib/courses/mesParcours";
 
 // « Enregistrer » dans la navigation depuis le 21/09/2026 (Cyprien), comme l'onglet du
 // téléphone : c'est l'écran qui enregistre une course. Le nom « Ghost Runner » reste sur
@@ -21,7 +22,7 @@ export default async function GhostRunnerPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   const todayStr = aujourdhui(FUSEAU_DEFAUT);
-  const [profileRes, baselineRes, coachRes, effectiveVma, contactRes, traceRes] = await Promise.all([
+  const [profileRes, baselineRes, coachRes, effectiveVma, contactRes, traceRes, parcoursRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single(),
     supabase
       .from("performance_baselines")
@@ -51,7 +52,14 @@ export default async function GhostRunnerPage() {
       .select("min_lat,max_lat,min_lon,max_lon")
       .eq("user_id", user!.id).eq("has_gps", true)
       .order("fetched_at", { ascending: false }).limit(1).maybeSingle(),
+    // « Mes parcours » (27/11/2026) : ses dernières traces, en bleu sous sa position —
+    // sa propre carte de chaleur, comme celle de Strava. Allégées avant l'envoi.
+    supabase.from("activity_tracks")
+      .select("polyline")
+      .eq("user_id", user!.id).eq("has_gps", true).not("polyline", "is", null)
+      .order("fetched_at", { ascending: false }).limit(MAX_PARCOURS),
   ]);
+  const mesParcours = allegerParcours(((parcoursRes.data ?? []) as { polyline: string | null }[]).map((r) => r.polyline));
   // Le centre de la dernière trace — rendu seulement si les QUATRE bornes sont des
   // nombres finis : une seule valeur manquante produirait un NaN, et Leaflet s'ouvrirait
   // sur une carte vide sans lever la moindre erreur.
@@ -103,7 +111,7 @@ export default async function GhostRunnerPage() {
   // Le profil et le test de référence portent la FC max déclarée, le seuil et la VMA : leur panne compte
   // aussi. La porte commune (`signalerLectures`) écarte « aucun test » (PGRST116) et journalise une fois par jour.
   const pannes = await signalerLectures("ghost-runner", user!.id, [["pic", { error: ePic }], ["footings", { error: eRecentes }],
-    ["profil", profileRes], ["repere", baselineRes]]);
+    ["profil", profileRes], ["repere", baselineRes], ["parcours", { error: parcoursRes.error }]]);
   const fcMaxObservee = (fcRows?.[0] as { max_hr?: number } | undefined)?.max_hr ?? null;
   const pGr = profileRes.data as { max_hr?: number | null; garmin_metrics?: { maxHR?: number; lthr?: number } | null } | null;
   const bGr = baselineRes.data as { max_hr?: number | null; lt_hr?: number | null } | null;
@@ -127,7 +135,7 @@ export default async function GhostRunnerPage() {
       {/* Une panne est DITE au coureur (12/11/2026) : ses zones et allures en dépendent. */}
       <BandeauPanne lectures={pannes} lang={await langueEcran((profileRes.data as { preferred_language?: string } | null)?.preferred_language)} />
       <GhostRunner contact={contact} centreInitial={centreInitial} profile={stripProfileSecrets(profileRes.data)} baseline={baselineRes.data} effectiveVma={effectiveVma}
-        fcMaxObservee={fcMaxObservee} fcFootings={fcFootings} coachSessions={coachSessions} />
+        fcMaxObservee={fcMaxObservee} fcFootings={fcFootings} coachSessions={coachSessions} mesParcours={mesParcours} />
     </div>
   );
 }

@@ -71,17 +71,20 @@ type Style = { layers: Couche[]; [k: string]: unknown };
 
 const GRIS_FOND = "#f2f1ed";
 const BATI = "#dfdcd5";
-const PARC = "#c6e4b0";
-const BOIS = "#b5d99c";
-const EAU = "#a9d2f0";
+const PARC = "#bfe3a3";
+const BOIS = "#a3d389";
+const EAU = "#9ccdf2";
 const ROUTE = "#ffffff";
 const BORD_ROUTE = "#d3d0c8";
 const AXE = "#fff6d8";
 const BORD_AXE = "#e6cf98";
-const CHEMIN = "#c4b79d";
+const CHEMIN = "#7c9a5c";
 
 const RETIREES = new Set(["building-3d", "poi_r20", "poi_r7", "highway-shield-non-us", "highway-shield-us-interstate", "road_shield_us"]);
 
+// 27/11/2026, deuxième passe d'après la vidéo de Strava : verts plus francs (parcs,
+// bois), eau plus bleue, et les CHEMINS en vert-olive pointillé — sur la carte de Strava,
+// on voit d'abord où l'on peut courir hors des rues.
 /** Couleur par identifiant de couche du style Liberty. Absente = inchangée. */
 const REPEINT: Record<string, Record<string, unknown>> = {
   background: { "background-color": GRIS_FOND },

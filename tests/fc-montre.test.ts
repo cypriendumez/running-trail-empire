@@ -301,7 +301,7 @@ test("UNE seule FC max : coach, zones, discipline, montre, Jour J, bilan, analys
   assert.match(code("src/app/dashboard/jour-j/page.tsx"), /\["repere", baseRes\], \["fc-profil", fcProfilRes\]/, "Jour J ne lit plus l'erreur des lectures de FC");
   assert.match(code("src/app/dashboard/jour-j/page.tsx"), /const fcMax = ePanneFc \? null : fcMaxConnue/, "Jour J calcule une FC max sur une lecture en panne");
   assert.match(code("src/app/api/ai/analyse-seance/route.ts"), /objRes\.error \?\? picRes\.error;/, "l'analyse ne lit plus l'erreur du pic de FC");
-  assert.match(code("src/app/dashboard/ghost-runner/page.tsx"), /await signalerLectures\("ghost-runner", user!\.id, \[\["pic", \{ error: ePic \}\], \["footings", \{ error: eRecentes \}\],\s*\["profil", profileRes\], \["repere", baselineRes\]\]\);/, "le Ghost Runner ne lit plus l'erreur du pic, des footings, du profil ou du test de référence");
+  assert.match(code("src/app/dashboard/ghost-runner/page.tsx"), /await signalerLectures\("ghost-runner", user!\.id, \[\["pic", \{ error: ePic \}\], \["footings", \{ error: eRecentes \}\],\s*\["profil", profileRes\], \["repere", baselineRes\](, \["parcours", \{ error: parcoursRes\.error \}\])?\]\);/, "le Ghost Runner ne lit plus l'erreur du pic, des footings, du profil ou du test de référence");
   // Le coach : zones et discipline des footings lisent la MÊME valeur ; le seuil des zones aussi.
   const c = code("src/lib/ai/coachContext.ts");
   assert.match(c, /const maxHrEff = fcMaxEst;/, "les zones ont retrouvé leur propre FC max");

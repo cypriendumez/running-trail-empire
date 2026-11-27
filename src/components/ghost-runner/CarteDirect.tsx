@@ -6,6 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import {
   ATTRIBUTION_PLAN, REPLI_PLAN, STYLE_PLAN_URL, satelliteDisponible, stylePacevo, type IdFond,
 } from "@/lib/courses/fondsCarte";
+import { RELIEF, avecCle } from "@/lib/trail/couches";
 
 /**
  * LA CARTE DE L'ÉCRAN « ENREGISTRER » — comme Strava : la position d'abord.
@@ -38,6 +39,16 @@ import {
 if (typeof window !== "undefined") maplibregl.setWorkerUrl("/maplibre-gl-worker.mjs");
 
 const SATELLITE = satelliteDisponible(process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined);
+/**
+ * Le relief 3D (bouton « 3D », comme Strava). ⚠️ SANS CLÉ MAPTILER, PAS DE RELIEF : on ne
+ * propose pas une carte simplement inclinée en la faisant passer pour du relief (même
+ * règle que la vue relief du Trail Builder, cf. `lib/trail/couches`).
+ */
+const URL_RELIEF = avecCle(RELIEF.url, process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined);
+export const RELIEF_DISPO = URL_RELIEF !== null;
+
+/** Ligne vide : la forme qu'attendent les sources GeoJSON avant le premier point. */
+const VIDE = { type: "Feature" as const, properties: {}, geometry: { type: "LineString" as const, coordinates: [] as [number, number][] } };
 
 const versLngLat = (p: [number, number]): [number, number] => [p[1], p[0]];
 
@@ -67,6 +78,7 @@ async function stylePlan(): Promise<maplibregl.StyleSpecification> {
 
 export function CarteDirect({
   position, track, centre, fond = "plan", suivre = true, onDeplacement, recentrer = 0, etiquette, className = "",
+  parcours = [], voirParcours = false, relief = false,
 }: {
   position: [number, number] | null;
   track: [number, number][];
@@ -88,6 +100,11 @@ export function CarteDirect({
   recentrer?: number;
   etiquette?: string;
   className?: string;
+  /** Les traces des dernières sorties [lat, lon][] — « Mes parcours », en bleu. */
+  parcours?: [number, number][][];
+  voirParcours?: boolean;
+  /** Relief 3D : terrain MapTiler + carte inclinée. Ignoré sans clé (`RELIEF_DISPO`). */
+  relief?: boolean;
 }) {
   const conteneur = useRef<HTMLDivElement>(null);
   const carte = useRef<maplibregl.Map | null>(null);
@@ -99,6 +116,12 @@ export function CarteDirect({
   const positionRef = useRef(position);
   const traceRef = useRef(track);
   const fondRef = useRef(fond);
+  const parcoursRef = useRef(parcours);
+  const voirParcoursRef = useRef(voirParcours);
+  const reliefRef = useRef(relief);
+  useEffect(() => { parcoursRef.current = parcours; }, [parcours]);
+  useEffect(() => { voirParcoursRef.current = voirParcours; }, [voirParcours]);
+  useEffect(() => { reliefRef.current = relief; }, [relief]);
   useEffect(() => { suivreRef.current = suivre; }, [suivre]);
   useEffect(() => { deplacementRef.current = onDeplacement; }, [onDeplacement]);
   useEffect(() => { positionRef.current = position; }, [position]);
@@ -117,6 +140,34 @@ export function CarteDirect({
   function poserTrace(m: maplibregl.Map, t: [number, number][]) {
     const src = m.getSource("trace") as maplibregl.GeoJSONSource | undefined;
     src?.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: t.map(versLngLat) } });
+  }
+
+  function poserParcours(m: maplibregl.Map, p: [number, number][][]) {
+    const src = m.getSource("parcours") as maplibregl.GeoJSONSource | undefined;
+    src?.setData({ type: "Feature", properties: {}, geometry: { type: "MultiLineString", coordinates: p.map((t) => t.map(versLngLat)) } });
+  }
+
+  function montrerParcours(m: maplibregl.Map, oui: boolean) {
+    if (m.getLayer("parcours")) m.setLayoutProperty("parcours", "visibility", oui ? "visible" : "none");
+  }
+
+  /**
+   * Relief 3D. ⚠️ LA SOURCE N'EST POSÉE QU'AU PREMIER APPUI : chaque tuile de relief est
+   * une requête MapTiler (quota gratuit compté), et la plupart des sorties n'en ont pas
+   * besoin.
+   */
+  function appliquerRelief(m: maplibregl.Map, oui: boolean) {
+    if (!URL_RELIEF) return;
+    try {
+      if (oui) {
+        if (!m.getSource("relief")) m.addSource("relief", { type: "raster-dem", tiles: [URL_RELIEF], tileSize: RELIEF.taille, maxzoom: RELIEF.zoomMax, attribution: RELIEF.attribution });
+        m.setTerrain({ source: "relief", exaggeration: 1.4 });
+        m.easeTo({ pitch: 60, duration: 800 });
+      } else {
+        m.setTerrain(null);
+        m.easeTo({ pitch: 0, duration: 600 });
+      }
+    } catch { /* style pas encore prêt : le prochain appui réessaiera */ }
   }
 
   function appliquerFond(m: maplibregl.Map, f: IdFond) {
@@ -142,10 +193,11 @@ export function CarteDirect({
         dragRotate: false, pitchWithRotate: false, touchPitch: false,
       });
       m.touchZoomRotate.disableRotation();
-      // ⚠️ EN HAUT À GAUCHE, PAS EN BAS : le bloc blanc des chiffres occupe tout le bas de
-      // la carte et la recouvrait. Une attribution cachée vaut une attribution absente —
-      // c'est-à-dire une carte utilisée sans droit. Jamais repliée (`compact: false`).
-      m.addControl(new maplibregl.AttributionControl({ compact: false }), "top-left");
+      // ⚠️ EN HAUT À DROITE, PAS EN BAS : le bloc de chiffres et le tiroir occupent tout le
+      // bas de la carte et la recouvraient. Pas à gauche non plus depuis le 27/11/2026 : la
+      // flèche ⌄ de sortie du grand écran y est posée. Une attribution cachée vaut une
+      // attribution absente — c'est-à-dire une carte utilisée sans droit. Jamais repliée.
+      m.addControl(new maplibregl.AttributionControl({ compact: false }), "top-right");
       m.on("dragstart", () => deplacementRef.current?.());
       m.on("zoomstart", (e) => { if ((e as { originalEvent?: unknown }).originalEvent) deplacementRef.current?.(); });
       m.on("load", () => {
@@ -157,12 +209,20 @@ export function CarteDirect({
           m.addSource("satellite", { type: "raster", tiles: [SATELLITE.url], tileSize: SATELLITE.taille, maxzoom: SATELLITE.zoomMax, attribution: SATELLITE.attribution });
           m.addLayer({ id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } }, premiereEtiquette);
         }
-        m.addSource("trace", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [] } } });
+        // « Mes parcours » : sous le tracé du jour, bleu translucide comme une carte de
+        // chaleur — là où les lignes se superposent, le bleu fonce.
+        m.addSource("parcours", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "MultiLineString", coordinates: [] } } });
+        m.addLayer({ id: "parcours", type: "line", source: "parcours", layout: { "line-cap": "round", "line-join": "round", visibility: "none" },
+          paint: { "line-color": "#2563eb", "line-opacity": 0.45, "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 16, 3.5] } }, premiereEtiquette);
+        m.addSource("trace", { type: "geojson", data: VIDE });
         m.addLayer({ id: "trace-bord", type: "line", source: "trace", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ffffff", "line-width": 7 } });
         m.addLayer({ id: "trace", type: "line", source: "trace", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#059669", "line-width": 4 } });
         pret.current = true;
         appliquerFond(m, fondRef.current);
         poserTrace(m, traceRef.current);
+        poserParcours(m, parcoursRef.current);
+        montrerParcours(m, voirParcoursRef.current);
+        if (reliefRef.current) appliquerRelief(m, true);
         if (positionRef.current) poserPoint(m, positionRef.current);
       });
       carte.current = m;
@@ -177,12 +237,27 @@ export function CarteDirect({
     if (m && pret.current) appliquerFond(m, fond);
   }, [fond]);
 
+  useEffect(() => {
+    const m = carte.current;
+    if (m && pret.current) poserParcours(m, parcours);
+  }, [parcours]);
+
+  useEffect(() => {
+    const m = carte.current;
+    if (m && pret.current) montrerParcours(m, voirParcours);
+  }, [voirParcours]);
+
+  useEffect(() => {
+    const m = carte.current;
+    if (m && pret.current) appliquerRelief(m, relief);
+  }, [relief]);
+
   // Position : un point bleu qui suit. Le recentrage n'a lieu QUE si le suivi est actif.
   useEffect(() => {
     const m = carte.current; if (!m || !position) return;
     poserPoint(m, position);
     if (!suivreRef.current) return;
-    m.easeTo({ center: versLngLat(position), zoom: Math.max(m.getZoom(), 15) });
+    m.easeTo({ center: versLngLat(position), zoom: Math.max(m.getZoom(), 15), pitch: m.getPitch() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position]);
 
