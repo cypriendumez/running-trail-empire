@@ -454,6 +454,20 @@ test("« Mes parcours » : ses traces, allégées, jamais inventées", () => {
   assert.ok(carte.indexOf('id: "parcours"') < carte.indexOf('id: "trace-bord"'), "les anciens parcours passent par-dessus le tracé du jour");
 });
 
+test("le réglage « Dénivelé D+ » ne revient pas dans Enregistrer (27/11/2026)", () => {
+  // Cyprien : « il ne sert à rien, ça fait trop de modes sur cet onglet ». Il ne mesurait
+  // rien, et le D+ CHOISI était même enregistré comme celui de la sortie.
+  const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
+  assert.ok(!/setElevation\(parseInt/.test(gr), "le curseur de dénivelé est revenu dans Enregistrer");
+  assert.ok(!/function ElevationProfile/.test(gr), "le faux profil de dénivelé est revenu");
+});
+
+test("« Mes sorties » sont masquées à l'ouverture (27/11/2026)", () => {
+  // Trente traces bleues superposées couvraient la carte dès l'arrivée : on les allume à la demande.
+  const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
+  assert.match(gr, /const \[modeSorties, setModeSorties\] = useState<[^>]*>\("aucune"\);/, "« Mes sorties » s'affichent de nouveau d'office à l'ouverture");
+});
+
 test("les mots des commandes existent dans les cinq langues", () => {
   const src = readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8");
   for (const k of ["map.plan", "map.satellite", "map.recentrer", "map.reglages", "map.details", "map.fc",
