@@ -20,6 +20,7 @@ import { AUTH } from "@/components/auth/authI18n";
 import { ReglesMotDePasse, messageRefusMotDePasse } from "@/components/auth/ReglesMotDePasse";
 import { Turnstile, CLE_TURNSTILE, TOAST_CAPTCHA, type TurnstileRef } from "@/components/auth/Turnstile";
 import { DeuxFacteurs } from "./DeuxFacteurs";
+import { AbonnementCalendrier } from "./AbonnementCalendrier";
 import { verifierRegles } from "@/lib/auth/reglesMotDePasse";
 import { deconnexion } from "@/lib/auth/deconnexion";
 
@@ -505,6 +506,7 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
           )}
 
           {tab === "connexions" && (
+            <>
             <Card title={t("set.conn.title")} desc={t("set.conn.desc")}>
               <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-100 p-4">
                 <div className="flex items-center gap-3">
@@ -517,6 +519,8 @@ export function SettingsView({ profile, email, userId, settings }: { profile: Pr
                 <Link href="/dashboard/sync" className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 px-3.5 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">{intervalsOn ? t("set.conn.manage") : t("set.conn.connect")} <ExternalLink className="h-3.5 w-3.5" /></Link>
               </div>
             </Card>
+            <AbonnementCalendrier lang={lang} />
+            </>
           )}
 
           {tab === "compte" && (

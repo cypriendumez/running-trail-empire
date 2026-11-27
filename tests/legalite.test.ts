@@ -165,8 +165,12 @@ const LANGUES = ["fr", "en", "de", "es", "pt"] as const;
     }
     // La date suit le DERNIER changement du texte : 01/10/2026 (ce bloc), puis 08/11/2026
     // (Have I Been Pwned nommé, sécurité des mots de passe), puis 09/11/2026 (Pacevo réservé aux
-    // majeurs, kiné IA retiré). Texte modifié → date avancée ici.
-    assert.match(lire("src/app/confidentialite/page.tsx"), /date="09\/11\/2026"/);
+    // majeurs, kiné IA retiré), puis 27/11/2026 (l'agenda du coureur nommé parmi les
+    // destinataires : abonnement de calendrier). Texte modifié → date avancée ici.
+    assert.match(lire("src/app/confidentialite/page.tsx"), /date="27\/11\/2026"/);
+    for (const [l, re] of [["fr", /Ton agenda \(Apple/], ["en", /Your calendar \(Apple/], ["de", /Dein Kalender \(Apple/], ["es", /Tu calendario \(Apple/], ["pt", /O teu calendário \(Apple/]] as const) {
+      assert.match((LEGAL[l].privacy.sections.find((x) => x.title.startsWith("5. "))?.list ?? []).join("\n"), re, `${l} §5 : l'agenda abonné n'est pas nommé`);
+    }
   });
 
   // ── 5. LE REFUS DE LA MESURE D'AUDIENCE EXISTE ──────────────────────────────
