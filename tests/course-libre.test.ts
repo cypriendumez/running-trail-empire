@@ -73,10 +73,12 @@ test("la fourchette cardiaque choisie prime sur la zone, et elle est ordonnée",
 test("rien d'inventé à l'écran : pas de fin prévue, pas de barre, pas d'avance", () => {
   const gr = codeNu(GR);
   assert.match(gr, /if \(!libreRef\.current && km > 0\) setPredictedFinish/, "une fin est prédite sans distance visée : c'est un chiffre inventé");
-  assert.match(gr, /\{phase === "running" && !libreRef\.current && Math\.abs\(timeDelta\) > 3 && \(/, "l'avance/retard s'affiche encore alors que rien n'est visé");
-  assert.match(gr, /\{!libreRef\.current && \(<>/, "la barre de progression revient alors qu'il n'y a pas de fin");
+  // La vue chiffres (27/11/2026) lit le mode libre UNE fois, dans `libreCourse`.
+  assert.match(gr, /const libreCourse = libreRef\.current;/, "la vue chiffres ne sait plus si la course est libre");
+  assert.match(gr, /\{phase === "running" && !libreCourse && currentPace > 0 && \(/, "l'avance/retard s'affiche encore alors que rien n'est visé");
+  assert.match(gr, /\{!libreCourse && \(\s*\n\s*<div className="w-full max-w-md">/, "la fin prévue et la barre reviennent alors qu'il n'y a pas de fin");
   // À la place, une mesure vraie : l'allure moyenne.
-  assert.match(gr, /\{libreRef\.current \? \(/, "la colonne « fin prévue » n'est plus remplacée en libre");
+  assert.match(gr, /\{libreCourse \? \(/, "la colonne « allure cible » n'est plus remplacée en libre");
   assert.match(gr, /currentKm > 0\.05 \? formatPace\(elapsed \/ 60 \/ currentKm\) : "—"/, "l'allure moyenne n'est plus calculée, ou n'attend plus d'avoir couru pour l'afficher");
 });
 

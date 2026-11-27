@@ -7,7 +7,7 @@ import {
   TrendingUp, TrendingDown, Minus, Zap, Timer, MapPin, Watch, Loader2,
   Ghost, Heart, ClipboardList, ChevronDown, Satellite, Mic, Bluetooth,
   Activity, Gauge, Layers, LocateFixed, SlidersHorizontal, Maximize2, Minimize2,
-  AlertTriangle, X, ShieldCheck,
+  AlertTriangle, X, ShieldCheck, Flag, Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { UserProfile, PerformanceBaseline } from "@/types";
@@ -23,11 +23,15 @@ import { sauverEnCours, lireEnCours, effacerEnCours, mettreEnAttente, vautEnregi
 import { avancer, intensite, idPartage, lienSuivi, lienSms, messageAlerte, messageDepart, type EtatVeille } from "@/lib/courses/veille";
 import { createClient } from "@/lib/supabase/client";
 import { fondsCarteDirecte, type IdFond } from "@/lib/courses/fondsCarte";
+import { RELIEF, avecCle } from "@/lib/trail/couches";
 
 /** ⚠️ Le satellite n'existe QUE si la clé MapTiler existe : sans elle les tuiles
  *  répondent 403 et la carte reste grise sans la moindre erreur. On ne propose donc
  *  pas le bouton plutôt que de le proposer cassé (cf. lib/courses/fondsCarte). */
 const SATELLITE_DISPO = fondsCarteDirecte(process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined).includes("satellite");
+/** Le bouton « 3D » n'existe que si le relief existe (clé MapTiler) : une carte seulement
+ *  inclinée ne se fait pas passer pour du relief (cf. lib/trail/couches). */
+const RELIEF_DISPO = avecCle(RELIEF.url, process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined) !== null;
 
 /**
  * ⚠️ `title`, `detail` et `tags` sont en FRANÇAIS, et doivent le rester :
@@ -57,6 +61,8 @@ interface GhostRunnerProps {
   contact?: { nom: string; tel: string };
   /** Centre de la dernière trace connue — CADRAGE de la carte, jamais une position. */
   centreInitial?: [number, number] | null;
+  /** Ses dernières traces GPS, allégées (`lib/courses/mesParcours`) — « Mes parcours ». */
+  mesParcours?: [number, number][][];
 }
 
 interface Checkpoint {
@@ -147,7 +153,7 @@ export function nomLecture(l: { appareil: string | null; source: string | null }
   return l?.appareil?.trim() || l?.source?.trim() || "intervals.icu";
 }
 
-export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = null, fcFootings = [], coachSessions = [], contact = { nom: "", tel: "" }, centreInitial = null }: GhostRunnerProps) {
+export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = null, fcFootings = [], coachSessions = [], contact = { nom: "", tel: "" }, centreInitial = null, mesParcours = [] }: GhostRunnerProps) {
   // Les curseurs sont reliés à leur intitulé : sans cela un lecteur d'écran annonce
   // « curseur, 12 » sans dire de QUOI, et le libellé n'est pas cliquable.
   const cid = useId();
@@ -199,6 +205,20 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   /** Carte en grand, comme le bouton plein écran d'une vidéo (Cyprien, 23/09/2026). */
   const [plein, setPlein] = useState(false);
   const sectionCarte = useRef<HTMLElement | null>(null);
+  /**
+   * ── LA VUE, COMME STRAVA (Cyprien, 27/11/2026, vidéo de Strava à l'appui) ──
+   * « carte » : la carte, le bloc de chiffres et le tiroir du bas. « chiffres » : l'écran
+   * blanc aux chiffres géants, celui qu'on regarde en courant. Le départ ouvre les
+   * chiffres ; le bouton ⤡ passe de l'un à l'autre. La carte reste MONTÉE dessous : elle
+   * continue de suivre et de tracer pendant qu'on regarde les chiffres.
+   */
+  const [vue, setVue] = useState<"carte" | "chiffres">("carte");
+  const [calquesOuverts, setCalquesOuverts] = useState(false);
+  const [voirParcours, setVoirParcours] = useState(mesParcours.length > 0);
+  const [relief3d, setRelief3d] = useState(false);
+  /** Vrai quelques secondes après la première position : « Signal GPS trouvé », en vert. */
+  const [gpsTrouve, setGpsTrouve] = useState(false);
+  const avaitPosition = useRef(false);
   /** Le nom de la séance chargée depuis le coach — titre du bloc de chiffres. */
   const [seanceChargee, setSeanceChargee] = useState<string | null>(null);
   /** Le bas de l'écran : réglages avant le départ, chiffres géants pendant. */
@@ -939,9 +959,22 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
     pleinAuto.current = true;
     setPlein(true);
   }, []);
+  // ⚠️ LE DÉPART N'OUVRE PLUS LA PAGE (27/11/2026) : il ouvre la vue CHIFFRES, dans la
+  // couverture, comme Strava. Le lien de suivi et la limite de la veille de choc, qui
+  // obligeaient à sortir du grand écran, sont désormais DANS la couverture (`alertesSecurite`).
   useEffect(() => {
-    if (phase !== "setup" && pleinAuto.current) { pleinAuto.current = false; setPlein(false); }
+    setVue(phase === "setup" ? "carte" : "chiffres");
+    setCalquesOuverts(false);
   }, [phase]);
+
+  // « Signal GPS trouvé » : dit une fois, à la PREMIÈRE position, puis le titre revient.
+  useEffect(() => {
+    if (!positionCarte || avaitPosition.current) return;
+    avaitPosition.current = true;
+    setGpsTrouve(true);
+    const t = setTimeout(() => setGpsTrouve(false), 4000);
+    return () => clearTimeout(t);
+  }, [positionCarte]);
 
   // Échap sort du grand écran, et sortir du plein écran natif (Échap du navigateur)
   // referme la couverture : les deux doivent rester d'accord.
@@ -1066,18 +1099,17 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   // ⚠️ DÉFINIES UNE FOIS, RENDUES À DEUX ENDROITS. Leur place change avec l'écran (en
   // ligne au-dessus du bloc sur téléphone, en colonne sur la carte sur ordinateur) mais
   // leur comportement, non : dupliquer le JSX, c'est dupliquer l'état qu'il commande.
+  // ── LES BOUTONS RONDS DE LA CARTE, EN COLONNE À DROITE (comme Strava) ────────
+  // Au-dessus du bloc de chiffres, au pouce. ⚠️ DÉFINIS UNE FOIS : la colonne est la même
+  // sur téléphone et sur ordinateur (Cyprien, 27/11/2026 : « pareil sur ordinateur »).
   const commandesCarte = (
     <>
-      <BtnCarte actif={audioEnabled} titre={d["ch.voice"]} onClick={() => setAudioEnabled(!audioEnabled)}>
-        {audioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+      <BtnCarte actif={calquesOuverts} titre={d["map.calques"]} onClick={() => setCalquesOuverts((o) => !o)}>
+        <Layers className="h-5 w-5" />
       </BtnCarte>
-      {SATELLITE_DISPO && (
-        <BtnCarte
-          actif={fondCarte === "satellite"}
-          titre={fondCarte === "satellite" ? d["map.plan"] : d["map.satellite"]}
-          onClick={() => setFondCarte(fondCarte === "satellite" ? "plan" : "satellite")}
-        >
-          <Layers className="h-5 w-5" />
+      {RELIEF_DISPO && (
+        <BtnCarte actif={relief3d} titre={d["map.3d"]} onClick={() => setRelief3d((r) => !r)}>
+          <span className="text-[15px] font-bold">3D</span>
         </BtnCarte>
       )}
       {/* Allumé = la carte reste collée à la position. Éteint = la main a pris la carte,
@@ -1089,9 +1121,203 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
       >
         <LocateFixed className="h-5 w-5" />
       </BtnCarte>
-      <BtnCarte actif={plein} titre={plein ? d["map.reduire"] : d["map.plein"]} onClick={basculerPlein}>
-        {plein ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+      <BtnCarte actif={audioEnabled} titre={d["ch.voice"]} onClick={() => setAudioEnabled(!audioEnabled)}>
+        {audioEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
       </BtnCarte>
+      {/* Hors grand écran seulement : dedans, c'est la flèche ⌄ en haut à gauche qui en sort. */}
+      {!plein && (
+        <BtnCarte titre={d["map.plein"]} onClick={basculerPlein}>
+          <Maximize2 className="h-5 w-5" />
+        </BtnCarte>
+      )}
+    </>
+  );
+
+  // Le statut GPS, dans l'entête du bloc de chiffres avant le départ (comme Strava).
+  const statutGps: "ok" | "cherche" | null = phase !== "setup" ? null
+    : gpsTrouve ? "ok"
+    : !positionCarte && !geoRefusee ? "cherche"
+    : null;
+
+  /**
+   * ⚠️ LA SÉCURITÉ RESTE À L'ÉCRAN, DANS LA COUVERTURE. Le lien de suivi à envoyer au
+   * contact et la limite de la veille de choc vivaient sous la carte : en grand écran,
+   * l'athlète partait sans les voir. Ils sont posés ici, dans les DEUX vues.
+   */
+  const alertesSecurite = (departPret || ((veilleActive || capteursIndispo) && phase === "running")) ? (
+    <div className="space-y-2">
+      {/* Le lien de suivi, proposé au départ — un geste, puis il disparaît. */}
+      {departPret && (
+        <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 shadow-sm">
+          <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold leading-snug text-blue-900">{d["veille.partage"]}</p>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              <button type="button"
+                onClick={() => { prevenirContact(messageDepart(prenom, departPret, { depart: tg("veille.depart", { nom: prenom ?? "" }), suivi: d["veille.suivi"] })); setDepartPret(null); }}
+                className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
+                {contactNom ? tg("veille.prevenir", { nom: contactNom }) : d["veille.partage"]}
+              </button>
+              <button type="button"
+                onClick={() => { navigator.clipboard?.writeText(departPret).then(() => toast.success(d["veille.partageCopie"]), () => toast.error(d["veille.partageCopie"])); setDepartPret(null); }}
+                className="rounded-full border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700">
+                {d["veille.copier"]}
+              </button>
+            </div>
+          </div>
+          <button type="button" onClick={() => setDepartPret(null)} aria-label={d["t.recoverDrop"]} className="rounded-full p-1 text-blue-400">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      {/* L'état de la veille, dit sans emphase — et sa LIMITE, dans le même regard.
+          ⚠️ « Veille active » est une promesse ; la phrase qui la borne ne doit pas être
+          repliée dessous : quelqu'un qui part en montagne en se croyant surveillé. */}
+      {(veilleActive || capteursIndispo) && phase === "running" && (
+        <div className="rounded-2xl border border-zinc-100 bg-white/95 px-4 py-2 shadow-sm">
+          <div className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-500">
+            <ShieldCheck className={`mt-0.5 h-3.5 w-3.5 flex-shrink-0 ${veilleActive ? "text-emerald-600" : "text-zinc-300"}`} aria-hidden />
+            <p>
+              <b className="font-semibold text-zinc-700">{veilleActive ? d["veille.active"] : d["veille.titre"]} — </b>
+              {capteursIndispo ? d["veille.indispo"] : d["veille.limite"]}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  /** Le statut du GPS et du capteur cardiaque pendant la course — et le bouton qui le relie. */
+  const pastillesCourse = phase === "running" ? (
+    <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-semibold">
+      {gpsStatus === "live" && <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> {d["st.gps"]}{gpsAccuracy != null ? ` · ±${Math.round(gpsAccuracy)} m` : ""}</span>}
+      {gpsStatus === "searching" && <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-amber-700"><Loader2 className="h-3 w-3 animate-spin" /> {d["st.search"]}</span>}
+      {gpsStatus === "sim" && sessionKind === "pace" && <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-zinc-600">{d["st.demo"]}</span>}
+      {sessionKind === "hr" && (
+        hrSensor === "on" ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1 text-rose-700"><Bluetooth className="h-3 w-3" /> {d["st.hrOn"]}</span>
+        ) : hrSensor === "connecting" ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-zinc-600"><Loader2 className="h-3 w-3 animate-spin" /> {d["st.hrConn"]}</span>
+        ) : (
+          <button onClick={connectHrSensor}
+            className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-white transition-colors hover:bg-emerald-500">
+            <Bluetooth className="h-3 w-3" /> {d["st.hrBtn"]}
+          </button>
+        )
+      )}
+    </div>
+  ) : null;
+
+  /**
+   * LES BOUTONS DE COURSE, COMME STRAVA : en course, une seule grande « Pause » ; en
+   * pause, « Reprendre » et « Terminer ». ⚠️ ARRÊTER DEMANDE DEUX GESTES (pause, puis
+   * terminer) : un appui malheureux sur un bouton rouge en courant ne coupe plus la séance.
+   */
+  const boutonsCourse = phase === "running" ? (
+    paused ? (
+      <div className="mx-auto flex w-full max-w-md gap-3">
+        <button type="button" onClick={pauseSession} className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-emerald-600 text-[16px] font-semibold text-white active:scale-[0.98]">
+          <Play className="h-5 w-5" fill="currentColor" /> {d["ct.resume"]}
+        </button>
+        <button type="button" onClick={arreterSession} className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-zinc-900 text-[16px] font-semibold text-white active:scale-[0.98]">
+          <Flag className="h-5 w-5" /> {d["ct.terminer"]}
+        </button>
+      </div>
+    ) : (
+      <button type="button" onClick={pauseSession} className="mx-auto flex h-14 w-full max-w-md items-center justify-center gap-2 rounded-full bg-emerald-600 text-[16px] font-semibold text-white active:scale-[0.98]">
+        <Pause className="h-5 w-5" fill="currentColor" /> {d["ct.pause"]}
+      </button>
+    )
+  ) : (
+    <button type="button" onClick={nouvelleSession} className="mx-auto flex h-14 w-full max-w-md items-center justify-center rounded-full bg-zinc-900 text-[16px] font-semibold text-white">
+      {d["ct.new"]}
+    </button>
+  );
+
+  // ── LA VUE CHIFFRES : ce qu'on lit en courant ───────────────────────────────
+  const libreCourse = libreRef.current;
+  const ahead = paceDeltaSec < 0;
+  const accentAllure = phase === "finished" ? "#18181b" : currentPace <= 0 || libreCourse ? "#18181b" : onPace ? "#0369a1" : ahead ? "#047857" : "#c2410c";
+  const hrLo = hrLoRef.current, hrHi = hrHiRef.current;
+  const dansLaZone = liveHr != null && liveHr >= hrLo && liveHr <= hrHi;
+  const accentFc = phase === "finished" ? "#18181b" : liveHr == null ? "#0369a1" : dansLaZone ? "#047857" : liveHr > hrHi ? "#e11d48" : "#0369a1";
+  const dureeHr = durationMin * 60;
+  const fcMoy = hrNRef.current > 0 ? Math.round(hrSumRef.current / hrNRef.current) : null;
+  const chiffreGeant = "text-[84px] font-extrabold leading-none tracking-tight tabular-nums md:text-[112px]";
+  const chiffreMoyen = "text-[40px] font-bold leading-none tabular-nums md:text-[48px]";
+  const legende = "mt-1.5 text-[13px] font-semibold text-zinc-500";
+
+  const contenuChiffres = sessionKind === "hr" ? (
+    <>
+      <div>
+        <div className={chiffreGeant} style={{ color: accentFc }}>{liveHr != null ? liveHr : "—"}</div>
+        <div className={legende}>{d["md.hr"]} (bpm)</div>
+        {phase === "running" && (
+          <div className="mt-3 inline-flex flex-wrap items-center justify-center gap-2 rounded-full bg-zinc-50 px-4 py-1.5 text-[13px] font-semibold" style={{ color: accentFc }}>
+            <span className="opacity-70">{tg("lv.target", { z: zn(hrZone), lo: hrLo, hi: hrHi })}</span>
+            {liveHr != null && (<><span className="opacity-30">·</span>{dansLaZone ? <span>{d["lv.inZone"]}</span> : liveHr > hrHi ? <span>{d["lv.tooHigh"]}</span> : <span>{d["lv.tooLow"]}</span>}</>)}
+          </div>
+        )}
+      </div>
+      <div className="grid w-full max-w-md grid-cols-2 gap-6">
+        <div>
+          <div className={chiffreMoyen}>{formatTime(Math.max(0, dureeHr - elapsed))}</div>
+          <div className={legende}>{d["lv.left"]}</div>
+        </div>
+        <div>
+          <div className={chiffreMoyen}>{gpsStatus === "live" ? currentKm.toFixed(2) : fcMoy ?? "—"}</div>
+          <div className={legende}>{gpsStatus === "live" ? `${d["lb.dist"]} (km)` : `${d["lv.avgHr"]} (bpm)`}</div>
+        </div>
+      </div>
+      <div className="w-full max-w-md">
+        <div className="relative h-2 overflow-hidden rounded-full bg-zinc-100">
+          <div className="absolute left-0 top-0 h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.min(100, (elapsed / dureeHr) * 100)}%`, background: accentFc }} />
+        </div>
+      </div>
+    </>
+  ) : (
+    <>
+      <div>
+        <div className={`${chiffreGeant} text-zinc-900`}>{currentKm.toFixed(2)}</div>
+        <div className={legende}>{d["lb.dist"]} (km)</div>
+      </div>
+      <div className="grid w-full max-w-md grid-cols-2 gap-6">
+        <div>
+          <div className={chiffreMoyen} style={{ color: accentAllure }}>{currentPace > 0 ? formatPace(currentPace) : "—"}</div>
+          <div className={legende}>{d["lv.curPace"]} (/km)</div>
+        </div>
+        {/* En libre, rien n'est visé : l'allure moyenne, qui se mesure, au lieu d'une cible. */}
+        {libreCourse ? (
+          <div>
+            <div className={chiffreMoyen}>{currentKm > 0.05 ? formatPace(elapsed / 60 / currentKm) : "—"}</div>
+            <div className={legende}>{d["lv.avgPace"]} (/km)</div>
+          </div>
+        ) : (
+          <div>
+            <div className={chiffreMoyen}>{formatPace(targetPace)}</div>
+            <div className={legende}>{d["lb.pace"]} (/km)</div>
+          </div>
+        )}
+      </div>
+      {phase === "running" && !libreCourse && currentPace > 0 && (
+        <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-full bg-zinc-50 px-4 py-1.5 text-[13px] font-semibold" style={{ color: accentAllure }}>
+          {onPace ? <span>{d["lv.onPace"]}</span> : ahead ? <span>{tg("lv.faster", { s: Math.abs(paceDeltaSec) })}</span> : <span>{tg("lv.slower", { s: paceDeltaSec })}</span>}
+          {Math.abs(timeDelta) > 3 && (<><span className="opacity-30">·</span><span>{isAhead ? tg("lv.aheadGoal", { t: formatTime(Math.abs(timeDelta)) }) : tg("lv.behindGoal", { t: formatTime(Math.abs(timeDelta)) })}</span></>)}
+        </div>
+      )}
+      {/* ⚠️ PAS DE « FIN PRÉVUE » SANS DISTANCE VISÉE : ce serait un chiffre inventé. */}
+      {!libreCourse && (
+        <div className="w-full max-w-md">
+          <div className="flex items-baseline justify-between text-[13px] font-semibold text-zinc-500">
+            <span>{d["lv.eta"]}</span>
+            <span className="text-[18px] font-bold tabular-nums" style={{ color: isAhead ? "#047857" : isBehind ? "#c2410c" : "#0369a1" }}>{formatTime(predictedFinish)}</span>
+          </div>
+          <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-zinc-100">
+            <div className="absolute left-0 top-0 h-full rounded-full bg-emerald-600 transition-[width] duration-500" style={{ width: `${progressPct}%` }} />
+          </div>
+          <div className="mt-1 flex justify-between text-[11px] font-medium text-zinc-400"><span>0 km</span><span>{distance} km</span></div>
+        </div>
+      )}
     </>
   );
 
@@ -1125,47 +1351,6 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         </div>
       )}
 
-      {/* Le lien de suivi, proposé au départ — un geste, puis il disparaît. */}
-      {departPret && (
-        <div className="-mx-3 -mt-3 flex items-start gap-3 border-b border-blue-100 bg-blue-50 px-5 py-3 md:mx-0 md:mt-0 md:rounded-2xl md:border">
-          <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold leading-snug text-blue-900">{d["veille.partage"]}</p>
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              <button type="button"
-                onClick={() => { prevenirContact(messageDepart(prenom, departPret, { depart: tg("veille.depart", { nom: prenom ?? "" }), suivi: d["veille.suivi"] })); setDepartPret(null); }}
-                className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
-                {contactNom ? tg("veille.prevenir", { nom: contactNom }) : d["veille.partage"]}
-              </button>
-              <button type="button"
-                onClick={() => { navigator.clipboard?.writeText(departPret).then(() => toast.success(d["veille.partageCopie"]), () => toast.error(d["veille.partageCopie"])); setDepartPret(null); }}
-                className="rounded-full border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700">
-                {d["veille.copier"]}
-              </button>
-            </div>
-          </div>
-          <button type="button" onClick={() => setDepartPret(null)} aria-label={d["t.recoverDrop"]} className="rounded-full p-1 text-blue-400">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* L'état de la veille, dit sans emphase — et sa LIMITE, dans le même regard.
-          ⚠️ « Veille active » est une promesse ; la phrase qui la borne ne doit pas être
-          repliée dessous, sinon on retombe sur ce qui a été retiré de l'onglet Sécurité :
-          quelqu'un qui part en montagne en se croyant surveillé. */}
-      {(veilleActive || capteursIndispo) && phase === "running" && (
-        <div className="-mx-3 border-b border-zinc-100 bg-white px-5 py-2 md:mx-0 md:rounded-2xl md:border">
-          <div className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-500">
-            <ShieldCheck className={`mt-0.5 h-3.5 w-3.5 flex-shrink-0 ${veilleActive ? "text-emerald-600" : "text-zinc-300"}`} aria-hidden />
-            <p>
-              <b className="font-semibold text-zinc-700">{veilleActive ? d["veille.active"] : d["veille.titre"]} — </b>
-              {capteursIndispo ? d["veille.indispo"] : d["veille.limite"]}
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* ══ L'ÉCRAN S'OUVRE SUR LA CARTE — COMME STRAVA ═══════════════════════════
           Cyprien, 22/09/2026 puis 23/09 : « fais comme sur Strava ça rend », et devant son
           ordinateur, capture à l'appui : « ça rend pas ». Les deux sont vrais, parce que
@@ -1189,9 +1374,12 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
         // `fixed inset-0` héritait d'une marge haute de 24 px et s'arrêtait 24 px avant le
         // bas de l'écran. Mesuré : carte de 788 px dans une fenêtre de 812.
         style={plein ? { margin: 0 } : undefined}
+        // ⚠️ MÊME COMPOSITION SUR TÉLÉPHONE ET SUR ORDINATEUR (Cyprien, 27/11/2026 :
+        // « pareil sur ordinateur ») : carte, bloc de chiffres, tiroir du bas. Seule la
+        // hauteur change — l'écran entier en grand, la fenêtre moins l'entête sinon.
         className={plein
-          ? "fixed inset-0 z-[2000] bg-white"
-          : "relative -mx-3 -mt-3 md:mx-0 md:mt-0 md:overflow-hidden md:rounded-2xl md:border md:border-zinc-200"}
+          ? "fixed inset-0 z-[2000] overflow-hidden bg-white"
+          : "relative -mx-3 -mt-3 h-[calc(100dvh-8.5rem)] min-h-[560px] overflow-hidden md:mx-0 md:mt-0 md:rounded-2xl md:border md:border-zinc-200"}
       >
         <CarteDirect
           position={positionCarte}
@@ -1202,87 +1390,157 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
           onDeplacement={() => setSuiviCarte(false)}
           recentrer={recentrages}
           etiquette={d["hero"]}
-          className={plein
-            ? "h-full w-full"
-            : phase === "setup"
-              ? "h-[calc(100dvh-13.5rem)] min-h-[360px] w-full md:h-[440px]"
-              : "h-[40vh] min-h-[220px] w-full md:h-[380px]"}
+          parcours={mesParcours}
+          voirParcours={voirParcours}
+          relief={relief3d}
+          className="h-full w-full"
         />
 
-        {/* Sur ordinateur, les commandes reprennent leur place naturelle : en colonne, en
-            haut à droite de la carte. Le bloc blanc n'est plus dessous, il est à gauche. */}
-        <div className="absolute right-3 top-3 z-[500] hidden flex-col gap-2 md:flex">{commandesCarte}</div>
+        {/* En grand écran, la flèche ⌄ en haut à gauche en sort — comme Strava. */}
+        {plein && vue === "carte" && (
+          <button type="button" onClick={basculerPlein} aria-label={d["map.fermer"]} title={d["map.fermer"]}
+            className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-[600] flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-zinc-700 shadow-[0_8px_18px_-8px_rgba(9,9,11,0.6)] ring-1 ring-black/5">
+            <ChevronDown className="h-6 w-6" />
+          </button>
+        )}
 
-        {/* Le bloc blanc : ce qu'on va faire (ou ce qu'on fait), puis l'action.
-            ⚠️ IL EST HORS DE LA CARTE dans le DOM, posé dessus : à l'intérieur, Leaflet
-            capterait le doigt et un appui sur « Démarrer » déplacerait la carte. */}
-        <div className="absolute inset-x-0 bottom-0 z-[500] px-3 pb-3 md:px-4 md:pb-4">
-          {/* Sur téléphone, les commandes sont DANS cette pile, pas collées en haut de la
-              carte : en colonne à droite, elles passaient derrière le bloc blanc dès que la
-              carte se réduit au départ de la course (325 px de carte pour 148 px de
-              commandes et 173 px de bloc), et le bouton de recentrage devenait
-              inatteignable au moment précis où il sert. */}
-          <div className="mx-auto mb-2.5 flex max-w-lg justify-end gap-2 md:hidden">{commandesCarte}</div>
+        {/* La sécurité, en haut de la carte pendant la course. */}
+        {vue === "carte" && alertesSecurite && (
+          <div className={`absolute inset-x-3 z-[600] mx-auto max-w-md ${plein ? "top-[4.25rem]" : "top-3"}`}>{alertesSecurite}</div>
+        )}
 
-          {/* ⚠️ UN REFUS DE LOCALISATION SE DIT. Sans cette ligne, la carte reste sur son
-              cadrage et l'athlète ne comprend ni pourquoi il ne se voit pas dessus, ni
-              comment revenir en arrière. */}
-          {geoRefusee && (
-            <div className="mx-auto mb-2.5 flex max-w-lg items-center justify-center gap-2 rounded-full bg-zinc-900 px-3 py-1.5 text-[12px] font-semibold text-white md:mx-0 md:max-w-sm">
-              <MapPin className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
-              <span className="truncate">{d["map.geoOff"]}</span>
-              <button type="button" onClick={demanderPosition} className="ml-1 flex-shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-900">
-                {d["map.geoBtn"]}
-              </button>
-            </div>
-          )}
-          <div className="mx-auto max-w-lg rounded-[26px] md:mx-0 md:max-w-sm border border-black/5 bg-white px-4 py-3 shadow-[0_20px_45px_-20px_rgba(9,9,11,0.55)]">
-            <p className="truncate text-center text-[13px] font-semibold text-zinc-900">{titreCarte}</p>
-            {/* 2 colonnes en libre (rien d'imposé), 3 sinon. Classe dynamique impossible
-                avec Tailwind : la grille se donne en style. */}
-            <div className="mt-1.5 grid" style={{ gridTemplateColumns: `repeat(${chiffresCarte.length}, minmax(0, 1fr))` }}>
-              {chiffresCarte.map((c) => (
-                <div key={c.l} className="min-w-0 text-center">
-                  <div className="text-[22px] font-semibold leading-none tabular-nums text-zinc-900">
-                    {c.v}{c.u && <span className="ml-0.5 text-[11px] font-semibold text-zinc-400">{c.u}</span>}
-                  </div>
-                  <div className="mt-1 truncate text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{c.l}</div>
+        {/* Le bas de la carte. ⚠️ IL EST HORS DE LA CARTE dans le DOM, posé dessus : à
+            l'intérieur, la carte capterait le doigt et un appui sur « Démarrer » la
+            déplacerait. */}
+        {vue === "carte" && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col">
+            <div className="pointer-events-auto mx-auto w-full max-w-md px-3">
+              <div className="mb-2.5 flex flex-col items-end gap-2">{commandesCarte}</div>
+              {/* ⚠️ UN REFUS DE LOCALISATION SE DIT. Sans cette ligne, la carte reste sur son
+                  cadrage et l'athlète ne comprend ni pourquoi il ne se voit pas dessus, ni
+                  comment revenir en arrière. */}
+              {geoRefusee && (
+                <div className="mb-2.5 flex items-center justify-center gap-2 rounded-full bg-zinc-900 px-3 py-1.5 text-[12px] font-semibold text-white">
+                  <MapPin className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+                  <span className="truncate">{d["map.geoOff"]}</span>
+                  <button type="button" onClick={demanderPosition} className="ml-1 flex-shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-900">
+                    {d["map.geoBtn"]}
+                  </button>
                 </div>
-              ))}
+              )}
+              {/* Le bloc de chiffres : ce qu'on va faire, ou ce qu'on fait. Le chiffre du
+                  milieu en plus grand, comme Strava. */}
+              <div className="mb-3 overflow-hidden rounded-2xl border border-black/5 bg-white shadow-[0_18px_40px_-18px_rgba(9,9,11,0.55)]">
+                <div className={`relative flex h-9 items-center justify-center px-11 text-[13px] font-semibold transition-colors ${statutGps === "ok" ? "bg-emerald-50 text-emerald-700" : statutGps === "cherche" ? "bg-amber-50 text-amber-700" : "text-zinc-700"}`}>
+                  <span className="truncate">{statutGps === "ok" ? d["map.gpsOk"] : statutGps === "cherche" ? d["map.gpsCherche"] : titreCarte}</span>
+                  {phase !== "setup" && (
+                    <button type="button" onClick={() => setVue("chiffres")} aria-label={d["map.vueChiffres"]} title={d["map.vueChiffres"]}
+                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100">
+                      <Maximize2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {/* 2 colonnes en libre (rien d'imposé), 3 sinon. Classe dynamique impossible
+                    avec Tailwind : la grille se donne en style. */}
+                <div className="grid items-end px-3 pb-3 pt-1" style={{ gridTemplateColumns: `repeat(${chiffresCarte.length}, minmax(0, 1fr))` }}>
+                  {chiffresCarte.map((c, i) => {
+                    const central = chiffresCarte.length === 3 && i === 1;
+                    return (
+                      <div key={c.l} className="min-w-0 text-center">
+                        <div className={`font-bold leading-none tabular-nums text-zinc-900 ${central ? "text-[34px]" : "text-[22px]"}`}>
+                          {c.v}{c.u && <span className="ml-0.5 text-[11px] font-semibold text-zinc-400">{c.u}</span>}
+                        </div>
+                        <div className="mt-1 truncate text-[11px] font-semibold text-zinc-500 first-letter:uppercase">{c.l}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            <div className="mt-3 flex items-start justify-around border-t border-zinc-100 pt-3">
+            {/* Le tiroir du bas, blanc, avec sa poignée — comme Strava. */}
+            <div className="pointer-events-auto rounded-t-[28px] bg-white px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_30px_-18px_rgba(9,9,11,0.45)]">
+              <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-zinc-200" aria-hidden />
               {phase === "setup" ? (
-                <>
-                  <ActionCarte label={targetMode === "hr" ? d["md.hr"] : d["md.pace"]} onClick={() => setTargetMode(targetMode === "hr" ? "pace" : "hr")}>
-                    {targetMode === "hr" ? <Heart className="h-5 w-5 text-rose-500" /> : <Zap className="h-5 w-5 text-emerald-600" />}
+                <div className="mx-auto flex max-w-md items-start justify-around">
+                  <ActionCarte label={targetMode === "hr" ? d["md.hr"] : d["md.pace"]} coche onClick={() => setTargetMode(targetMode === "hr" ? "pace" : "hr")}>
+                    {targetMode === "hr" ? <Heart className="h-6 w-6 text-rose-500" /> : <Zap className="h-6 w-6 text-emerald-600" />}
                   </ActionCarte>
                   <GrosBouton label={d["start"]} teinte="emerald" onClick={() => (targetMode === "hr" ? startHrSession() : startSession())}>
-                    <Play className="h-7 w-7 translate-x-0.5" fill="currentColor" />
+                    <Play className="h-8 w-8 translate-x-0.5" fill="currentColor" />
                   </GrosBouton>
                   <ActionCarte label={d["map.reglages"]} onClick={versDetails}>
-                    <SlidersHorizontal className="h-5 w-5 text-zinc-600" />
+                    <SlidersHorizontal className="h-6 w-6 text-zinc-600" />
                   </ActionCarte>
-                </>
-              ) : phase === "running" ? (
-                <>
-                  <ActionCarte label={paused ? d["ct.resume"] : d["ct.pause"]} onClick={pauseSession}>
-                    {paused ? <Play className="h-5 w-5 text-zinc-700" /> : <Pause className="h-5 w-5 text-zinc-700" />}
-                  </ActionCarte>
-                  <GrosBouton label={d["ct.stop"]} teinte="rouge" onClick={arreterSession}>
-                    <StopCircle className="h-7 w-7" />
-                  </GrosBouton>
-                  <ActionCarte label={d["map.details"]} onClick={versDetails}>
-                    <ChevronDown className="h-5 w-5 text-zinc-600" />
-                  </ActionCarte>
-                </>
-              ) : (
-                <button type="button" onClick={nouvelleSession} className="rounded-2xl bg-zinc-900 px-6 py-3 text-sm font-semibold text-white">
-                  {d["ct.new"]}
-                </button>
-              )}
+                </div>
+              ) : boutonsCourse}
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Les calques, comme Strava : un tiroir par-dessus la carte. */}
+        {vue === "carte" && calquesOuverts && (
+          <div className="absolute inset-x-0 bottom-0 z-[650] mx-auto max-w-xl rounded-t-[28px] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_40px_-12px_rgba(9,9,11,0.5)]">
+            <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-zinc-200" aria-hidden />
+            <div className="flex items-center justify-between">
+              <p className="text-[17px] font-bold text-zinc-900">{d["map.calques"]}</p>
+              <button type="button" onClick={() => setCalquesOuverts(false)} aria-label={d["map.fermer"]} className="rounded-full p-1.5 text-zinc-700 hover:bg-zinc-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mt-3 text-[14px] font-bold text-zinc-900">{d["map.fond"]}</p>
+            <div className="mt-2 flex gap-3">
+              {([["plan", d["map.plan"], "linear-gradient(135deg,#f2f1ed 0 40%,#bfe3a3 40% 62%,#9ccdf2 62%)"], ...(SATELLITE_DISPO ? [["satellite", d["map.satellite"], "linear-gradient(135deg,#4b5a3a,#7c8a5c 45%,#3d5566)"]] : [])] as [IdFond, string, string][]).map(([id, nom, fondVignette]) => (
+                <button key={id} type="button" onClick={() => setFondCarte(id)} aria-pressed={fondCarte === id} className="flex w-20 flex-col items-center gap-1.5">
+                  <span className={`h-16 w-16 rounded-2xl ring-2 ${fondCarte === id ? "ring-emerald-600" : "ring-transparent"}`} style={{ background: fondVignette }} />
+                  <span className={`text-[12px] font-semibold ${fondCarte === id ? "text-emerald-700" : "text-zinc-600"}`}>{nom}</span>
+                </button>
+              ))}
+            </div>
+            <p className="mt-4 text-[14px] font-bold text-zinc-900">{d["map.calques"]}</p>
+            <button type="button" onClick={() => setVoirParcours((v) => !v)} disabled={mesParcours.length === 0} aria-pressed={voirParcours}
+              className="mt-2 flex w-full items-center gap-3 rounded-2xl border border-zinc-100 px-3 py-2.5 text-left disabled:opacity-60">
+              <span className="h-10 w-10 flex-shrink-0 rounded-xl" style={{ background: "repeating-linear-gradient(120deg,#e8eefc 0 6px,#2563eb55 6px 8px)" }} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-semibold text-zinc-900">{d["map.mesParcours"]}</span>
+                <span className="block truncate text-[12px] text-zinc-500">{mesParcours.length ? tg("map.mesParcoursAide", { n: mesParcours.length }) : d["map.mesParcoursVide"]}</span>
+              </span>
+              <span className={`relative h-6 w-10 flex-shrink-0 rounded-full transition-colors ${voirParcours && mesParcours.length ? "bg-emerald-600" : "bg-zinc-200"}`}>
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${voirParcours && mesParcours.length ? "left-[1.125rem]" : "left-0.5"}`} />
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* ══ LA VUE CHIFFRES — l'écran qu'on lit en courant (Strava) ══════════════
+            Chrono en haut, distance géante, puis l'allure (ou la FC) et la cible. En
+            pause, l'entête passe au JAUNE : on le voit de loin, la montre au poignet. */}
+        {vue === "chiffres" && (
+          <div className="absolute inset-0 z-[600] flex flex-col bg-white">
+            <div className={`relative px-14 pb-3 pt-[max(0.9rem,env(safe-area-inset-top))] text-center transition-colors ${paused && phase === "running" ? "bg-amber-400" : "bg-white"}`}>
+              {paused && phase === "running" && <div className="text-[13px] font-semibold text-zinc-900">{d["lv.enPause"]}</div>}
+              <div className="text-[32px] font-bold leading-tight tabular-nums text-zinc-900">{formatTime(elapsed)}</div>
+              <button type="button" onClick={() => setVue("carte")} aria-label={d["map.vueCarte"]} title={d["map.vueCarte"]}
+                className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-zinc-800 hover:bg-black/5">
+                <Minimize2 className="h-5 w-5" />
+              </button>
+            </div>
+            {(alertesSecurite || pastillesCourse) && (
+              <div className="mx-auto w-full max-w-md space-y-2 px-3 pt-1">{alertesSecurite}{pastillesCourse}</div>
+            )}
+            <div className="flex flex-1 flex-col items-center justify-center gap-7 overflow-y-auto px-6 py-4 text-center">
+              {contenuChiffres}
+              {lastCue && (
+                <p className="flex max-w-md items-center gap-2 text-[13px] italic text-zinc-500">
+                  <Volume2 className="h-4 w-4 flex-shrink-0 text-zinc-400" />&ldquo;{lastCue}&rdquo;
+                </p>
+              )}
+            </div>
+            <div className="rounded-t-[28px] bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_30px_-18px_rgba(9,9,11,0.35)]">
+              <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-zinc-200" aria-hidden />
+              {boutonsCourse}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ⚠️ L'ENTÊTE VERT « GHOST RUNNER » A ÉTÉ RETIRÉ (23/09/2026). Il était passé SOUS
@@ -1739,168 +1997,8 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
 
         {(phase === "running" || phase === "finished") && (
           <motion.div key="running" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            {/* Statut GPS en course */}
-            {phase === "running" && (
-              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
-                {gpsStatus === "live" && <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> {d["st.gps"]}{gpsAccuracy != null ? ` · ±${Math.round(gpsAccuracy)} m` : ""}</span>}
-                {gpsStatus === "searching" && <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-amber-700"><Loader2 className="h-3 w-3 animate-spin" /> {d["st.search"]}</span>}
-                {gpsStatus === "sim" && sessionKind === "pace" && <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-zinc-600">{d["st.demo"]}</span>}
-                {sessionKind === "hr" && (
-                  hrSensor === "on" ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1 text-rose-700"><Bluetooth className="h-3 w-3" /> {d["st.hrOn"]}</span>
-                  ) : hrSensor === "connecting" ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-zinc-600"><Loader2 className="h-3 w-3 animate-spin" /> {d["st.hrConn"]}</span>
-                  ) : (
-                    <button onClick={connectHrSensor}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-white transition-colors hover:bg-emerald-500">
-                      <Bluetooth className="h-3 w-3" /> {d["st.hrBtn"]}
-                    </button>
-                  )
-                )}
-              </div>
-            )}
-            {/* Affichage principal — mode FC : BPM géant coloré par zone, progression à la durée */}
-            {sessionKind === "hr" ? (() => {
-              const total = durationMin * 60;
-              const lo = hrLoRef.current, hi = hrHiRef.current;
-              const inZone = liveHr != null && liveHr >= lo && liveHr <= hi;
-              const accent = phase === "finished" ? "#047857" : liveHr == null ? "#0369a1" : inZone ? "#047857" : liveHr > hi ? "#e11d48" : "#0369a1";
-              const pct = Math.min(100, (elapsed / total) * 100);
-              const remaining = Math.max(0, total - elapsed);
-              const avg = hrNRef.current > 0 ? Math.round(hrSumRef.current / hrNRef.current) : null;
-              return (
-            <div className="relative overflow-hidden rounded-[28px] border border-zinc-200/70 bg-white p-7 sm:p-10 mb-6 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_30px_70px_-34px_rgba(16,24,40,0.22)]">
-              <div className="relative z-10">
-                <div className="text-center">
-                  <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{liveHr != null ? d["md.hr"] : d["lv.elapsed"]}</div>
-                  {liveHr != null ? (
-                    <div className="mt-2 text-7xl sm:text-[8rem] font-semibold tabular-nums leading-[0.95] tracking-tight transition-colors duration-300" style={{ color: phase === "finished" ? "#18181b" : accent }}>
-                      {liveHr}<span className="align-top text-2xl font-semibold text-zinc-300"> bpm</span>
-                    </div>
-                  ) : (
-                    <div className="mt-2 text-7xl sm:text-[8rem] font-semibold tabular-nums leading-[0.95] tracking-tight text-zinc-900">{formatTime(elapsed)}</div>
-                  )}
-                  {phase === "running" && (
-                    <div className="mt-4 inline-flex flex-wrap items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold" style={{ background: "#f8fafc", color: accent }}>
-                      <span className="opacity-70">{tg("lv.target", { z: zn(hrZone), lo, hi })}</span>
-                      {liveHr != null && (
-                        <>
-                          <span className="opacity-30">·</span>
-                          {inZone ? <span>{d["lv.inZone"]}</span> : liveHr > hi ? <span>{d["lv.tooHigh"]}</span> : <span>{d["lv.tooLow"]}</span>}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-8 grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lv.time"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums text-zinc-900">{formatTime(elapsed)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lv.left"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums text-zinc-900">{formatTime(remaining)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{gpsStatus === "live" ? d["lb.dist"] : d["lv.avgHr"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums text-zinc-900">
-                      {gpsStatus === "live"
-                        ? <>{currentKm.toFixed(2)}<span className="text-sm text-zinc-300"> km</span></>
-                        : avg != null ? <>{avg}<span className="text-sm text-zinc-300"> bpm</span></> : "—"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="relative mt-8 h-2 rounded-full bg-zinc-100 overflow-hidden">
-                  <motion.div className="absolute left-0 top-0 h-full rounded-full" style={{ background: accent }} animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} />
-                </div>
-                <div className="mt-2 flex justify-between text-xs font-medium text-zinc-400">
-                  <span>0 min</span>
-                  <span>{Math.round(durationMin / 2)} min</span>
-                  <span>{durationMin} min</span>
-                </div>
-              </div>
-            </div>
-              );
-            })() : (() => {
-              const ahead = paceDeltaSec < 0;
-              const accent = phase === "finished" ? "#047857" : onPace ? "#0369a1" : ahead ? "#047857" : "#c2410c";
-              const soft = onPace ? "#eff6ff" : ahead ? "#ecfdf5" : "#fff7ed";
-              return (
-            <div className="relative overflow-hidden rounded-[28px] border border-zinc-200/70 bg-white p-7 sm:p-10 mb-6 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_30px_70px_-34px_rgba(16,24,40,0.22)]">
-              <div className="relative z-10">
-                {/* Allure GÉANTE, teinte raffinée */}
-                <div className="text-center">
-                  <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lv.curPace"]}</div>
-                  <div className="mt-2 text-7xl sm:text-[8rem] font-semibold tabular-nums leading-[0.95] tracking-tight transition-colors duration-300" style={{ color: phase === "finished" ? "#18181b" : accent }}>
-                    {formatPace(currentPace)}<span className="align-top text-2xl font-semibold text-zinc-300"> /km</span>
-                  </div>
-                  {phase === "running" && (
-                    <div className="mt-4 inline-flex flex-wrap items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold" style={{ background: soft, color: accent }}>
-                      <span className="opacity-70">{tg("lv.targetPace", { p: formatPace(targetPace) })}</span>
-                      <span className="opacity-30">·</span>
-                      {onPace ? <span>{d["lv.onPace"]}</span>
-                        : ahead ? <span>{tg("lv.faster", { s: Math.abs(paceDeltaSec) })}</span>
-                        : <span>{tg("lv.slower", { s: paceDeltaSec })}</span>}
-                    </div>
-                  )}
-                </div>
-
-                {/* Avance / retard cumulé — sur QUOI, en libre ? Rien n'est visé. */}
-                {phase === "running" && !libreRef.current && Math.abs(timeDelta) > 3 && (
-                  <div className="mt-4 text-center text-base font-semibold" style={{ color: isAhead ? "#047857" : "#c2410c" }}>
-                    {isAhead ? tg("lv.aheadGoal", { t: formatTime(Math.abs(timeDelta)) }) : tg("lv.behindGoal", { t: formatTime(Math.abs(timeDelta)) })}
-                  </div>
-                )}
-
-                {/* Stats secondaires */}
-                <div className="mt-8 grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lv.time"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums text-zinc-900">{formatTime(elapsed)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lb.dist"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums text-zinc-900">{currentKm.toFixed(2)}<span className="text-sm text-zinc-300"> km</span></div>
-                  </div>
-                  {/* ⚠️ PAS DE « FIN PRÉVUE » SANS DISTANCE VISÉE : ce serait un chiffre
-                      inventé. On montre à la place l'allure moyenne, qui, elle, se mesure. */}
-                  {libreRef.current ? (
-                  <div>
-                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lv.avgPace"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums text-zinc-900">
-                      {currentKm > 0.05 ? formatPace(elapsed / 60 / currentKm) : "—"}<span className="ml-0.5 text-sm font-semibold text-zinc-300">/km</span>
-                    </div>
-                  </div>
-                  ) : (
-                  <div>
-                    <div className="text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{d["lv.eta"]}</div>
-                    <div className="mt-0.5 text-2xl sm:text-3xl font-semibold tabular-nums flex items-center justify-center gap-1" style={{ color: isAhead ? "#047857" : isBehind ? "#c2410c" : "#0369a1" }}>
-                      {formatTime(predictedFinish)}
-                      {isAhead ? <TrendingDown className="w-4 h-4" /> : isBehind ? <TrendingUp className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
-                    </div>
-                  </div>
-                  )}
-                </div>
-
-                {/* Progress bar fine & élégante — masquée en libre : aucune fin à viser. */}
-                {!libreRef.current && (<>
-                <div className="relative mt-8 h-2 rounded-full bg-zinc-100 overflow-hidden">
-                  <motion.div className="absolute left-0 top-0 h-full rounded-full" style={{ background: accent }} animate={{ width: `${progressPct}%` }} transition={{ duration: 0.5 }} />
-                  <div className="absolute top-1/2 h-3.5 w-1 -translate-y-1/2 rounded-full" style={{ left: `calc(${Math.min(100, (elapsed / targetTime) * 100)}% - 2px)`, background: accent, boxShadow: `0 0 8px ${accent}66` }} />
-                </div>
-                <div className="mt-2 flex justify-between text-xs font-medium text-zinc-400">
-                  <span>0 km</span>
-                  <span>{(distance / 2).toFixed(1)} km</span>
-                  <span>{distance} km</span>
-                </div>
-                </>)}
-              </div>
-            </div>
-              );
-            })()}
-
+            {/* Les chiffres de la course vivent dans la vue « chiffres », au-dessus (27/11/2026).
+                Ici ne restent que les passages au kilomètre, à relire après coup. */}
             {/* Checkpoints — mode allure uniquement (la séance FC est pilotée par la durée) */}
             {sessionKind === "pace" && checkpoints.length > 0 && (
             <div className="bg-white rounded-2xl border border-zinc-200 p-5 mb-5">
@@ -1930,43 +2028,6 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             </div>
             )}
 
-            {/* Last audio cue */}
-            {lastCue && (
-              <div className="bg-zinc-50 rounded-xl px-4 py-3 text-sm text-zinc-600 flex items-center gap-2 mb-5">
-                <Volume2 className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-                <span className="italic">&ldquo;{lastCue}&rdquo;</span>
-              </div>
-            )}
-
-            {/* Controls */}
-            <div className="flex gap-3">
-              {phase === "running" && (
-                <>
-                  <button
-                    onClick={pauseSession}
-                    className="flex-1 flex items-center justify-center gap-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold py-3 rounded-2xl transition"
-                  >
-                    {paused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-                    {paused ? d["ct.resume"] : d["ct.pause"]}
-                  </button>
-                  <button
-                    onClick={arreterSession}
-                    className="flex items-center justify-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 font-semibold px-6 py-3 rounded-2xl transition"
-                  >
-                    <StopCircle className="w-5 h-5" />
-                    {d["ct.stop"]}
-                  </button>
-                </>
-              )}
-              {phase === "finished" && (
-                <button
-                  onClick={nouvelleSession}
-                  className="flex-1 flex items-center justify-center gap-2 bg-white text-zinc-700 font-semibold py-3 rounded-2xl border border-zinc-200 hover:border-zinc-400 transition"
-                >
-                  {d["ct.new"]}
-                </button>
-              )}
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1992,11 +2053,15 @@ function BtnCarte({ actif, titre, onClick, children }: { actif?: boolean; titre:
 }
 
 /** Une action secondaire du bloc du bas : icône ronde + son mot, comme sur Strava. */
-function ActionCarte({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+function ActionCarte({ label, onClick, coche, children }: { label: string; onClick: () => void; coche?: boolean; children: ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className="flex w-20 flex-col items-center gap-1.5">
-      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 transition-colors hover:bg-zinc-200">{children}</span>
-      <span className="w-full truncate text-center text-[11px] font-semibold text-zinc-600">{label}</span>
+    <button type="button" onClick={onClick} className="flex w-24 flex-col items-center gap-1.5">
+      <span className={`relative flex h-14 w-14 items-center justify-center rounded-full transition-colors ${coche ? "bg-emerald-50 hover:bg-emerald-100" : "bg-zinc-100 hover:bg-zinc-200"}`}>
+        {children}
+        {/* La coche dit « c'est ce qui est choisi », comme le sport chez Strava. */}
+        {coche && <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white ring-2 ring-white"><Check className="h-3 w-3" strokeWidth={3} /></span>}
+      </span>
+      <span className="w-full truncate text-center text-[12px] font-semibold text-zinc-700">{label}</span>
     </button>
   );
 }
@@ -2005,11 +2070,11 @@ function ActionCarte({ label, onClick, children }: { label: string; onClick: () 
 function GrosBouton({ label, teinte, onClick, children }: { label: string; teinte: "emerald" | "rouge"; onClick: () => void; children: ReactNode }) {
   const vert = teinte === "emerald";
   return (
-    <button type="button" onClick={onClick} className="flex w-20 flex-col items-center gap-1.5">
-      <span className={`flex h-[60px] w-[60px] items-center justify-center rounded-full text-white transition-transform active:scale-95 ${vert ? "bg-emerald-600 shadow-[0_2px_8px_rgba(0,0,0,0.15)]" : "bg-red-600 shadow-[0_2px_8px_rgba(0,0,0,0.15)]"}`}>
+    <button type="button" onClick={onClick} className="-mt-3 flex w-24 flex-col items-center gap-1.5">
+      <span className={`flex h-[76px] w-[76px] items-center justify-center rounded-full text-white transition-transform active:scale-95 ${vert ? "bg-emerald-600 shadow-[0_10px_24px_-10px_rgba(5,150,105,0.9)]" : "bg-red-600 shadow-[0_2px_8px_rgba(0,0,0,0.15)]"}`}>
         {children}
       </span>
-      <span className={`w-full truncate text-center text-[11px] font-semibold ${vert ? "text-emerald-700" : "text-red-700"}`}>{label}</span>
+      <span className={`w-full truncate text-center text-[14px] font-bold ${vert ? "text-emerald-700" : "text-red-700"}`}>{label}</span>
     </button>
   );
 }

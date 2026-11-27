@@ -17,6 +17,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fondsCarteDirecte, satelliteDisponible, stylePacevo, REPLI_PLAN, ATTRIBUTION_PLAN, STYLE_PLAN_URL } from "../src/lib/courses/fondsCarte";
 import { FONDS, avecCle } from "../src/lib/trail/couches";
+import { allegerParcours, MAX_POINTS } from "../src/lib/courses/mesParcours";
+import { encodePolyline } from "../src/lib/segments/geo";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -102,9 +104,9 @@ test("chaque fond porte son attribution — c'est une obligation de licence", ()
   assert.match(carte, /if \(om\) om\.attribution = ATTRIBUTION_PLAN;/, "le style vectoriel est posé sans attribution");
   assert.match(carte, /attribution: REPLI_PLAN\.attribution/, "le repli est posé sans attribution");
   assert.match(carte, /attribution: SATELLITE\.attribution/, "le satellite est posé sans attribution");
-  // ⚠️ EN HAUT, ET DÉPLIÉE : le bloc blanc des chiffres couvre tout le bas de la carte, et
-  // une attribution recouverte ou repliée vaut une attribution absente.
-  assert.match(carte, /new maplibregl\.AttributionControl\(\{ compact: false \}\), "top-left"/, "l'attribution est repassée sous le bloc blanc, ou repliée");
+  // ⚠️ EN HAUT À DROITE, ET DÉPLIÉE : le bloc de chiffres et le tiroir couvrent le bas de
+  // la carte, la flèche ⌄ le haut à gauche. Recouverte ou repliée = absente.
+  assert.match(carte, /new maplibregl\.AttributionControl\(\{ compact: false \}\), "top-right"/, "l'attribution est repassée sous le bloc de chiffres ou sous la flèche, ou repliée");
 });
 
 test("si le style vectoriel ne vient pas, la carte retombe sur OpenStreetMap", () => {
@@ -136,30 +138,35 @@ test("le suivi automatique se coupe à la main et se reprend au bouton", () => {
 });
 
 test("la carte change de hauteur en cours de vie : elle se remesure", () => {
-  // Plein écran avant le départ, réduite pendant la course. La carte garde la taille
-  // mesurée à la création et ne dessine que dessus : le reste reste vide.
+  // Grand écran ou non, la carte remplit la section — dont la hauteur change. La carte garde
+  // la taille mesurée à la création et ne dessine que dessus : le reste resterait vide.
   const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
-  assert.match(carte, /new ResizeObserver\(\(\) => carte\.current\?\.resize\(\)\)/, "la carte ne se remesure plus quand sa hauteur change : la moitié reste grise");
+  assert.match(carte, /new ResizeObserver\(\(\) => carte\.current\?\.resize\(\)\)/, "la carte ne se remesure plus quand sa hauteur change : la moitié reste vide");
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
-  assert.match(gr, /phase === "setup"\s*\n?\s*\? "h-\[calc\(100dvh-13\.5rem\)\]/, "la carte ne prend plus l'écran avant le départ");
-  assert.match(gr, /: "h-\[40vh\] min-h-\[220px\] w-full md:h-\[380px\]"/, "la carte ne se réduit plus pendant la course : les chiffres géants passent sous le pli");
+  assert.match(gr, /: "relative -mx-3 -mt-3 h-\[calc\(100dvh-8\.5rem\)\] min-h-\[560px\] overflow-hidden/, "hors grand écran, la carte ne prend plus la hauteur de la fenêtre");
+  assert.match(gr, /<CarteDirect[\s\S]{0,600}className="h-full w-full"/, "la carte ne remplit plus sa section");
 });
 
-test("le bloc blanc est POSÉ sur la carte, pas dedans — sinon Leaflet mange le doigt", () => {
+test("le bloc de chiffres et le tiroir sont POSÉS sur la carte, pas dedans — sinon la carte mange le doigt", () => {
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
   assert.ok(!/<\/CarteDirect>/.test(gr), "des commandes sont passées À L'INTÉRIEUR de la carte : appuyer dessus la déplacerait");
-  const bloc = gr.indexOf('<div className="absolute inset-x-0 bottom-0 z-[500]');
+  const bloc = gr.indexOf('<div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500] flex flex-col">');
   assert.ok(bloc > gr.indexOf("<CarteDirect"), "le bloc de chiffres ne suit plus la carte");
-  // Les trois chiffres, et LE bouton de départ.
+  // Les chiffres, et LE bouton de départ.
   assert.match(gr, /chiffresCarte\.map/, "les chiffres ont disparu du bloc posé sur la carte");
-  assert.match(gr, /<GrosBouton label=\{d\["start"\]\}/, "le gros bouton « Démarrer » a quitté la carte");
-  assert.match(gr, /<GrosBouton label=\{d\["ct\.stop"\]\}/, "le gros bouton d'arrêt a quitté la carte pendant la course");
+  assert.match(gr, /<GrosBouton label=\{d\["start"\]\}/, "le gros bouton « Démarrer » a quitté le tiroir");
+  // ⚠️ `pointer-events-none` sur l'enveloppe, `auto` sur ce qu'elle contient : sans cela,
+  // la bande transparente entre les boutons ronds bloquerait la carte au doigt.
+  assert.ok((gr.match(/pointer-events-auto/g) ?? []).length >= 2, "le contenu du bas ne reprend plus le doigt : les boutons seraient morts");
 });
 
-test("le bouton satellite n'apparaît que si la clé existe", () => {
+test("le satellite n'est proposé que si la clé existe", () => {
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
   assert.match(gr, /const SATELLITE_DISPO = fondsCarteDirecte\(process\.env\.NEXT_PUBLIC_MAPTILER_KEY[^)]*\)\.includes\("satellite"\)/, "la disponibilité du satellite n'est plus déduite de la clé");
-  assert.match(gr, /\{SATELLITE_DISPO && \(\s*\n?\s*<BtnCarte/, "le bouton de fond n'est plus conditionné à la clé : il basculerait sur des tuiles 403");
+  assert.match(gr, /\.\.\.\(SATELLITE_DISPO \? \[\["satellite"/, "le satellite n'est plus conditionné à la clé dans les calques : il basculerait sur des tuiles 403");
+  // Même règle pour le relief : pas de « 3D » sans clé, pas de carte inclinée déguisée.
+  assert.match(gr, /const RELIEF_DISPO = avecCle\(RELIEF\.url, process\.env\.NEXT_PUBLIC_MAPTILER_KEY[^)]*\) !== null;/, "le bouton 3D n'est plus conditionné à la clé");
+  assert.match(gr, /\{RELIEF_DISPO && \(\s*\n?\s*<BtnCarte/, "le bouton 3D apparaît sans relief disponible");
   // Et la clé n'est jamais écrite en dur nulle part.
   for (const f of ["src/components/ghost-runner/CarteDirect.tsx", "src/lib/courses/fondsCarte.ts", "src/components/ghost-runner/GhostRunner.tsx"]) {
     assert.ok(!/key=[A-Za-z0-9]{8,}/.test(readFileSync(f, "utf8")), `une clé MapTiler est écrite en dur dans ${f}`);
@@ -222,12 +229,13 @@ test("un refus de localisation se dit, et se rattrape", () => {
   }
 });
 
-test("sur ordinateur, le bloc s'ancre à gauche et les commandes montent sur la carte", () => {
-  // Un bloc de 512 px centré au milieu de 1 200 px de carte flottait dans le vide.
+test("même composition sur téléphone et sur ordinateur (Cyprien, 27/11/2026)", () => {
+  // « Pareil sur ordinateur » : une seule colonne de boutons, un seul bloc de chiffres, un
+  // seul tiroir — plus de mise en page propre à l'ordinateur (`md:hidden` / `md:flex`).
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
-  assert.match(gr, /rounded-\[26px\][^"]*md:mx-0 md:max-w-sm/, "le bloc blanc est redevenu centré et large sur ordinateur");
-  assert.match(gr, /absolute right-3 top-3 z-\[500\] hidden flex-col gap-2 md:flex">\{commandesCarte\}/, "les commandes ne remontent plus sur la carte sur ordinateur");
-  assert.match(gr, /mx-auto mb-2\.5 flex max-w-lg justify-end gap-2 md:hidden">\{commandesCarte\}/, "les commandes ne sont plus dans la pile du bas sur téléphone");
+  assert.equal([...gr.matchAll(/\{commandesCarte\}/g)].length, 1, "les boutons de la carte sont de nouveau rendus à deux endroits");
+  assert.match(gr, /mb-2\.5 flex flex-col items-end gap-2">\{commandesCarte\}/, "les boutons ne sont plus en colonne à droite, au-dessus du bloc");
+  assert.ok(!/hidden flex-col gap-2 md:flex">\{commandesCarte\}/.test(gr), "l'ancienne colonne réservée à l'ordinateur est revenue");
   // Une seule définition : deux copies du JSX, ce serait deux fois le même état à tenir.
   assert.equal([...gr.matchAll(/setAudioEnabled\(!audioEnabled\)/g)].length, 1, "le bouton audio est de nouveau écrit deux fois");
 });
@@ -238,9 +246,12 @@ test("le plein écran ne repose pas sur une API absente d'iPhone", () => {
   // bouton qui ne reposerait que sur elle ne ferait RIEN sur la moitié des téléphones,
   // sans erreur. Le mécanisme est une couverture CSS ; l'API n'est qu'un bonus.
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
-  assert.match(gr, /\? "fixed inset-0 z-\[2000\] bg-white"/, "le grand écran ne repose plus sur une couverture CSS");
+  assert.match(gr, /\? "fixed inset-0 z-\[2000\] overflow-hidden bg-white"/, "le grand écran ne repose plus sur une couverture CSS");
   assert.match(gr, /void sectionCarte\.current\?\.requestFullscreen\?\.\(\)\.catch\(\(\) => \{\}\)/, "l'appel au plein écran natif n'est plus facultatif ni protégé");
-  assert.match(gr, /className=\{plein\s*\n?\s*\? "h-full w-full"/, "la carte ne remplit plus la couverture");
+  assert.match(gr, /<CarteDirect[\s\S]{0,600}className="h-full w-full"/, "la carte ne remplit plus la couverture");
+  // En grand écran, la flèche ⌄ en sort (comme Strava) ; hors grand écran, le bouton y entre.
+  assert.match(gr, /\{plein && vue === "carte" && \(\s*\n?\s*<button type="button" onClick=\{basculerPlein\}/, "plus moyen de sortir du grand écran sur la carte");
+  assert.match(gr, /\{!plein && \(\s*\n?\s*<BtnCarte titre=\{d\["map\.plein"\]\} onClick=\{basculerPlein\}>/, "plus moyen d'entrer dans le grand écran");
   // ⚠️ LA MARGE HÉRITÉE. La pile parente est en `space-y-6`, dont `> * + *` l'emporte sur
   // un `mt-0` : la couverture s'arrêtait 24 px avant le bas (mesuré 788 px sur 812).
   assert.match(gr, /style=\{plein \? \{ margin: 0 \} : undefined\}/, "la marge héritée de la pile n'est plus annulée : la couverture sera trop courte de 24 px");
@@ -253,15 +264,19 @@ test("le plein écran ne repose pas sur une API absente d'iPhone", () => {
   }
 });
 
-test("sur téléphone, l'écran s'ouvre en grand — et rend la page au départ", () => {
+test("sur téléphone, l'écran s'ouvre en grand — et la sécurité reste à l'écran au départ", () => {
   // Cyprien, 27/11/2026 : « mets-le en grand écran directement, comme sur Strava ».
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
   assert.match(gr, /window\.matchMedia\?\.\("\(max-width: 767px\)"\)\.matches\) return;\s*\n\s*pleinAuto\.current = true;\s*\n\s*setPlein\(true\);/, "l'écran ne s'ouvre plus en grand sur téléphone");
-  // ⚠️ Le lien de suivi et la limite de la veille s'affichent HORS de la carte : sous la
-  // couverture, l'athlète partirait sans les voir. Le grand écran automatique se referme.
-  assert.match(gr, /if \(phase !== "setup" && pleinAuto\.current\) \{ pleinAuto\.current = false; setPlein\(false\); \}/, "le grand écran automatique cache le lien de suivi au départ");
-  // Celui que l'athlète a demandé lui-même reste : basculer efface la marque « automatique ».
-  assert.match(gr, /function basculerPlein\(\) \{\s*\n\s*const suivant = !plein;\s*\n\s*pleinAuto\.current = false;/, "un grand écran demandé à la main se refermerait seul au départ");
+  // Le départ ouvre la vue chiffres (Strava) ; la configuration rouvre la carte.
+  assert.match(gr, /setVue\(phase === "setup" \? "carte" : "chiffres"\);/, "le départ n'ouvre plus la vue chiffres");
+  // ⚠️ Le lien de suivi et la limite de la veille sont DANS la couverture, dans les deux
+  // vues : sinon l'athlète part sans les voir (le défaut qui faisait refermer le grand écran).
+  assert.match(gr, /\{vue === "carte" && alertesSecurite && \(/, "la sécurité n'apparaît plus sur la carte pendant la course");
+  assert.match(gr, /\{alertesSecurite\}\{pastillesCourse\}/, "la sécurité n'apparaît plus dans la vue chiffres");
+  const alertes = gr.slice(gr.indexOf("const alertesSecurite"), gr.indexOf("const pastillesCourse"));
+  assert.match(alertes, /\{departPret && \(/, "le lien de suivi au départ a quitté l'écran de course");
+  assert.match(alertes, /d\["veille\.limite"\]/, "la limite de la veille de choc a quitté l'écran de course");
   // « Réglages » sort du grand écran avant de défiler, sinon rien ne bouge à l'écran.
   const vers = gr.slice(gr.indexOf("const versDetails = () =>"), gr.indexOf("const versDetails = () =>") + 500);
   assert.match(vers, /setPlein\(false\);/, "« Réglages » défile derrière la couverture : rien ne bouge à l'écran");
@@ -281,17 +296,45 @@ test("« Arrêter » enregistre la course — il ne la jetait pas, il la perdait
   const neuve = gr.slice(gr.indexOf("function nouvelleSession()"), gr.indexOf("function nouvelleSession()") + 900);
   assert.ok(!/saveRun/.test(neuve), "« Nouvelle session » enregistre une seconde fois la course déjà envoyée");
   assert.match(neuve, /setPhase\("setup"\)/, "« Nouvelle session » ne ramène plus aux réglages");
-  // Les quatre boutons vont au bon endroit : 2 pendant la course, 2 à l'arrivée.
-  assert.equal([...gr.matchAll(/onClick=\{arreterSession\}|onClick=\{\(\) => arreterSession/g)].length + [...gr.matchAll(/teinte="rouge" onClick=\{arreterSession\}/g)].length, 3, "les boutons d'arrêt ne pointent plus tous sur l'enregistrement");
-  assert.equal([...gr.matchAll(/onClick=\{nouvelleSession\}/g)].length, 2, "les boutons « Nouvelle session » ne pointent plus tous sur la remise à zéro");
+  // Comme Strava (27/11/2026) : « Terminer » n'existe QU'EN PAUSE — arrêter demande deux
+  // gestes, un appui malheureux en courant ne coupe plus la séance. Un seul jeu de boutons.
+  assert.equal([...gr.matchAll(/onClick=\{arreterSession\}/g)].length, 1, "les boutons d'arrêt ne pointent plus tous sur l'enregistrement");
+  const boutons = gr.slice(gr.indexOf("const boutonsCourse"), gr.indexOf("const libreCourse"));
+  assert.match(boutons, /paused \? \([\s\S]*onClick=\{arreterSession\}[\s\S]*d\["ct\.terminer"\][\s\S]*\) : \([\s\S]*onClick=\{pauseSession\}[\s\S]*d\["ct\.pause"\]/, "« Terminer » est accessible sans passer par la pause");
+  assert.equal([...gr.matchAll(/onClick=\{nouvelleSession\}/g)].length, 1, "le bouton « Nouvelle session » ne pointe plus sur la remise à zéro");
   assert.ok(!/stopSession\(/.test(gr), "l'ancien arrêt sans enregistrement est revenu");
   const n = [...readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8").matchAll(/"sp\.arret":/g)].length;
   assert.equal(n, 5, `« sp.arret » présent ${n} fois, attendu 5`);
 });
 
+test("« Mes parcours » : ses traces, allégées, jamais inventées", () => {
+  // Deux traces de 1 000 points, une absente, une vide, une d'un seul point : il en reste
+  // deux, allégées.
+  const longue = encodePolyline(Array.from({ length: 1000 }, (_, i) => ({ lat: 49.44 + i * 1e-5, lon: 1.1 + i * 1e-5 })));
+  const point = encodePolyline([{ lat: 49.44, lon: 1.1 }]);
+  const t = allegerParcours([longue, null, "", point, longue]);
+  assert.equal(t.length, 2, `${t.length} traces gardées sur 2 dessinables`);
+  for (const tr of t) {
+    assert.ok(tr.length <= MAX_POINTS + 1, `trace de ${tr.length} points envoyée au téléphone, plafond ${MAX_POINTS}`);
+    assert.deepEqual(tr[tr.length - 1], [49.44 + 999e-5, 1.1 + 999e-5].map((v) => Math.round(v * 1e5) / 1e5), "la trace s'arrête avant son arrivée");
+  }
+  assert.deepEqual(allegerParcours([]), [], "sans trace, la couche doit rester vide");
+  // Côté page : SES traces (user_id), avec GPS, plafonnées ; une panne de lecture se dit.
+  const page = codeNu("src/app/dashboard/ghost-runner/page.tsx");
+  assert.match(page, /\.select\("polyline"\)\s*\n?\s*\.eq\("user_id", user!\.id\)\.eq\("has_gps", true\)/, "les parcours ne sont plus filtrés sur l'athlète et le GPS");
+  assert.match(page, /\.limit\(MAX_PARCOURS\)/, "le nombre de parcours lus n'est plus plafonné");
+  assert.match(page, /\["parcours", \{ error: parcoursRes\.error \}\]/, "une panne de lecture des parcours passerait sous silence");
+  // Côté carte : sous le tracé du jour et sous les étiquettes, masquée par défaut.
+  const carte = codeNu("src/components/ghost-runner/CarteDirect.tsx");
+  assert.match(carte, /m\.addLayer\(\{ id: "parcours"[\s\S]{0,200}visibility: "none"/, "la couche des parcours s'affiche avant qu'on la demande");
+  assert.ok(carte.indexOf('id: "parcours"') < carte.indexOf('id: "trace-bord"'), "les anciens parcours passent par-dessus le tracé du jour");
+});
+
 test("les mots des commandes existent dans les cinq langues", () => {
   const src = readFileSync("src/components/ghost-runner/ghostI18n.tsx", "utf8");
-  for (const k of ["map.plan", "map.satellite", "map.recentrer", "map.reglages", "map.details", "map.fc"]) {
+  for (const k of ["map.plan", "map.satellite", "map.recentrer", "map.reglages", "map.details", "map.fc",
+    "map.gpsOk", "map.gpsCherche", "map.vueChiffres", "map.vueCarte", "map.3d", "map.calques", "map.fond",
+    "map.mesParcours", "map.mesParcoursAide", "map.mesParcoursVide", "map.fermer", "ct.terminer", "lv.enPause"]) {
     const n = [...src.matchAll(new RegExp(`"${k.replace(/\./g, "\\.")}":`, "g"))].length;
     assert.equal(n, 5, `« ${k} » présent ${n} fois, attendu 5`);
   }

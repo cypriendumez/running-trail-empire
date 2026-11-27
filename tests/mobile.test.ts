@@ -349,7 +349,8 @@ test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les r
   const gr = codeNu("src/components/ghost-runner/GhostRunner.tsx");
   // La branche « pas en plein écran » du className de la section (elle en a deux depuis
   // que la carte peut passer en grand écran).
-  const carte = gr.indexOf(': "relative -mx-3 -mt-3 md:mx-0 md:mt-0');
+  // 27/11/2026 : la section porte aussi sa hauteur (même composition partout, Strava).
+  const carte = gr.indexOf(': "relative -mx-3 -mt-3 h-[calc(100dvh-8.5rem)]');
   assert.ok(carte > 0, "le bloc carte a disparu de l'écran « Enregistrer »");
   assert.ok(!/relative -mx-[36] -mt-[36] md:hidden/.test(gr), "la carte est redevenue invisible sur bureau");
   assert.ok(/<CarteDirect\s+position=\{positionCarte\}\s+track=\{traceCarte\}/.test(gr.slice(carte, carte + 700)), "la carte ne suit plus la position ni la trace");
@@ -371,9 +372,10 @@ test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les r
   const rendu = gr.slice(carte);
   assert.ok(/onClick=\{\(\) => setTargetMode\(m\)\}/.test(rendu), "le choix allure / FC n'est plus sous la carte");
   assert.ok(/onClick=\{sendToWatch\}|sendToWatch\(\)/.test(rendu), "l'envoi vers la montre n'est plus sous la carte");
-  // Les commandes de la carte sont DÉFINIES UNE FOIS (`commandesCarte`) et posées à deux
-  // endroits selon l'écran : dupliquer le JSX dupliquerait l'état qu'il commande.
-  assert.equal([...gr.matchAll(/\{commandesCarte\}/g)].length, 2, "les commandes de la carte ne sont plus posées aux deux emplacements (téléphone et bureau)");
+  // Les commandes de la carte sont DÉFINIES UNE FOIS (`commandesCarte`) et, depuis le
+  // 27/11/2026 (« pareil sur ordinateur »), posées à UN seul endroit sur tous les écrans :
+  // la colonne de droite, au-dessus du bloc de chiffres, comme Strava.
+  assert.equal([...gr.matchAll(/\{commandesCarte\}/g)].length, 1, "les commandes de la carte sont de nouveau posées à deux endroits selon l'écran");
   assert.match(gr, /const commandesCarte = \(/, "les commandes de la carte ne sont plus définies une seule fois");
 });
 
