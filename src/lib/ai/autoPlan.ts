@@ -19,7 +19,7 @@ import { heatAdvice, windAdvice } from "@/lib/weather/openMeteo";
 import { dureesMarcheCourse, MARCHE_ENCADRANTE_MIN } from "@/lib/coach/marcheCourse";
 import { choisirJourQualite } from "@/lib/coach/meteoPlacement";
 import { fenetreRespectee } from "@/lib/coach/qualiteRecente";
-import { repartirFootings, varianteFooting } from "@/lib/coach/footings";
+import { joursEtales, repartirFootings, varianteFooting } from "@/lib/coach/footings";
 import { manqueDeVolume } from "@/lib/coach/ecartVolume";
 import { joursSansIntensite } from "@/lib/coach/apresCourse";
 import { axesRenforcement } from "@/lib/coach/renforcement";
@@ -612,9 +612,11 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
     });
   }
   // ── 1 ter. UN JOUR SANS COURSE ENTRE DEUX SORTIES (`weekPlan.espacer`, règle d'intensité d'un arrêt de plus de
-  // 28 jours) : couru hier, le jour 0 reste au repos. Les footings, eux, s'espacent à l'étape 5.
+  // 28 jours) : couru hier, le jour 0 reste au repos. Les footings, eux, s'espacent à l'étape 5. Couru hier ET déjà ce
+  // matin (visa @HeadCoach, 27/11/2026), le jour 0 n'est pas un repos : il reste libre, l'étape 5 y pose le footing (la
+  // sortie faite), et le jour 1 ne reçoit rien, parce qu'il touche un jour couru.
   const espacer = ctx.weekPlan.espacer;
-  if (espacer?.hier && isFree(0)) put(0, {
+  if (espacer?.hier && !espacer.aujourdhui && isFree(0)) put(0, {
     type: "Repos", title: (l) => PLAN_T[l].reposTitre, tags: tags("Repos"),
     detail: (l) => PLAN_T[l].reposEspaceDetail,
     why: (l) => PLAN_T[l].reposEspaceWhy,
@@ -640,17 +642,29 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   //  décalée, pas raccourcie, pas expliquée : absente. Six jours sur sept, personne ne
   //  pouvait le voir. Sept jours consécutifs contenant toujours exactement un samedi et
   //  un dimanche, l'écarter laisse forcément l'autre jour de week-end disponible.
-  const dayZeroDropped = ctx.readiness.level === "rouge" || ctx.lastHardDaysAgo === 0;
-  // Jamais le lendemain d'une course C : la course était la séance dure de la veille.
-  const apresCourseC = (i: number) => courseCIdx >= 0 && i === courseCIdx + 1;
+  // ⚠️ NI LE JOUR DONT LA SORTIE EST DÉJÀ FAITE, PENDANT UNE REPRISE (visa @HeadCoach, 27/11/2026) : couru hier et ce
+  // matin sous la garde `espacer`, le jour 0 n'est plus mis au repos (étape 1 ter) pour recevoir le footing déjà fait ;
+  // un dimanche, la sortie longue le prenait alors, au lendemain d'une autre sortie et le jour même d'une première. Ce
+  // jour-là ne porte rien de plus qu'un footing : ni sortie longue ni séance dure, sous `espacer` comme sous `etaler`.
+  const jourZeroFait = !!(ctx.weekPlan.espacer ?? ctx.weekPlan.etaler)?.aujourdhui;
+  const dayZeroDropped = ctx.readiness.level === "rouge" || ctx.lastHardDaysAgo === 0 || jourZeroFait;
+  // LE LENDEMAIN D'UNE SORTIE FAITE NE PORTE PAS LA SORTIE LONGUE : sous la garde `espacer` (jamais deux jours de course de
+  // suite), dès que la sortie du jour est faite (3ᵉ visa @HeadCoach, 27/11/2026 : couru samedi matin, la sortie longue tombait
+  // dimanche) ; sous `etaler`, quand on a couru hier ET ce matin (réserve du 4ᵉ visa : vendredi et samedi courus, la sortie
+  // longue du dimanche faisait trois jours d'affilée). Elle est déplacée vers un autre jour libre ; quand le lendemain était
+  // le seul, elle n'est pas posée et ses kilomètres vont aux footings (1 plan sur 927 tirés dans ce cas, 27/11/2026).
+  const lendemainProtege = jourZeroFait && (!!ctx.weekPlan.espacer || !!ctx.weekPlan.etaler?.hier);
+  // Jamais le lendemain d'une course C : la course était la séance dure de la veille. Ni le lendemain d'une sortie déjà
+  // faite quand `lendemainProtege` le protège.
+  const lendemainInterdit = (i: number) => (courseCIdx >= 0 && i === courseCIdx + 1) || (lendemainProtege && i === 1);
   const weekend = dates.map((d, i) => ({ i, day: d.getDay() }))
-    .filter((x) => (x.day === 0 || x.day === 6) && canRun(x.i) && !(dayZeroDropped && x.i === 0) && !apresCourseC(x.i));
+    .filter((x) => (x.day === 0 || x.day === 6) && canRun(x.i) && !(dayZeroDropped && x.i === 0) && !lendemainInterdit(x.i));
   // Une « sortie longue » de moins de 4 km n'est pas une sortie longue. Cas rencontré
   // sur un profil sans aucune donnée (volume cible nul) : le plan annonçait « Sortie
   // longue : ~0 km (environ 0 min) ». Mieux vaut ne rien poser.
   const longIdx = longRunKm < 4 ? -1 : raceIdx >= 0 ? -1
     : (weekend.find((x) => x.day === 0)?.i ?? weekend[0]?.i
-      ?? [6, 5, 4, 3, 2, 1, 0].find((i) => canRun(i) && !(dayZeroDropped && i === 0) && !apresCourseC(i)) ?? -1);
+      ?? [6, 5, 4, 3, 2, 1, 0].find((i) => canRun(i) && !(dayZeroDropped && i === 0) && !lendemainInterdit(i)) ?? -1);
   const bike = ctx.longRunMode === "bike";
   if (longIdx >= 0) {
     put(longIdx, bike
@@ -806,7 +820,12 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   const quality = wp.quality.slice(0, Math.min(wp.quality.length, plafondQualite));
   // Premier jour possible pour une qualité : jamais avant la reprise d'après-course
   // (`qualiteDes`), qui peut tomber au milieu des sept jours du plan.
-  const debutQualite = Math.max(dayZeroDropped ? 1 : 0, Math.min(7, Math.max(0, Math.trunc(wp.qualiteDes ?? 0))));
+  // La sortie du jour faite, la séance dure attend le surlendemain : sous `espacer`, toujours (jamais deux jours de course
+  // de suite, 3ᵉ visa @HeadCoach) ; sous `etaler`, quand on a couru hier ET ce matin. Chassée du jour 0 (`jourZeroFait`),
+  // elle glissait au jour 1 : troisième jour d'affilée sous `etaler` (tirage du 27/11/2026 : 3 plans sur 1 518 où la sortie
+  // du jour était faite, et un renforcement perdu), deuxième sous `espacer`.
+  const qualiteAuSurlendemain = lendemainProtege;
+  const debutQualite = Math.max(qualiteAuSurlendemain ? 2 : dayZeroDropped ? 1 : 0, Math.min(7, Math.max(0, Math.trunc(wp.qualiteDes ?? 0))));
   // La reprise après une course : séance déjà écrite courte (coachContext), et annoncée.
   // Elle l'emporte sur le « sauvée par le plancher », dont le texte parle de charge et
   // couperait une seconde fois des répétitions déjà réduites.
@@ -873,14 +892,18 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   const easySlots: number[] = [];
   // Le jour 0 RESTE un créneau de footing même quand la fraîcheur le convertit en
   // récupération : une séance de récup est un footing court, elle porte du kilométrage.
+  // (En reprise, `joursEtales` peut toutefois le laisser au repos quand la sortie d'hier le touche.)
   // (À la différence d'une séance de qualité annulée, dont les 11 km, eux, se libèrent.)
   // Pendant la règle d'intensité d'un long arrêt (`espacer`), un footing ne touche aucun jour couru : sortie longue,
   // séance dure, course, footing déjà retenu, ni la sortie d'hier pour le jour 0. Les créneaux se prennent espacés,
   // jamais les premiers de la liste ; un créneau sans place est perdu et rend sa sortie au budget.
   const SANS_COURSE = new Set(["Repos", "Renfo", "Vélo", "Natation", "Croisé", "Mobilité"]);
-  // La veille n'est pas lue ici : couru hier, l'étape 1 ter a déjà mis le jour 0 au repos.
-  const couruLe = (j: number) => j >= 0 && j <= 6 && (easySlots.includes(j) || (slot[j] != null && !SANS_COURSE.has(slot[j]!.type)));
-  for (let i = 0; i <= 6; i++) if (canRun(i) && (!espacer || (!couruLe(i - 1) && !couruLe(i + 1)))) { easySlots.push(i); spend(); }
+  // La veille n'est pas lue ici sous `espacer` : couru hier (et pas encore aujourd'hui), l'étape 1 ter a déjà mis le
+  // jour 0 au repos. Sous `etaler`, la veille entre dans les jours courus de `joursEtales` ; le jour 0 déjà couru y entre
+  // par `couruLe`, comme pour la garde `espacer`.
+  // Le jour 0 dont la sortie est déjà faite compte comme couru, même si le plan n'y pose rien (jour indisponible).
+  const couruLe = (j: number) => j >= 0 && j <= 6 && (easySlots.includes(j) || (slot[j] != null && !SANS_COURSE.has(slot[j]!.type))
+    || (j === 0 && !!(espacer ?? ctx.weekPlan.etaler)?.aujourdhui));
   // La séance du jour est arbitrée par la fraîcheur à l'étape 7. Si la qualité prévue
   // aujourd'hui va être remplacée par de la récupération, ses kilomètres ne doivent PAS
   // être décomptés du budget : sinon les footings de la semaine rétrécissent pour
@@ -911,6 +934,19 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   const footingMax = ctx.weekPlan.footingMaxKm;
   const plancherFooting = footingMax != null ? Math.min(kmMinFooting, footingMax) : kmMinFooting;
   const affordable = Math.max(0, Math.floor(remaining / plancherFooting));
+  // EN REPRISE (`etaler`, 26/11/2026), les footings que le budget finance ne prennent plus les premiers jours libres :
+  // ils s'étalent (`joursEtales`), la sortie d'hier comptant pour le jour 0. Leur NOMBRE ne change pas : le même que
+  // la boucle ci-dessous et la coupe de l'étape suivante auraient gardé (budget de sorties, puis kilomètres).
+  const etaler = !espacer ? ctx.weekPlan.etaler : undefined;
+  if (etaler) {
+    const candidats = [0, 1, 2, 3, 4, 5, 6].filter((i) => isFree(i) && avail(i));
+    const courus = new Set<number>([0, 1, 2, 3, 4, 5, 6].filter((j) => couruLe(j)));
+    if (etaler.hier) courus.add(-1);
+    const n = Math.min(Math.max(0, runBudget), candidats.length, affordable);
+    for (const i of joursEtales(candidats, n, courus)) { easySlots.push(i); spend(); }
+  } else {
+    for (let i = 0; i <= 6; i++) if (canRun(i) && (!espacer || (!couruLe(i - 1) && !couruLe(i + 1)))) { easySlots.push(i); spend(); }
+  }
   if (easySlots.length > affordable) {
     for (const i of easySlots.splice(affordable)) { slot[i] = null; runBudget += 1; }
   }
@@ -1031,10 +1067,13 @@ function construireSemaine(ctx: AthleteContext, today: Date): PlanDay[] {
   });
 
   // ── 7. Tout ce qui reste = repos.
+  // En reprise (`etaler`), un jour laissé libre est un repos VOULU : « le nombre de séances que tu peux réellement
+  // assurer » serait faux pour un coureur qui en déclare six (visa @HeadCoach, 27/11/2026). Le texte ne dit pas « entre
+  // deux sorties » : le repos peut tomber après le dernier footing de la fenêtre (relectures du 27/11).
   for (let i = 0; i <= 6; i++) put(i, {
     type: "Repos", title: (l) => PLAN_T[l].reposTitre, tags: tags("Repos"),
     detail: (l) => PLAN_T[l].reposFinalDetail,
-    why: (l) => PLAN_T[l].reposFinalWhy,
+    why: (l) => (etaler ? PLAN_T[l].reposEtaleWhy : PLAN_T[l].reposFinalWhy),
   });
 
   const week = slot as PlanDay[];

@@ -133,3 +133,64 @@ export function varianteFooting(rang: number, total: number, o: { taper?: boolea
   if (rang === 2 && total >= 3) return "progressif";
   return "base";
 }
+
+/**
+ * QUELS JOURS POUR LES FOOTINGS d'une semaine de reprise qui ne remplit pas ses jours libres.
+ *
+ * Défaut constaté le 26/11/2026 pendant une reprise de 6 à 28 jours (volume réduit de moitié) : le plan prenait
+ * les jours libres DANS L'ORDRE à partir d'aujourd'hui, puis coupait la fin de la liste quand le budget ne finançait que
+ * trois footings. Résultat : jeudi, vendredi, samedi courus, puis trois jours vides qui n'étaient pas un repos voulu. Or
+ * le souffle revient plus vite que la tolérance des os et des tendons à la charge : trois jours de course d'affilée en
+ * tête de reprise tombent quand cette tolérance est la plus basse.
+ *
+ * On choisit donc, parmi les `candidats` (jours libres et praticables, 0 = aujourd'hui), `n` jours. Les jours déjà courus
+ * comptent (`courus` : sortie longue, séance dure, course, la veille `-1` si une sortie y a été courue, le jour 0 si la
+ * sortie du jour est déjà faite). L'ordre de préférence :
+ *   1. le plus court des plus longs BLOCS de jours de course consécutifs (visa @HeadCoach, 27/11/2026 : compter les seules
+ *      paires laissait, à égalité, cinq footings sur sept jours en « 0, 1, 2, 4, 6 », trois jours d'affilée en tête, quand
+ *      « 0, 1, 3, 4, 6 » avait le même nombre de paires et des blocs de deux) ;
+ *   2. le moins de paires de jours consécutifs ;
+ *   3. les blocs les plus égaux (somme des carrés de leurs longueurs) ;
+ *   4. les jours les plus tôt : quand rien ne force l'écart, le choix est celui d'avant (le jour 0 reste un footing).
+ * Ce n'est PAS une interdiction (c'est la garde `espacer` des arrêts de plus de 28 jours) : aucune sortie n'est retirée,
+ * seuls les jours changent. Un jour candidat déjà couru (le jour 0 quand la sortie du jour est faite) ne coûte rien : il
+ * est pris, et c'est la sortie faite qui compte pour un des `n` footings. Rend les jours triés ; au plus 128 sous-ensembles.
+ */
+export function joursEtales(candidats: readonly number[], n: number, courus: ReadonlySet<number>): number[] {
+  const c = [...new Set(candidats)].filter((i) => Number.isInteger(i)).sort((a, b) => a - b);
+  const k = Math.max(0, Math.min(c.length, Math.floor(Number.isFinite(n) ? n : 0)));
+  if (k === 0) return [];
+  if (k === c.length || c.length > 12) return c.slice(0, k);
+  let meilleur: number[] | null = null;
+  let meilleurScore: number[] | null = null;
+  for (let m = 0; m < 1 << c.length; m++) {
+    let bits = 0;
+    for (let x = m; x; x &= x - 1) bits += 1;
+    if (bits !== k) continue;
+    const jours = c.filter((_, idx) => (m >> idx) & 1);
+    const score = scoreEtalement([...courus, ...jours]);
+    const cmp = meilleurScore ? comparer(score, meilleurScore) : -1;
+    if (cmp < 0 || (cmp === 0 && meilleur && comparer(jours, meilleur) < 0)) { meilleur = jours; meilleurScore = score; }
+  }
+  return meilleur ?? c.slice(0, k);
+}
+
+/** Longueurs des blocs de jours consécutifs d'un ensemble de jours (doublons ignorés). */
+export function blocsDeJours(jours: readonly number[]): number[] {
+  const t = [...new Set(jours)].filter((j) => Number.isInteger(j)).sort((a, b) => a - b);
+  const blocs: number[] = [];
+  t.forEach((j, i) => { if (i > 0 && j === t[i - 1] + 1) blocs[blocs.length - 1] += 1; else blocs.push(1); });
+  return blocs;
+}
+
+/** [plus long bloc, paires consécutives, somme des carrés des blocs] : plus petit = mieux étalé. */
+const scoreEtalement = (jours: readonly number[]) => {
+  const b = blocsDeJours(jours);
+  return [Math.max(0, ...b), b.reduce((t, l) => t + l - 1, 0), b.reduce((t, l) => t + l * l, 0)];
+};
+
+/** Comparaison lexicographique de deux listes de nombres de même longueur. */
+const comparer = (a: readonly number[], b: readonly number[]) => {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+  return 0;
+};
