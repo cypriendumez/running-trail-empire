@@ -24,6 +24,7 @@ import { avancer, intensite, idPartage, lienSuivi, lienSms, messageAlerte, messa
 import { createClient } from "@/lib/supabase/client";
 import { calquesDisponibles, fondsDisponibles, tuileDe, type CalqueCarte, type FondCarte, type IdCalque, type IdFond } from "@/lib/courses/fondsCarte";
 import { sortiesDepuis, type ParcoursDate } from "@/lib/courses/mesParcours";
+import { vignetteDessinee, VIGNETTE_RUES } from "./vignettes";
 import { RELIEF, avecCle } from "@/lib/trail/couches";
 
 /** La clé MapTiler (publique) : elle décide quels modèles existent (satellite, relief). */
@@ -214,7 +215,7 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   const [vue, setVue] = useState<"carte" | "chiffres">("carte");
   const [calquesOuverts, setCalquesOuverts] = useState(false);
   /** « Mes sorties » : toutes, les 30 derniers jours, ou masquées. */
-  const [modeSorties, setModeSorties] = useState<"toutes" | "recents" | "aucune">(mesParcours.length ? "toutes" : "aucune");
+  const [modeSorties, setModeSorties] = useState<"toutes" | "recents" | "semaine" | "aucune">(mesParcours.length ? "toutes" : "aucune");
   /** Les calques allumés. Les points d'intérêt le sont d'office, comme sur le plan d'origine. */
   const [calquesActifs, setCalquesActifs] = useState<IdCalque[]>(["poi"]);
   const [relief3d, setRelief3d] = useState(false);
@@ -1114,18 +1115,20 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   const fondChoisi: FondCarte = fondsDispo.find((f) => f.id === fondCarte) ?? fondsDispo[0];
   const calquesAllumes: CalqueCarte[] = calquesDispo.filter((c) => calquesActifs.includes(c.id));
   const sortiesRecentes = useMemo(() => sortiesDepuis(mesParcours, jourCivil(new Date(Date.now() - 30 * 86400000), fuseau)), [mesParcours, fuseau]);
-  const tracesAffichees = useMemo(() => (modeSorties === "recents" ? sortiesRecentes : mesParcours).map((p) => p.trace), [modeSorties, sortiesRecentes, mesParcours]);
+  const sortiesSemaine = useMemo(() => sortiesDepuis(mesParcours, jourCivil(new Date(Date.now() - 7 * 86400000), fuseau)), [mesParcours, fuseau]);
+  const tracesAffichees = useMemo(() => (modeSorties === "recents" ? sortiesRecentes : modeSorties === "semaine" ? sortiesSemaine : mesParcours).map((p) => p.trace), [modeSorties, sortiesRecentes, sortiesSemaine, mesParcours]);
   /** Ce qui est allumé en plus du plan : la pastille du bouton des calques, comme Strava. */
   const nbCalques = calquesAllumes.filter((c) => c.id !== "poi").length + (modeSorties !== "aucune" && mesParcours.length ? 1 : 0) + (relief3d ? 1 : 0);
   const coinVignette = centreModeles ?? [48.8566, 2.3522];
+  // Fonds : la VRAIE tuile du quartier (le dégradé dessous si elle ne répond pas).
+  // Calques : une petite carte DESSINÉE — la tuile d'un calque est vide là où il n'y a
+  // rien (VTT, vélo à Rouen), et la vignette n'aurait rien montré (27/11/2026).
   const vignetteFond = (f: FondCarte) => {
-    if (f.type === "vecteur") return f.id === "nuit" ? VIGNETTE_NUIT : VIGNETTE_PLAN;
+    if (f.type === "vecteur") return vignetteDessinee(f.id);
     const img = `url("${tuileDe(f.urls![0], coinVignette[0], coinVignette[1], 14)}") center/cover`;
-    return f.place === "sous-routes" ? `linear-gradient(35deg, transparent 46%, rgba(255,246,216,.9) 46% 52%, transparent 52%), linear-gradient(-55deg, transparent 62%, rgba(255,255,255,.75) 62% 66%, transparent 66%), ${img}` : img;
+    return f.place === "sous-routes" ? `${VIGNETTE_RUES}, ${img}, ${VIGNETTE_PLAN}` : `${img}, ${VIGNETTE_PLAN}`;
   };
-  const vignetteCalque = (c: CalqueCarte) =>
-    c.type === "image" && c.urls?.length ? `url("${tuileDe(c.urls[0], coinVignette[0], coinVignette[1], 14)}") center/cover, ${VIGNETTE_PLAN}`
-    : c.type === "ombrage" ? VIGNETTE_RELIEF : VIGNETTE_PLAN;
+  const vignetteCalque = (c: CalqueCarte) => vignetteDessinee(c.id === "pentes-fr" ? "pentes" : c.id === "courbes-fr" ? "courbes" : c.id);
 
   const commandesCarte = (
     <>
@@ -1524,7 +1527,9 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
             de chaque fond à sa position), pas des illustrations. */}
         {vue === "carte" && calquesOuverts && (
           <div className="absolute inset-x-0 bottom-0 z-[650] mx-auto max-h-[80%] max-w-xl overflow-y-auto rounded-t-[28px] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_40px_-12px_rgba(9,9,11,0.5)]">
-            <div className="sticky top-0 -mx-5 bg-white px-5 pb-2 pt-0.5">
+            {/* ⚠️ `z-10` : sans lui, les vignettes (positionnées) défilaient PAR-DESSUS le
+                titre collé en haut — vu sur iPhone le 27/11/2026. */}
+            <div className="sticky top-0 z-10 -mx-5 bg-white px-5 pb-2 pt-0.5">
               <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-zinc-200" aria-hidden />
               <div className="flex items-center justify-between">
                 <p className="text-[18px] font-bold text-zinc-900">{d["map.panneau"]}</p>
@@ -1545,8 +1550,8 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
 
             <p className="mt-5 text-[15px] font-bold text-zinc-900">{d["map.secSorties"]}</p>
             <p className="mt-0.5 text-[12px] text-zinc-500">{mesParcours.length ? tg("map.mesParcoursAide", { n: mesParcours.length }) : d["map.mesParcoursVide"]}</p>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              {([["toutes", d["s.toutes"], mesParcours.length], ["recents", d["s.recentes"], sortiesRecentes.length], ["aucune", d["s.aucune"], null]] as const).map(([id, nom, n]) => (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {([["toutes", d["s.toutes"], mesParcours.length], ["recents", d["s.recentes"], sortiesRecentes.length], ["semaine", d["s.semaine"], sortiesSemaine.length], ["aucune", d["s.aucune"], null]] as const).map(([id, nom, n]) => (
                 <button key={id} type="button" onClick={() => setModeSorties(id)} aria-pressed={modeSorties === id} disabled={id !== "aucune" && !mesParcours.length}
                   className={`rounded-2xl border px-2 py-2.5 text-center text-[12.5px] font-semibold leading-tight transition disabled:opacity-50 ${modeSorties === id ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-zinc-200 text-zinc-700 hover:border-zinc-300"}`}>
                   {nom}
@@ -1562,10 +1567,13 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
               return (
                 <div key={groupe}>
                   <p className="mt-5 text-[15px] font-bold text-zinc-900">{titre}</p>
+                  {/* Les pentes de l'IGN ne sont dessinées qu'EN MONTAGNE : à Rouen la couche
+                      est vide, et sans cette phrase on la croirait en panne. */}
+                  {groupe === "relief" && liste.some((c) => c.id === "pentes-fr") && <p className="mt-0.5 text-[12px] text-zinc-500">{d["c.pentesAide"]}</p>}
                   <div className="mt-2.5 grid grid-cols-4 gap-x-2 gap-y-3 sm:grid-cols-5">
                     {avec3d && (
-                      <Vignette nom={d["map.3d"]} actif={relief3d} onClick={() => setRelief3d((r) => !r)} fond={VIGNETTE_RELIEF}>
-                        <span className="rounded-lg bg-white/90 px-1.5 py-0.5 text-[15px] font-bold text-zinc-900">3D</span>
+                      <Vignette nom={d["map.3d"]} actif={relief3d} onClick={() => setRelief3d((r) => !r)} fond={vignetteDessinee("relief")}>
+                        <span className="absolute bottom-1.5 left-1.5 rounded-md bg-white/90 px-1 text-[11px] font-bold text-zinc-900">3D</span>
                       </Vignette>
                     )}
                     {liste.map((c) => (
@@ -2125,8 +2133,6 @@ function BtnCarte({ actif, titre, onClick, children }: { actif?: boolean; titre:
 }
 
 const VIGNETTE_PLAN = "linear-gradient(135deg,#f2f1ed 0 36%,#bfe3a3 36% 58%,#f2f1ed 58% 66%,#9ccdf2 66%)";
-const VIGNETTE_NUIT = "linear-gradient(135deg,#16191e 0 36%,#1b3324 36% 58%,#16191e 58% 66%,#0e2638 66%)";
-const VIGNETTE_RELIEF = "radial-gradient(circle at 30% 28%,#ffffff 0,#d9dfd2 30%,#9aa891 62%,#5f6f57 100%)";
 
 /**
  * Une vignette du tiroir des modèles : l'image, le nom, et la coche de ce qui est choisi.

@@ -191,7 +191,14 @@ test("les modèles de carte : selon la clé et le PAYS, jamais une tuile 403 ni 
   }
   // Avec la clé, à Paris : satellite, hybride, et les cartes de l'IGN — pas celles de la Suisse.
   const fr = ids("CLE_TEST_123", paris);
-  for (const id of ["plan", "nuit", "satellite", "hybride", "topo", "ign-plan", "ign-photo"]) assert.ok(fr.includes(id as never), `${id} manque à Paris`);
+  for (const id of ["plan", "nuit", "satellite", "hybride", "outdoor", "topo", "hiver", "cyclosm", "ign-plan", "ign-photo"]) assert.ok(fr.includes(id as never), `${id} manque à Paris`);
+  // Outdoor et Hiver sont des styles MapTiler : pas sans clé.
+  assert.ok(!ids(undefined, paris).includes("outdoor") && !ids(undefined, paris).includes("hiver"), "un style MapTiler est proposé sans clé : 403 sur chaque tuile");
+  assert.ok(ids(undefined, paris).includes("cyclosm"), "CyclOSM (libre) a disparu sans clé");
+  // Les itinéraires du monde partout ; la rando suisse en Suisse seulement.
+  const itin = (c: [number, number]) => calquesDisponibles("CLE_TEST_123", c).filter((x) => x.groupe === "itineraires").map((x) => x.id);
+  for (const id of ["rando", "vtt", "velo", "ski"]) assert.ok(itin(paris).includes(id as never), `${id} manque en France`);
+  assert.ok(!itin(paris).includes("rando-ch") && itin(zurich).includes("rando-ch"), "la rando suisse n'est pas réservée à la Suisse");
   assert.ok(!fr.includes("swisstopo") && !fr.includes("us-topo"), "une carte nationale est proposée hors de son pays");
   assert.ok(ids("CLE_TEST_123", zurich).includes("swisstopo"), "swisstopo n'est pas proposé en Suisse");
   assert.ok(!ids("CLE_TEST_123", ny).includes("ign-plan"), "l'IGN est proposé à New York");
@@ -219,6 +226,21 @@ test("les modèles de carte : selon la clé et le PAYS, jamais une tuile 403 ni 
   for (const f of ["src/components/ghost-runner/CarteDirect.tsx", "src/lib/courses/fondsCarte.ts", "src/components/ghost-runner/GhostRunner.tsx"]) {
     assert.ok(!/key=[A-Za-z0-9]{8,}/.test(readFileSync(f, "utf8")), `une clé MapTiler est écrite en dur dans ${f}`);
   }
+});
+
+test("chaque calque a sa vignette DESSINÉE — jamais un dégradé muet (27/11/2026)", () => {
+  // La tuile d'un calque est vide là où il n'y a rien : à Rouen, VTT et Vélo n'avaient
+  // qu'un dégradé. Chaque calque proposé, partout, doit avoir son propre dessin.
+  const src = readFileSync("src/components/ghost-runner/vignettes.ts", "utf8");
+  const dessins = src.slice(src.indexOf("const DESSINS"), src.indexOf("/** Les rues seules"));
+  const alias: Record<string, string> = { "pentes-fr": "pentes", "courbes-fr": "courbes" };
+  const ids = new Set<string>();
+  for (const c of [[48.85, 2.35], [47.37, 8.54], [40.71, -74.0]] as [number, number][]) for (const x of calquesDisponibles("CLE_TEST_123", c)) ids.add(alias[x.id] ?? x.id);
+  for (const id of [...ids, "plan", "nuit", "relief"]) {
+    assert.match(dessins, new RegExp(`(^|\\n)\\s*"?${id.replace("-", "\\-")}"?: `), `le calque ou fond « ${id} » n'a pas de vignette dessinée : il retomberait sur le plan nu`);
+  }
+  // Le titre du tiroir reste DEVANT les vignettes qui défilent (vu sur iPhone).
+  assert.match(codeNu("src/components/ghost-runner/GhostRunner.tsx"), /className="sticky top-0 z-10 -mx-5 bg-white/, "les vignettes défilent de nouveau par-dessus le titre du tiroir");
 });
 
 test("changer de modèle ne recharge JAMAIS le style : le tracé de la course resterait effacé", () => {
@@ -409,7 +431,8 @@ test("les mots des commandes existent dans les cinq langues", () => {
     "map.mesParcours", "map.mesParcoursAide", "map.mesParcoursVide", "map.fermer", "ct.terminer", "lv.enPause",
     "map.panneau", "map.secSorties", "map.secItineraires", "map.secRelief", "map.secAffichage", "f.plan", "f.nuit", "f.hybride",
     "f.topo", "f.ignPlan", "f.ignPhoto", "f.swisstopo", "f.bkgDe", "f.ignEs", "f.usTopo", "s.toutes", "s.recentes", "s.aucune",
-    "c.rando", "c.vtt", "c.velo", "c.ombrage", "c.pentes", "c.courbes", "c.poi"]) {
+    "c.rando", "c.vtt", "c.velo", "c.ombrage", "c.pentes", "c.courbes", "c.poi",
+    "f.outdoor", "f.hiver", "f.cyclosm", "c.ski", "c.randoCh", "s.semaine", "c.pentesAide"]) {
     const n = [...src.matchAll(new RegExp(`"${k.replace(/\./g, "\\.")}":`, "g"))].length;
     assert.equal(n, 5, `« ${k} » présent ${n} fois, attendu 5`);
   }
