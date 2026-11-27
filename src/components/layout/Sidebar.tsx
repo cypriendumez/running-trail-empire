@@ -90,7 +90,7 @@ export function Sidebar({ profile, unreadMessages = 0, estEditeur }: { profile: 
       // ⚠️ `transition` ANIMAIT TOUT, sur un élément pleine hauteur : chaque image
       // recalculait la mise en page de la barre entière. On ne déclare que la seule
       // propriété qui change réellement — la largeur du repli.
-      "hidden md:flex h-screen flex-col border-r border-zinc-100 bg-white transition-[width] duration-300 ease-out",
+      "hidden md:flex sticky top-0 h-screen shrink-0 flex-col border-r border-zinc-100 bg-white transition-[width] duration-300 ease-out",
       // ⚠️ LARGEURS PRÉFIXÉES `md:` : une largeur nue s'appliquerait aussi au téléphone.
       collapsed ? "md:w-[76px]" : "md:w-[232px]",
     )}>

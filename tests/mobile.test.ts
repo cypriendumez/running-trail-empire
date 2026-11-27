@@ -30,7 +30,7 @@ const LAYOUT = "src/app/dashboard/layout.tsx";
 
 test("sur mobile, la barre latérale ne prend AUCUNE largeur au contenu", () => {
   const src = codeNu(SIDEBAR);
-  assert.ok(/"hidden md:flex h-screen/.test(src),
+  assert.ok(/"hidden md:flex sticky top-0 h-screen/.test(src),
     "la colonne latérale n'est plus `hidden md:flex` : elle reprend de la largeur au téléphone");
   // ⚠️ LE POINT QUI COMPTE : les largeurs doivent être PRÉFIXÉES. Une largeur nue
   // s'applique aussi au téléphone et rétablit exactement le défaut.
@@ -356,7 +356,7 @@ test("« Enregistrer » ouvre sur la carte — sur TOUS les écrans — et les r
   assert.ok(/<CarteDirect\s+position=\{positionCarte\}\s+track=\{traceCarte\}/.test(gr.slice(carte, carte + 700)), "la carte ne suit plus la position ni la trace");
   // Elle est pleine largeur : les marges négatives annulent EXACTEMENT la marge du <main>
   // sur téléphone (`p-3` depuis le 29/09/2026 — « on défile trop ») ; `md:p-6` au-delà.
-  assert.match(codeNu("src/app/dashboard/layout.tsx"), /<main className="flex-1 overflow-auto p-3 md:p-6">/, "le <main> n'a plus p-3 sur téléphone : les marges -mx-3/-mt-3 de la carte ne s'annulent plus");
+  assert.match(codeNu("src/app/dashboard/layout.tsx"), /<main className="flex-1 p-3 md:p-6">/, "le <main> n'a plus p-3 sur téléphone : les marges -mx-3/-mt-3 de la carte ne s'annulent plus");
   // ⚠️ L'ENTÊTE VERT A ÉTÉ RETIRÉ (23/09/2026). Passé SOUS la carte quand celle-ci a pris
   // la tête de l'écran, il ne disait plus rien qu'elle ne dise déjà : un titre, un
   // sous-titre et trois pastilles décoratives, 200 px entre l'action et les réglages.

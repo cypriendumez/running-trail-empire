@@ -25,7 +25,7 @@ export function CoursSommaire({ items, label = "Sommaire" }: { items: { id: stri
   }, [items]);
 
   return (
-    <nav className="sticky top-6 space-y-1">
+    <nav className="sticky top-[5.5rem] space-y-1">
       <div className="mb-2 px-3 text-[11px] font-semibold text-zinc-400 first-letter:uppercase">{label}</div>
       {items.map((i) => {
         const on = active === i.id;

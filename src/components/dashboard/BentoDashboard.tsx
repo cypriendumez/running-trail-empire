@@ -1463,8 +1463,10 @@ export function BentoDashboard({ profile, hrv, metriqueVfc = null, workouts, pla
           qui ne peut PAS recréer de vide, quel que soit le nombre de cartes — or
           plusieurs d'entre elles sont conditionnelles.
           PAS de `overscroll-contain` : le défilement doit se propager à la page une
-          fois le bas du rail atteint, sinon la molette se bloque dans le rail. */}
-      <aside className="mt-4 space-y-4 lg:sticky lg:top-6 lg:mt-0 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
+          fois le bas du rail atteint, sinon la molette se bloque dans le rail.
+          `top-[5.5rem]` : depuis que la PAGE défile (27/11/2026), l'entête collant (4 rem)
+          couvre le haut de la fenêtre ; le rail se colle sous lui, pas derrière. */}
+      <aside className="mt-4 space-y-4 lg:sticky lg:top-[5.5rem] lg:mt-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1">
         {/* ORDRE DU RAIL, du plus utile au moins utile (07/11/2026, Cyprien : « du plus important
             au moins ») : ce que le coach dit de la dernière séance, le bilan chiffré de la
             semaine, la discipline, les records, puis le bilan Premium, les badges et la
