@@ -37,3 +37,27 @@ export function allegerParcours(polylignes: (string | null | undefined)[], maxPo
   }
   return sorties;
 }
+
+/** Une sortie dessinable, avec sa date (YYYY-MM-DD) quand on la connaît. */
+export type ParcoursDate = { trace: [number, number][]; date: string | null };
+
+/**
+ * Comme `allegerParcours`, mais chaque trace garde la date de sa séance : c'est ce qui
+ * permet « 30 derniers jours » à côté de « Toutes » (27/11/2026). Une date inconnue n'est
+ * pas inventée : la sortie reste dans « Toutes » et sort de « 30 derniers jours ».
+ */
+export function parcoursDates(lignes: { polyline: string | null | undefined; date: string | null | undefined }[], maxPoints = MAX_POINTS): ParcoursDate[] {
+  const sorties: ParcoursDate[] = [];
+  for (const l of lignes.slice(0, MAX_PARCOURS)) {
+    const [trace] = allegerParcours([l.polyline], maxPoints);
+    if (!trace) continue;
+    const date = typeof l.date === "string" && /^\d{4}-\d{2}-\d{2}/.test(l.date) ? l.date.slice(0, 10) : null;
+    sorties.push({ trace, date });
+  }
+  return sorties;
+}
+
+/** Les sorties depuis `depuis` (YYYY-MM-DD, inclus). Sans date : exclues, jamais devinées. */
+export function sortiesDepuis(p: ParcoursDate[], depuis: string): ParcoursDate[] {
+  return p.filter((s) => s.date !== null && s.date >= depuis);
+}

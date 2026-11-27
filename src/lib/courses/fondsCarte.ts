@@ -22,9 +22,17 @@
  * L'URL et l'attribution du satellite viennent du catalogue de `lib/trail/couches`, où
  * chaque source a été interrogée pour de vrai : une seule copie de l'adresse.
  */
-import { FONDS, avecCle } from "@/lib/trail/couches";
+import { FONDS, CALQUES, TRACES, avecCle, type Couverture } from "@/lib/trail/couches";
 
-export type IdFond = "plan" | "satellite";
+/**
+ * ── LES MODÈLES DE CARTE (Cyprien, 27/11/2026, vidéo de Strava à l'appui) ──
+ * « Strava propose plein de modèles quand on appuie sur le bouton des calques : mets-en
+ * autant, en mieux, sans copier-coller. » Les fonds ci-dessous viennent tous du catalogue
+ * VÉRIFIÉ de `lib/trail/couches` (chaque adresse interrogée pour de vrai), plus deux
+ * styles à nous : Pacevo (clair) et Pacevo Nuit (sombre, pour courir le soir).
+ * Les cartes nationales (IGN, swisstopo…) ne sont proposées que dans LEUR pays.
+ */
+export type IdFond = "plan" | "nuit" | "satellite" | "hybride" | "topo" | "ign-plan" | "ign-photo" | "swisstopo" | "bkg-de" | "ign-es" | "us-topo";
 
 /** Le style vectoriel de départ — OpenFreeMap « Liberty », repeint par `stylePacevo`. */
 export const STYLE_PLAN_URL = "https://tiles.openfreemap.org/styles/liberty";
@@ -141,4 +149,154 @@ export function stylePacevo<S extends Style>(base: S): S {
       return { ...c, paint };
     });
   return copie;
+}
+
+
+// ── LE CATALOGUE DU TIROIR ────────────────────────────────────────────────────
+
+/** Où placer une couche d'image par rapport au plan vectoriel. */
+export type Place = "dessus" | "sous-noms" | "sous-routes";
+
+export type FondCarte = {
+  id: IdFond;
+  /** Clé de traduction du nom. */
+  cle: string;
+  /** « vecteur » = notre style repeint ; « image » = tuiles d'une source du catalogue. */
+  type: "vecteur" | "image";
+  urls?: string[];
+  attribution?: string;
+  taille?: 256 | 512;
+  zoomMax?: number;
+  /** « dessus » : la carte a ses propres noms, elle couvre tout (hors nos tracés).
+   *  « sous-noms » : une photo, nos noms par-dessus. « sous-routes » : photo + rues + noms. */
+  place?: Place;
+  couverture: Couverture;
+};
+
+/** OpenTopoMap sert sur trois sous-domaines ; MapLibre ne connaît pas `{s}`. */
+function sousDomaines(url: string): string[] {
+  return url.includes("{s}") ? ["a", "b", "c"].map((x) => url.replace("{s}", x)) : [url];
+}
+
+const SOURCE = (id: string) => FONDS.find((f) => f.id === id);
+
+/** Le pays (ou les pays) d'un point — boîtes larges, assez pour choisir quelles cartes proposer. */
+export function paysDe(lat: number, lon: number): Couverture[] {
+  const dans = (s: number, n: number, o: number, e: number) => lat >= s && lat <= n && lon >= o && lon <= e;
+  const p: Couverture[] = ["monde"];
+  if (dans(41.2, 51.2, -5.3, 9.7)) p.push("fr");
+  if (dans(45.8, 47.9, 5.9, 10.6)) p.push("ch");
+  if (dans(47.2, 55.1, 5.8, 15.1)) p.push("de");
+  if (dans(35.9, 43.9, -9.4, 3.4)) p.push("es");
+  if (dans(24.4, 49.4, -125, -66.9)) p.push("us");
+  return p;
+}
+
+/** Les fonds proposés ici et maintenant, dans l'ordre du tiroir. */
+export function fondsDisponibles(cleMapTiler: string | undefined, centre: [number, number] | null): FondCarte[] {
+  const pays = centre ? paysDe(centre[0], centre[1]) : (["monde"] as Couverture[]);
+  const sat = satelliteDisponible(cleMapTiler);
+  const image = (id: IdFond, sourceId: string, cle: string, place: Place): FondCarte | null => {
+    const src = SOURCE(sourceId);
+    const url = src ? avecCle(src.url, cleMapTiler) : null;
+    if (!src || !url || !pays.includes(src.couverture)) return null;
+    return { id, cle, type: "image", urls: sousDomaines(url), attribution: src.attribution, taille: src.taille, zoomMax: src.zoomMax, place, couverture: src.couverture };
+  };
+  const liste: (FondCarte | null)[] = [
+    { id: "plan", cle: "f.plan", type: "vecteur", couverture: "monde" },
+    { id: "nuit", cle: "f.nuit", type: "vecteur", couverture: "monde" },
+    sat && { id: "satellite", cle: "map.satellite", type: "image", urls: [sat.url], attribution: sat.attribution, taille: sat.taille, zoomMax: sat.zoomMax, place: "sous-noms", couverture: "monde" },
+    sat && { id: "hybride", cle: "f.hybride", type: "image", urls: [sat.url], attribution: sat.attribution, taille: sat.taille, zoomMax: sat.zoomMax, place: "sous-routes", couverture: "monde" },
+    image("topo", "opentopo", "f.topo", "dessus"),
+    image("ign-plan", "ign-plan", "f.ignPlan", "dessus"),
+    image("ign-photo", "ign-ortho", "f.ignPhoto", "sous-noms"),
+    image("swisstopo", "swisstopo", "f.swisstopo", "dessus"),
+    image("bkg-de", "bkg-de", "f.bkgDe", "dessus"),
+    image("ign-es", "ign-es", "f.ignEs", "dessus"),
+    image("us-topo", "us-topo", "f.usTopo", "dessus"),
+  ];
+  return liste.filter((f): f is FondCarte => !!f);
+}
+
+export type IdCalque = "rando" | "vtt" | "velo" | "ombrage" | "pentes-fr" | "courbes-fr" | "poi";
+
+export type CalqueCarte = {
+  id: IdCalque;
+  cle: string;
+  groupe: "itineraires" | "relief" | "affichage";
+  /** « image » : tuiles transparentes posées dessus ; « ombrage » : calculé du relief ;
+   *  « style » : une partie de notre propre style, montrée ou cachée. */
+  type: "image" | "ombrage" | "style";
+  urls?: string[];
+  attribution?: string;
+  zoomMax?: number;
+  couverture: Couverture;
+};
+
+/**
+ * Les calques proposés ici et maintenant. ⚠️ L'OMBRAGE vient du relief MapTiler : sans
+ * clé, il n'existe pas (on ne le remplace pas par une image plate). Les pentes et les
+ * courbes de l'IGN ne couvrent que la France : ailleurs, on ne les propose pas.
+ */
+export function calquesDisponibles(cleMapTiler: string | undefined, centre: [number, number] | null): CalqueCarte[] {
+  const pays = centre ? paysDe(centre[0], centre[1]) : (["monde"] as Couverture[]);
+  const depuis = (id: IdCalque, cle: string, groupe: CalqueCarte["groupe"], src: { url: string; attribution: string; zoomMax: number; couverture: Couverture } | undefined): CalqueCarte | null =>
+    src && pays.includes(src.couverture) ? { id, cle, groupe, type: "image", urls: sousDomaines(src.url), attribution: src.attribution, zoomMax: src.zoomMax, couverture: src.couverture } : null;
+  const rando = TRACES.find((t) => t.id === "rando");
+  const liste: (CalqueCarte | null)[] = [
+    depuis("rando", "c.rando", "itineraires", rando),
+    depuis("vtt", "c.vtt", "itineraires", TRACES.find((t) => t.id === "vtt")),
+    // Vélo : même service que la randonnée (Waymarked Trails), interrogé le 27/11/2026 → 200.
+    rando ? { id: "velo", cle: "c.velo", groupe: "itineraires", type: "image", urls: [rando.url.replace("/hiking/", "/cycling/")], attribution: rando.attribution, zoomMax: rando.zoomMax, couverture: "monde" } : null,
+    cleMapTiler ? { id: "ombrage", cle: "c.ombrage", groupe: "relief", type: "ombrage", couverture: "monde" } : null,
+    depuis("pentes-fr", "c.pentes", "relief", CALQUES.find((c) => c.id === "pentes-fr")),
+    depuis("courbes-fr", "c.courbes", "relief", CALQUES.find((c) => c.id === "courbes-fr")),
+    { id: "poi", cle: "c.poi", groupe: "affichage", type: "style", couverture: "monde" },
+  ];
+  return liste.filter((c): c is CalqueCarte => !!c);
+}
+
+/** L'adresse de la tuile qui contient un point — pour les vignettes du tiroir (vraie image du quartier). */
+export function tuileDe(url: string, lat: number, lon: number, z: number): string {
+  const n = 2 ** z;
+  const x = Math.floor(((lon + 180) / 360) * n);
+  const r = (lat * Math.PI) / 180;
+  const y = Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n);
+  return url.replace("{z}", String(z)).replace("{x}", String(x)).replace("{y}", String(y));
+}
+
+// ── PACEVO NUIT ───────────────────────────────────────────────────────────────
+const NUIT: Record<string, Record<string, unknown>> = {
+  background: { "background-color": "#16191e" },
+  landuse_residential: { "fill-color": "#1d2128", "fill-opacity": 0.6 },
+  park: { "fill-color": "#1b3324" }, park_outline: { "line-color": "#1b3324" },
+  landcover_grass: { "fill-color": "#1b3324" }, landcover_wood: { "fill-color": "#183020", "fill-opacity": 0.85 },
+  landuse_pitch: { "fill-color": "#1e2f24" }, landuse_track: { "fill-color": "#1e2f24" },
+  landuse_cemetery: { "fill-color": "#1e2a22" }, landuse_hospital: { "fill-color": "#2a1f22" }, landuse_school: { "fill-color": "#23252a" },
+  water: { "fill-color": "#0e2638" }, waterway_river: { "line-color": "#0e2638" }, waterway_other: { "line-color": "#0e2638" }, waterway_tunnel: { "line-color": "#0e2638" },
+  // Le contour des bâtiments garde sinon le gris clair du jour : un quadrillage lumineux.
+  building: { "fill-color": "#252a32", "fill-outline-color": "#2c323b" },
+};
+
+/**
+ * Les couleurs de Pacevo Nuit, couche par couche, à partir du style de JOUR déjà repeint :
+ * fond presque noir, rues gris ardoise, grands axes ambre sourd, chemins vert mousse, noms
+ * en clair sur halo sombre. Pure : renvoie seulement ce qui change.
+ */
+export function peinturesNuit(jour: { layers: { id: string; type: string; paint?: Record<string, unknown> }[] }): Record<string, Record<string, unknown>> {
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const c of jour.layers) {
+    const p: Record<string, unknown> = { ...(NUIT[c.id] ?? {}) };
+    if (/^(road|bridge|tunnel)_/.test(c.id) && c.type === "line" && !/rail/.test(c.id)) {
+      const grand = /motorway|trunk|primary|secondary|tertiary|link/.test(c.id);
+      if (/path_pedestrian/.test(c.id) && !/casing/.test(c.id)) p["line-color"] = "#5f7d45";
+      else if (/casing/.test(c.id)) p["line-color"] = grand ? "#3d3422" : "#23272e";
+      else p["line-color"] = grand ? "#6b5a32" : "#3a404a";
+    }
+    if (/rail/.test(c.id) && c.type === "line") p["line-color"] = "#3a3f47";
+    if (c.type === "symbol") { p["text-color"] = "#d4d4d8"; p["text-halo-color"] = "rgba(16,18,22,0.9)"; }
+    if (c.type === "line" && /boundary/.test(c.id)) p["line-color"] = "#4b5160";
+    if (Object.keys(p).length) out[c.id] = p;
+  }
+  return out;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback , useId, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useId, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, Pause, StopCircle, Volume2, VolumeX,
@@ -22,13 +22,12 @@ const CarteDirect = dynamic(() => import("./CarteDirect").then((m) => m.CarteDir
 import { sauverEnCours, lireEnCours, effacerEnCours, mettreEnAttente, vautEnregistrement, INTERVALLE_SAUVEGARDE_MS, type CourseEnCours } from "@/lib/courses/horsLigne";
 import { avancer, intensite, idPartage, lienSuivi, lienSms, messageAlerte, messageDepart, type EtatVeille } from "@/lib/courses/veille";
 import { createClient } from "@/lib/supabase/client";
-import { fondsCarteDirecte, type IdFond } from "@/lib/courses/fondsCarte";
+import { calquesDisponibles, fondsDisponibles, tuileDe, type CalqueCarte, type FondCarte, type IdCalque, type IdFond } from "@/lib/courses/fondsCarte";
+import { sortiesDepuis, type ParcoursDate } from "@/lib/courses/mesParcours";
 import { RELIEF, avecCle } from "@/lib/trail/couches";
 
-/** ⚠️ Le satellite n'existe QUE si la clé MapTiler existe : sans elle les tuiles
- *  répondent 403 et la carte reste grise sans la moindre erreur. On ne propose donc
- *  pas le bouton plutôt que de le proposer cassé (cf. lib/courses/fondsCarte). */
-const SATELLITE_DISPO = fondsCarteDirecte(process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined).includes("satellite");
+/** La clé MapTiler (publique) : elle décide quels modèles existent (satellite, relief). */
+const CLE_MAPTILER = process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined;
 /** Le bouton « 3D » n'existe que si le relief existe (clé MapTiler) : une carte seulement
  *  inclinée ne se fait pas passer pour du relief (cf. lib/trail/couches). */
 const RELIEF_DISPO = avecCle(RELIEF.url, process.env.NEXT_PUBLIC_MAPTILER_KEY || undefined) !== null;
@@ -61,8 +60,8 @@ interface GhostRunnerProps {
   contact?: { nom: string; tel: string };
   /** Centre de la dernière trace connue — CADRAGE de la carte, jamais une position. */
   centreInitial?: [number, number] | null;
-  /** Ses dernières traces GPS, allégées (`lib/courses/mesParcours`) — « Mes parcours ». */
-  mesParcours?: [number, number][][];
+  /** Ses dernières traces GPS, allégées et datées (`lib/courses/mesParcours`) — « Mes sorties ». */
+  mesParcours?: ParcoursDate[];
 }
 
 interface Checkpoint {
@@ -214,7 +213,10 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
    */
   const [vue, setVue] = useState<"carte" | "chiffres">("carte");
   const [calquesOuverts, setCalquesOuverts] = useState(false);
-  const [voirParcours, setVoirParcours] = useState(mesParcours.length > 0);
+  /** « Mes sorties » : toutes, les 30 derniers jours, ou masquées. */
+  const [modeSorties, setModeSorties] = useState<"toutes" | "recents" | "aucune">(mesParcours.length ? "toutes" : "aucune");
+  /** Les calques allumés. Les points d'intérêt le sont d'office, comme sur le plan d'origine. */
+  const [calquesActifs, setCalquesActifs] = useState<IdCalque[]>(["poi"]);
   const [relief3d, setRelief3d] = useState(false);
   /** Vrai quelques secondes après la première position : « Signal GPS trouvé », en vert. */
   const [gpsTrouve, setGpsTrouve] = useState(false);
@@ -1102,10 +1104,36 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
   // ── LES BOUTONS RONDS DE LA CARTE, EN COLONNE À DROITE (comme Strava) ────────
   // Au-dessus du bloc de chiffres, au pouce. ⚠️ DÉFINIS UNE FOIS : la colonne est la même
   // sur téléphone et sur ordinateur (Cyprien, 27/11/2026 : « pareil sur ordinateur »).
+  // ── LES MODÈLES PROPOSÉS ICI : selon la clé et le PAYS où l'on se trouve ──────────
+  // Arrondi au dixième de degré : on ne recalcule pas la liste à chaque point GPS.
+  const centreModeles = positionCarte ?? centreInitial;
+  const cleCentre = centreModeles ? `${centreModeles[0].toFixed(1)},${centreModeles[1].toFixed(1)}` : "";
+  const fondsDispo = useMemo(() => fondsDisponibles(CLE_MAPTILER, centreModeles), [cleCentre]); // eslint-disable-line react-hooks/exhaustive-deps
+  const calquesDispo = useMemo(() => calquesDisponibles(CLE_MAPTILER, centreModeles), [cleCentre]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Un fond qui n'existe plus ici (on a changé de pays) retombe sur Pacevo, jamais sur du vide.
+  const fondChoisi: FondCarte = fondsDispo.find((f) => f.id === fondCarte) ?? fondsDispo[0];
+  const calquesAllumes: CalqueCarte[] = calquesDispo.filter((c) => calquesActifs.includes(c.id));
+  const sortiesRecentes = useMemo(() => sortiesDepuis(mesParcours, jourCivil(new Date(Date.now() - 30 * 86400000), fuseau)), [mesParcours, fuseau]);
+  const tracesAffichees = useMemo(() => (modeSorties === "recents" ? sortiesRecentes : mesParcours).map((p) => p.trace), [modeSorties, sortiesRecentes, mesParcours]);
+  /** Ce qui est allumé en plus du plan : la pastille du bouton des calques, comme Strava. */
+  const nbCalques = calquesAllumes.filter((c) => c.id !== "poi").length + (modeSorties !== "aucune" && mesParcours.length ? 1 : 0) + (relief3d ? 1 : 0);
+  const coinVignette = centreModeles ?? [48.8566, 2.3522];
+  const vignetteFond = (f: FondCarte) => {
+    if (f.type === "vecteur") return f.id === "nuit" ? VIGNETTE_NUIT : VIGNETTE_PLAN;
+    const img = `url("${tuileDe(f.urls![0], coinVignette[0], coinVignette[1], 14)}") center/cover`;
+    return f.place === "sous-routes" ? `linear-gradient(35deg, transparent 46%, rgba(255,246,216,.9) 46% 52%, transparent 52%), linear-gradient(-55deg, transparent 62%, rgba(255,255,255,.75) 62% 66%, transparent 66%), ${img}` : img;
+  };
+  const vignetteCalque = (c: CalqueCarte) =>
+    c.type === "image" && c.urls?.length ? `url("${tuileDe(c.urls[0], coinVignette[0], coinVignette[1], 14)}") center/cover, ${VIGNETTE_PLAN}`
+    : c.type === "ombrage" ? VIGNETTE_RELIEF : VIGNETTE_PLAN;
+
   const commandesCarte = (
     <>
       <BtnCarte actif={calquesOuverts} titre={d["map.calques"]} onClick={() => setCalquesOuverts((o) => !o)}>
         <Layers className="h-5 w-5" />
+        {nbCalques > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">{nbCalques}</span>
+        )}
       </BtnCarte>
       {RELIEF_DISPO && (
         <BtnCarte actif={relief3d} titre={d["map.3d"]} onClick={() => setRelief3d((r) => !r)}>
@@ -1390,13 +1418,14 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
           position={positionCarte}
           track={traceCarte}
           centre={centreInitial}
-          fond={fondCarte}
+          fond={fondChoisi}
+          calques={calquesAllumes}
           suivre={suiviCarte}
           onDeplacement={() => setSuiviCarte(false)}
           recentrer={recentrages}
           etiquette={d["hero"]}
-          parcours={mesParcours}
-          voirParcours={voirParcours}
+          parcours={tracesAffichees}
+          voirParcours={modeSorties !== "aucune"}
           relief={relief3d}
           className="h-full w-full"
         />
@@ -1489,37 +1518,68 @@ export function GhostRunner({ profile, baseline, effectiveVma, fcMaxObservee = n
           </div>
         )}
 
-        {/* Les calques, comme Strava : un tiroir par-dessus la carte. */}
+        {/* ══ LE TIROIR DES MODÈLES DE CARTE (27/11/2026) ════════════════════════════
+            Cyprien, vidéo de Strava à l'appui : « autant de modèles, en mieux, sans copier-
+            coller ». Les vignettes sont de VRAIES images du quartier de l'athlète (la tuile
+            de chaque fond à sa position), pas des illustrations. */}
         {vue === "carte" && calquesOuverts && (
-          <div className="absolute inset-x-0 bottom-0 z-[650] mx-auto max-w-xl rounded-t-[28px] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_40px_-12px_rgba(9,9,11,0.5)]">
-            <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-zinc-200" aria-hidden />
-            <div className="flex items-center justify-between">
-              <p className="text-[17px] font-bold text-zinc-900">{d["map.calques"]}</p>
-              <button type="button" onClick={() => setCalquesOuverts(false)} aria-label={d["map.fermer"]} className="rounded-full p-1.5 text-zinc-700 hover:bg-zinc-100">
-                <X className="h-5 w-5" />
-              </button>
+          <div className="absolute inset-x-0 bottom-0 z-[650] mx-auto max-h-[80%] max-w-xl overflow-y-auto rounded-t-[28px] bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_40px_-12px_rgba(9,9,11,0.5)]">
+            <div className="sticky top-0 -mx-5 bg-white px-5 pb-2 pt-0.5">
+              <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-zinc-200" aria-hidden />
+              <div className="flex items-center justify-between">
+                <p className="text-[18px] font-bold text-zinc-900">{d["map.panneau"]}</p>
+                <button type="button" onClick={() => setCalquesOuverts(false)} aria-label={d["map.fermer"]} className="rounded-full p-1.5 text-zinc-700 hover:bg-zinc-100">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
-            <p className="mt-3 text-[14px] font-bold text-zinc-900">{d["map.fond"]}</p>
-            <div className="mt-2 flex gap-3">
-              {([["plan", d["map.plan"], "linear-gradient(135deg,#f2f1ed 0 40%,#bfe3a3 40% 62%,#9ccdf2 62%)"], ...(SATELLITE_DISPO ? [["satellite", d["map.satellite"], "linear-gradient(135deg,#4b5a3a,#7c8a5c 45%,#3d5566)"]] : [])] as [IdFond, string, string][]).map(([id, nom, fondVignette]) => (
-                <button key={id} type="button" onClick={() => setFondCarte(id)} aria-pressed={fondCarte === id} className="flex w-20 flex-col items-center gap-1.5">
-                  <span className={`h-16 w-16 rounded-2xl ring-2 ${fondCarte === id ? "ring-emerald-600" : "ring-transparent"}`} style={{ background: fondVignette }} />
-                  <span className={`text-[12px] font-semibold ${fondCarte === id ? "text-emerald-700" : "text-zinc-600"}`}>{nom}</span>
+
+            <p className="mt-2 text-[15px] font-bold text-zinc-900">{d["map.fond"]}</p>
+            <div className="mt-2.5 grid grid-cols-4 gap-x-2 gap-y-3 sm:grid-cols-5">
+              {fondsDispo.map((f) => (
+                <Vignette key={f.id} nom={d[f.cle] ?? f.id} actif={fondChoisi.id === f.id} onClick={() => setFondCarte(f.id)}
+                  etiquette={f.couverture !== "monde" ? f.couverture.toUpperCase() : undefined}
+                  fond={vignetteFond(f)} />
+              ))}
+            </div>
+
+            <p className="mt-5 text-[15px] font-bold text-zinc-900">{d["map.secSorties"]}</p>
+            <p className="mt-0.5 text-[12px] text-zinc-500">{mesParcours.length ? tg("map.mesParcoursAide", { n: mesParcours.length }) : d["map.mesParcoursVide"]}</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {([["toutes", d["s.toutes"], mesParcours.length], ["recents", d["s.recentes"], sortiesRecentes.length], ["aucune", d["s.aucune"], null]] as const).map(([id, nom, n]) => (
+                <button key={id} type="button" onClick={() => setModeSorties(id)} aria-pressed={modeSorties === id} disabled={id !== "aucune" && !mesParcours.length}
+                  className={`rounded-2xl border px-2 py-2.5 text-center text-[12.5px] font-semibold leading-tight transition disabled:opacity-50 ${modeSorties === id ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-zinc-200 text-zinc-700 hover:border-zinc-300"}`}>
+                  {nom}
+                  {n != null && <span className="mt-0.5 block text-[11px] font-medium text-zinc-500">{n}</span>}
                 </button>
               ))}
             </div>
-            <p className="mt-4 text-[14px] font-bold text-zinc-900">{d["map.calques"]}</p>
-            <button type="button" onClick={() => setVoirParcours((v) => !v)} disabled={mesParcours.length === 0} aria-pressed={voirParcours}
-              className="mt-2 flex w-full items-center gap-3 rounded-2xl border border-zinc-100 px-3 py-2.5 text-left disabled:opacity-60">
-              <span className="h-10 w-10 flex-shrink-0 rounded-xl" style={{ background: "repeating-linear-gradient(120deg,#e8eefc 0 6px,#2563eb55 6px 8px)" }} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[14px] font-semibold text-zinc-900">{d["map.mesParcours"]}</span>
-                <span className="block truncate text-[12px] text-zinc-500">{mesParcours.length ? tg("map.mesParcoursAide", { n: mesParcours.length }) : d["map.mesParcoursVide"]}</span>
-              </span>
-              <span className={`relative h-6 w-10 flex-shrink-0 rounded-full transition-colors ${voirParcours && mesParcours.length ? "bg-emerald-600" : "bg-zinc-200"}`}>
-                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${voirParcours && mesParcours.length ? "left-[1.125rem]" : "left-0.5"}`} />
-              </span>
-            </button>
+
+            {([["itineraires", d["map.secItineraires"]], ["relief", d["map.secRelief"]], ["affichage", d["map.secAffichage"]]] as const).map(([groupe, titre]) => {
+              const liste = calquesDispo.filter((c) => c.groupe === groupe);
+              const avec3d = groupe === "relief" && RELIEF_DISPO;
+              if (!liste.length && !avec3d) return null;
+              return (
+                <div key={groupe}>
+                  <p className="mt-5 text-[15px] font-bold text-zinc-900">{titre}</p>
+                  <div className="mt-2.5 grid grid-cols-4 gap-x-2 gap-y-3 sm:grid-cols-5">
+                    {avec3d && (
+                      <Vignette nom={d["map.3d"]} actif={relief3d} onClick={() => setRelief3d((r) => !r)} fond={VIGNETTE_RELIEF}>
+                        <span className="rounded-lg bg-white/90 px-1.5 py-0.5 text-[15px] font-bold text-zinc-900">3D</span>
+                      </Vignette>
+                    )}
+                    {liste.map((c) => (
+                      <Vignette key={c.id} nom={d[c.cle] ?? c.id} actif={calquesActifs.includes(c.id)}
+                        onClick={() => setCalquesActifs((a) => (a.includes(c.id) ? a.filter((x) => x !== c.id) : [...a, c.id]))}
+                        etiquette={c.couverture !== "monde" ? c.couverture.toUpperCase() : undefined}
+                        fond={vignetteCalque(c)}>
+                        {c.id === "poi" && <MapPin className="h-6 w-6 text-rose-500" fill="#fecdd3" />}
+                      </Vignette>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -2057,9 +2117,31 @@ function BtnCarte({ actif, titre, onClick, children }: { actif?: boolean; titre:
   return (
     <button
       type="button" onClick={onClick} title={titre} aria-label={titre} aria-pressed={!!actif}
-      className={`pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full shadow-[0_8px_18px_-8px_rgba(9,9,11,0.6)] ring-1 transition-colors ${actif ? "bg-zinc-900 text-white ring-zinc-900" : "bg-white/95 text-zinc-600 ring-black/5 hover:bg-white"}`}
+      className={`pointer-events-auto relative flex h-11 w-11 items-center justify-center rounded-full shadow-[0_8px_18px_-8px_rgba(9,9,11,0.6)] ring-1 transition-colors ${actif ? "bg-zinc-900 text-white ring-zinc-900" : "bg-white/95 text-zinc-600 ring-black/5 hover:bg-white"}`}
     >
       {children}
+    </button>
+  );
+}
+
+const VIGNETTE_PLAN = "linear-gradient(135deg,#f2f1ed 0 36%,#bfe3a3 36% 58%,#f2f1ed 58% 66%,#9ccdf2 66%)";
+const VIGNETTE_NUIT = "linear-gradient(135deg,#16191e 0 36%,#1b3324 36% 58%,#16191e 58% 66%,#0e2638 66%)";
+const VIGNETTE_RELIEF = "radial-gradient(circle at 30% 28%,#ffffff 0,#d9dfd2 30%,#9aa891 62%,#5f6f57 100%)";
+
+/**
+ * Une vignette du tiroir des modèles : l'image, le nom, et la coche de ce qui est choisi.
+ * L'image passe en FOND CSS (pas d'<img>) : une tuile qui ne répond pas laisse le dégradé
+ * dessous, jamais une icône d'image cassée.
+ */
+function Vignette({ nom, actif, onClick, fond, etiquette, children }: { nom: string; actif: boolean; onClick: () => void; fond: string; etiquette?: string; children?: ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={actif} className="flex flex-col items-center gap-1.5">
+      <span className={`relative h-[68px] w-[68px] overflow-hidden rounded-2xl ring-2 ring-offset-2 transition ${actif ? "ring-emerald-600" : "ring-transparent hover:ring-zinc-200"}`} style={{ background: fond }}>
+        {children && <span className="absolute inset-0 flex items-center justify-center">{children}</span>}
+        {etiquette && <span className="absolute left-1 top-1 rounded bg-white/90 px-1 text-[9px] font-bold text-zinc-700">{etiquette}</span>}
+        {actif && <span className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white ring-2 ring-white"><Check className="h-3 w-3" strokeWidth={3} /></span>}
+      </span>
+      <span className={`w-full text-center text-[11.5px] font-semibold leading-tight ${actif ? "text-emerald-700" : "text-zinc-700"}`}>{nom}</span>
     </button>
   );
 }
