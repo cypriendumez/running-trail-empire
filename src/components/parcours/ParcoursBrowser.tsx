@@ -428,7 +428,7 @@ function buildGpx(name: string, coords: [number, number][], credit?: string): st
   const seg = coords.map(([lng, lat]) => `      <trkpt lat="${lat.toFixed(6)}" lon="${lng.toFixed(6)}"></trkpt>`).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Pacevo" xmlns="http://www.topografix.com/GPX/1/1">
-  <metadata><name>${escapeXml(name)}</name>${credit ? `<desc>${escapeXml(credit)}</desc>` : `<desc>Tracé © les contributeurs OpenStreetMap (ODbL)</desc>`}</metadata>
+  <metadata><name>${escapeXml(name)}</name>${credit ? `<desc>${escapeXml(credit)}</desc>` : `<desc>Tracé © les contributeurs OpenStreetMap (ODbL)</desc><copyright author="Contributeurs OpenStreetMap"><license>https://opendatacommons.org/licenses/odbl/1-0/</license></copyright><link href="https://www.openstreetmap.org/copyright"><text>© OpenStreetMap</text></link>`}</metadata>
   <trk><name>${escapeXml(name)}</name><trkseg>
 ${seg}
   </trkseg></trk>
@@ -543,6 +543,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad, exportGpx }: { p: Pa
             </span>
           )}
         </div>
+        {p.courable && p.sport !== "Running" && <p className="mt-1.5 truncate text-[11px] font-medium text-emerald-600">{L["courable"]}</p>}
         {/* La source d'un parcours qui ne vient pas d'OSM : la Licence Ouverte exige de la citer. */}
         {p.osm_type && p.osm_type !== "relation" && p.osm_type !== "way" && p.source && (
           <p className="mt-1.5 truncate text-[11px] text-zinc-400">{L["source"]} : {p.source}</p>

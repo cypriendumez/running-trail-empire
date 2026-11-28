@@ -26,16 +26,19 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } fr
 import path from "node:path";
 import { geometrieParcours, chainSegmentsMesure } from "../src/lib/parcours/geometrie";
 import { estCleabs } from "../src/lib/parcours/geometrieIgn";
-import { reparerNom } from "../src/lib/parcours/noms";
+import { reparerNom, marqueFfrandonnee } from "../src/lib/parcours/noms";
 import { UA_PACEVOBOT } from "../src/lib/races/robot";
 import { sportDepuisOsm, raisonDeRetrait, typeSportif } from "./parcours-auditer";
 import { arreterSiDepasse, seuil } from "./garde-fous";
+import { SOURCES_OUVERTES, type Indice } from "./parcours-sources-ouvertes";
 
 type LL = [number, number];   // [longitude, latitude]
 export type Candidat = {
   cle: string;                // identifiant stable de la source
-  source: "osm" | "metropole" | "ign";
+  source: "osm" | "metropole" | "ign" | "ouvert";
   nom: string;
+  /** Source ouverte (parcours-sources-ouvertes.ts) : son attribution, sa licence, son indice de sport. */
+  attribution?: string; licence?: string; indice?: Indice;
   osm?: { id: number; route: string };
   nature?: string;            // IGN : « Itinéraire cyclable », « Itinéraire de randonnée pédestre »…
   segments?: LL[][];          // géométrie fournie par la source (Métropole, IGN)
@@ -131,10 +134,12 @@ export function estAllerRetour(c: LL[]): boolean {
  * OSM, où qu'il soit dans le nom (« Boucle des Huguenots GR 965 », relecture du 28/11/2026).
  */
 // ⚠️ Pas de `\b` : en JavaScript, « è » n'est pas une lettre pour lui (« Les Grès » passait pour un GR).
-export const citeUnGr = (nom: string) => /(?<![\p{L}\d])GRP?(?!\p{L})|GR®|(?<![\p{L}\d])PR\s?\d|PR®/iu.test(nom);
+export const citeUnGr = (nom: string) => marqueFfrandonnee(nom) !== null;
 
 export function sportDuCandidat(c: Candidat, km: number, dp: number): string | null {
   if (c.source === "osm") return sportDepuisOsm(c.osm?.route, km, dp);
+  // Une source ouverte DIT sa pratique ; « à pied » : le relief tranche (Trail ou Randonnée).
+  if (c.source === "ouvert") return c.indice === "à pied" ? sportDepuisOsm("hiking", km, dp) : c.indice ?? null;
   // La NATURE donnée par la source, d'abord ; le nom seulement à défaut (Métropole), et par mots
   // entiers : « Sentier du développement durable » n'est pas du vélo, ni « Champ de Courses » une
   // course (relecture du 28/11/2026).
@@ -254,7 +259,7 @@ async function candidatsOsm(region: string, connus: Set<number>): Promise<Candid
     + `rel(area.a)[type=route][route~"^(hiking|foot|running|bicycle|mtb)$"]["name"];out tags;`;
   const j = await overpass(q);
   return (j.elements ?? [])
-    .filter((e) => !connus.has(e.id) && !raisonDeRetrait(e.tags ?? {}))
+    .filter((e) => !connus.has(e.id) && !raisonDeRetrait(e.tags ?? {}) && !marqueFfrandonnee(e.tags?.name ?? "", e.tags))
     .map((e) => ({ cle: `osm-${e.id}`, source: "osm" as const, nom: e.tags!.name, osm: { id: e.id, route: typeSportif(e.tags) ?? "hiking" } }));
 }
 
@@ -296,6 +301,35 @@ async function candidatsIgn(cadre?: string): Promise<Candidat[]> {
     await dormir(1000);
   }
   return out;
+}
+
+/**
+ * Les candidats des sources ouvertes, depuis leur fichier en cache (téléchargé une fois). Écartés
+ * d'office : pratique non retenue (équestre, alpinisme…), sans nom, et tout ce qui relève de la
+ * FFRandonnée (nom, ou réseau « GR® » de la source).
+ */
+async function candidatsOuverts(dossier: string): Promise<{ candidats: Candidat[]; ecartes: Record<string, number> }> {
+  mkdirSync(dossier, { recursive: true });
+  const candidats: Candidat[] = [];
+  const ecartes: Record<string, number> = {};
+  const ecarter = (k: string) => { ecartes[k] = (ecartes[k] ?? 0) + 1; };
+  for (const src of SOURCES_OUVERTES) {
+    const f = path.join(dossier, `${src.cle}.json`);
+    if (!existsSync(f)) {
+      const r = await fetch(src.url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(180000) });
+      if (!r.ok) throw new Error(`${src.cle} : ${r.status}`);
+      writeFileSync(f, await r.text());
+    }
+    const objets = (JSON.parse(readFileSync(f, "utf8")) as { features?: never[] }).features ?? [];
+    for (const c of src.lire(objets)) {
+      if (!c.indice) { ecarter("pratique non retenue"); continue; }
+      if (!c.nom) { ecarter("sans nom"); continue; }
+      if (marqueFfrandonnee(c.nom, { ref: c.reseau ?? "" })) { ecarter("FFRandonnée (GR®)"); continue; }
+      candidats.push({ cle: `ouv-${src.cle}-${c.id}`, source: "ouvert", nom: c.nom, segments: c.segments, attribution: src.attribution, licence: src.licence, indice: c.indice });
+    }
+    console.log(`  ${src.cle} : ${objets.length} objets`);
+  }
+  return { candidats, ecartes };
 }
 
 // ── La mesure d'un candidat ──────────────────────────────────────────────────────────
@@ -411,7 +445,7 @@ async function mesurer(c: Candidat, idSynthetique: number): Promise<{ ok: Mesure
   const w = sport === "Trail" || sport === "Randonnée" || sport === "VTT" ? 1.3 : 1;
   const effort = km + (dn.dp / 100) * w;
   const pente = penteMax(echantillon, z!);
-  const src = SOURCES[c.source];
+  const src = c.source === "ouvert" ? { attribution: c.attribution!, licence: c.licence! } : SOURCES[c.source];
   return { ok: {
     osm_id: c.source === "osm" ? c.osm!.id : idSynthetique,
     osm_type: c.source === "osm" ? "relation" : c.source,
@@ -456,8 +490,8 @@ export class Grille {
     for (const p of c) { const k = cellule(p); if (vus.has(k)) continue; vus.add(k); (this.cases.get(k) ?? this.cases.set(k, []).get(k)!).push(e); }
   }
   /** Un tracé déjà présent qui recouvre `c` à 70 % au moins (ou l'inverse : une portion d'un plus long). */
-  doublon(c: LL[]): string | null {
-    const vus = new Set<string>();
+  doublon(c: LL[], exclus?: Set<string>): string | null {
+    const vus = new Set<string>(exclus ?? []);
     const cadre = cadreDe(c);
     // Les 9 cases autour de chaque point : une copie décalée de 15 m peut tomber de l'autre côté
     // d'une limite de case (cas du test du 28/11/2026, à la latitude 49,4 tout ronde).
@@ -507,6 +541,11 @@ if (process.argv[1]?.endsWith("parcours-importer.ts")) {
       candidats.push(...o.filter((c) => !connus.has(c.osm!.id)));
     }
     if (process.argv.includes("--metropole")) { const m = await candidatsMetropole(); console.log(`Métropole : ${m.length}`); candidats.push(...m); }
+    if (arg("--ouverts")) {
+      const { candidats: o, ecartes } = await candidatsOuverts(arg("--ouverts")!);
+      console.log(`Sources ouvertes : ${o.length} candidats (écartés à la lecture : ${JSON.stringify(ecartes)})`);
+      candidats.push(...o);
+    }
     if (arg("--ign")) {
       const enCache = cache<Candidat[]>(`ign-${arg("--ign")}`) as unknown as Candidat[];
       const g = Array.isArray(enCache) && enCache.length ? enCache : await candidatsIgn(arg("--ign"));
@@ -556,7 +595,7 @@ if (process.argv[1]?.endsWith("parcours-importer.ts")) {
     // Le catalogue d'AUJOURD'HUI (un audit a pu être appliqué pendant l'import).
     const actuel = JSON.parse(readFileSync(SOURCE_DATA, "utf8")) as typeof catalogue;
     const ids = idsUniques(candidats.filter((c) => c.source !== "osm").map((c) => c.cle), actuel.map((p) => p.osm_id));
-    const ordre = { osm: 0, metropole: 1, ign: 2 } as const;
+    const ordre = { osm: 0, metropole: 1, ouvert: 2, ign: 3 } as const;
     const acceptes: Mesure[] = [];
     const refus: Record<string, number> = {};
     const compter = (k: string) => { refus[k] = (refus[k] ?? 0) + 1; };
@@ -564,7 +603,7 @@ if (process.argv[1]?.endsWith("parcours-importer.ts")) {
       const r = mesures.get(c.cle);
       if (!r?.ok) { compter((r?.refus ?? "non mesuré").replace(/\(.*\)/, "").trim()); continue; }
       // Les filtres de source s'appliquent aussi aux candidats d'un cache plus ancien qu'eux.
-      if (c.source !== "osm" && citeUnGr(c.nom)) { compter("nom citant un GR®/PR® (FFRandonnée)"); continue; }
+      if (citeUnGr(c.nom)) { compter("nom citant un GR®/PR® (FFRandonnée)"); continue; }
       if (c.source === "ign" && !estCleabs(c.cle.replace(/^ign-/, ""))) { compter("identifiant IGN inattendu"); continue; }
       const m = { ...r.ok, ...(c.source !== "osm" ? { osm_id: ids.get(c.cle)! } : {}) } as Mesure & { lat: number; lng: number; sport: string; osm_id: number };
       if (dejaAuCatalogue(m, actuel)) { compter("déjà au catalogue (départ et longueur)"); continue; }
@@ -595,6 +634,14 @@ if (process.argv[1]?.endsWith("parcours-importer.ts")) {
       const { catalogue: fusion, ecartes } = fusionner(JSON.parse(relu) as { osm_id: number }[], ajout as unknown as { osm_id: number }[]);
       arreterSiDepasse([{ quoi: "parcours ajoutés", n: fusion.length - actuel.length, max: seuil(process.argv, "--max-ajouts", 30000) }]);
       writeFileSync(SOURCE_DATA, JSON.stringify(fusion));
+      // Les tracés COMPLETS des sources ouvertes (aucune source à relire à l'ouverture) : gardés
+      // par scripts/parcours-traces-extraire.ts (`--ouverts`), comme ceux d'OSM et de l'IGN.
+      const parCle = new Map(candidats.map((c) => [c.cle, c]));
+      const fo = path.join(CACHE, "traces-ouvertes.jsonl");
+      writeFileSync(fo, acceptes.filter((m) => m.osm_type === "ouvert").map((m) => {
+        const c = parCle.get(String(m.cle_source));
+        return JSON.stringify({ id: m.osm_id, c: chainSegmentsMesure(c?.segments ?? []).coords });
+      }).join("\n") + "\n");
       console.log(`écrit : ${SOURCE_DATA} (+${fusion.length - actuel.length}, ${ecartes} déjà là, total ${fusion.length})\n⚠️ relancer « npx tsx scripts/parcours-compacter.ts » : la production lit le .min.json.gz`);
     }
   })();

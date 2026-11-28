@@ -14,6 +14,7 @@ import { estDuCatalogue, distanceDuCatalogue, cleabsDuCatalogue } from "@/lib/pa
 import { geometrieIgn, ErreurIgn } from "@/lib/parcours/geometrieIgn";
 import { tracePartiel } from "@/lib/parcours/trace";
 import { MemoireJournal } from "@/lib/parcours/journalTraces";
+import { traceStockee } from "@/lib/parcours/tracesStockees";
 
 /**
  * GÉOMÉTRIE GPS RÉELLE D'UN PARCOURS, chargée à la demande depuis OpenStreetMap (ODbL).
@@ -183,6 +184,21 @@ async function traceIgn(id: string): Promise<NextResponse> {
   }
 }
 
+/**
+ * Le tracé gardé d'un parcours du catalogue : `coords`, ou rien (pas de tracé gardé pour ce
+ * parcours), ou `panne` (tranche illisible ou absente — journalisé ; la route ne doit PAS le dire
+ * « définitif », relecture du 28/11/2026).
+ */
+async function traceGardee(type: string, id: string): Promise<{ coords?: [number, number][]; panne?: true }> {
+  if (estDuCatalogue(type, id) !== true) return {};
+  try {
+    return { coords: traceStockee(Number(id)) ?? undefined };
+  } catch (e) {
+    if (MEMOIRE.uneFois("tranche de tracés illisible", Date.now())) await journaliserEchecUneFois(null, { source: "parcours-geometrie", url: "/api/parcours/geometry", message: `Tracés gardés illisibles : ${(e as Error)?.name ?? "erreur"}`, meta: { id } });
+    return { panne: true };
+  }
+}
+
 export async function GET(req: NextRequest) {
   // Interroge Overpass, un service communautaire GRATUIT aux quotas stricts. Laisser la
   // route ouverte aux requêtes anonymes, c'est risquer de faire bannir l'adresse IP de
@@ -191,8 +207,24 @@ export async function GET(req: NextRequest) {
   if (denied) return NextResponse.json({ error: denied }, { status: 401 });
   const id = req.nextUrl.searchParams.get("id");
   if (!id || !/^\d+$/.test(id)) return NextResponse.json({ error: "id invalide" }, { status: 400 });
-  if (req.nextUrl.searchParams.get("type") === "ign") return traceIgn(id);
-  const type = req.nextUrl.searchParams.get("type") === "way" ? "way" : "relation";
+  const typeParam = req.nextUrl.searchParams.get("type");
+  // 1. LE TRACÉ GARDÉ PAR PACEVO (28/11/2026) : aucun appel réseau, ni chez OSM ni à l'IGN. Seulement
+  //    pour un parcours DU CATALOGUE, sous son type (un chemin n° X n'est pas la relation n° X).
+  const typeCatalogue = typeParam === "ign" || typeParam === "ouvert" || typeParam === "metropole" || typeParam === "way" ? typeParam : "relation";
+  // Une source sans service à relire (source ouverte, Métropole de Rouen) : jamais d'appel à Overpass
+  // pour un identifiant qui n'est pas d'OpenStreetMap.
+  const sansSource = typeCatalogue === "ouvert" || typeCatalogue === "metropole";
+  const gardee = await traceGardee(typeCatalogue, id);
+  if (gardee.coords) return NextResponse.json({ coordinates: gardee.coords }, { headers: { "Cache-Control": "private, max-age=86400" } });
+  // Une source ouverte n'a pas de service à relire. Tranche en PANNE : « réessaie » (503) ;
+  // tranche lue mais sans ce parcours : définitif (404), et on le dit.
+  if (sansSource && gardee.panne) return NextResponse.json({ error: "Géométrie indisponible pour le moment." }, { status: 503, headers: { "Retry-After": "60" } });
+  if (sansSource) {
+    if (MEMOIRE.uneFois(`ouvert sans tracé ${id}`, Date.now())) await journaliserEchecUneFois(null, { source: "parcours-geometrie", url: "/api/parcours/geometry", message: `Parcours de source ouverte sans tracé gardé : ${id}`, meta: { id } });
+    return NextResponse.json({ error: "Tracé indisponible pour ce parcours.", definitif: true }, { status: 404 });
+  }
+  if (typeParam === "ign") return traceIgn(id);
+  const type = typeParam === "way" ? "way" : "relation";
 
   const key = `${type}/${id}`;
   // Le navigateur garde aussi le tracé : il ne change pour ainsi dire jamais.

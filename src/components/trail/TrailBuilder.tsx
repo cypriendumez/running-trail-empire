@@ -1189,6 +1189,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
                           <span className="block truncate text-[12px] text-zinc-500">
                             {fmtKm(p.distance_km, lang, 1)} · +{Math.round(p.denivele_positif_m)} m · {P[`diff.${p.difficulte}`] ?? p.difficulte}
                             {km != null && <> · {tb("parcoursA", { d: fmtKm(km, lang, km < 10 ? 1 : 0) })}</>}
+                            {p.courable && p.sport !== "Running" && <> · {P["courable"]}</>}
                           </span>
                         </span>
                       </button>

@@ -10,12 +10,15 @@
  *    relations supprimées d'OSM depuis la collecte.
  */
 import assert from "node:assert/strict";
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { gunzipSync } from "node:zlib";
-import { reparerNom } from "../src/lib/parcours/noms";
+import { reparerNom, marqueFfrandonnee } from "../src/lib/parcours/noms";
+import { aRetirer } from "../scripts/parcours-retirer-ffrandonnee";
+import { doublons, nomNormalise } from "../scripts/parcours-dedoublonner";
 import { sportDepuisOsm, raisonDeRetrait, auditer } from "../scripts/parcours-auditer";
 import { geometrieIgn, estCleabs, ErreurIgn } from "../src/lib/parcours/geometrieIgn";
 import { remesurer, ecartAcceptable, appliquerDecisions, estAllerRetour } from "../scripts/parcours-traces-appliquer";
@@ -23,6 +26,10 @@ import { juger, verdictSeule } from "../scripts/parcours-traces-controler";
 import { denivele, alleger, recouvrement, sportDuCandidat, dejaAuCatalogue, longueurKm, SOURCES, penteMax,
   Grille, idHache, idsUniques, fusionner, reponseUtilisable, refusPassager, citeUnGr, enMetropole } from "../scripts/parcours-importer";
 import { cleabsDuCatalogue } from "../src/lib/parcours/catalogue";
+import { encoder, decoder, simplifier, traceStockee, oublierTranches, trancheDe, TRANCHES } from "../src/lib/parcours/tracesStockees";
+import { aGarder, choisirOrdre } from "../scripts/parcours-traces-extraire";
+import { indiceDePratique, SOURCES_OUVERTES } from "../scripts/parcours-sources-ouvertes";
+import { praticableEnCourant, filterAndSort, type ParcoursHdf } from "../src/data/parcoursHdf";
 
 let ok = 0;
 const echecs: string[] = [];
@@ -198,6 +205,9 @@ test("la route sert des noms RÉPARÉS et ignore une position impossible (site d
     const lire = async (q: string) => (await (await GET(new NextRequest(`http://localhost/api/parcours?pageSize=60${q}`))).json()) as { items: { osm_id: number; nom: string }[] };
     const tous = await lire("");
     assert.equal(tous.items.find((p) => p.osm_id === 11)?.nom, "Circuit de Malaunay à Le Houlme");
+    // La route marque « praticable en courant » (8 km, plat) : sans elle, le filtre Running l'ignore.
+    assert.equal((tous.items.find((p) => p.osm_id === 11) as { courable?: boolean } | undefined)?.courable, true, "randonnée plate non marquée praticable en courant");
+    assert.ok((await lire("&sport=Running")).items.some((p) => p.osm_id === 11), "le filtre Running de la route ne la montre pas");
     // Latitude 95 : aucun tri « près de moi » vers le pôle (Lille d'abord), même ordre que sans position.
     // (Le catalogue de travail est rangé du sud au nord : un tri vers le pôle l'inverserait.)
     const ordre = (r: { items: { osm_id: number }[] }) => r.items.map((p) => p.osm_id);
@@ -244,6 +254,96 @@ test("route IGN : catalogue illisible et tracé incomplet laissent une trace, la
   assert.ok(cond("src/components/parcours/ParcoursBrowser.tsx", "p") && cond("src/components/trail/TrailBuilder.tsx", "choisi"), "la mention de source diffère entre la liste et la carte");
 });
 
+test("Lille : une randonnée courte et plate sort au filtre Running, affichée comme telle", () => {
+  // « Autour de la Citadelle » : 5,43 km, D+ 0 — était invisible au filtre Running (28/11/2026).
+  assert.equal(praticableEnCourant({ sport: "Randonnée", distance_km: 5.43, denivele_positif_m: 0 }), true);
+  assert.equal(praticableEnCourant({ sport: "Randonnée", distance_km: 12, denivele_positif_m: 400 }), false, "33 m/km : du relief, pas une sortie de course");
+  assert.equal(praticableEnCourant({ sport: "Randonnée", distance_km: 66, denivele_positif_m: 150 }), false, "66 km : une randonnée sur plusieurs jours");
+  assert.equal(praticableEnCourant({ sport: "Randonnée", distance_km: 1.2, denivele_positif_m: 0 }), false, "1,2 km : trop court");
+  assert.equal(praticableEnCourant({ sport: "Randonnée", distance_km: 10, denivele_positif_m: 0, denivele_negatif_m: -400 }), false, "une descente de 400 m n'est pas plate");
+  assert.equal(praticableEnCourant({ sport: "Vélo (Route)", distance_km: 8, denivele_positif_m: 10 }), false, "un itinéraire vélo n'est pas proposé en course");
+  assert.equal(praticableEnCourant({ sport: "Vélo (Route)", distance_km: 8, denivele_positif_m: 10, nom: "Voie verte · Canal de Roubaix" }), true, "une voie verte (piétons admis, R110-2) se court");
+  assert.equal(praticableEnCourant({ sport: "Vélo (Route)", distance_km: 60, denivele_positif_m: 100, nom: "Voie verte de la Seine" }), false, "60 km : pas une sortie de course");
+  const base = { difficulte: "Facile", type_parcours: "Boucle", denivele_negatif_m: 0, temps_estime: "", calories_kcal: 0, pente_mean: "", altitude_min_m: 0, altitude_max_m: 0, localisation: { region: "", departement: "" }, description: "" } as const;
+  const liste = [
+    { ...base, id: 1, nom: "Autour de la Citadelle", sport: "Randonnée", distance_km: 5.43, denivele_positif_m: 0, courable: true },
+    { ...base, id: 2, nom: "Boucle du Nord", sport: "Running", distance_km: 8, denivele_positif_m: 10 },
+    { ...base, id: 3, nom: "Grand Tour", sport: "Randonnée", distance_km: 40, denivele_positif_m: 100 },
+  ] as ParcoursHdf[];
+  assert.deepEqual(filterAndSort(liste, { sport: "Running" }).map((p) => p.id).sort(), [1, 2], "le filtre Running perd la Citadelle, ou prend une longue randonnée");
+  assert.deepEqual(filterAndSort(liste, { sport: "Randonnée" }).map((p) => p.id).sort(), [1, 3], "la Citadelle reste une randonnée");
+});
+
+test("tracés gardés : encodés sans perte utile, simplifiés sans déformer, contrôlés avant d'être gardés", () => {
+  const ligne: [number, number][] = Array.from({ length: 200 }, (_, k) => [1 + k * 0.0005, 49.4 + Math.sin(k / 10) * 0.002]);
+  const d = decoder(encoder(ligne));
+  assert.equal(d.length, ligne.length);
+  assert.ok(d.every(([x, y], i) => Math.abs(x - ligne[i][0]) < 6e-6 && Math.abs(y - ligne[i][1]) < 6e-6), "un point déplacé de plus d'un mètre à l'encodage");
+  const droite: [number, number][] = Array.from({ length: 50 }, (_, k) => [1 + k * 0.001, 49.4]);
+  assert.equal(simplifier(droite, 4).length, 2, "une ligne droite garde ses 50 points");
+  const s = simplifier(ligne, 4);
+  assert.ok(s.length < ligne.length && Math.abs(longueurKm(s) - longueurKm(ligne)) / longueurKm(ligne) < 0.02, "la simplification déforme le tracé de plus de 2 %");
+  assert.ok("ok" in aGarder(ligne, longueurKm(ligne)), "un tracé conforme n'est pas gardé");
+  assert.ok("refus" in aGarder(ligne, longueurKm(ligne) * 1.5), "un tracé qui ne fait pas la distance du catalogue est gardé");
+  assert.ok("refus" in aGarder([], 5));
+  // Deux chaînages du même tracé : celui qui fait la distance mesurée (« 10 - Teliere »).
+  const court = droite.slice(0, 20), long = droite;
+  assert.equal(choisirOrdre([court, long], longueurKm(long)), long);
+  assert.equal(trancheDe(-5), TRANCHES - 5, "un identifiant négatif sort des tranches");
+});
+
+test("tracés gardés : lus depuis leur tranche, et rien pour un parcours absent", () => {
+  const dossier = mkdtempSync(join(tmpdir(), "pacevo-traces-"));
+  const id = 9_000_000_123, c: [number, number][] = [[1, 49.4], [1.01, 49.41], [1.02, 49.4]];
+  writeFileSync(join(dossier, `${trancheDe(id)}.json.gz`), gzipSync(Buffer.from(JSON.stringify({ [id]: encoder(c) }))));
+  process.env.PACEVO_DOSSIER_TRACES = dossier;
+  oublierTranches();
+  try {
+    assert.deepEqual(traceStockee(id), c);
+    assert.equal(traceStockee(id + TRANCHES), null, "un parcours de la même tranche, absent, reçoit un tracé");
+    assert.throws(() => traceStockee(id + 1), "une tranche ABSENTE passe pour « aucun tracé » : la route retomberait sur Overpass sans le dire");
+  } finally { delete process.env.PACEVO_DOSSIER_TRACES; oublierTranches(); }
+  // La route sert le tracé gardé AVANT toute source, et seulement pour un parcours du catalogue.
+  const route = readFileSync("src/app/api/parcours/geometry/route.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const avant = route.slice(route.indexOf("export async function GET"), route.indexOf("return traceIgn(id)"));
+  assert.match(avant, /const gardee = await traceGardee\(typeCatalogue, id\);\s*if \(gardee\.coords\) return NextResponse\.json\(\{ coordinates: gardee\.coords \}/, "le tracé gardé n'est plus servi en premier");
+  assert.match(route, /if \(estDuCatalogue\(type, id\) !== true\) return \{\};/, "un tracé gardé est servi pour un identifiant hors catalogue (ou sous un autre type)");
+  // Tranche en panne pour une source ouverte : « réessaie », jamais « définitif ».
+  assert.match(avant, /if \(sansSource && gardee\.panne\) return NextResponse\.json\(\{ error: "Géométrie indisponible pour le moment\." \}, \{ status: 503/, "une tranche cassée est annoncée « tracé définitivement indisponible »");
+  assert.match(avant, /const sansSource = typeCatalogue === "ouvert" \|\| typeCatalogue === "metropole";/, "un parcours de la Métropole ou d'une source ouverte part chez Overpass sous un identifiant inventé");
+  // Le nombre de tranches de la route (next.config) est celui du module.
+  assert.match(readFileSync("next.config.ts", "utf8"), new RegExp(`Array\\.from\\(\\{ length: ${TRANCHES} \\}`), "next.config n'embarque pas toutes les tranches");
+});
+
+test("sources ouvertes : licence citée, pratique lue, rien d'équestre", () => {
+  for (const s of SOURCES_OUVERTES) {
+    assert.match(s.licence, /^(Licence Ouverte (1|2)\.0|ODbL 1\.0)$/, `${s.cle} : licence ${s.licence}`);
+    assert.match(s.page, /^https:\/\//, `${s.cle} : la page de la licence manque`);
+    assert.ok(s.attribution.length > 10, `${s.cle} : attribution vide`);
+  }
+  assert.equal(new Set(SOURCES_OUVERTES.map((s) => s.cle)).size, SOURCES_OUVERTES.length, "deux sources ont la même clé (identifiants en double)");
+  for (const [p, i] of [["À pied", "à pied"], ["Pédestre", "à pied"], ["trail", "Trail"], ["VTTAE", "VTT"], ["Gravel", "VTT"], ["cyclo", "Vélo (Route)"], ["Équestre", null], ["Cheval", null], ["Alpinisme", null], ["Points-nœuds", null], ["Moto", null]] as const)
+    assert.equal(indiceDePratique(p), i, p);
+});
+
+test("FFRandonnée : aucun GR®, ni au nom, ni à la référence, ni à l'opérateur — une petite randonnée locale reste", () => {
+  assert.ok(marqueFfrandonnee("Accès GR 59"));
+  assert.ok(marqueFfrandonnee("PR Vert Correns"), "« PR » dans le NOM : la marque serait affichée");
+  assert.ok(marqueFfrandonnee("Lévignac, une Grande Randonnée en Guyenne"));
+  assert.ok(marqueFfrandonnee("Voie d'Ossau", { ref: "GR 108" }), "un GR® sous un autre nom (106 cas, 28/11/2026)");
+  assert.ok(marqueFfrandonnee("Tour du Mont Aigoual", { operator: "FFRP" }));
+  assert.ok(marqueFfrandonnee("Au Pays de Jeanne d'Arc", { operator: "Fédération Française de la Randonnée Pédestre" }));
+  assert.ok(marqueFfrandonnee("Circuit des sources", { ref: "GR® de Pays,PR" }), "un réseau « GR® de Pays » d'une source ouverte");
+  assert.equal(marqueFfrandonnee("Autour de Baffie", { ref: "PR 3" }), null, "une petite randonnée numérotée PR par le département est retirée");
+  assert.equal(marqueFfrandonnee("Les Grès de Fontainebleau"), null, "« Grès » pris pour un GR (le piège du \\b)");
+  assert.equal(marqueFfrandonnee("Prairie du Cailly"), null);
+  const retraits = aRetirer([
+    { osm_id: 1, nom: "Voie d'Ossau" }, { osm_id: 2, nom: "Autour de Baffie" },
+    { osm_id: 3, osm_type: "ign", nom: "PR la Voie Romaine" }, { osm_id: 4, osm_type: "ign", nom: "Voie d'Ossau" },
+  ], { "1": { ref: "GR 108" }, "2": { ref: "PR 3" }, "4": { ref: "GR 108" } });
+  assert.deepEqual([...retraits.keys()].sort(), [1, 3], "les étiquettes OSM s'appliquent à un parcours IGN de même numéro, ou un GR passe");
+});
+
 test("Overpass : une réponse vide ou tronquée n'est PAS une liste de relations disparues", () => {
   const elements = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i }));
   assert.equal(reponseUtilisable({ elements: [] }, 40), false, "200 sans éléments : 40 parcours retirés d'un coup");
@@ -272,7 +372,7 @@ test("import : ni GR®/PR® de la FFRandonnée hors OSM, ni outre-mer, ni sport 
 test("IGN : la route ne relit que les itinéraires DU CATALOGUE, et refuse un morceau", () => {
   // Sans les commentaires (sans couper « :// ») : une ligne mise en commentaire ne compte pas.
   const route = readFileSync("src/app/api/parcours/geometry/route.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-  assert.match(route, /if \(req\.nextUrl\.searchParams\.get\("type"\) === "ign"\) return traceIgn\(id\);/);
+  assert.match(route, /if \(typeParam === "ign"\) return traceIgn\(id\);/);
   // La porte des comptes connectés passe AVANT (service gratuit de l'IGN, pas d'accès anonyme).
   assert.ok(route.indexOf("denyIfAnonymous()") < route.indexOf("return traceIgn(id)"), "la route IGN est ouverte aux anonymes");
   assert.match(route, /const cleabs = cleabsDuCatalogue\(id\);/);
@@ -346,6 +446,66 @@ test("le catalogue livré (.gz) est celui des données : mêmes parcours que dat
   const a = complet.map((p) => p.osm_id).sort((x, y) => x - y), b = livre.map((p) => p.osm_id).sort((x, y) => x - y);
   assert.equal(b.length, a.length, "le .gz n'a pas été recompacté après la dernière écriture (parcours-compacter.ts)");
   assert.deepEqual(b, a);
+});
+
+test("le catalogue livré : CHAQUE parcours a son tracé gardé, et il fait la distance affichée", () => {
+  oublierTranches();
+  const sans: string[] = [], faux: string[] = [];
+  for (const p of livre as { osm_id: number; osm_type?: string; nom: string; distance_km: number; coordinates?: [number, number][] }[]) {
+    const c = p.coordinates?.length ? p.coordinates : traceStockee(p.osm_id);
+    if (!c) { sans.push(`${p.osm_id} ${p.nom}`); continue; }
+    const km = longueurKm(c);
+    if (Math.abs(km - p.distance_km) / p.distance_km > 0.15) faux.push(`${p.osm_id} ${p.nom} : ${p.distance_km} km affichés, ${km.toFixed(2)} km de tracé`);
+  }
+  assert.deepEqual(sans.slice(0, 5), [], `${sans.length} parcours sans tracé gardé (relus en direct, ou pas du tout)`);
+  // Et git les VERSIONNE (relecture du 28/11/2026 : `/data/*` les ignorait — présents sur le disque,
+  // absents d'un clone, de la CI et de la licence publiée).
+  const ignore = (f: string) => spawnSync("git", ["check-ignore", "-q", f]).status === 0;
+  const tranches = readdirSync("data/traces").filter((f) => f.endsWith(".json.gz"));
+  assert.equal(tranches.length, TRANCHES, `${tranches.length} tranches sur ${TRANCHES}`);
+  for (const f of ["data/LICENCE.md", ...tranches.map((t) => `data/traces/${t}`)]) assert.ok(!ignore(f), `${f} est ignoré par git : jamais publié`);
+  assert.deepEqual(faux.slice(0, 5), [], `${faux.length} parcours dont le tracé ne fait pas la distance affichée`);
+});
+
+test("doublons : le même tracé une seule fois par famille de sport, deux circuits voisins gardés", () => {
+  const ligne = (lat: number, n = 80) => Array.from({ length: n }, (_, k) => [1 + k * 0.001, lat] as [number, number]);
+  const t = ligne(49.4);
+  const P = (osm_id: number, nom: string, sport: string, osm_type = "relation") => ({ osm_id, osm_type, nom, sport, distance_km: longueurKm(t) });
+  const velo = ligne(49.45);
+  const traces = new Map<number, [number, number][]>([[1, t], [2, t], [3, t], [4, velo], [5, velo], [6, ligne(49.403)]]);
+  const r = doublons([P(1, "Canal du Puy - 3", "Running"), P(2, "Canal du Puy - 3", "Randonnée", "ign"), P(3, "Canal du Puy 3", "VTT"),
+    P(4, "Boucle A vers B", "Vélo (Route)", "ign"), P(5, "Boucle B vers A", "VTT"), P(6, "Autre circuit", "Randonnée")], (p) => traces.get(p.osm_id) ?? null);
+  assert.deepEqual([...r].sort(), [[2, 1], [4, 5]], "le même tracé reste deux fois dans une famille, ou un VTT / un circuit voisin (330 m) est retiré");
+  assert.equal(nomNormalise("Boucle de Thil Saint-Thibault vers Flée (CDM)"), nomNormalise("Boucle de Thil Flée vers Saint-Thibault"));
+  // Deux circuits de noms différents qui partagent 75 % de leurs chemins : deux circuits (règle des 85 %).
+  const long = ligne(49.5, 100), a = long.slice(0, 80), b = long.slice(20);
+  const Q = (osm_id: number, nom: string) => ({ osm_id, osm_type: "relation", nom, sport: "Randonnée", distance_km: longueurKm(a) });
+  assert.equal(doublons([Q(11, "Circuit des Lacs"), Q(12, "Circuit des Vignes")], (p) => (p.osm_id === 11 ? a : b)).size, 0, "deux circuits voisins sous deux noms sont fusionnés");
+  assert.equal(doublons([Q(11, "Circuit des Lacs"), Q(12, "Circuit des Lacs")], (p) => (p.osm_id === 11 ? a : b)).size, 1, "précondition : sous le même nom, c'est un doublon");
+});
+
+test("le catalogue livré : aucun doublon évident (même nom, même départ, même longueur, même famille)", () => {
+  const fam = (s: string) => (s === "Vélo (Route)" || s === "VTT" ? "v" : "p");
+  const vus = new Map<string, number>(), doubles: string[] = [];
+  for (const p of livre as { osm_id: number; nom: string; sport: string; distance_km: number; lat: number; lng: number }[]) {
+    const k = `${nomNormalise(p.nom)}|${fam(p.sport)}|${Math.round(p.lat * 500)}|${Math.round(p.lng * 350)}|${Math.round(p.distance_km * 5)}`;
+    // Même nom, même départ, même longueur : un doublon si les TRACÉS se recouvrent (« Brévent » depuis
+    // deux départs, deux liaisons voisines : 6 et 15 % — deux parcours).
+    const autre = vus.get(k);
+    if (autre == null) { vus.set(k, p.osm_id); continue; }
+    const a = traceStockee(p.osm_id), b = traceStockee(autre);
+    if (a && b && Math.min(recouvrement(a, b), recouvrement(b, a)) >= 0.5) doubles.push(`${p.nom} (${p.osm_id} = ${autre})`);
+  }
+  assert.deepEqual(doubles.slice(0, 5), [], `${doubles.length} doublon(s) : ${doubles.slice(0, 5).join(" ; ")}`);
+});
+
+test("chaque source du catalogue est citée dans data/LICENCE.md (la Licence Ouverte l'exige)", () => {
+  const licence = readFileSync("data/LICENCE.md", "utf8");
+  assert.match(licence, /`traces\/\*\.json\.gz`[\s\S]{0,200}bases de données dérivées d'OpenStreetMap/, "les tracés publiés dans le dépôt ne sont pas sous la licence du catalogue");
+  const sources = new Set((livre as { source?: string }[]).map((p) => p.source).filter((x): x is string => !!x && !/OpenStreetMap|IGN|Rouen/.test(x)));
+  const absentes = [...sources].filter((x) => !licence.includes(x.replace(/ \(.*\)$/, "")));
+  assert.deepEqual(absentes, [], "source non citée");
+  assert.ok(sources.size >= 15, `${sources.size} sources ouvertes au catalogue`);
 });
 
 test("le catalogue livré n'a plus de nom abîmé", () => {

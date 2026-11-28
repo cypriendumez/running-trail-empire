@@ -6,14 +6,16 @@
  * 502 et les miroirs ne répondaient plus. Le navigateur fabriquait ensuite une boucle
  * « déterministe » autour du départ (`generateTrace`) et l'affichait sous le nom du parcours.
  *
- * Désormais : l'API officielle d'OpenStreetMap ET Overpass en même temps, la première géométrie
- * valable gagne ; cache persistant ; et rien d'inventé côté navigateur.
+ * Puis : l'API officielle d'OpenStreetMap ET Overpass en même temps. ⚠️ 28/11/2026 : l'API
+ * d'édition est RETIRÉE (politique d'usage de l'OSMF : « not for read-only purposes ») ; les tracés
+ * du catalogue sont gardés par Pacevo, et le secours interroge les DEUX miroirs Overpass en même
+ * temps, la première géométrie valable gagne ; cache persistant ; et rien d'inventé côté navigateur.
  *
  *   npx tsx tests/parcours-geometrie.test.ts
  */
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import { geometrieParcours, geometrieVerifiee, depuisApiOsm, depuisOverpass, refusDefinitif, causes, ErreurSource, echecPassager } from "../src/lib/parcours/geometrie";
+import { geometrieParcours, geometrieVerifiee, depuisOverpass, refusDefinitif, causes, ErreurSource, echecPassager } from "../src/lib/parcours/geometrie";
 import { tracePartiel, longueurKm, PART_MIN } from "../src/lib/parcours/trace";
 import { estDuCatalogue, distanceDuCatalogue } from "../src/lib/parcours/catalogue";
 import { MemoireJournal } from "../src/lib/parcours/journalTraces";
@@ -36,22 +38,31 @@ process.on("exit", () => { if (!resume) { console.log("  ✗ arrêt sans résum�
 const codeNu = (f: string) => readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "")
   .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
 
-// ── Un faux réseau : chaque test dit ce que répondent l'API officielle et Overpass ──────────
+// ── Un faux réseau : chaque test dit ce que répondent les DEUX miroirs Overpass ─────────────
+// `a` : overpass-api.de ; `b` : maps.mail.ru. Un corps écrit avec des nœuds (`n(…)` et des chemins
+// à `nodes`) est rendu comme Overpass le rend (`out geom` : chaque chemin avec sa géométrie).
 type Reponse = { status: number; body?: unknown } | "jamais";
 const vrai = globalThis.fetch;
-function reseau(api: (url: string) => Reponse, overpass: Reponse) {
+const MIROIR_A = "overpass-api.de";
+function versOverpass(body: unknown): unknown {
+  const els = (body as { elements?: { type: string; id: number; lon?: number; lat?: number; nodes?: number[] }[] })?.elements;
+  if (!els?.some((e) => e.type === "node")) return body;
+  const pts = new Map(els.filter((e) => e.type === "node").map((e) => [e.id, { lon: e.lon!, lat: e.lat! }]));
+  return { elements: els.filter((e) => e.type === "way").map((w) => ({ type: "way", id: w.id, geometry: (w.nodes ?? []).map((k) => pts.get(k)!) })) };
+}
+function reseau(a: (url: string) => Reponse, b: Reponse) {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    const r = url.includes("api.openstreetmap.org") ? api(url) : overpass;
+    const r = url.includes(MIROIR_A) ? a(url) : b;
     if (r === "jamais") {
       // Un serveur qui ne répond plus : seule la limite de temps (signal) l'arrête.
       return new Promise((_, rej) => init?.signal?.addEventListener("abort", () => rej(new Error("délai"))));
     }
-    return new Response(JSON.stringify(r.body ?? {}), { status: r.status, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(versOverpass(r.body) ?? {}), { status: r.status, headers: { "Content-Type": "application/json" } });
   }) as typeof fetch;
 }
 
-// Une relation de deux chemins qui se touchent, au format de l'API officielle (`/full.json`).
+// Une relation de deux chemins qui se touchent (nœuds puis chemins ; voir `versOverpass`).
 const n = (id: number, lon: number, lat: number) => ({ type: "node", id, lon, lat });
 const RELATION_SIMPLE = { elements: [
   n(1, 5.600, 43.520), n(2, 5.601, 43.521), n(3, 5.602, 43.522), n(4, 5.603, 43.523),
@@ -64,16 +75,16 @@ const ETAPE1 = { elements: [n(1, 5.6, 43.5), n(2, 5.61, 43.51), { type: "way", i
 const ETAPE2 = { elements: [n(2, 5.61, 43.51), n(3, 5.62, 43.52), { type: "way", id: 22, nodes: [2, 3] }, { type: "relation", id: 202, members: [{ type: "way", ref: 22 }] }] };
 const OVERPASS_OK = { elements: [{ type: "way", geometry: [{ lat: 43.5, lon: 5.6 }, { lat: 43.51, lon: 5.61 }, { lat: 43.52, lon: 5.62 }] }] };
 
-console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
+console.log("\nTRACÉ D'UN PARCOURS — deux miroirs Overpass, rien d'inventé\n");
 
 (async () => {
-  await test("API officielle seule (Overpass en panne, comme le 09/11/2026) : le tracé arrive", async () => {
+  await test("un seul miroir répond (l'autre en panne, comme overpass-api.de le 09/11/2026) : le tracé arrive", async () => {
     reseau(() => ({ status: 200, body: RELATION_SIMPLE }), { status: 502 });
     const c = await geometrieParcours("relation", "100");
     assert.deepEqual(c, [[5.6, 43.52], [5.601, 43.521], [5.602, 43.522], [5.603, 43.523]], "les deux chemins ne sont pas chaînés bout à bout");
   });
 
-  await test("Overpass seule (API officielle en panne) : le tracé arrive aussi", async () => {
+  await test("l'autre miroir seul : le tracé arrive aussi", async () => {
     reseau(() => ({ status: 503 }), { status: 200, body: OVERPASS_OK });
     const c = await geometrieParcours("relation", "100");
     assert.equal(c.length, 3);
@@ -96,46 +107,26 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
     await assert.rejects(geometrieParcours("relation", "100"), "une géométrie vide passe pour un tracé");
   });
 
-  await test("super-relation (sentier en étapes) : les sous-relations sont relues et chaînées", async () => {
-    reseau((url) => ({ status: 200, body: url.includes("/201/") ? ETAPE1 : url.includes("/202/") ? ETAPE2 : SUPER }), { status: 502 });
-    const c = await depuisApiOsm("relation", "200");
+  await test("super-relation (sentier en étapes) : les chemins de TOUTES les étapes (rendus par « >> ») sont chaînés", async () => {
+    // Overpass relit lui-même les sous-relations (`>>`) : les chemins des deux étapes arrivent ensemble.
+    reseau(() => ({ status: 200, body: { elements: [...ETAPE1.elements, ...ETAPE2.elements] } }), { status: 502 });
+    const c = await geometrieParcours("relation", "200");
     assert.deepEqual(c, [[5.6, 43.5], [5.61, 43.51], [5.62, 43.52]], "les étapes ne sont pas relues ou pas chaînées");
+    // Et la requête demande bien la descente récursive (sans elle, une super-relation est vide).
+    let corps = "";
+    globalThis.fetch = (async (_i: RequestInfo | URL, init?: RequestInit) => { corps = decodeURIComponent(String(init?.body)); return new Response(JSON.stringify(versOverpass(ETAPE1)), { status: 200 }); }) as typeof fetch;
+    await depuisOverpass("relation", "200");
+    assert.match(corps, /relation\(200\);>>;out geom;/, "la descente dans les sous-relations a disparu de la requête");
   });
 
-  await test("super-relation sur DEUX niveaux et 30 étapes : tout est relu, rien n'est tronqué", async () => {
-    // Avant : un seul niveau et 25 sous-relations au plus — un tracé PARTIEL gagnait la course,
-    // était montré comme « tracé réel » et gardé 30 jours en cache.
-    const etapes = Array.from({ length: 30 }, (_, i) => 1000 + i);
-    const corps = (url: string) => {
-      const id = Number(url.match(/relation\/(\d+)\//)?.[1]);
-      if (id === 300) return { elements: [{ type: "relation", id: 300, members: [{ type: "relation", ref: 301 }] }] };
-      if (id === 301) return { elements: [{ type: "relation", id: 301, members: etapes.map((ref) => ({ type: "relation", ref })) }] };
-      const k = id - 1000;
-      return { elements: [n(k, 5 + k / 100, 43), n(k + 1, 5 + (k + 1) / 100, 43), { type: "way", id: 5000 + k, nodes: [k, k + 1] }, { type: "relation", id, members: [{ type: "way", ref: 5000 + k }] }] };
-    };
-    reseau((url) => ({ status: 200, body: corps(url) }), { status: 502 });
-    const c = await depuisApiOsm("relation", "300");
-    assert.equal(c.length, 31, `${c.length} points : des étapes manquent (30 tronçons bout à bout = 31 points)`);
-  });
-
-  await test("au-delà de la limite, l'API officielle RENONCE (Overpass répond) au lieu de rendre un morceau", async () => {
-    const enorme = { elements: [{ type: "relation", id: 400, members: Array.from({ length: 400 }, (_, i) => ({ type: "relation", ref: 2000 + i })) }] };
-    reseau(() => ({ status: 200, body: enorme }), { status: 200, body: OVERPASS_OK });
-    await assert.rejects(depuisApiOsm("relation", "400"), "un tracé partiel est rendu au lieu d'un refus");
-    assert.equal((await geometrieParcours("relation", "400")).length, 3, "Overpass ne prend pas le relais");
-  });
-
-  await test("un nœud manquant : tracé refusé, pas raccourci", async () => {
-    const troue = { elements: [n(1, 5.6, 43.5), n(2, 5.61, 43.51), { type: "way", id: 10, nodes: [1, 2, 99] }, { type: "relation", id: 100, members: [{ type: "way", ref: 10 }] }] };
-    reseau(() => ({ status: 200, body: troue }), { status: 502 });
-    // La raison exacte : un plantage plus loin (lecture d'un point absent) ne vaut pas un refus voulu.
-    await assert.rejects(depuisApiOsm("relation", "100"), /nœud manquant/);
-  });
-
-  await test("parcours retiré d'OpenStreetMap (404) : refus DÉFINITIF ; panne (502) : passagère", async () => {
-    reseau(() => ({ status: 404 }), { status: 200, body: { elements: [] } });
+  await test("parcours retiré d'OpenStreetMap (les DEUX miroirs n'ont rien) : refus DÉFINITIF ; un seul, ou une panne : non", async () => {
+    reseau(() => ({ status: 200, body: { elements: [] } }), { status: 200, body: { elements: [] } });
     const e404 = await geometrieParcours("relation", "100").then(() => null, (e) => e);
     assert.ok(e404 && refusDefinitif(e404), "un parcours supprimé passe pour une panne passagère");
+    // Un miroir surchargé peut répondre vide : seul, il ne fait rien retirer (relecture du 28/11/2026).
+    reseau(() => ({ status: 200, body: { elements: [] } }), { status: 503 });
+    const eUn = await geometrieParcours("relation", "100").then(() => null, (e) => e);
+    assert.ok(eUn && !refusDefinitif(eUn), "un seul miroir vide suffit à déclarer le parcours supprimé");
     reseau(() => ({ status: 502 }), { status: 502 });
     const e502 = await geometrieParcours("relation", "100").then(() => null, (e) => e);
     assert.ok(e502 && !refusDefinitif(e502), "une panne passe pour un refus définitif");
@@ -144,12 +135,12 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
   await test("la source qui perd est annulée dès que l'autre a gagné", async () => {
     let annulee = false;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).includes("api.openstreetmap.org")) return new Response(JSON.stringify(RELATION_SIMPLE), { status: 200 });
+      if (String(input).includes(MIROIR_A)) return new Response(JSON.stringify(versOverpass(RELATION_SIMPLE)), { status: 200 });
       return new Promise((_, rej) => init?.signal?.addEventListener("abort", () => { annulee = true; rej(new Error("annulé")); }));
     }) as typeof fetch;
     await geometrieParcours("relation", "100");
     await new Promise((r) => setTimeout(r, 50));
-    assert.ok(annulee, "Overpass reste interrogé après la victoire de l'API officielle");
+    assert.ok(annulee, "l'autre miroir reste interrogé après la victoire du premier");
   });
 
   await test("Overpass interrompue (« remark » en 200) : le fragment ne gagne jamais", async () => {
@@ -190,42 +181,7 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
     reseau(() => ({ status: 429 }), { status: 403 });
     const e = await geometrieParcours("relation", "100").then(() => null, (x) => x);
     const statuts = causes(e).map((c) => (c instanceof ErreurSource ? `${c.source}:${c.status}` : String(c)));
-    assert.ok(statuts.includes("api-osm:429"), `statuts : ${statuts.join(", ")}`);
-    assert.ok(statuts.filter((x) => x === "overpass:403").length >= 2, `les miroirs d'Overpass sont perdus : ${statuts.join(", ")}`);
-  });
-
-  await test("les étapes d'un long sentier sont relues par lots de 10, jamais en rafale", async () => {
-    const etapes = Array.from({ length: 40 }, (_, i) => 3000 + i);
-    let enCours = 0, max = 0;
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (!url.includes("api.openstreetmap.org")) return new Response("{}", { status: 502 });
-      enCours++; max = Math.max(max, enCours);
-      await new Promise((r) => setTimeout(r, 5));
-      enCours--;
-      const id = Number(url.match(/relation\/(\d+)\//)?.[1]);
-      const body = id === 500 ? { elements: [{ type: "relation", id: 500, members: etapes.map((ref) => ({ type: "relation", ref })) }] }
-        : { elements: [n(id, 5 + (id - 3000) / 100, 43), n(id + 1, 5 + (id - 2999) / 100, 43), { type: "way", id: 9000 + id, nodes: [id, id + 1] }, { type: "relation", id, members: [{ type: "way", ref: 9000 + id }] }] };
-      return new Response(JSON.stringify(body), { status: 200 });
-    }) as typeof fetch;
-    const c = await depuisApiOsm("relation", "500");
-    assert.equal(c.length, 41, `${c.length} points`);
-    assert.ok(max <= 10, `${max} requêtes simultanées vers OpenStreetMap`);
-  });
-
-  await test("parcours supprimé d'OpenStreetMap : annoncé tout de suite, sans attendre un Overpass muet", async () => {
-    reseau(() => ({ status: 410 }), "jamais");
-    const t0 = Date.now();
-    const e = await geometrieParcours("relation", "100").then(() => null, (x) => x);
-    assert.ok(e && refusDefinitif(e), "le refus définitif est perdu");
-    assert.ok(Date.now() - t0 < 2000, `${Date.now() - t0} ms : on a attendu Overpass pour annoncer un parcours supprimé`);
-  });
-
-  await test("une ÉTAPE supprimée d'un long sentier n'est pas le sentier supprimé", async () => {
-    reseau((url) => (url.includes("/201/") ? { status: 404 } : { status: 200, body: url.includes("/202/") ? ETAPE2 : SUPER }), { status: 502 });
-    const e = await geometrieParcours("relation", "200").then(() => null, (x) => x);
-    assert.ok(e, "précondition : les deux sources échouent");
-    assert.equal(refusDefinitif(e), false, "une étape supprimée fait annoncer tout le sentier comme supprimé");
+    assert.ok(statuts.includes("overpass:429") && statuts.includes("overpass:403"), `les causes des miroirs sont perdues : ${statuts.join(", ")}`);
   });
 
   await test("le même tracé quelle que soit la source et l'ordre d'arrivée des tronçons", async () => {
@@ -234,24 +190,16 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
     // long gagne quel que soit l'ordre et le test ne prouve rien (vu en l'éprouvant par mutation).
     const pts = { 1: [5.0, 43.5], 2: [5.125, 43.5], 3: [5.375, 43.5], 4: [5.5, 43.5] } as Record<number, [number, number]>;
     const ways = [{ id: 11, nodes: [3, 4] }, { id: 10, nodes: [1, 2] }];
-    const api = (ordre: typeof ways) => ({ elements: [
-      ...Object.entries(pts).map(([k, [lon, lat]]) => n(Number(k), lon, lat)),
-      ...ordre.map((w) => ({ type: "way", ...w })),
-      { type: "relation", id: 100, members: ordre.map((w) => ({ type: "way", ref: w.id })) },
-    ] });
     const overpass = (ordre: typeof ways) => ({ elements: ordre.map((w) => ({ type: "way", id: w.id, geometry: w.nodes.map((k) => ({ lon: pts[k][0], lat: pts[k][1] })) })) });
-    reseau(() => ({ status: 200, body: api(ways) }), { status: 502 });
-    const a1 = await depuisApiOsm("relation", "100");
-    reseau(() => ({ status: 200, body: api([...ways].reverse()) }), { status: 502 });
-    const a2 = await depuisApiOsm("relation", "100");
-    reseau(() => ({ status: 502 }), { status: 200, body: overpass(ways) });
-    const o1 = await depuisOverpass("relation", "100");
+    reseau(() => ({ status: 200, body: overpass(ways) }), { status: 502 });
+    const a1 = await depuisOverpass("relation", "100");
+    reseau(() => ({ status: 200, body: overpass([...ways].reverse()) }), { status: 502 });
+    const a2 = await depuisOverpass("relation", "100");
     reseau(() => ({ status: 502 }), { status: 200, body: overpass([...ways].reverse()) });
-    const o2 = await depuisOverpass("relation", "100");
+    const b1 = await depuisOverpass("relation", "100");
     assert.equal(longueurKm(a1.slice(0, 2)), longueurKm([[5.375, 43.5], [5.5, 43.5]]), "précondition : les deux morceaux ont exactement la même longueur");
-    assert.deepEqual(a2, a1, "l'API officielle rend un autre morceau selon l'ordre des tronçons");
-    assert.deepEqual(o1, a1, "Overpass et l'API officielle ne gardent pas le même morceau");
-    assert.deepEqual(o2, a1, "Overpass rend un autre morceau selon l'ordre des tronçons");
+    assert.deepEqual(a2, a1, "un miroir rend un autre morceau selon l'ordre des tronçons");
+    assert.deepEqual(b1, a1, "les deux miroirs ne gardent pas le même morceau");
   });
 
   // ── Un morceau de parcours : l'autre source, puis jamais en cache ─────────────────────────
@@ -263,15 +211,15 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
   ] };
   const PTS: Record<number, [number, number]> = { 1: [5.0, 43.5], 2: [5.124, 43.5], 3: [5.248, 43.5], 4: [5.372, 43.5] };
   const geo = (ids: number[][]) => ids.map((w) => w.map((k) => ({ lon: PTS[k][0], lat: PTS[k][1] })));
-  /** Overpass rapide qui ne rend qu'un morceau ; l'API officielle, plus lente, a le parcours entier. */
-  function courseInegale(apiCorps: unknown, overpassWays: number[][], apiMs: number) {
-    let appels = 0; // appels à l'API officielle (Overpass, lui, part vers chaque miroir)
+  /** Un miroir rapide qui ne rend qu'un morceau ; l'autre (overpass-api.de), plus lent, a le parcours entier. */
+  function courseInegale(lentCorps: unknown, rapideWays: number[][], lentMs: number) {
+    let appels = 0; // appels au miroir lent
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.includes("api.openstreetmap.org")) appels++;
-      const corps = url.includes("api.openstreetmap.org") ? apiCorps
-        : { elements: geo(overpassWays).map((g, i) => ({ type: "way", id: 10 + i, geometry: g })) };
-      const attente = url.includes("api.openstreetmap.org") ? apiMs : 0;
+      if (url.includes(MIROIR_A)) appels++;
+      const corps = url.includes(MIROIR_A) ? versOverpass(lentCorps)
+        : { elements: geo(rapideWays).map((g, i) => ({ type: "way", id: 10 + i, geometry: g })) };
+      const attente = url.includes(MIROIR_A) ? lentMs : 0;
       await new Promise<void>((ok, ko) => {
         const t = setTimeout(ok, attente);
         init?.signal?.addEventListener("abort", () => { clearTimeout(t); ko(new Error("annulé")); });
@@ -283,12 +231,12 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
 
   await test("la source rapide n'a qu'un MORCEAU : on attend l'autre et on garde le parcours entier", async () => {
     courseInegale(COMPLET, [[1, 2]], 150);
-    // Précondition : la source rapide (Overpass) gagne bien avec son morceau.
+    // Précondition : le miroir rapide gagne bien avec son morceau.
     assert.ok(longueurKm(await geometrieParcours("relation", "100")) < 11, "précondition : la source rapide ne rend pas le morceau");
     const appels = courseInegale(COMPLET, [[1, 2]], 150);
     const v = await geometrieVerifiee("relation", "100", 30);
-    assert.equal(v.partiel, false, "l'API officielle avait le parcours entier, il est déclaré incomplet");
-    assert.equal(appels(), 1, `${appels()} appels à l'API officielle : la recherche a été relancée au lieu d'attendre la source déjà partie`);
+    assert.equal(v.partiel, false, "l'autre miroir avait le parcours entier, il est déclaré incomplet");
+    assert.equal(appels(), 1, `${appels()} appels au miroir lent : la recherche a été relancée au lieu d'attendre la source déjà partie`);
     assert.ok(longueurKm(v.coords) > 29, `${longueurKm(v.coords).toFixed(1)} km gardés pour 30 : le morceau a gagné`);
   });
 
@@ -317,18 +265,16 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
     for (const [e, attendu, quoi] of [
       [new ErreurSource("Overpass 429", 429, "overpass"), true, "429 (trop de requêtes)"],
       [new ErreurSource("Overpass 504", 504, "overpass"), true, "504"],
-      [new ErreurSource("API OSM 500", 500, "api-osm"), true, "500"],
-      [new ErreurSource("API OSM : TimeoutError", 0, "api-osm"), true, "délai dépassé"],
+      [new ErreurSource("Overpass 500", 500, "overpass"), true, "500"],
+      [new ErreurSource("Overpass : TimeoutError", 0, "overpass"), true, "délai dépassé"],
       [new ErreurSource("Overpass : TypeError", 0, "overpass"), true, "coupure réseau"],
       [new ErreurSource("Overpass : runtime error: Query timed out", 0, "overpass"), true, "Overpass interrompue (remark)"],
       [new AggregateError([new ErreurSource("Overpass 403", 403, "overpass"), new ErreurSource("Overpass 503", 503, "overpass")]), true, "un miroir en panne parmi d'autres"],
-      [new ErreurSource("API OSM : nœud manquant", 0, "api-osm"), false, "nœud manquant"],
-      [new ErreurSource("API OSM : plus de 300 relations", 0, "api-osm"), false, "trop de relations"],
       [new ErreurSource("Overpass : géométrie vide", 0, "overpass"), false, "géométrie vide"],
       [new ErreurSource("Overpass 403", 403, "overpass"), false, "403 (refus)"],
-      [new ErreurSource("API OSM 404", 404, "api-osm"), false, "étape supprimée (404)"],
+      [new ErreurSource("Overpass : absente", 404, "overpass", true), false, "un miroir n'a pas la relation (404)"],
       [new AggregateError([new ErreurSource("Overpass 503", 503, "overpass"), new ErreurSource("Overpass : géométrie vide", 0, "overpass")]), false, "un miroir en panne, l'autre dit « géométrie vide » (le fait l'emporte)"],
-      [new AggregateError([new ErreurSource("API OSM : nœud manquant", 0, "api-osm"), new ErreurSource("Overpass 429", 429, "overpass")]), false, "nœud manquant d'un côté, 429 de l'autre (le fait l'emporte)"],
+      [new AggregateError([new ErreurSource("Overpass : géométrie vide", 0, "overpass"), new ErreurSource("Overpass 429", 429, "overpass")]), false, "géométrie vide d'un côté, 429 de l'autre (le fait l'emporte)"],
       [new SyntaxError("Unexpected token <"), true, "page HTML illisible d'un Overpass surchargé"],
     ] as [unknown, boolean, string][]) assert.equal(echecPassager(e), attendu, `${quoi} : ${attendu ? "une panne prise pour un fait du tracé" : "un fait du tracé pris pour une panne"}`);
   });
@@ -336,12 +282,12 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
   await test("un morceau dont l'autre source est en panne : l'échec est rendu, et reconnu passager", async () => {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes("api.openstreetmap.org")) return new Response("{}", { status: 503 });
+      if (url.includes(MIROIR_A)) return new Response("{}", { status: 503 });
       return new Response(JSON.stringify({ elements: geo([[1, 2]]).map((g, i) => ({ type: "way", id: 10 + i, geometry: g })) }), { status: 200, headers: { "Content-Type": "application/json" } });
     }) as typeof fetch;
     const v = await geometrieVerifiee("relation", "100", 30);
     assert.equal(v.partiel, true);
-    assert.ok(v.echecs.length > 0 && v.echecs.some(echecPassager), "la panne de l'API officielle (503) n'est pas rendue comme passagère");
+    assert.ok(v.echecs.length > 0 && v.echecs.some(echecPassager), "la panne de l'autre miroir (503) n'est pas rendue comme passagère");
   });
 
   await test("journal des tracés : plafond compté en LIGNES écrites, fenêtre d'une heure, rien en double", () => {
@@ -384,7 +330,7 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
     assert.equal(estDuCatalogue("relation", "123"), false, "un identifiant inventé passe pour un parcours du catalogue");
     assert.equal(estDuCatalogue("way", "6105302"), false, "le type n'est pas vérifié : un chemin passe pour la relation");
     const conf = codeNu("next.config.ts");
-    assert.match(conf, /"\/api\/parcours\/geometry": \["\.\/data\/parcours_certifies\.min\.json\.gz"\]/, "le catalogue n'est plus embarqué dans la route du tracé : rien ne serait plus journalisé en production");
+    assert.match(conf, /"\/api\/parcours\/geometry": \["\.\/data\/parcours_certifies\.min\.json\.gz", \.\.\.Array\.from\(\{ length: 128 \}, \(_, t\) => `\.\/data\/traces\/\$\{t\}\.json\.gz`\)\]/, "le catalogue ou les tracés gardés ne sont plus embarqués dans la route du tracé");
   });
 
   globalThis.fetch = vrai;
@@ -435,7 +381,9 @@ console.log("\nTRACÉ D'UN PARCOURS — deux sources, rien d'inventé\n");
     assert.match(route, /const \{ coords, verifie \} = await enCours;/, "la route n'attend plus la recherche partagée");
     assert.match(route, /status: 503, headers: \{ "Retry-After": "60" \}/, "un échec n'est plus dit comme tel");
     const lib = codeNu("src/lib/parcours/geometrie.ts");
-    assert.match(lib, /const sources = \[valable\(api\), valable\(depuisOverpass\(type, id, fin\.signal\)\)\];\s*const premier = await Promise\.any\(sources\);/, "les deux sources ne partent plus en même temps");
+    assert.match(lib, /const sources = ENDPOINTS\.map\(\(url\) => valable\(depuisMiroir\(url, type, id, fin\.signal\)\)\);\s*const premier = await Promise\.any\(sources\);/, "les deux miroirs ne partent plus en même temps");
+    // Plus jamais l'API d'ÉDITION d'OSM pour lire (politique d'usage de l'OSMF, 28/11/2026).
+    assert.doesNotMatch(lib + route, /api\.openstreetmap\.org/, "l'API d'édition d'OpenStreetMap est de nouveau lue par l'application");
     // Un morceau : on attend l'AUTRE source déjà partie, sans relancer de recherche (quotas d'OSM).
     assert.match(lib, /const r = await Promise\.allSettled\(sources\);/, "un morceau relance une recherche au lieu d'attendre l'autre source");
     assert.match(route, /message: `Tracé de parcours indisponible : \$\{cause\}`/, "le journal redevient une seule ligne par jour, quelle que soit la cause");

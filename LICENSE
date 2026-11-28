@@ -1,0 +1,8 @@
+Copyright (c) 2026 Pacevo. Tous droits réservés.
+
+Le code source de ce dépôt n'est pas sous licence libre : il est publié pour consultation, sans
+droit de reproduction, de modification ni de redistribution.
+
+EXCEPTION — les catalogues de parcours du dossier `data/` sont des bases de données dérivées
+d'OpenStreetMap, diffusées sous la licence Open Database License (ODbL) 1.0 : voir
+`data/LICENCE.md`.

@@ -100,3 +100,24 @@ export function reparerNom(p: ParcoursNomme): string {
 
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+
+/**
+ * UN ITINÉRAIRE DE LA FFRANDONNÉE (GR®, GRP®, PR®) : marques déposées, et la fédération revendique
+ * un droit sur ses tracés (« la propriété intellectuelle fédérale », ffrandonnee.fr, 12/06/2024).
+ * Audit juridique du 28/11/2026 : par prudence, Pacevo n'en propose AUCUN — reconnu au nom
+ * (« GR 34 », « PR Vert Correns », « une Grande Randonnée en Guyenne »), à la référence OSM
+ * (`ref=GR 34B` sous un autre nom : 106 cas) ou à l'opérateur (FFRP, FFRandonnée). Un réseau ou
+ * un balisage « GR » d'une source ouverte se passe en `etiquettes.ref`.
+ * ⚠️ Pas de `\b` : en JavaScript, « è » n'est pas une lettre pour lui (« Les Grès » passait pour un GR).
+ */
+export function marqueFfrandonnee(nom: string, etiquettes?: Record<string, string> | null): string | null {
+  if (/(?<![\p{L}\d])GRP?(?!\p{L})|GR®|(?<![\p{L}\d])PR(?!\p{L})|PR®|grandes?\s+randonn[ée]es?/iu.test(nom)) return "nom citant un GR®/PR® (FFRandonnée)";
+  const t = etiquettes ?? {};
+  // `ref=GR 34B` : un GR® sous un autre nom. Une `ref=PR 3` seule, non : c'est le plus souvent la
+  // numérotation d'une petite randonnée départementale (balisage jaune), pas un label fédéral — et
+  // la marque n'est jamais affichée (seul le nom l'est, filtré ci-dessus).
+  if (/^\s*GRP?(?!\p{L})/iu.test(t.ref ?? "")) return "référence GR® (FFRandonnée)";
+  if (/ffr(p|andonn)|f[ée]d[ée]ration fran[çc]aise de (la )?randonn/i.test(`${t.operator ?? ""} ${t["network:name"] ?? ""}`)) return "opérateur FFRandonnée";
+  return null;
+}

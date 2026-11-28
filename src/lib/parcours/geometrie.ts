@@ -8,35 +8,29 @@ import { estErreurTransitoire } from "@/lib/cron/transitoire";
  * l'historique (plus d'une minute d'attente quand Overpass tombait).
  */
 const DELAI_MS = 12_000;
-const API_OSM = "https://api.openstreetmap.org/api/0.6";
 /**
- * Super-relation (sentier en étapes, parfois sur plusieurs niveaux) : au-delà de ce nombre de
- * relations relues, l'API officielle RENONCE et laisse Overpass (récursif) répondre. Jamais de
- * troncature : un tracé partiel serait montré comme « tracé réel » et gardé 30 jours en cache
- * (relecture « échecs muets » du 09/11/2026).
+ * ⚠️ PLUS D'API D'ÉDITION D'OSM (28/11/2026). La politique d'usage de l'OSMF la réserve à
+ * l'édition : « not for read-only purposes or projects » (operations.osmfoundation.org/policies/api).
+ * Les tracés du catalogue sont désormais GARDÉS par Pacevo (src/lib/parcours/tracesStockees.ts) ;
+ * ce module ne sert plus que de secours, par Overpass (service fait pour la lecture), deux miroirs.
  */
-const RELATIONS_MAX = 300;
-/** Sous-relations relues en même temps, au plus. */
-const LOT_API = 10;
 /** Durée totale d'une recherche de tracé : au-delà, les deux sources sont annulées (503). */
 const DUREE_MAX_MS = 20_000;
 
 /** Un échec qui porte le statut HTTP de sa source (0 : délai, réseau, tracé incomplet). */
 export class ErreurSource extends Error {
   /** `principal` : l'erreur porte sur la relation (ou le chemin) DEMANDÉ, pas sur une de ses étapes. */
-  constructor(message: string, readonly status: number, readonly source: "api-osm" | "overpass", readonly principal = false) { super(message); }
+  constructor(message: string, readonly status: number, readonly source: "overpass", readonly principal = false) { super(message); }
 }
 
 /**
- * La relation n'existe plus (ou jamais) sur OpenStreetMap : l'API officielle répond 404 ou 410.
- * Ce n'est PAS une panne passagère — « réessaie dans quelques minutes » serait faux.
+ * La relation n'existe plus (ou jamais) sur OpenStreetMap : DEUX miroirs Overpass répondent, sans
+ * erreur, qu'elle n'a rien (aucun élément). Un seul ne suffit pas : un miroir surchargé peut répondre
+ * vide (relecture du 28/11/2026). Ce n'est PAS une panne passagère — « réessaie » serait faux.
  */
 export function refusDefinitif(e: unknown): boolean {
-  // Seulement sur l'objet DEMANDÉ : une étape supprimée d'un long sentier n'est pas le sentier supprimé
-  // (relecture du 09/11/2026) — Overpass, lui, peut encore rendre le reste.
-  return causes(e).some((c) => c instanceof ErreurSource && c.source === "api-osm" && c.principal && (c.status === 404 || c.status === 410));
+  return causes(e).filter((c) => c instanceof ErreurSource && c.principal && c.status === 404).length >= 2;
 }
-
 
 /**
  * Toutes les causes, à plat : Overpass lève son propre `AggregateError` (un par miroir) À
@@ -79,10 +73,14 @@ type OsmEl = OsmWay | OsmRelation | { type: string };
 
 const ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter",
+  // kumi.systems ne répond plus (28/11/2026). private.coffee (association autrichienne) autorise
+  // EXPRESSÉMENT l'usage commercial : « Use our endpoints in any project requiring access to
+  // OpenStreetMap data, including commercial use » (https://overpass.private.coffee/, lu le 28/11/2026).
+  // Il tombe parfois : ce n'est qu'un SECOURS, chaque parcours du catalogue a son tracé gardé.
+  "https://overpass.private.coffee/api/interpreter",
 ];
 
-function segmentsOverpass(elements: OsmEl[]): [number, number][][] {
+export function segmentsOverpass(elements: OsmEl[]): [number, number][][] {
   // Récupère chaque tronçon (way) séparément.
   const segs: [number, number][][] = [];
   const addWay = (geom?: OsmGeomPt[]) => {
@@ -218,76 +216,31 @@ function dedup(chain: [number, number][]): [number, number][] {
   return out;
 }
 
-type ElementApi = { type: string; id: number; lat?: number; lon?: number; nodes?: number[]; members?: { type: string; ref: number }[] };
-
-/** L'API officielle d'OpenStreetMap : la relation (ou le chemin) avec tous ses nœuds. */
-export async function depuisApiOsm(type: "relation" | "way", id: string, commun?: AbortSignal): Promise<[number, number][]> {
-  const lire = async (t: string, i: string | number, principal = false): Promise<ElementApi[]> => {
-    const r = await fetch(`${API_OSM}/${t}/${i}/full.json`, {
-      headers: { "User-Agent": UA_PACEVOBOT, Accept: "application/json" },
-      signal: signalDe(commun),
-    }).catch((e) => { throw new ErreurSource(`API OSM : ${(e as Error).name}`, 0, "api-osm"); });
-    if (!r.ok) throw new ErreurSource(`API OSM ${r.status}`, r.status, "api-osm", principal);
-    return ((await r.json()) as { elements?: ElementApi[] }).elements ?? [];
-  };
-  const tous = await lire(type, id, true);
-  // Super-relation : TOUS les niveaux de sous-relations, comme `>>` chez Overpass, sans troncature.
-  if (type === "relation") {
-    const lues = new Set<number>([Number(id)]);
-    let aLire = tous.filter((e) => e.type === "relation" && e.id === Number(id)).flatMap((r) => r.members ?? [])
-      .filter((m) => m.type === "relation").map((m) => m.ref);
-    while (aLire.length) {
-      aLire = [...new Set(aLire)].filter((r) => !lues.has(r));
-      if (!aLire.length) break;
-      if (lues.size + aLire.length > RELATIONS_MAX) throw new ErreurSource(`API OSM : plus de ${RELATIONS_MAX} relations`, 0, "api-osm");
-      for (const r of aLire) lues.add(r);
-      // Par lots de 10 : jamais des centaines de requêtes simultanées sur un service gratuit.
-      const lot: ElementApi[] = [];
-      for (let k = 0; k < aLire.length; k += LOT_API) {
-        for (const els of await Promise.all(aLire.slice(k, k + LOT_API).map((r) => lire("relation", r)))) {
-          for (const el of els) { lot.push(el); tous.push(el); }
-        }
-      }
-      aLire = lot.filter((e) => e.type === "relation" && lues.has(e.id)).flatMap((r) => r.members ?? [])
-        .filter((m) => m.type === "relation").map((m) => m.ref);
-    }
-  }
-  const noeuds = new Map<number, [number, number]>();
-  for (const e of tous) if (e.type === "node" && e.lat != null && e.lon != null) noeuds.set(e.id, [e.lon, e.lat]);
-  const segs: [number, number][][] = [];
-  const vus = new Set<number>();
-  // Par identifiant de chemin : le même ordre que chez Overpass (voir `parIdentifiant`).
-  for (const e of parIdentifiant(tous.filter((x) => x.type === "way"))) {
-    if (vus.has(e.id)) continue;
-    vus.add(e.id);
-    const g = (e.nodes ?? []).map((n) => noeuds.get(n));
-    // Un nœud manquant = un tracé troué : on le refuse plutôt que de le montrer raccourci.
-    if (g.some((p) => p == null)) throw new ErreurSource("API OSM : nœud manquant", 0, "api-osm");
-    if (g.length >= 2) segs.push(g as [number, number][]);
-  }
-  return chainerOuRefuser(segs);
+/** UN miroir Overpass : la géométrie, ou une `ErreurSource` qui dit pourquoi. */
+export async function depuisMiroir(url: string, type: "relation" | "way", id: string, commun?: AbortSignal): Promise<[number, number][]> {
+  // ">>" (recurse down) récupère AUSSI la géométrie des sous-relations (super-relations).
+  const q = `[out:json][timeout:25];${type}(${id});${type === "relation" ? ">>;" : ""}out geom;`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA_PACEVOBOT },
+    body: "data=" + encodeURIComponent(q),
+    signal: signalDe(commun),
+  }).catch((e) => { throw new ErreurSource(`Overpass : ${(e as Error).name}`, 0, "overpass"); });
+  if (!res.ok) throw new ErreurSource(`Overpass ${res.status}`, res.status, "overpass");
+  const json = (await res.json()) as { elements?: OsmEl[]; remark?: string };
+  // ⚠️ Un « remark » en 200 = requête interrompue (délai, mémoire) : les éléments sont PARTIELS.
+  // Un fragment ne gagne jamais la course (relecture du 09/11/2026).
+  if (json.remark) throw new ErreurSource(`Overpass : ${String(json.remark).slice(0, 80)}`, 0, "overpass");
+  // Rien du tout (ni chemin, ni nœud) : l'objet n'existe pas, POUR CE MIROIR (voir refusDefinitif).
+  if (!(json.elements ?? []).length) throw new ErreurSource("Overpass : absente", 404, "overpass", true);
+  const coords = chainerOuRefuser(segmentsOverpass(json.elements ?? []));
+  if (coords.length < 2) throw new ErreurSource("Overpass : géométrie vide", 0, "overpass");
+  return coords;
 }
 
 /** Overpass : tous ses miroirs EN MÊME TEMPS, le premier qui répond gagne. */
 export async function depuisOverpass(type: "relation" | "way", id: string, commun?: AbortSignal): Promise<[number, number][]> {
-  // ">>" (recurse down) récupère AUSSI la géométrie des sous-relations (super-relations).
-  const q = `[out:json][timeout:25];${type}(${id});${type === "relation" ? ">>;" : ""}out geom;`;
-  return Promise.any(ENDPOINTS.map(async (url) => {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA_PACEVOBOT },
-      body: "data=" + encodeURIComponent(q),
-      signal: signalDe(commun),
-    }).catch((e) => { throw new ErreurSource(`Overpass : ${(e as Error).name}`, 0, "overpass"); });
-    if (!res.ok) throw new ErreurSource(`Overpass ${res.status}`, res.status, "overpass");
-    const json = (await res.json()) as { elements?: OsmEl[]; remark?: string };
-    // ⚠️ Un « remark » en 200 = requête interrompue (délai, mémoire) : les éléments sont PARTIELS.
-    // Un fragment ne gagne jamais la course (relecture du 09/11/2026).
-    if (json.remark) throw new ErreurSource(`Overpass : ${String(json.remark).slice(0, 80)}`, 0, "overpass");
-    const coords = chainerOuRefuser(segmentsOverpass(json.elements ?? []));
-    if (coords.length < 2) throw new ErreurSource("Overpass : géométrie vide", 0, "overpass");
-    return coords;
-  }));
+  return Promise.any(ENDPOINTS.map((url) => depuisMiroir(url, type, id, commun)));
 }
 
 /** La première géométrie valable des deux sources. Une erreur n'est PAS mise en cache. */
@@ -298,7 +251,7 @@ export async function geometrieParcours(type: "relation" | "way", id: string): P
 /**
  * UN MORCEAU N'EST PAS LE PARCOURS, ET IL NE DOIT PAS RESTER EN CACHE (09/11/2026).
  *
- * Les deux sources partent ensemble ; la première géométrie valable gagne (le cas courant, 0,3 s).
+ * Les deux sources (les deux miroirs Overpass) partent ensemble ; la première géométrie valable gagne.
  * Si elle n'est qu'un morceau — moins des trois quarts de la distance du catalogue —, on ATTEND
  * l'autre source, déjà partie (rien n'est relancé : un service gratuit, des quotas stricts), et on
  * garde la plus longue. Toujours partiel : on le DIT (`partiel`), avec la cause de l'échec de l'autre
@@ -319,10 +272,8 @@ export async function geometrieVerifiee(
   const fin = new AbortController();
   const butoir = setTimeout(() => fin.abort(), DUREE_MAX_MS);
   try {
-    // Parcours SUPPRIMÉ d'OpenStreetMap (l'API officielle le dit en 0,3 s) : on n'attend pas les 12 s
-    // d'un Overpass en panne pour l'annoncer — tout s'arrête, le refus remonte aussitôt.
-    const api = depuisApiOsm(type, id, fin.signal).catch((e) => { if (refusDefinitif(e)) fin.abort(); throw e; });
-    const sources = [valable(api), valable(depuisOverpass(type, id, fin.signal))];
+    // Les deux SOURCES sont les deux miroirs Overpass, interrogés ensemble (plus d'API d'édition).
+    const sources = ENDPOINTS.map((url) => valable(depuisMiroir(url, type, id, fin.signal)));
     const premier = await Promise.any(sources);
     if (!(distanceKm > 0) || !tracePartiel(premier, distanceKm)) return { coords: premier, partiel: false, echecs: [] };
     // Un morceau : l'autre source est encore en route (même butoir) — on l'attend, sans rien relancer.
