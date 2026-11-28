@@ -8,7 +8,7 @@
 
 export type SportHdf = "Running" | "Trail" | "Randonnée" | "Vélo (Route)" | "VTT";
 export type DiffHdf = "Facile" | "Moyen" | "Difficile";
-export type TypeHdf = "Boucle" | "Aller simple";
+export type TypeHdf = "Boucle" | "Aller simple" | "Aller-retour";
 
 export interface ParcoursHdf {
   id: number;
@@ -31,11 +31,14 @@ export interface ParcoursHdf {
   localisation: { departement: string; region: string };
   description: string;
   coordinates?: [number, number][]; // géométrie GPS [lng,lat] si déjà connue
+  /** D'où vient le parcours (attribution exigée par sa licence) : « IGN, BD TOPO® (11/2026) »… */
+  source?: string;
+  licence?: string;
 }
 
 export const SPORTS: SportHdf[] = ["Running", "Trail", "Randonnée", "Vélo (Route)", "VTT"];
 export const DIFFICULTES: DiffHdf[] = ["Facile", "Moyen", "Difficile"];
-export const TYPES: TypeHdf[] = ["Boucle", "Aller simple"];
+export const TYPES: TypeHdf[] = ["Boucle", "Aller simple", "Aller-retour"];
 
 export const SPORT_META: Record<SportHdf, { label: string; emoji: string; color: string; chip: string }> = {
   "Running":      { label: "Running",   emoji: "🏃", color: "#f97316", chip: "bg-orange-100 text-orange-700" },

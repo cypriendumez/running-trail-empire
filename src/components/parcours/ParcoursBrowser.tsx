@@ -417,11 +417,18 @@ function escapeXml(s: string): string {
   const map: Record<string, string> = { "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" };
   return s.replace(/[<>&'"]/g, (c) => map[c] ?? c);
 }
-function buildGpx(name: string, coords: [number, number][]): string {
+/** Le crédit d'un tracé qui ne vient PAS d'OSM (IGN, Métropole) ; `undefined` : celui d'OSM. */
+const creditTrace = (p: { osm_type?: string; source?: string; licence?: string }) =>
+  p.osm_type && p.osm_type !== "relation" && p.osm_type !== "way" && p.source
+    ? `Tracé : ${p.source}${p.licence ? ` — ${p.licence}` : ""}`
+    : undefined;
+
+/** Mention légale ÉCRITE DANS LE FICHIER GPX (pas à l'écran) : l'attribution exigée par la licence. */
+function buildGpx(name: string, coords: [number, number][], credit?: string): string {
   const seg = coords.map(([lng, lat]) => `      <trkpt lat="${lat.toFixed(6)}" lon="${lng.toFixed(6)}"></trkpt>`).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Pacevo" xmlns="http://www.topografix.com/GPX/1/1">
-  <metadata><name>${escapeXml(name)}</name><desc>Tracé © les contributeurs OpenStreetMap (ODbL)</desc></metadata>
+  <metadata><name>${escapeXml(name)}</name>${credit ? `<desc>${escapeXml(credit)}</desc>` : `<desc>Tracé © les contributeurs OpenStreetMap (ODbL)</desc>`}</metadata>
   <trk><name>${escapeXml(name)}</name><trkseg>
 ${seg}
   </trkseg></trk>
@@ -466,7 +473,7 @@ function ParcoursCard({ p, near, loading, disabled, onLoad, exportGpx }: { p: Pa
       if (!coords || coords.length < 2) { toast.error(L["t.gpxNa"], { id: tid }); return; }
       // Le même garde-fou qu'au chargement sur la carte : pas de GPX d'un morceau de parcours.
       if (tracePartiel(coords, p.distance_km)) { toast.error(L["t.traceIncomplete"], { id: tid }); return; }
-      const blob = new Blob([buildGpx(p.nom, coords)], { type: "application/gpx+xml" });
+      const blob = new Blob([buildGpx(p.nom, coords, creditTrace(p))], { type: "application/gpx+xml" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -536,6 +543,10 @@ function ParcoursCard({ p, near, loading, disabled, onLoad, exportGpx }: { p: Pa
             </span>
           )}
         </div>
+        {/* La source d'un parcours qui ne vient pas d'OSM : la Licence Ouverte exige de la citer. */}
+        {p.osm_type && p.osm_type !== "relation" && p.osm_type !== "way" && p.source && (
+          <p className="mt-1.5 truncate text-[11px] text-zinc-400">{L["source"]} : {p.source}</p>
+        )}
       </div>
     </button>
 

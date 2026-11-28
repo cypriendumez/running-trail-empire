@@ -22,6 +22,9 @@ const CHAMPS = [
   "osm_id", "osm_type", "nom", "sport", "difficulte", "type_parcours", "distance_km", "denivele_positif_m",
   "denivele_negatif_m", "temps_estime", "calories_kcal", "pente_max_pct", "altitude_min_m", "altitude_max_m",
   "lat", "lng", "region", "departements", "depart", "arrivee",
+  // 27/11/2026 : les parcours IGN et Métropole portent leur tracé (pas d'OSM où le relire),
+  // et chaque parcours sa source — la Licence Ouverte exige de la citer.
+  "coordinates", "source", "licence", "cle_source",
 ] as const;
 
 const SOURCE = "data/parcours_certifies.json";

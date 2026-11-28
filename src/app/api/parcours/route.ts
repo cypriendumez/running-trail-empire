@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+import { reparerNom } from "@/lib/parcours/noms";
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
@@ -31,12 +32,16 @@ type RawCertified = {
   distance_km?: number; denivele_positif_m?: number; denivele_negatif_m?: number; temps_estime?: string;
   calories_kcal?: number; pente_max_pct?: number; altitude_min_m?: number; altitude_max_m?: number;
   lat?: number; lng?: number; region?: string; departements?: string[] | string; depart?: string; arrivee?: string;
+  /** Tracé embarqué : parcours d'une source NON OSM (IGN, Métropole), qu'on ne peut pas relire chez OSM. */
+  coordinates?: [number, number][]; source?: string; licence?: string;
 };
 function mapCertified(p: RawCertified): ParcoursHdf {
   return {
     id: Number(p.osm_id) || 0,
     osm_id: p.osm_id, osm_type: p.osm_type,
-    nom: p.nom ?? "Parcours",
+    // Filet : un nom abîmé venu d'OpenStreetMap (« Circuit de à ») est réparé à la lecture,
+    // même si une prochaine collecte le réintroduit (lib/parcours/noms).
+    nom: reparerNom({ nom: p.nom ?? "", depart: p.depart, arrivee: p.arrivee }),
     sport: (p.sport ?? "Trail") as SportHdf,
     difficulte: (p.difficulte ?? "Moyen") as DiffHdf,
     type_parcours: (p.type_parcours ?? "Boucle") as TypeHdf,
@@ -52,6 +57,8 @@ function mapCertified(p: RawCertified): ParcoursHdf {
     localisation: { region: p.region ?? "", departement: Array.isArray(p.departements) ? (p.departements[0] ?? "") : (p.departements ?? "") },
     // « None » : le None de Python, sérialisé tel quel par le crawl — pas une arrivée.
     description: [p.depart, p.arrivee].filter((v) => v && v !== "None").join(" → "),
+    ...(Array.isArray(p.coordinates) && p.coordinates.length > 1 ? { coordinates: p.coordinates } : {}),
+    ...(p.source ? { source: p.source, licence: p.licence } : {}),
   };
 }
 
@@ -88,7 +95,8 @@ export async function GET(req: NextRequest) {
   const distMaxRaw = sp.get("distMax");
   // near=lat,lng → tri « Près de moi » (position approximative, jamais stockée).
   const nearRaw = (sp.get("near") ?? "").split(",").map(Number);
-  const near = nearRaw.length === 2 && isFinite(nearRaw[0]) && isFinite(nearRaw[1])
+  // Une position impossible (latitude 95, crash-test du 27/11/2026) n'ordonne rien : ignorée.
+  const near = nearRaw.length === 2 && isFinite(nearRaw[0]) && isFinite(nearRaw[1]) && Math.abs(nearRaw[0]) <= 90 && Math.abs(nearRaw[1]) <= 180
     ? { lat: nearRaw[0], lng: nearRaw[1] } : undefined;
   const filtered = filterAndSort(all, {
     q: sp.get("q") ?? undefined,

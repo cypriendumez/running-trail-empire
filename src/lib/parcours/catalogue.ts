@@ -17,12 +17,15 @@ import { gunzipSync } from "zlib";
  * pour toujours la liste des parcours morts, sans trace (relecture « échecs muets », 09/11/2026).
  */
 let CLES: Map<string, number> | null = null;
+/** `ign/<osm_id>` → identifiant IGN (`cleabs`) : la route du tracé n'accepte que ceux du catalogue. */
+let SOURCES: Map<string, string> | null = null;
 
 function cles(): Map<string, number> | null {
   if (CLES) return CLES;
   try {
-    const brut = JSON.parse(gunzipSync(fs.readFileSync(path.join(process.cwd(), "data", "parcours_certifies.min.json.gz"))).toString("utf-8")) as { osm_id?: number; osm_type?: string; distance_km?: number }[];
+    const brut = JSON.parse(gunzipSync(fs.readFileSync(path.join(process.cwd(), "data", "parcours_certifies.min.json.gz"))).toString("utf-8")) as { osm_id?: number; osm_type?: string; distance_km?: number; cle_source?: string }[];
     CLES = new Map(brut.filter((p) => Number(p.osm_id) > 0).map((p) => [`${p.osm_type || "relation"}/${p.osm_id}`, Number(p.distance_km) || 0]));
+    SOURCES = new Map(brut.filter((p) => p.osm_type === "ign" && p.cle_source?.startsWith("ign-")).map((p) => [`ign/${p.osm_id}`, p.cle_source!.slice(4)]));
     return CLES;
   } catch {
     return null;
@@ -44,4 +47,13 @@ export function estDuCatalogue(type: string, id: string): boolean | null {
 export function distanceDuCatalogue(type: string, id: string): number | null {
   const c = cles();
   return c ? c.get(`${type}/${id}`) ?? 0 : null;
+}
+
+/**
+ * L'identifiant IGN d'un parcours du catalogue (`undefined` : pas au catalogue ; `null` :
+ * catalogue illisible). La route du tracé ne relit à l'IGN que ce qui est AU CATALOGUE.
+ */
+export function cleabsDuCatalogue(id: string): string | null | undefined {
+  if (!cles()) return null;
+  return SOURCES?.get(`ign/${id}`);
 }

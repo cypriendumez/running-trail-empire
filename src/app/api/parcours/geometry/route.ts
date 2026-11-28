@@ -9,7 +9,10 @@ import { unstable_cache } from "next/cache";
 import { denyIfAnonymous } from "@/lib/api/adminGuard";
 import { geometrieVerifiee, refusDefinitif, causes, ErreurSource, echecPassager } from "@/lib/parcours/geometrie";
 import { journaliserEchecUneFois } from "@/lib/journal/echecServeur";
-import { estDuCatalogue, distanceDuCatalogue } from "@/lib/parcours/catalogue";
+import { estErreurTransitoire } from "@/lib/cron/transitoire";
+import { estDuCatalogue, distanceDuCatalogue, cleabsDuCatalogue } from "@/lib/parcours/catalogue";
+import { geometrieIgn, ErreurIgn } from "@/lib/parcours/geometrieIgn";
+import { tracePartiel } from "@/lib/parcours/trace";
 import { MemoireJournal } from "@/lib/parcours/journalTraces";
 
 /**
@@ -127,6 +130,59 @@ async function journaliserRecherche(e: unknown, type: "relation" | "way", id: st
     ...base, message: `Tracé de parcours indisponible : ${cause}`, meta: { type, id, statuts },
   });
 }
+/**
+ * UN ITINÉRAIRE DE L'IGN (BD TOPO, 27/11/2026) : relu au service WFS de l'IGN, gardé 30 jours.
+ * Mêmes règles que pour OSM : un morceau n'est ni montré ni gardé ; un itinéraire retiré de l'IGN
+ * est un refus définitif ; une panne se dit comme telle.
+ */
+const ignPourCache = async (cleabs: string, distanceKm: number) => {
+  const { coords } = await geometrieIgn(cleabs);
+  if (distanceKm > 0 && tracePartiel(coords, distanceKm)) throw new TraceIncomplet(`tracé IGN incomplet : ${cleabs}`, [], false);
+  return coords;
+};
+const ignEnCache = unstable_cache(ignPourCache, ["parcours-geometrie-ign-v1"], { revalidate: 60 * 60 * 24 * 30 });
+
+async function traceIgn(id: string): Promise<NextResponse> {
+  const cleabs = cleabsDuCatalogue(id);
+  const base = { source: "parcours-geometrie", url: "/api/parcours/geometry", meta: { id, type: "ign" } };
+  if (cleabs === null) {
+    // Catalogue illisible : AUCUN parcours IGN ne s'ouvre. On le dit (relecture du 28/11/2026).
+    if (MEMOIRE.uneFois("catalogue illisible (ign)", Date.now())) await journaliserEchecUneFois(null, { ...base, message: "Catalogue des parcours illisible : tracés IGN indisponibles" });
+    return NextResponse.json({ error: "Géométrie indisponible pour le moment." }, { status: 503, headers: { "Retry-After": "60" } });
+  }
+  if (!cleabs) return NextResponse.json({ error: "Parcours inconnu." }, { status: 404 });
+  // Un tracé IGN incomplet, déjà vu : pas de nouvelle requête au WFS à chaque clic.
+  const vu = PARTIELS.get(`ign/${id}`);
+  if (vu && Date.now() < vu.jusqua) return NextResponse.json({ error: "Tracé incomplet.", partiel: true, transitoire: false }, { status: 422 });
+  try {
+    const coords = await ignEnCache(cleabs, distanceDuCatalogue("ign", id) ?? 0);
+    return NextResponse.json({ coordinates: coords }, { headers: { "Cache-Control": "private, max-age=86400" } });
+  } catch (e) {
+    if ((e as { partiel?: unknown })?.partiel === true) {
+      if (PARTIELS.size > 2000) PARTIELS.clear();
+      PARTIELS.set(`ign/${id}`, { jusqua: Date.now() + PARTIEL_MS, transitoire: false });
+      if (MEMOIRE.uneFois(`ign incomplet ${id}`, Date.now())) await journaliserEchecUneFois(null, { ...base, message: `Tracé IGN incomplet : ${cleabs}` });
+      return NextResponse.json({ error: "Tracé incomplet.", partiel: true, transitoire: false }, { status: 422 });
+    }
+    if (e instanceof ErreurIgn && e.status === 404) {
+      // Retiré de la BD TOPO (ou réponse vide du service) : Cyprien doit le savoir pour retirer le
+      // parcours du catalogue — une fois par parcours (relecture du 28/11/2026).
+      if (MEMOIRE.uneFois(`ign absent ${id}`, Date.now())) await journaliserEchecUneFois(null, { ...base, message: `Tracé IGN absent de la BD TOPO : ${cleabs} (parcours à retirer du catalogue ?)` });
+      return NextResponse.json({ error: "Ce parcours n'a plus de tracé à l'IGN.", definitif: true }, { status: 404 });
+    }
+    const statut = e instanceof ErreurIgn ? e.status : null;
+    // Passager (5xx, 429, réseau) : « réessaie ». Un refus du service (4xx) : réessayer ne peut pas
+    // réussir, on ne le promet pas — et le journal dit lequel des deux.
+    const passager = estErreurTransitoire({ message: (e as Error)?.message ?? String(e) }, statut) || statut === null;
+    if (MEMOIRE.uneFois(`panne ign ${statut ?? "réseau"}`, Date.now())) {
+      await journaliserEchecUneFois(null, { ...base, message: passager ? `Tracé IGN indisponible : ${statut ? `ign:${statut}` : "réseau"}` : `Tracé IGN refusé par le service WFS (ign:${statut}) : requête à revoir, pas une panne` });
+    }
+    return passager
+      ? NextResponse.json({ error: "Géométrie indisponible pour le moment." }, { status: 503, headers: { "Retry-After": "60" } })
+      : NextResponse.json({ error: "Tracé indisponible.", definitif: false }, { status: 502 });
+  }
+}
+
 export async function GET(req: NextRequest) {
   // Interroge Overpass, un service communautaire GRATUIT aux quotas stricts. Laisser la
   // route ouverte aux requêtes anonymes, c'est risquer de faire bannir l'adresse IP de
@@ -134,8 +190,9 @@ export async function GET(req: NextRequest) {
   const denied = await denyIfAnonymous();
   if (denied) return NextResponse.json({ error: denied }, { status: 401 });
   const id = req.nextUrl.searchParams.get("id");
-  const type = req.nextUrl.searchParams.get("type") === "way" ? "way" : "relation";
   if (!id || !/^\d+$/.test(id)) return NextResponse.json({ error: "id invalide" }, { status: 400 });
+  if (req.nextUrl.searchParams.get("type") === "ign") return traceIgn(id);
+  const type = req.nextUrl.searchParams.get("type") === "way" ? "way" : "relation";
 
   const key = `${type}/${id}`;
   // Le navigateur garde aussi le tracé : il ne change pour ainsi dire jamais.
