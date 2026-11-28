@@ -1346,6 +1346,7 @@ export function TrailBuilder({ centre, onTrace, exportGpx = false }: {
             <span>· {P[`diff.${choisi.difficulte}`] ?? choisi.difficulte}</span>
             {choisi.localisation?.region && <span className="truncate">· {choisi.localisation.region}</span>}
           </div>
+          {choisi.osm_type && choisi.osm_type !== "relation" && choisi.osm_type !== "way" && choisi.source && <p className="mt-1.5 text-[12px] text-zinc-400">{P["source"]} : {choisi.source}</p>}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-2xl bg-zinc-50 p-3 text-center">
               <div className="text-[20px] font-bold tabular-nums text-zinc-900">{fmtKm(choisi.distance_km, lang, 1)}</div>

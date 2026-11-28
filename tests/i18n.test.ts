@@ -135,6 +135,7 @@ const HORS_TRADUCTION: Record<string, string> = {
   // (lib/brand/stats) : les nombres ne peuvent plus dériver, seuls les mots restent ici.
   "courses ·": "libellé du gabarit de l'image de partage ; les nombres viennent de CHIFFRES",
   "Tracé © les contributeurs OpenStreetMap (ODbL)": "mention légale ÉCRITE DANS LE FICHIER GPX exporté, pas à l'écran — la licence ODbL impose l'attribution, la traduire l'affaiblirait",
+  "Tracé :": "même mention légale du GPX exporté, pour un parcours IGN ou Métropole (Licence Ouverte : citer la source) — 28/11/2026",
 };
 
 /**
