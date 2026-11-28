@@ -69,11 +69,16 @@ export type Liens = { https: string; webcal: string; google: string; outlook: st
  * connexion. Avant : un guide en 3 étapes (copier, ouvrir, « S'abonner à partir du web ») où
  * Cyprien s'est perdu. Si Microsoft retire cette adresse, le bouton ouvre Outlook sans rien ajouter :
  * « Copier le lien » reste là pour le faire à la main.
+ *
+ * ⚠️ OUTLOOK REÇOIT L'ADRESSE HTTPS, JAMAIS WEBCAL (28/11/2026). Avec `webcal://`, Outlook lit
+ * `http://pacevo.fr/…`, que l'hébergeur renvoie vers https par un 308 ; les serveurs de Microsoft
+ * ne le suivent pas : « Nous n'avons pas pu importer le calendrier », et aucune lecture du flux
+ * côté Pacevo. Même essai avec l'adresse https : calendrier importé, séances affichées.
  */
 export function adresseFlux(origine: string, jeton: string): Liens {
   const https = `${origine.replace(/\/+$/, "")}/api/calendrier/flux/${jeton}.ics`;
   const webcal = https.replace(/^https?:\/\//, "webcal://");
-  const ajoutOutlook = (hote: string) => `https://${hote}/calendar/0/addfromweb?url=${encodeURIComponent(webcal)}&name=Pacevo`;
+  const ajoutOutlook = (hote: string) => `https://${hote}/calendar/0/addfromweb?url=${encodeURIComponent(https)}&name=Pacevo`;
   return {
     https, webcal,
     google: `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcal)}`,
