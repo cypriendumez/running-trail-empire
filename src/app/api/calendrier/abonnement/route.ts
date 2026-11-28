@@ -2,21 +2,25 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { adresseFlux, empreinteJeton, nouveauJeton } from "@/lib/calendrier/jeton";
+import { adresseFlux, jetonRetrouve } from "@/lib/calendrier/jeton";
+import { lienDuCompte, ORIGINE_FLUX, tableAbsente } from "@/lib/calendrier/abonnement";
 import { journaliserEchec } from "@/lib/journal/echecServeur";
 
-// /api/calendrier/abonnement — l'abonnement de calendrier du coureur connecté (Réglages → Connexions).
-//   GET    → { actif, creeLe, derniereLecture } (jamais l'adresse : seule son empreinte est gardée)
-//   POST   → crée l'adresse, ou la REMPLACE (l'ancienne cesse aussitôt de marcher) → { https, webcal, google }
+// /api/calendrier/abonnement — l'abonnement de calendrier du coureur connecté (Paramètres → Connexions).
+//   GET    → { actif, derniereLecture, liens } : les liens se RECALCULENT (jeton dérivé, voir jeton.ts),
+//            `null` pour un lien d'avant le 28/11/2026 qu'on ne peut plus retrouver.
+//   POST   → { liens } : le lien EXISTANT s'il se recalcule, sinon un nouveau s'il n'y en a pas
+//            (insert : deux appuis simultanés rendent le même) ; 409 { ancien } s'il existe un lien
+//            qu'on ne sait pas retrouver ; { remplacer: true } (« Changer de lien ») seul le coupe.
+//            Logique dans lib/calendrier/abonnement.ts (testée contre une fausse base).
 //   DELETE → révoque : l'agenda du coureur ne reçoit plus rien.
 //
 // La table `calendrier_abonnements` n'a aucune politique RLS : seul le serveur (service role) la
 // touche, toujours filtrée sur l'utilisateur de la SESSION, jamais sur un identifiant reçu.
 
-const ORIGINE_FLUX = "https://pacevo.fr";
+const URL_ROUTE = "/api/calendrier/abonnement";
 
-/** Table absente (migration 042 pas encore passée) : l'écran dit « indisponible », pas « erreur ». */
-const tableAbsente = (e: { code?: string } | null) => e?.code === "42P01" || e?.code === "PGRST205";
+type Ligne = { cree_le?: string | null; derniere_lecture?: string | null; jeton_empreinte?: string | null };
 
 async function utilisateur() {
   const sb = await createClient();
@@ -29,33 +33,40 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const admin = createAdminClient();
   const { data, error } = await admin.from("calendrier_abonnements")
-    .select("cree_le, derniere_lecture").eq("user_id", user.id).maybeSingle();
+    .select("cree_le, derniere_lecture, jeton_empreinte").eq("user_id", user.id).maybeSingle();
   if (tableAbsente(error)) return NextResponse.json({ indisponible: true });
   if (error) {
-    await journaliserEchec(admin, { source: "calendrier", userId: user.id, url: "/api/calendrier/abonnement", message: `Abonnement illisible : ${error.code ?? "?"} ${error.message}` });
+    await journaliserEchec(admin, { source: "calendrier", userId: user.id, url: URL_ROUTE, message: `Abonnement illisible : ${error.code ?? "?"} ${error.message}` });
     return NextResponse.json({ error: "Lecture impossible, réessaie." }, { status: 500 });
   }
-  const d = data as { cree_le?: string; derniere_lecture?: string | null } | null;
-  return NextResponse.json({ actif: !!d, creeLe: d?.cree_le ?? null, derniereLecture: d?.derniere_lecture ?? null });
+  const d = data as Ligne | null;
+  if (!d) return NextResponse.json({ actif: false, derniereLecture: null, liens: null });
+  let jeton: string | null;
+  try { jeton = jetonRetrouve(user.id, d); }
+  catch (e) {
+    await journaliserEchec(admin, { source: "calendrier", userId: user.id, url: URL_ROUTE, message: `Jeton non recalculé : ${(e as Error).message}` });
+    return NextResponse.json({ error: "Lecture impossible, réessaie." }, { status: 500 });
+  }
+  // La réponse porte l'adresse secrète : jamais gardée en cache.
+  return NextResponse.json(
+    { actif: true, derniereLecture: d.derniere_lecture ?? null, liens: jeton ? adresseFlux(ORIGINE_FLUX, jeton) : null },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   const user = await utilisateur();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const corps = await req.json().catch(() => ({})) as { remplacer?: unknown };
+  const remplacer = corps?.remplacer === true;
   const admin = createAdminClient();
-  const jeton = nouveauJeton();
-  const { error } = await admin.from("calendrier_abonnements").upsert(
-    { user_id: user.id, jeton_empreinte: empreinteJeton(jeton), cree_le: new Date().toISOString(), derniere_lecture: null },
-    { onConflict: "user_id" },
-  );
-  if (tableAbsente(error)) return NextResponse.json({ indisponible: true }, { status: 503 });
-  if (error) {
-    await journaliserEchec(admin, { source: "calendrier", userId: user.id, url: "/api/calendrier/abonnement", message: `Abonnement non créé : ${error.code ?? "?"} ${error.message}` });
-    return NextResponse.json({ error: "Le lien n'a pas pu être créé, réessaie." }, { status: 500 });
-  }
-  // L'adresse vise TOUJOURS le site en ligne : le jeton vit dans la base unique, et un lien créé
-  // depuis un aperçu Vercel ou un serveur local pointerait vers un hôte qui disparaîtra.
-  return NextResponse.json({ ok: true, ...adresseFlux(ORIGINE_FLUX, jeton) });
+  const r = await lienDuCompte(admin, user.id, { remplacer });
+  if (r.k === "liens") return NextResponse.json({ ok: true, liens: r.liens }, { headers: { "Cache-Control": "private, no-store" } });
+  if (r.k === "indisponible") return NextResponse.json({ indisponible: true }, { status: 503 });
+  // Un lien existe mais ne se retrouve pas : on ne l'écrase pas sans « Changer de lien » confirmé.
+  if (r.k === "ancien") return NextResponse.json({ ancien: true }, { status: 409 });
+  await journaliserEchec(admin, { source: "calendrier", userId: user.id, url: URL_ROUTE, message: r.message });
+  return NextResponse.json({ error: "Le lien n'a pas pu être créé, réessaie." }, { status: 500 });
 }
 
 export async function DELETE() {
@@ -64,7 +75,7 @@ export async function DELETE() {
   const admin = createAdminClient();
   const { error } = await admin.from("calendrier_abonnements").delete().eq("user_id", user.id);
   if (error && !tableAbsente(error)) {
-    await journaliserEchec(admin, { source: "calendrier", userId: user.id, url: "/api/calendrier/abonnement", message: `Abonnement non révoqué : ${error.code ?? "?"} ${error.message}` });
+    await journaliserEchec(admin, { source: "calendrier", userId: user.id, url: URL_ROUTE, message: `Abonnement non révoqué : ${error.code ?? "?"} ${error.message}` });
     return NextResponse.json({ error: "La révocation a échoué, réessaie." }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
