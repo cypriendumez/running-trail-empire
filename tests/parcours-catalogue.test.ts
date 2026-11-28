@@ -366,6 +366,7 @@ test("le catalogue livré : identifiants uniques, sports connus, coordonnées en
   }
   // Chaque parcours IGN livré se relit à l'IGN par un identifiant valable.
   const ign = (livre as { osm_id: number; osm_type?: string }[]).filter((p) => p.osm_type === "ign");
+  assert.ok(ign.length > 15000, `seulement ${ign.length} parcours IGN livrés (import du 28/11/2026 : 17 753)`);
   for (const p of ign) { const c = cleabsDuCatalogue(String(p.osm_id)); assert.ok(c && estCleabs(c), `${p.osm_id} : identifiant IGN « ${c} »`); }
   assert.equal(cleabsDuCatalogue("1"), undefined, "un identifiant hors catalogue ne se relit pas à l'IGN");
   // Les randonnées ont leur place : plus seulement 61 sur 15 708.

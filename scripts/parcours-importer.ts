@@ -171,9 +171,11 @@ function garder(nom: string, v: unknown) { writeFileSync(path.join(CACHE, nom + 
  * rafales (28/11/2026 : 3 échecs sur 10 appels simultanés), et chaque refus coûtait une mesure.
  */
 let enVol = 0;
+/** Réglable (`PACEVO_ALTI_SIMULTANES`) : le service tolère moins en journée qu'en pleine nuit. */
+const ALTI_SIMULTANES = Math.max(1, Number(process.env.PACEVO_ALTI_SIMULTANES) || 3);
 const attente: (() => void)[] = [];
 async function jeton<T>(f: () => Promise<T>): Promise<T> {
-  if (enVol >= 3) await new Promise<void>((r) => attente.push(r));
+  if (enVol >= ALTI_SIMULTANES) await new Promise<void>((r) => attente.push(r));
   enVol++;
   try { return await f(); } finally { enVol--; attente.shift()?.(); }
 }
