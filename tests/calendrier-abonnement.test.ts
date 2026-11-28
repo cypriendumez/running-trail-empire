@@ -17,6 +17,7 @@ import { construireIcs, dureeEvenementMin, heureDebut, plierLigne, seanceExporte
 import { nouveauJeton, empreinteJeton, jetonDuChemin, adresseFlux, jetonDe, jetonRetrouve } from "../src/lib/calendrier/jeton";
 import { lireFlux, versSeanceFlux } from "../src/lib/calendrier/flux";
 import { lienDuCompte } from "../src/lib/calendrier/abonnement";
+import { ouvertureNavigateur, reponseNavigateur } from "../src/lib/calendrier/navigateur";
 import { PLAN_T } from "../src/lib/ai/planI18n";
 import { QUALITE_T } from "../src/lib/ai/qualityI18n";
 
@@ -622,6 +623,85 @@ await test("l'encart tient en deux gros boutons, celui de l'appareil d'abord, l'
     const corps = src.split(`async function ${f}(`)[1].split("\n  }\n")[0];
     assert.match(corps, /generation\.current\+\+;/, `${f} n'invalide pas les relectures en vol`);
   }
+});
+
+console.log("\nLE LIEN OUVERT DANS UN NAVIGATEUR : L'ABONNEMENT, JAMAIS UNE COPIE FIGÉE");
+
+const NAV = (ua: string) => new Headers({ "sec-fetch-dest": "document", "sec-fetch-mode": "navigate", "user-agent": ua });
+const UA_IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1";
+const UA_ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36";
+const deps = (existe: boolean | null, connecte: boolean) => {
+  const appels: string[] = [];
+  return { appels, d: { existe: async (j: string) => { appels.push(`existe:${j}`); return existe; }, connecte: async () => { appels.push("connecte"); return connecte; } } };
+};
+
+await test("ouvert dans Safari ou Chrome sur iPhone, iPad, Mac : l'abonnement webcal, pas le fichier", async () => {
+  // 28/11/2026 : le lien collé dans Safari a importé une copie figée dans « Travail » (chaque séance en double).
+  const j = nouveauJeton();
+  for (const ua of [UA_IPHONE,
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36",
+  ]) {
+    const r = await reponseNavigateur(NAV(ua), `${j}.ics`, deps(true, false).d);
+    assert.equal(r?.status, 302, ua);
+    assert.equal(r?.headers.get("location"), `webcal://pacevo.fr/api/calendrier/flux/${j}.ics`, ua);
+    assert.equal(r?.headers.get("cache-control"), "private, no-store");
+    assert.match(r?.headers.get("x-robots-tag") ?? "", /noindex/);
+  }
+  assert.equal(ouvertureNavigateur(new Headers({ "sec-fetch-mode": "navigate", "user-agent": "Mozilla/5.0 (iPhone)" }), `${j}.ics`)?.apple, true, "le seul mode « navigate » compte aussi");
+});
+
+await test("lien révoqué ouvert sur iPhone : 404, jamais un abonnement à un flux mort ; base illisible : 503", async () => {
+  const j = nouveauJeton();
+  const mort = await reponseNavigateur(NAV(UA_IPHONE), `${j}.ics`, deps(false, true).d);
+  assert.equal(mort?.status, 404);
+  assert.equal(mort?.headers.get("location"), null);
+  const panne = await reponseNavigateur(NAV(UA_IPHONE), `${j}.ics`, deps(null, true).d);
+  assert.equal(panne?.status, 503);
+  assert.equal(panne?.headers.get("retry-after"), "900");
+});
+
+await test("Android, Windows : la page des boutons, par la connexion d'abord si ce navigateur n'est pas connecté", async () => {
+  const j = nouveauJeton();
+  const connecte = await reponseNavigateur(NAV(UA_ANDROID), `${j}.ics`, deps(true, true).d);
+  assert.equal(connecte?.status, 302);
+  assert.equal(connecte?.headers.get("location"), "https://pacevo.fr/dashboard/settings?onglet=connexions&agenda=lien");
+  const anonyme = await reponseNavigateur(NAV("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0"), `${j}.ics`, deps(true, false).d);
+  assert.equal(anonyme?.headers.get("location"), `https://pacevo.fr/login?next=${encodeURIComponent("/dashboard/settings?onglet=connexions&agenda=lien")}`);
+  // Sans agent utilisateur : pas d'Apple supposé.
+  assert.equal(ouvertureNavigateur(new Headers({ "sec-fetch-dest": "document" }), `${j}.ics`)?.apple, false);
+});
+
+await test("les agendas eux-mêmes (Apple, Google, Outlook) et les jetons mal formés ne sont pas détournés, ni la base lue", async () => {
+  const j = nouveauJeton();
+  const agendas: Record<string, string>[] = [
+    { "user-agent": "macOS/15.1 (24B83) CalendarAgent/1000" },
+    { "user-agent": "iOS/18.1 (22B83) dataaccessd/1.0" },
+    { "user-agent": "Google-Calendar-Importer" },
+    { "user-agent": "Microsoft Office/16.0 (Windows NT 10.0; Microsoft Outlook 16.0.17928; Pro)" },
+    { "sec-fetch-dest": "empty", "sec-fetch-mode": "cors", "user-agent": "Mozilla/5.0 (iPhone)" },
+  ];
+  for (const h of agendas) {
+    const { appels, d } = deps(true, true);
+    assert.equal(await reponseNavigateur(new Headers(h), `${j}.ics`, d), null, JSON.stringify(h));
+    assert.deepEqual(appels, []);
+  }
+  assert.equal(await reponseNavigateur(NAV(UA_IPHONE), "abc.ics", deps(true, true).d), null, "jeton mal formé : le 404 habituel");
+});
+
+await test("la route passe par `reponseNavigateur` AVANT de construire le calendrier", () => {
+  const src = codeNu("src/app/api/calendrier/flux/[jeton]/route.ts");
+  const i = src.indexOf("const navigateur = await reponseNavigateur(req.headers, jeton, {");
+  assert.ok(i > 0 && i < src.indexOf("lireFlux(createAdminClient()"), "le fichier serait servi au navigateur");
+  assert.match(src, /if \(navigateur\) return navigateur;/);
+  assert.match(src, /\.eq\("jeton_empreinte", empreinteJeton\(j\)\)\.maybeSingle\(\);\s*return error \? null : !!data;/, "une base illisible prise pour « lien révoqué »");
+});
+
+await test("l'encart dit pourquoi on y arrive depuis le lien, et l'aide Outlook dit « dans l'agenda » (5 langues)", () => {
+  const src = codeNu("src/components/settings/AbonnementCalendrier.tsx");
+  assert.match(src, /get\("agenda"\) === "lien"\) \{\s*setDepuisLien\(true\);/);
+  assert.match(src, /\{depuisLien && <p role="status"[^>]*>\{t\("depuisLien"\)\}<\/p>\}/);
+  for (const mot of ["pas dans le navigateur", "not the browser", "nicht im Browser", "no en el navegador", "não no navegador"]) assert.ok(src.includes(mot), mot);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);

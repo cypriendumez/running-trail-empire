@@ -41,12 +41,13 @@ const L: Record<Lang, Record<string, string>> = {
     googleTel: "Google Agenda sur téléphone : ouvre le menu ☰ et coche « Pacevo · séances ». Sur Android, ouvre aussi Paramètres, touche « Pacevo · séances » et active la synchronisation.",
     googleOrdi: "Si, sur ton téléphone, Google n'affiche pas de bouton pour ajouter l'agenda, fais-le une fois depuis un ordinateur (pacevo.fr › Paramètres › Connexions) : il arrive ensuite tout seul sur le téléphone.",
     iphone: "Sur iPhone, Google ne transmet pas toujours ce calendrier à l'app Calendrier : pour elle, touche « Calendrier Apple ».",
-    outlook: "Outlook : « Ajouter un calendrier », choisis l'abonnement depuis Internet (ou le web), puis colle le lien copié.",
+    outlook: "Outlook : « Ajouter un calendrier », choisis l'abonnement depuis Internet (ou le web), puis colle le lien copié (dans l'agenda, pas dans le navigateur).",
     contenu: "Seuls le type de chaque séance (footing, sortie longue…) et sa durée partent dans ton agenda. Le détail, les allures et tout ce qui touche à ta santé restent dans Pacevo.",
     changer: "Changer de lien", confirmeChanger: "Ton lien actuel cessera de marcher : il faudra rajouter Pacevo à chacun de tes agendas. À faire seulement si tu as partagé ton lien par erreur. Continuer ?",
     confirmeAncien: "Un nouveau lien va remplacer l'ancien, qui cessera de marcher. Continuer ?",
     rappel: "Nouveau lien prêt. Supprime l'ancien calendrier « Pacevo · séances » de ton agenda, puis touche ton agenda ci-dessus pour ajouter le nouveau.",
     ordiConfirme: "Sur ordinateur, Google te demande de confirmer l'ajout : accepte.",
+    depuisLien: "Ce lien s'ajoute à un agenda, pas dans le navigateur : touche simplement ton agenda ci-dessous.",
     arreter: "Arrêter l'envoi", confirmeArret: "Ton agenda ne recevra plus tes séances. Continuer ?", arrete: "Envoi arrêté. Tu peux supprimer le calendrier « Pacevo · séances » de ton agenda.",
     indispo: "Bientôt disponible.", erreur: "Échec, réessaie.", illisible: "État illisible pour le moment, réessaie plus tard.",
   },
@@ -61,12 +62,13 @@ const L: Record<Lang, Record<string, string>> = {
     googleTel: "Google Calendar on your phone: open the ☰ menu and tick “Pacevo · sessions”. On Android, also open Settings, tap “Pacevo · sessions” and turn on sync.",
     googleOrdi: "If Google shows no button to add the calendar on your phone, do it once from a computer (pacevo.fr › Settings › Connections): it then reaches your phone by itself.",
     iphone: "On iPhone, Google doesn't always pass this calendar on to the Calendar app: for that app, tap “Apple Calendar”.",
-    outlook: "Outlook: “Add calendar”, choose subscribing from the internet (or the web), then paste the copied link.",
+    outlook: "Outlook: “Add calendar”, choose subscribing from the internet (or the web), then paste the copied link (in the calendar, not the browser).",
     contenu: "Only each session's type (easy run, long run…) and duration go to your calendar. The details, your paces and anything about your health stay in Pacevo.",
     changer: "Change link", confirmeChanger: "Your current link will stop working: you'll need to add Pacevo to each of your calendars again. Only do this if you shared your link by mistake. Continue?",
     confirmeAncien: "A new link will replace the old one, which will stop working. Continue?",
     rappel: "New link ready. Delete the old “Pacevo · sessions” calendar from your calendar app, then tap your calendar above to add the new one.",
     ordiConfirme: "On a computer, Google asks you to confirm adding the calendar: accept.",
+    depuisLien: "This link goes into a calendar, not the browser: just tap your calendar below.",
     arreter: "Stop sending", confirmeArret: "Your calendar will no longer receive your sessions. Continue?", arrete: "Sending stopped. You can delete the “Pacevo · sessions” calendar from your calendar app.",
     indispo: "Coming soon.", erreur: "Failed, try again.", illisible: "Status unavailable for now, try again later.",
   },
@@ -81,12 +83,13 @@ const L: Record<Lang, Record<string, string>> = {
     googleTel: "Google Kalender auf dem Handy: Öffne das Menü ☰ und hake „Pacevo · Einheiten“ an. Unter Android öffne außerdem die Einstellungen, tippe auf „Pacevo · Einheiten“ und aktiviere die Synchronisierung.",
     googleOrdi: "Zeigt Google auf deinem Handy keine Schaltfläche zum Hinzufügen, mach es einmal am Computer (pacevo.fr › Einstellungen › Verbindungen): Der Kalender kommt danach von selbst aufs Handy.",
     iphone: "Auf dem iPhone gibt Google diesen Kalender nicht immer an die Kalender-App weiter: Tippe dafür auf „Apple Kalender“.",
-    outlook: "Outlook: „Kalender hinzufügen“, wähle das Abonnieren aus dem Internet (oder Web) und füge den kopierten Link ein.",
+    outlook: "Outlook: „Kalender hinzufügen“, wähle das Abonnieren aus dem Internet (oder Web) und füge den kopierten Link ein (im Kalender, nicht im Browser).",
     contenu: "Nur die Art jeder Einheit (lockerer Lauf, langer Lauf…) und ihre Dauer gehen in deinen Kalender. Details, Tempi und alles zu deiner Gesundheit bleiben in Pacevo.",
     changer: "Link ändern", confirmeChanger: "Dein aktueller Link funktioniert dann nicht mehr: Du musst Pacevo in jedem deiner Kalender neu hinzufügen. Nur nötig, wenn du deinen Link versehentlich geteilt hast. Fortfahren?",
     confirmeAncien: "Ein neuer Link ersetzt den alten, der dann nicht mehr funktioniert. Fortfahren?",
     rappel: "Neuer Link bereit. Lösche den alten Kalender „Pacevo · Einheiten“ aus deiner Kalender-App und tippe dann oben auf deinen Kalender, um den neuen hinzuzufügen.",
     ordiConfirme: "Am Computer bittet Google dich, das Hinzufügen zu bestätigen: Stimme zu.",
+    depuisLien: "Dieser Link gehört in einen Kalender, nicht in den Browser: Tippe einfach unten auf deinen Kalender.",
     arreter: "Senden beenden", confirmeArret: "Dein Kalender erhält deine Einheiten nicht mehr. Fortfahren?", arrete: "Senden beendet. Du kannst den Kalender „Pacevo · Einheiten“ aus deiner Kalender-App löschen.",
     indispo: "Bald verfügbar.", erreur: "Fehlgeschlagen, versuch es erneut.", illisible: "Status gerade nicht lesbar, versuch es später.",
   },
@@ -101,12 +104,13 @@ const L: Record<Lang, Record<string, string>> = {
     googleTel: "Google Calendar en el móvil: abre el menú ☰ y marca «Pacevo · sesiones». En Android, abre también Ajustes, toca «Pacevo · sesiones» y activa la sincronización.",
     googleOrdi: "Si en tu móvil Google no muestra ningún botón para añadir el calendario, hazlo una vez desde un ordenador (pacevo.fr › Ajustes › Conexiones): luego llega solo al móvil.",
     iphone: "En el iPhone, Google no siempre pasa este calendario a la app Calendario: para ella, toca «Calendario de Apple».",
-    outlook: "Outlook: «Añadir calendario», elige suscribirte desde Internet (o la web) y pega el enlace copiado.",
+    outlook: "Outlook: «Añadir calendario», elige suscribirte desde Internet (o la web) y pega el enlace copiado (en el calendario, no en el navegador).",
     contenu: "Solo el tipo de cada sesión (rodaje suave, tirada larga…) y su duración van a tu calendario. El detalle, tus ritmos y todo lo relativo a tu salud se quedan en Pacevo.",
     changer: "Cambiar de enlace", confirmeChanger: "Tu enlace actual dejará de funcionar: tendrás que volver a añadir Pacevo a cada uno de tus calendarios. Hazlo solo si compartiste tu enlace por error. ¿Continuar?",
     confirmeAncien: "Un enlace nuevo sustituirá al antiguo, que dejará de funcionar. ¿Continuar?",
     rappel: "Enlace nuevo listo. Borra el antiguo calendario «Pacevo · sesiones» de tu app de calendario y luego toca tu calendario arriba para añadir el nuevo.",
     ordiConfirme: "En el ordenador, Google te pide confirmar que lo añades: acepta.",
+    depuisLien: "Este enlace se añade a un calendario, no al navegador: toca tu calendario aquí abajo.",
     arreter: "Dejar de enviar", confirmeArret: "Tu calendario dejará de recibir tus sesiones. ¿Continuar?", arrete: "Envío detenido. Puedes borrar el calendario «Pacevo · sesiones» de tu app de calendario.",
     indispo: "Próximamente.", erreur: "Error, inténtalo de nuevo.", illisible: "Estado no disponible por ahora, inténtalo más tarde.",
   },
@@ -121,12 +125,13 @@ const L: Record<Lang, Record<string, string>> = {
     googleTel: "Google Agenda no telemóvel: abre o menu ☰ e marca «Pacevo · sessões». No Android, abre também as Definições, toca em «Pacevo · sessões» e ativa a sincronização.",
     googleOrdi: "Se no telemóvel a Google não mostrar nenhum botão para adicionar o calendário, fá-lo uma vez num computador (pacevo.fr › Definições › Ligações): depois chega sozinho ao telemóvel.",
     iphone: "No iPhone, a Google nem sempre passa este calendário para a app Calendário: para ela, toca em «Calendário da Apple».",
-    outlook: "Outlook: «Adicionar calendário», escolhe subscrever a partir da Internet (ou da web) e cola o link copiado.",
+    outlook: "Outlook: «Adicionar calendário», escolhe subscrever a partir da Internet (ou da web) e cola o link copiado (no calendário, não no navegador).",
     contenu: "Só o tipo de cada sessão (corrida fácil, corrida longa…) e a sua duração vão para o teu calendário. O detalhe, os teus ritmos e tudo o que diz respeito à tua saúde ficam no Pacevo.",
     changer: "Mudar de link", confirmeChanger: "O teu link atual deixará de funcionar: terás de voltar a adicionar o Pacevo a cada um dos teus calendários. Faz isto só se partilhaste o teu link por engano. Continuar?",
     confirmeAncien: "Um link novo vai substituir o antigo, que deixará de funcionar. Continuar?",
     rappel: "Link novo pronto. Apaga o antigo calendário «Pacevo · sessões» da tua app de calendário e depois toca no teu calendário acima para adicionar o novo.",
     ordiConfirme: "No computador, a Google pede-te para confirmar a adição: aceita.",
+    depuisLien: "Este link adiciona-se a um calendário, não ao navegador: toca no teu calendário aqui em baixo.",
     arreter: "Parar o envio", confirmeArret: "O teu calendário deixará de receber as tuas sessões. Continuar?", arrete: "Envio parado. Podes apagar o calendário «Pacevo · sessões» da tua app de calendário.",
     indispo: "Disponível em breve.", erreur: "Falhou, tenta de novo.", illisible: "Estado indisponível de momento, tenta mais tarde.",
   },
@@ -143,6 +148,9 @@ export function AbonnementCalendrier({ lang }: { lang: Lang }) {
   // Le bouton de l'appareil passe devant : Apple sur iPhone, iPad (qui se dit « Macintosh ») et Mac,
   // Google ailleurs (Android, Windows…). L'aide repliée ne montre que ce qui concerne l'appareil.
   const [appareil, setAppareil] = useState<Appareil>("apple");
+  // Arrivé ici en ouvrant le lien d'agenda dans un navigateur (lib/calendrier/navigateur.ts) : on dit pourquoi.
+  const [depuisLien, setDepuisLien] = useState(false);
+  const section = useRef<HTMLElement>(null);
   const appleDabord = appareil === "apple";
   const date = (iso: string | null) => iso
     ? new Date(iso).toLocaleDateString(lang, { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })
@@ -167,6 +175,10 @@ export function AbonnementCalendrier({ lang }: { lang: Lang }) {
     } catch { rate(); }
   }
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("agenda") === "lien") {
+      setDepuisLien(true);
+      section.current?.scrollIntoView({ block: "start" });
+    }
     const ua = navigator.userAgent;
     setAppareil(/iPhone|iPad|Macintosh/.test(ua) ? "apple" : /Android/.test(ua) ? "android" : "autre");
     void relire();
@@ -257,10 +269,11 @@ export function AbonnementCalendrier({ lang }: { lang: Lang }) {
   };
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
+    <section ref={section} className="scroll-mt-20 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
       <h2 className="text-base font-semibold text-zinc-900">{t("titre")}</h2>
       <p className="mt-0.5 text-sm text-zinc-500">{t("desc")}</p>
       <div className="mt-4 space-y-3">
+        {depuisLien && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm font-medium text-amber-800 ring-1 ring-amber-100">{t("depuisLien")}</p>}
         {etat.k === "lecture" && <Loader2 role="status" aria-label="…" className="h-5 w-5 animate-spin text-zinc-400" />}
         {etat.k === "illisible" && <p className="text-sm text-zinc-500">{t("illisible")}</p>}
         {etat.k === "indisponible" && <p className="text-sm text-zinc-500">{t("indispo")}</p>}
