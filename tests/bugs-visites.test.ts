@@ -23,6 +23,7 @@ import { agregerVisites, joursEntre, type LigneVisite } from "../src/lib/visites
 import { appelSurveille, reponseAnormale } from "../src/components/ErrorReporter";
 import { erreurReseau } from "../src/lib/erreurs/reseau";
 import { INTERDITES } from "../src/lib/sauvegarde/tables";
+import { adresseSure, extraitSur, lireRapportCsp } from "../src/lib/csp/rapport";
 
 let passed = 0; const fails: string[] = [];
 function test(nom: string, fn: () => void) {
@@ -403,6 +404,72 @@ test("l'espace coach a ses deux onglets et la politique de confidentialité dit 
     assert.ok(/const acces = await verdictAdmin\(\);\s*if \(!acces\.ok\)/.test(src), `${r} n'exige plus verdictAdmin`);
     assert.ok(/status: 403/.test(src) && /acces\.motif === "indisponible"[\s\S]{0,200}status: 503/.test(src), `${r} ne distingue plus « refus » (403) de « invérifiable » (503)`);
   }
+});
+
+test("un rapport CSP n'enregistre jamais la requête d'une adresse : ni position, ni jeton (28/11/2026)", () => {
+  // Le vrai rapport du 28/11 : la météo, bloquée, portait la position EXACTE du coureur.
+  const vrai = JSON.stringify({ "csp-report": {
+    "document-uri": "https://pacevo.fr/dashboard?onglet=x",
+    "violated-directive": "connect-src",
+    "blocked-uri": "https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=49.4446686093751&longitude=1.103290535699008&localityLanguage=fr",
+    "source-file": "https://pacevo.fr/_next/static/chunks/a.js?v=2#l",
+  } });
+  const r = lireRapportCsp(vrai);
+  assert.equal(r.bloque, "https://api.bigdatacloud.net/data/reverse-geocode-client");
+  assert.equal(r.page, "https://pacevo.fr/dashboard");
+  const e = extraitSur(vrai);
+  assert.ok(e.includes("connect-src") && e.includes("api.bigdatacloud.net"), "l'extrait ne sert plus au diagnostic");
+  assert.ok(!/latitude|longitude|49\.44|onglet=|\?v=2/.test(e), `position ou requête dans l'extrait : ${e}`);
+  // Format Reporting API (tableau de { url, body }).
+  const api = JSON.stringify([{ type: "csp-violation", url: "https://pacevo.fr/dashboard?token=abc", body: { documentURL: "https://pacevo.fr/dashboard?token=abc", blockedURL: "https://x.example/a?lat=1&lon=2", effectiveDirective: "img-src" } }]);
+  assert.ok(!/token=|lat=|lon=/.test(extraitSur(api)), extraitSur(api));
+  assert.equal(lireRapportCsp(api).bloque, "https://x.example/a");
+  // Les mots-clés de la CSP restent ; une extension reste reconnaissable (le tri du bruit la lit dans l'extrait).
+  assert.equal(adresseSure("inline"), "inline");
+  assert.equal(adresseSure("eval"), "eval");
+  // Une adresse non http garde aussi son seul chemin (Supabase temps réel : `wss://…?apikey=…`).
+  assert.equal(adresseSure("wss://abc.supabase.co/realtime/v1/websocket?apikey=eyJxyz&vsn=1.0.0"), "wss://abc.supabase.co/realtime/v1/websocket");
+  assert.match(extraitSur(JSON.stringify({ "csp-report": { "source-file": "safari-web-extension://1F/c.js" } })), /safari-web-extension:\/\/1F\/c\.js/);
+  // Rapport sans ressource lisible : le repère « ? » reste (vu en relecture : il devenait vide).
+  assert.equal(lireRapportCsp("{}").bloque, "?");
+  assert.equal(lireRapportCsp(JSON.stringify({ "csp-report": { "blocked-uri": "" } })).bloque, "?");
+  // Corps illisible : rien, jamais le texte brut.
+  assert.equal(extraitSur("latitude=49.44 pas du JSON"), "");
+  // La route garde l'extrait NETTOYÉ, jamais le corps brut.
+  const route = codeNu("src/app/api/csp-report/route.ts");
+  assert.match(route, /meta: sansAdresse\(\{ extrait: extraitSur\(brut\) \}\)/);
+  assert.match(route, /message: sansAdresse\(`CSP bloquée/);
+  // Liste blanche : ni extrait de script (texte de la page), ni politique entière.
+  const echantillon = extraitSur(JSON.stringify({ "csp-report": { "blocked-uri": "inline", "script-sample": "alert('moi@ex.fr')", "original-policy": "default-src 'self'", "violated-directive": "script-src" } }));
+  assert.ok(!/script-sample|alert|original-policy/.test(echantillon), echantillon);
+  assert.match(echantillon, /script-src/);
+  assert.ok(!/brut\.slice/.test(route), "le corps brut repart dans le journal");
+});
+
+test("la météo : le géocodage n'est plus bloqué, et les services tiers ne reçoivent qu'une position arrondie (≈ 1 km)", () => {
+  // 28/11/2026 : api.bigdatacloud.net répond 307 vers api-bdc.io, absent de la CSP → ville jamais affichée.
+  const meteo = codeNu("src/components/dashboard/WeatherChip.tsx");
+  const csp = readFileSync("next.config.ts", "utf8").match(/`connect-src ([^`]*)`/)?.[1] ?? "";
+  assert.ok(csp, "connect-src introuvable dans next.config.ts");
+  // Chaque hôte que la météo interroge est autorisé par connect-src (directement ou par joker).
+  const hotes = [...meteo.matchAll(/https:\/\/([a-z0-9.-]+)/gi)].map((m) => m[1]);
+  assert.ok(hotes.includes("api-bdc.io"), "le géocodage ne vise plus api-bdc.io");
+  assert.ok(!hotes.includes("api.bigdatacloud.net"), "l'ancien domaine (redirigé, bloqué) est revenu");
+  for (const h of hotes) {
+    const ok = csp.split(/\s+/).some((s) => s === `https://${h}` || (s.startsWith("https://*.") && h.endsWith(s.slice("https://*".length))));
+    assert.ok(ok, `${h} n'est pas dans connect-src : la CSP le bloquera`);
+  }
+  // La position est arrondie AVANT tout appel ; aucune adresse ne reçoit la position brute.
+  assert.match(codeNu("src/lib/geo/arrondi.ts"), /export const arrondiPosition = \(x: number\) => Math\.round\(x \* 100\) \/ 100;/);
+  // La recherche de parcours « près de moi » : la position de l'adresse de requête est arrondie, côté
+  // navigateur ET côté serveur (l'adresse finit dans les journaux de l'hébergeur).
+  assert.match(codeNu("src/components/parcours/ParcoursBrowser.tsx"), /params\.set\("near", `\$\{arrondiPosition\(near\.lat\)\},\$\{arrondiPosition\(near\.lng\)\}`\)/);
+  assert.ok(!/toFixed\(4\)/.test(codeNu("src/components/parcours/ParcoursBrowser.tsx")), "position à 11 m dans l'adresse");
+  assert.match(codeNu("src/app/api/parcours/route.ts"), /\{ lat: arrondiPosition\(nearRaw\[0\]\), lng: arrondiPosition\(nearRaw\[1\]\) \}/);
+  assert.match(meteo, /const lat = arrondiPosition\(pos\.coords\.latitude\), lon = arrondiPosition\(pos\.coords\.longitude\);/);
+  assert.ok(!/\$\{pos\.coords/.test(meteo), "une position brute part dans une adresse");
+  // Sans ville lisible : pas de puce « lieu » (jamais une ville inventée).
+  assert.match(meteo, /\{data\.city && <span/);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
