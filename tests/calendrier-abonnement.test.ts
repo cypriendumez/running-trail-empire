@@ -339,9 +339,11 @@ await test("les liens d'ajout : webcal pour Apple, page d'ajout pour Google", ()
   assert.equal(u.https, `https://pacevo.fr/api/calendrier/flux/${"J".repeat(43)}.ics`);
   assert.equal(u.webcal, `webcal://pacevo.fr/api/calendrier/flux/${"J".repeat(43)}.ics`);
   assert.equal(u.google, `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(u.webcal)}`);
-  // Outlook : l'adresse essayée le 28/11/2026 sur le vrai compte de Cyprien (ajout en un clic).
-  assert.equal(u.outlook, `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(u.webcal)}&name=Pacevo`);
-  assert.equal(u.outlookPro, `https://outlook.office.com/calendar/0/addfromweb?url=${encodeURIComponent(u.webcal)}&name=Pacevo`);
+  // Outlook : l'adresse essayée le 28/11/2026 sur le vrai compte de Cyprien (ajout en un clic), avec
+  // le lien HTTPS : en webcal, Outlook lit http, ne suit pas la redirection 308 et refuse l'import.
+  assert.equal(u.outlook, `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(u.https)}&name=Pacevo`);
+  assert.equal(u.outlookPro, `https://outlook.office.com/calendar/0/addfromweb?url=${encodeURIComponent(u.https)}&name=Pacevo`);
+  assert.ok(!/webcal/.test(decodeURIComponent(u.outlook + u.outlookPro)), "Outlook reçoit une adresse webcal : import refusé");
   assert.match(codeNu("src/app/api/calendrier/abonnement/route.ts"), /adresseFlux\(ORIGINE_FLUX, jeton\)/, "l'adresse suit l'hôte de la requête (aperçu, localhost)");
   assert.match(codeNu("src/lib/calendrier/abonnement.ts"), /export const ORIGINE_FLUX = "https:\/\/pacevo\.fr";/);
 });
