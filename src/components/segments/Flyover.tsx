@@ -121,7 +121,8 @@ export function Flyover({ polyline, altitudes, paces, stats }: {
       style: `https://api.maptiler.com/maps/hybrid/style.json?key=${MAPTILER}`,
       center: coords[0],
       zoom: 14, pitch: 60, bearing: 0,
-      attributionControl: false,
+      // Crédit OBLIGATOIRE (vue satellite MapTiler + données OpenStreetMap) : il manquait (audit du 28/11/2026).
+      attributionControl: { compact: true, customAttribution: "© MapTiler © les contributeurs OpenStreetMap" },
       // Aucun fondu à l'apparition des tuiles : par défaut MapLibre les fait
       // apparaître en 300 ms, ce qui produit un scintillement permanent quand la
       // caméra avance sans arrêt — lu comme une saccade alors que c'en est l'inverse.

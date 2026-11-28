@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { gunzipSync } from "zlib";
-import { filterAndSort, computeFacets, type ParcoursHdf, type SortKey, type Facets, type SportHdf, type DiffHdf, type TypeHdf } from "@/data/parcoursHdf";
+import { filterAndSort, computeFacets, praticableEnCourant, type ParcoursHdf, type SortKey, type Facets, type SportHdf, type DiffHdf, type TypeHdf } from "@/data/parcoursHdf";
 import { arrondiPosition } from "@/lib/geo/arrondi";
 
 // VRAIS parcours France (OpenStreetMap / ODbL). Lu une fois puis gardé en mémoire.
@@ -60,6 +60,7 @@ function mapCertified(p: RawCertified): ParcoursHdf {
     description: [p.depart, p.arrivee].filter((v) => v && v !== "None").join(" → "),
     ...(Array.isArray(p.coordinates) && p.coordinates.length > 1 ? { coordinates: p.coordinates } : {}),
     ...(p.source ? { source: p.source, licence: p.licence } : {}),
+    ...(praticableEnCourant({ sport: p.sport ?? "", distance_km: p.distance_km ?? 0, denivele_positif_m: p.denivele_positif_m ?? 0, denivele_negatif_m: p.denivele_negatif_m ?? 0, nom: p.nom }) ? { courable: true } : {}),
   };
 }
 

@@ -34,6 +34,24 @@ export interface ParcoursHdf {
   /** D'où vient le parcours (attribution exigée par sa licence) : « IGN, BD TOPO® (11/2026) »… */
   source?: string;
   licence?: string;
+  /** Une randonnée courte et plate, PRATICABLE EN COURANT (voir `praticableEnCourant`). */
+  courable?: boolean;
+}
+
+/**
+ * Une randonnée qu'on peut faire en courant, d'après ses MESURES : 2 à 21 km, moins de 20 m de
+ * D+ par kilomètre. Cyprien, 28/11/2026 : « quand je vais à Lille il met aucun parcours de
+ * running alors qu'il y a de beaux parcours au niveau de la citadelle » — « Autour de la
+ * Citadelle » (5,4 km, plat) était une « Randonnée », invisible au filtre Running. Elle reste une
+ * randonnée (affichée « praticable en courant »), on ne lui invente pas un balisage de course.
+ */
+export function praticableEnCourant(p: { sport: string; distance_km: number; denivele_positif_m: number; denivele_negatif_m?: number; nom?: string }): boolean {
+  // Une VOIE VERTE est, par définition, réservée aux déplacements non motorisés — piétons compris
+  // (code de la route, art. R110-2) : celles de Lille (canal de Roubaix, Deûle) se courent.
+  const voieVerte = p.sport === "Vélo (Route)" && /voie verte|coul[ée]e verte/i.test(p.nom ?? "");
+  // Plat dans LES DEUX SENS : un aller simple qui descend 400 m n'est pas plat (relecture du 28/11/2026).
+  return (p.sport === "Randonnée" || voieVerte) && p.distance_km >= 2 && p.distance_km <= 21
+    && (p.denivele_positif_m || 0) / p.distance_km < 20 && Math.abs(p.denivele_negatif_m || 0) / p.distance_km < 20;
 }
 
 export const SPORTS: SportHdf[] = ["Running", "Trail", "Randonnée", "Vélo (Route)", "VTT"];
@@ -122,7 +140,8 @@ function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): nu
 export function filterAndSort(all: ParcoursHdf[], query: ParcoursQuery): ParcoursHdf[] {
   const q = (query.q ?? "").trim().toLowerCase();
   let list = all.filter((p) => {
-    if (query.sport && query.sport !== "all" && p.sport !== query.sport) return false;
+    // « Running » : les parcours de course ET les randonnées praticables en courant.
+    if (query.sport && query.sport !== "all" && p.sport !== query.sport && !(query.sport === "Running" && p.courable)) return false;
     if (query.difficulte && query.difficulte !== "all" && p.difficulte !== query.difficulte) return false;
     if (query.type && query.type !== "all" && p.type_parcours !== query.type) return false;
     if (query.region && query.region !== "all" && p.localisation.region !== query.region) return false;

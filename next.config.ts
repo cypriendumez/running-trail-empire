@@ -46,7 +46,8 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/parcours": ["./data/parcours_certifies.min.json.gz"],
     // La route du tracé vérifie qu'un parcours « supprimé d'OSM » est bien au catalogue avant de le journaliser.
-    "/api/parcours/geometry": ["./data/parcours_certifies.min.json.gz"],
+    // Les tracés gardés (28/11/2026), nommés un par un : un motif d'étoile ouvrirait un faux commentaire.
+    "/api/parcours/geometry": ["./data/parcours_certifies.min.json.gz", ...Array.from({ length: 128 }, (_, t) => `./data/traces/${t}.json.gz`)],
   },
   images: {
     // ⚠️ NEXT 16 N'ACCEPTE QUE LES QUALITÉS DÉCLARÉES ICI. Sans cette liste, un

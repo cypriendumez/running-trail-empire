@@ -59,6 +59,10 @@ Capture*.png
 !/data/parcours_certifies.json
 !/data/dataset_france.json
 !/data/dataset.json
+# 28/11/2026 : la licence ODbL du catalogue (citée par les mentions légales) et les tracés gardés
+# (src/lib/parcours/tracesStockees.ts) — sans eux, un clone ou la CI n'ont ni licence ni tracé.
+!/data/LICENCE.md
+!/data/traces/
 .verif/
 
 # iCloud restaure ce fichier tout seul : Strava a été retiré de la rangée le 21/08/2026
