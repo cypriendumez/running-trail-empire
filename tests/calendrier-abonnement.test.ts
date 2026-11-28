@@ -580,7 +580,7 @@ await test("l'encart tient en deux gros boutons, celui de l'appareil d'abord, l'
   // Plus rien à comprendre sur « un lien affiché une seule fois » : le lien se retrouve à chaque visite.
   assert.ok(!/\b(unique|perdu|nouveauLien): "/.test(src), "le texte « lien affiché une fois » est revenu");
   // Deux gros boutons, chacun rendu une fois, l'ordre selon l'appareil.
-  assert.match(src, /appleDabord \? \[bouton\("webcal", true\), bouton\("google", false\)\] : \[bouton\("google", true\), bouton\("webcal", false\)\]/);
+  assert.match(src, /appleDabord \? \[bouton\("webcal", true\), bouton\("google", false\), boutonOutlook\(\)\]/);
   // Tant qu'il n'y a pas de lien : un vrai <button> (lecteur d'écran, barre d'espace), jamais un <a href="#">.
   assert.ok(!/href=\{[^}]*\?\? "#"\}/.test(src), "lien vide href=\"#\"");
   assert.match(src, /return liens\s*\? <a key=\{cible\} href=\{liens\[cible\]\}[^\n]*\n\s*: <button key=\{cible\} type="button" onClick=\{\(\) => ajouter\(cible\)\} disabled=\{occupe\}/);
@@ -588,11 +588,11 @@ await test("l'encart tient en deux gros boutons, celui de l'appareil d'abord, l'
   assert.match(src, /const appleDabord = appareil === "apple";/);
   // Un bouton sans lien encore créé le crée, puis y va (un seul appui) ; « Copier le lien » reste discret.
   assert.match(src, /const liens = await obtenir\(ancien\);\s*setEnCours\(null\);[\s\S]{0,200}?if \(!liens \|\| ancien\) return;\s*window\.location\.assign\(liens\[cible\]\);/);
-  assert.equal((src.match(/\{t\("copier"\)\}/g) ?? []).length, 1);
-  assert.ok(src.indexOf('{t("copier")}') > src.indexOf('{t("autres")}'));
+  // « Copier le lien » discret (autres agendas), après « Un autre agenda ? » ; le guide Outlook a le sien.
+  assert.match(src, /\{t\("autres"\)\}\{" "\}\s*<button onClick=\{copier\}[^>]*><Copy className="h-3 w-3" \/> \{t\("copier"\)\}<\/button>/);
   // L'aide (délais, appli Google, Outlook) est repliée.
   const aide = src.slice(src.indexOf("<details"), src.indexOf("</details>"));
-  for (const k of ["delai", "googleTel", "iphone", "ordiConfirme", "outlook"]) assert.ok(aide.includes(`{t("${k}")}`), `${k} hors de l'aide repliée`);
+  for (const k of ["delai", "googleTel", "iphone", "ordiConfirme"]) assert.ok(aide.includes(`{t("${k}")}`), `${k} hors de l'aide repliée`);
   // Chacun ne lit que ce qui concerne son appareil ; sur Android, la parade « depuis un ordinateur » est VISIBLE.
   assert.match(aide, /\{appareil !== "autre" && <li>\{t\("googleTel"\)\}<\/li>\}/);
   assert.match(aide, /\{appareil === "apple" && <li>\{t\("iphone"\)\}<\/li>\}/);
@@ -697,11 +697,51 @@ await test("la route passe par `reponseNavigateur` AVANT de construire le calend
   assert.match(src, /\.eq\("jeton_empreinte", empreinteJeton\(j\)\)\.maybeSingle\(\);\s*return error \? null : !!data;/, "une base illisible prise pour « lien révoqué »");
 });
 
-await test("l'encart dit pourquoi on y arrive depuis le lien, et l'aide Outlook dit « dans l'agenda » (5 langues)", () => {
+await test("l'encart dit pourquoi on y arrive depuis le lien, (5 langues)", () => {
   const src = codeNu("src/components/settings/AbonnementCalendrier.tsx");
   assert.match(src, /get\("agenda"\) === "lien"\) \{\s*setDepuisLien\(true\);/);
   assert.match(src, /\{depuisLien && <p role="status"[^>]*>\{t\("depuisLien"\)\}<\/p>\}/);
-  for (const mot of ["pas dans le navigateur", "not the browser", "nicht im Browser", "no en el navegador", "não no navegador"]) assert.ok(src.includes(mot), mot);
+});
+
+await test("Outlook : un gros bouton qui copie, ouvre Outlook et guide en 3 étapes (5 langues)", () => {
+  // 28/11/2026 : devant Outlook avec un lien copié, Cyprien « ne savait pas quoi faire avec le lien ».
+  const src = codeNu("src/components/settings/AbonnementCalendrier.tsx");
+  assert.match(src, /const OUTLOOK = "https:\/\/outlook\.live\.com\/calendar\/";/);
+  // Le bouton existe à côté des deux autres, et ouvre le guide.
+  assert.match(src, /const boutonOutlook = \(\) => \(\s*<button key="outlook" type="button" onClick=\{ouvrirGuideOutlook\}[\s\S]*?\{t\("outlookBouton"\)\}/);
+  // Apple : Apple, Google, Outlook ; ailleurs (PC, Android) : Google, Outlook, puis Apple.
+  assert.match(src, /appleDabord \? \[bouton\("webcal", true\), bouton\("google", false\), boutonOutlook\(\)\] : \[bouton\("google", true\), boutonOutlook\(\), bouton\("webcal", false\)\]/);
+  // Lien connu : copie ET ouverture d'Outlook dans le même geste (après un await, le navigateur bloquerait l'onglet).
+  const f = src.split("async function ouvrirGuideOutlook()")[1].split("\n  }\n")[0];
+  assert.match(f, /if \(etat\.liens && !ancien\) \{\s*setGuide\(true\);\s*void copierLien\(etat\.liens\.https, false\);[\s\S]{0,160}?if \(!mobile\) window\.open\(OUTLOOK, "_blank", "noopener"\);\s*return;\s*\}/);
+  assert.ok(f.indexOf("window.open") < f.indexOf("await"), "l'onglet Outlook s'ouvrirait après un await : bloqué");
+  // Lien « ancien » : jamais remplacé sans confirmation, comme les autres boutons.
+  assert.match(f, /if \(ancien && !window\.confirm\(t\("confirmeAncien"\)\)\) return;/);
+  // Le guide : 1 copier, 2 ouvrir Outlook (et le compte pro), 3 la marche à suivre.
+  const g = src.slice(src.indexOf("{guide && liens && ("), src.indexOf("{etat.rappel &&"));
+  for (const k of ["guideTitre", "etape1", "etape2", "ouvrirOutlook", "pro", "proLien", "etape3", "outlookClassique"]) assert.ok(g.includes(`{t("${k}")}`), `${k} absent du guide`);
+  assert.match(g, /onClick=\{\(\) => copierLien\(liens\.https, true\)\}/);
+  assert.match(g, /\{copie \? t\("copie"\) : t\("copier"\)\}/, "l'étape 1 ne dit pas que c'est fait");
+  assert.match(g, /href=\{OUTLOOK\} target="_blank"/);
+  assert.match(g, /href=\{OUTLOOK_PRO\} target="_blank"/);
+  // Téléphone : Outlook n'y ajoute pas de calendrier ; on le dit EN TÊTE du guide, sans bouton « Ouvrir Outlook ».
+  assert.ok(g.indexOf('{t("outlookTel")}') > 0 && g.indexOf('{t("outlookTel")}') < g.indexOf('{t("guideTitre")}</p>'), "consigne téléphone pas en tête");
+  assert.match(g, /\{mobile && <p[^>]*>\{t\("outlookTel"\)\}<\/p>\}/);
+  assert.match(g, /\{!mobile && <a href=\{OUTLOOK\}/);
+  assert.match(g, /id="guide-outlook" role="region" aria-label=\{t\("guideTitre"\)\}/);
+  // Coller dans Outlook, pas dans la barre d'adresse (sinon la copie figée du 28/11), et les libellés de Microsoft.
+  for (const [mot, lang] of [["« S'abonner à partir du web »", "fr"], ["“Subscribe from web”", "en"], ["„Aus dem Web abonnieren“", "de"], ["«Suscribirse desde la web»", "es"], ["«Subscrever a partir da Web»", "pt"],
+    ["pas dans la barre d'adresse", "fr"], ["not into the browser's address bar", "en"], ["nicht in die Adresszeile", "de"], ["no en la barra de direcciones", "es"], ["não na barra de endereço", "pt"]])
+    assert.ok(src.includes(mot), `${lang} : ${mot}`);
+  // Arrêter l'envoi referme le guide.
+  assert.match(src, /rappel: false \}\);\s*setGuide\(false\);/);
+  // Lien remplacé (« Changer de lien », ancien lien) : l'étape 1 ne dit plus « Lien copié » (le presse-papiers a l'ancien, mort).
+  assert.match(src, /rappel: remplacer \}\);\s*(\/\/[^\n]*\n\s*)?if \(remplacer\) setCopie\(false\);/);
+  // Sans lien (échec, 409 « ancien »), le guide ne s'ouvre pas, ni plus tard en secret.
+  assert.match(f, /setGuide\(false\);\s*setEnCours\("outlook"\);\s*const l = await obtenir\(ancien\);\s*setEnCours\(null\);\s*setGuide\(!!l\);/);
+  assert.ok(f.indexOf("setGuide(true)") > f.indexOf("if (etat.liens && !ancien)"), "guide armé avant de savoir s'il y aura un lien");
+  // Copie automatique ratée : on le dit (sinon on colle un presse-papiers vide dans Outlook).
+  assert.match(src, /else toast\.error\(t\("copieRatee"\)\);/);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
