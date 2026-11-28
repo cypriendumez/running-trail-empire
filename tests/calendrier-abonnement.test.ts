@@ -733,6 +733,8 @@ await test("Outlook : un gros bouton qui copie, ouvre Outlook et guide en 3 éta
   for (const [mot, lang] of [["« S'abonner à partir du web »", "fr"], ["“Subscribe from web”", "en"], ["„Aus dem Web abonnieren“", "de"], ["«Suscribirse desde la web»", "es"], ["«Subscrever a partir da Web»", "pt"],
     ["pas dans la barre d'adresse", "fr"], ["not into the browser's address bar", "en"], ["nicht in die Adresszeile", "de"], ["no en la barra de direcciones", "es"], ["não na barra de endereço", "pt"]])
     assert.ok(src.includes(mot), `${lang} : ${mot}`);
+  // 28/11 : le bouton a ouvert la page d'accueil de Microsoft (navigateur non connecté) : l'étape 2 le prévient.
+  for (const mot of ["S'il te demande de te connecter", "If it asks you to sign in", "Wenn er dich zur Anmeldung auffordert", "Si te pide iniciar sesión", "Se te pedir para iniciar sessão"]) assert.ok(src.includes(mot), mot);
   // Arrêter l'envoi referme le guide.
   assert.match(src, /rappel: false \}\);\s*setGuide\(false\);/);
   // Lien remplacé (« Changer de lien », ancien lien) : l'étape 1 ne dit plus « Lien copié » (le presse-papiers a l'ancien, mort).
