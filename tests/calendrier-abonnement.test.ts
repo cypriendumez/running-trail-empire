@@ -14,8 +14,10 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { construireIcs, dureeEvenementMin, heureDebut, plierLigne, seanceExportee, titreEvenement, ICS_T, type SeanceFlux } from "../src/lib/calendrier/ics";
-import { nouveauJeton, empreinteJeton, jetonDuChemin, adresseFlux } from "../src/lib/calendrier/jeton";
+import { nouveauJeton, empreinteJeton, jetonDuChemin, adresseFlux, jetonDe, jetonRetrouve } from "../src/lib/calendrier/jeton";
 import { lireFlux, versSeanceFlux } from "../src/lib/calendrier/flux";
+import { lienDuCompte } from "../src/lib/calendrier/abonnement";
+import { ouvertureNavigateur, reponseNavigateur } from "../src/lib/calendrier/navigateur";
 import { PLAN_T } from "../src/lib/ai/planI18n";
 import { QUALITE_T } from "../src/lib/ai/qualityI18n";
 
@@ -305,13 +307,40 @@ await test("le chemin n'est accepté qu'avec la forme exacte du jeton", () => {
   }
 });
 
+await test("le jeton DÉRIVÉ se recalcule à l'identique, et change avec le compte, la date ou la clé", () => {
+  // 28/11/2026 : réaffichable pour que les boutons marchent à chaque visite, sur chaque appareil.
+  const U = "7c0d5d1e-0000-4000-8000-000000000001", V = "7c0d5d1e-0000-4000-8000-000000000002", M = "cle-de-test";
+  const a = jetonDe(U, "2026-11-28T08:26:26.146Z", M);
+  assert.equal(jetonDuChemin(`${a}.ics`), a, "pas la forme d'un jeton de flux");
+  // La base rend la date sous une autre écriture (PostgREST) : le même instant, le même jeton.
+  assert.equal(jetonDe(U, "2026-11-28T08:26:26.146+00:00", M), a);
+  assert.equal(jetonDe(U, "2026-11-28T08:26:26.146000+00:00", M), a, "microsecondes PostgREST");
+  assert.equal(jetonDe(U, "2026-11-28T08:26:26+00:00", M), jetonDe(U, "2026-11-28T08:26:26.000Z", M), "milliseconde nulle");
+  assert.notEqual(jetonDe(V, "2026-11-28T08:26:26.146Z", M), a, "deux comptes, un même lien");
+  assert.notEqual(jetonDe(U, "2026-11-28T08:26:26.147Z", M), a, "changer de lien ne changerait rien");
+  assert.notEqual(jetonDe(U, "2026-11-28T08:26:26.146Z", "autre-cle"), a, "la clé du serveur ne compte pas");
+  assert.ok(!a.includes(U.slice(0, 8)));
+  assert.throws(() => jetonDe(U, "2026-11-28T08:26:26.146Z", ""), /clé du serveur absente/);
+  assert.throws(() => jetonDe(U, "pas une date", M), /illisible/);
+  assert.throws(() => jetonDe("", "2026-11-28T08:26:26.146Z", M), /illisible/);
+});
+
+await test("le lien se retrouve depuis la ligne en base ; un lien tiré au hasard (avant le 28/11) ne se retrouve pas", () => {
+  const U = "7c0d5d1e-0000-4000-8000-000000000001", M = "cle-de-test", quand = "2026-11-28T08:26:26.146+00:00";
+  const j = jetonDe(U, quand, M);
+  assert.equal(jetonRetrouve(U, { cree_le: quand, jeton_empreinte: empreinteJeton(j) }, M), j);
+  assert.equal(jetonRetrouve(U, { cree_le: quand, jeton_empreinte: empreinteJeton(nouveauJeton()) }, M), null);
+  assert.equal(jetonRetrouve("7c0d5d1e-0000-4000-8000-000000000002", { cree_le: quand, jeton_empreinte: empreinteJeton(j) }, M), null, "le lien d'un autre compte");
+  assert.equal(jetonRetrouve(U, { cree_le: null, jeton_empreinte: empreinteJeton(j) }, M), null);
+});
+
 await test("les liens d'ajout : webcal pour Apple, page d'ajout pour Google", () => {
   const u = adresseFlux("https://pacevo.fr/", "J".repeat(43));
   assert.equal(u.https, `https://pacevo.fr/api/calendrier/flux/${"J".repeat(43)}.ics`);
   assert.equal(u.webcal, `webcal://pacevo.fr/api/calendrier/flux/${"J".repeat(43)}.ics`);
   assert.equal(u.google, `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(u.webcal)}`);
   assert.match(codeNu("src/app/api/calendrier/abonnement/route.ts"), /adresseFlux\(ORIGINE_FLUX, jeton\)/, "l'adresse suit l'hôte de la requête (aperçu, localhost)");
-  assert.match(codeNu("src/app/api/calendrier/abonnement/route.ts"), /const ORIGINE_FLUX = "https:\/\/pacevo\.fr";/);
+  assert.match(codeNu("src/lib/calendrier/abonnement.ts"), /export const ORIGINE_FLUX = "https:\/\/pacevo\.fr";/);
 });
 
 console.log("\nLE FLUX : UNE LECTURE RATÉE NE VIDE JAMAIS L'AGENDA");
@@ -419,12 +448,108 @@ await test("la gestion n'agit que sur le compte de la SESSION, et lit chaque err
   for (const m of ["GET", "POST", "DELETE"]) {
     const corps = src.split(`export async function ${m}`)[1]?.split("export async function")[0] ?? "";
     assert.match(corps, /const user = await utilisateur\(\);\s*if \(!user\) return NextResponse\.json\(\{ error: "Unauthorized" \}, \{ status: 401 \}\);/, `${m} sans garde`);
-    assert.ok(/\{[^}]*\berror\b[^}]*\} = await/.test(corps) && /if \(error/.test(corps), `${m} ne lit pas l'erreur de la base`);
+    if (m !== "POST") assert.ok(/\{[^}]*\berror\b[^}]*\} = await/.test(corps) && /if \(error/.test(corps), `${m} ne lit pas l'erreur de la base`);
   }
+  // POST : la logique (testée plus haut contre une fausse base) sur le compte de la session ; son échec journalisé ;
+  // un lien introuvable répond 409 au lieu d'être écrasé.
+  const post = src.split("export async function POST")[1].split("export async function")[0];
+  assert.match(post, /const remplacer = corps\?\.remplacer === true;/, "« remplacer » doit être explicite, jamais par défaut");
+  assert.match(post, /const r = await lienDuCompte\(admin, user\.id, \{ remplacer \}\);/);
+  assert.match(post, /if \(r\.k === "ancien"\) return NextResponse\.json\(\{ ancien: true \}, \{ status: 409 \}\);/);
+  assert.match(post, /await journaliserEchec\(admin, \{ source: "calendrier", userId: user\.id, url: URL_ROUTE, message: r\.message \}\);/);
   assert.match(src, /\.eq\("user_id", user\.id\)\.maybeSingle\(\)/);
-  assert.match(src, /\{ user_id: user\.id, jeton_empreinte: empreinteJeton\(jeton\)/, "le jeton en clair serait écrit en base");
+  const lib = codeNu("src/lib/calendrier/abonnement.ts");
+  assert.match(lib, /\{ user_id: userId, jeton_empreinte: empreinteJeton\(jeton\)/, "le jeton en clair serait écrit en base");
+  assert.ok(!/jeton_empreinte: jeton\b/.test(lib));
+  assert.ok(!/\.upsert\(/.test(lib.split("if (opts.remplacer)")[1].split("const lu = await lire()")[1]), "création par upsert : deux appuis simultanés s'écraseraient");
   assert.match(src, /\.delete\(\)\.eq\("user_id", user\.id\)/);
   assert.ok(!/jeton_empreinte: jeton\b/.test(src));
+});
+
+console.log("\nLE LIEN DU COMPTE : UN APPUI NE COUPE JAMAIS UN AGENDA DÉJÀ RELIÉ");
+
+/** Fausse table `calendrier_abonnements` qui garde ses lignes : insert refuse un doublon (23505) comme Postgres. */
+function fausseTable(opts: { erreurLecture?: { code?: string; message: string }; erreurEcriture?: { code?: string; message: string } } = {}) {
+  const lignes = new Map<string, Record<string, unknown>>();
+  const ecritures: string[] = [];
+  const client = {
+    from() {
+      let action = "select", valeur: Record<string, unknown> | undefined, id: unknown;
+      const b: Record<string, unknown> = {};
+      b.select = () => b; b.maybeSingle = () => b;
+      b.eq = (_c: string, v: unknown) => { id = v; return b; };
+      for (const a of ["insert", "upsert"]) b[a] = (v: Record<string, unknown>) => { action = a; valeur = v; return b; };
+      b.then = (ok: (r: unknown) => unknown) => Promise.resolve().then(() => {
+        if (action === "select") {
+          if (opts.erreurLecture) return { data: null, error: opts.erreurLecture };
+          const l = lignes.get(String(id));
+          // La base rend la date à la façon de PostgREST (« +00:00 », microsecondes).
+          return { data: l ? { cree_le: String(l.cree_le).replace("Z", "000+00:00"), jeton_empreinte: l.jeton_empreinte } : null, error: null };
+        }
+        ecritures.push(action);
+        if (opts.erreurEcriture) return { data: null, error: opts.erreurEcriture };
+        const cle = String(valeur!.user_id);
+        if (action === "insert" && lignes.has(cle)) return { data: null, error: { code: "23505", message: "duplicate key" } };
+        lignes.set(cle, { ...valeur });
+        return { data: null, error: null };
+      }).then(ok);
+      return b;
+    },
+  };
+  return { client: client as never, lignes, ecritures };
+}
+const UL = "7c0d5d1e-0000-4000-8000-0000000000aa", ML = "cle-de-test";
+const T1 = new Date("2026-11-28T08:26:26.146Z"), T2 = new Date("2026-11-28T08:26:26.900Z");
+
+await test("premier appui : le lien est créé ; second appui (autre appareil) : le MÊME, sans rien écrire", async () => {
+  const f = fausseTable();
+  const a = await lienDuCompte(f.client, UL, { maintenant: T1, maitre: ML });
+  assert.equal(a.k, "liens");
+  const b = await lienDuCompte(f.client, UL, { maintenant: T2, maitre: ML });
+  assert.deepEqual(b, a, "le second appui a coupé le premier lien");
+  assert.deepEqual(f.ecritures, ["insert"]);
+  const l = f.lignes.get(UL)!;
+  assert.ok(a.k === "liens" && !String(l.jeton_empreinte).includes(a.liens.https.split("/flux/")[1].slice(0, 43)), "le jeton en clair en base");
+});
+
+await test("deux appuis SIMULTANÉS (ordinateur et téléphone) : un seul lien, rendu aux deux", async () => {
+  const f = fausseTable();
+  const [a, b] = await Promise.all([
+    lienDuCompte(f.client, UL, { maintenant: T1, maitre: ML }),
+    lienDuCompte(f.client, UL, { maintenant: T2, maitre: ML }),
+  ]);
+  assert.equal(a.k, "liens");
+  assert.deepEqual(b, a, "le second a écrasé le premier : un agenda reste sur un lien mort");
+  assert.equal(f.lignes.size, 1);
+});
+
+await test("un lien qui ne se retrouve pas (avant le 28/11, autre clé) n'est JAMAIS écrasé sans « remplacer »", async () => {
+  const f = fausseTable();
+  f.lignes.set(UL, { user_id: UL, cree_le: "2026-11-27T23:00:00.000Z", jeton_empreinte: empreinteJeton(nouveauJeton()) });
+  assert.deepEqual(await lienDuCompte(f.client, UL, { maintenant: T1, maitre: ML }), { k: "ancien" });
+  assert.deepEqual(f.ecritures, []);
+  const r = await lienDuCompte(f.client, UL, { remplacer: true, maintenant: T1, maitre: ML });
+  assert.equal(r.k, "liens");
+  assert.deepEqual(f.ecritures, ["upsert"]);
+  assert.deepEqual(await lienDuCompte(f.client, UL, { maintenant: T2, maitre: ML }), r, "le lien remplacé ne se retrouve pas");
+});
+
+await test("« Changer de lien » coupe l'ancien : le nouveau diffère", async () => {
+  const f = fausseTable();
+  const a = await lienDuCompte(f.client, UL, { maintenant: T1, maitre: ML });
+  const b = await lienDuCompte(f.client, UL, { remplacer: true, maintenant: T2, maitre: ML });
+  assert.ok(a.k === "liens" && b.k === "liens" && a.liens.https !== b.liens.https);
+});
+
+await test("base illisible : erreur, et RIEN d'écrit (créer pourrait couper un agenda relié) ; table absente : indisponible", async () => {
+  const f = fausseTable({ erreurLecture: { code: "57014", message: "timeout" } });
+  const r = await lienDuCompte(f.client, UL, { maintenant: T1, maitre: ML });
+  assert.equal(r.k, "erreur");
+  assert.deepEqual(f.ecritures, []);
+  assert.deepEqual(await lienDuCompte(fausseTable({ erreurLecture: { code: "PGRST205", message: "absente" } }).client, UL, { maitre: ML }), { k: "indisponible" });
+  const e = await lienDuCompte(fausseTable({ erreurEcriture: { code: "42501", message: "refus" } }).client, UL, { maintenant: T1, maitre: ML });
+  assert.ok(e.k === "erreur" && /42501/.test(e.message), "l'échec d'écriture n'est pas rapporté");
+  assert.equal((await lienDuCompte(fausseTable().client, UL, { maintenant: T1, maitre: "" })).k, "erreur", "sans clé, un lien quand même");
 });
 
 await test("la migration : empreinte seule, RLS sans politique, suppression avec le compte", () => {
@@ -440,6 +565,143 @@ await test("l'encart est dans Paramètres → Connexions, et la politique de con
   assert.match(codeNu("src/components/settings/SettingsView.tsx"), /<AbonnementCalendrier lang=\{lang\} \/>/);
   const legal = readFileSync("src/app/legalI18n.ts", "utf8");
   for (const mot of ["Ton agenda (Apple", "Your calendar (Apple", "Dein Kalender (Apple", "Tu calendario (Apple", "O teu calendário (Apple"]) assert.ok(legal.includes(mot), mot);
+});
+
+await test("l'encart tient en deux gros boutons, celui de l'appareil d'abord, l'aide repliée (5 langues)", () => {
+  // Règle de Cyprien (28/11/2026) : « des parents qui n'y connaissent rien doivent savoir le faire ».
+  const src = codeNu("src/components/settings/AbonnementCalendrier.tsx");
+  const blocs = [...src.matchAll(/\n  (fr|en|de|es|pt): \{\n([\s\S]*?)\n  \},(?=\n)/g)];
+  assert.equal(blocs.length, 5);
+  const cles = (b: string) => [...b.matchAll(/\b(\w+): "/g)].map((m) => m[1]).sort().join(",");
+  for (const [, lang, b] of blocs) {
+    assert.equal(cles(b), cles(blocs[0][2]), `${lang} : clés différentes du français`);
+    assert.match(b, /\bgoogleTel: "[^"]*☰[^"]*Pacevo · [^"]*Android/, `${lang} : où cocher le calendrier dans l'appli Google`);
+  }
+  // Plus rien à comprendre sur « un lien affiché une seule fois » : le lien se retrouve à chaque visite.
+  assert.ok(!/\b(unique|perdu|nouveauLien): "/.test(src), "le texte « lien affiché une fois » est revenu");
+  // Deux gros boutons, chacun rendu une fois, l'ordre selon l'appareil.
+  assert.match(src, /appleDabord \? \[bouton\("webcal", true\), bouton\("google", false\)\] : \[bouton\("google", true\), bouton\("webcal", false\)\]/);
+  // Tant qu'il n'y a pas de lien : un vrai <button> (lecteur d'écran, barre d'espace), jamais un <a href="#">.
+  assert.ok(!/href=\{[^}]*\?\? "#"\}/.test(src), "lien vide href=\"#\"");
+  assert.match(src, /return liens\s*\? <a key=\{cible\} href=\{liens\[cible\]\}[^\n]*\n\s*: <button key=\{cible\} type="button" onClick=\{\(\) => ajouter\(cible\)\} disabled=\{occupe\}/);
+  assert.match(src, /setAppareil\(\/iPhone\|iPad\|Macintosh\/\.test\(ua\) \? "apple" : \/Android\/\.test\(ua\) \? "android" : "autre"\)/);
+  assert.match(src, /const appleDabord = appareil === "apple";/);
+  // Un bouton sans lien encore créé le crée, puis y va (un seul appui) ; « Copier le lien » reste discret.
+  assert.match(src, /const liens = await obtenir\(ancien\);\s*setEnCours\(null\);[\s\S]{0,200}?if \(!liens \|\| ancien\) return;\s*window\.location\.assign\(liens\[cible\]\);/);
+  assert.equal((src.match(/\{t\("copier"\)\}/g) ?? []).length, 1);
+  assert.ok(src.indexOf('{t("copier")}') > src.indexOf('{t("autres")}'));
+  // L'aide (délais, appli Google, Outlook) est repliée.
+  const aide = src.slice(src.indexOf("<details"), src.indexOf("</details>"));
+  for (const k of ["delai", "googleTel", "iphone", "ordiConfirme", "outlook"]) assert.ok(aide.includes(`{t("${k}")}`), `${k} hors de l'aide repliée`);
+  // Chacun ne lit que ce qui concerne son appareil ; sur Android, la parade « depuis un ordinateur » est VISIBLE.
+  assert.match(aide, /\{appareil !== "autre" && <li>\{t\("googleTel"\)\}<\/li>\}/);
+  assert.match(aide, /\{appareil === "apple" && <li>\{t\("iphone"\)\}<\/li>\}/);
+  assert.match(aide, /\{appareil === "autre" && <li>\{t\("ordiConfirme"\)\}<\/li>\}/);
+  assert.ok(!aide.includes('t("googleOrdi")'));
+  assert.match(src, /\{appareil === "android" && <p className="text-sm text-zinc-600">\{t\("googleOrdi"\)\}<\/p>\}/);
+  // « Changer de lien » et « Arrêter » : seulement quand un lien existe, et après confirmation.
+  const fin = src.slice(src.indexOf("{etat.actif && (\n"));
+  assert.ok(fin.includes('{t("changer")}') && fin.includes('{t("arreter")}'));
+  assert.match(src, /if \(!window\.confirm\(t\("confirmeChanger"\)\)\) return;/);
+  assert.match(src, /obtenir\(true\)/);
+  // État « ancien » : rien ne remplace le lien sans confirmation ; « Copier le lien » est masqué et ne crée rien.
+  assert.match(src, /async function copier\(\) \{\s*if \(etat\.k === "pret" && etat\.actif && !etat\.liens\) return;/);
+  assert.match(src, /\{!\(etat\.actif && !liens\) && <p className="text-sm text-zinc-500">\s*\{t\("autres"\)\}/);
+  assert.match(src, /if \(ancien && !window\.confirm\(t\("confirmeAncien"\)\)\) return;\s*setEnCours\(cible\);\s*const liens = await obtenir\(ancien\);/);
+  // Après un remplacement, le rappel « supprime l'ancien calendrier » RESTE à l'écran (un toast s'effaçait
+  // en quittant la page), y compris à la relecture au retour de l'agenda.
+  assert.match(src, /liens: j\.liens, rappel: remplacer \}\);/);
+  assert.match(src, /rappel: e\.k === "pret" && !!e\.rappel && !!j\.liens/);
+  assert.match(src, /\{etat\.rappel && <p role="status"[^>]*>\{t\("rappel"\)\}<\/p>\}/);
+  assert.ok(!/toast[^;]*t\("(renouvele|change)"\)/.test(src));
+  // Retour de l'app Calendrier : une relecture ratée garde les boutons ; une relecture partie avant une
+  // action (Arrêter, Changer, créer) et revenue après est ignorée (relecture du second tour, 28/11).
+  assert.match(src, /setEtat\(\(e\) => \(e\.k === "pret" \? e : \{ k: "illisible" \}\)\)/);
+  assert.ok(!/setEtat\(\{ k: "illisible" \}\)/.test(src), "une relecture ratée effacerait les boutons");
+  assert.match(src, /const j = await r\.json\(\);\s*if \(g !== generation\.current\) return;/);
+  for (const f of ["obtenir", "arreter"]) {
+    const corps = src.split(`async function ${f}(`)[1].split("\n  }\n")[0];
+    assert.match(corps, /generation\.current\+\+;/, `${f} n'invalide pas les relectures en vol`);
+  }
+});
+
+console.log("\nLE LIEN OUVERT DANS UN NAVIGATEUR : L'ABONNEMENT, JAMAIS UNE COPIE FIGÉE");
+
+const NAV = (ua: string) => new Headers({ "sec-fetch-dest": "document", "sec-fetch-mode": "navigate", "user-agent": ua });
+const UA_IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1";
+const UA_ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36";
+const deps = (existe: boolean | null, connecte: boolean) => {
+  const appels: string[] = [];
+  return { appels, d: { existe: async (j: string) => { appels.push(`existe:${j}`); return existe; }, connecte: async () => { appels.push("connecte"); return connecte; } } };
+};
+
+await test("ouvert dans Safari ou Chrome sur iPhone, iPad, Mac : l'abonnement webcal, pas le fichier", async () => {
+  // 28/11/2026 : le lien collé dans Safari a importé une copie figée dans « Travail » (chaque séance en double).
+  const j = nouveauJeton();
+  for (const ua of [UA_IPHONE,
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36",
+  ]) {
+    const r = await reponseNavigateur(NAV(ua), `${j}.ics`, deps(true, false).d);
+    assert.equal(r?.status, 302, ua);
+    assert.equal(r?.headers.get("location"), `webcal://pacevo.fr/api/calendrier/flux/${j}.ics`, ua);
+    assert.equal(r?.headers.get("cache-control"), "private, no-store");
+    assert.match(r?.headers.get("x-robots-tag") ?? "", /noindex/);
+  }
+  assert.equal(ouvertureNavigateur(new Headers({ "sec-fetch-mode": "navigate", "user-agent": "Mozilla/5.0 (iPhone)" }), `${j}.ics`)?.apple, true, "le seul mode « navigate » compte aussi");
+});
+
+await test("lien révoqué ouvert sur iPhone : 404, jamais un abonnement à un flux mort ; base illisible : 503", async () => {
+  const j = nouveauJeton();
+  const mort = await reponseNavigateur(NAV(UA_IPHONE), `${j}.ics`, deps(false, true).d);
+  assert.equal(mort?.status, 404);
+  assert.equal(mort?.headers.get("location"), null);
+  const panne = await reponseNavigateur(NAV(UA_IPHONE), `${j}.ics`, deps(null, true).d);
+  assert.equal(panne?.status, 503);
+  assert.equal(panne?.headers.get("retry-after"), "900");
+});
+
+await test("Android, Windows : la page des boutons, par la connexion d'abord si ce navigateur n'est pas connecté", async () => {
+  const j = nouveauJeton();
+  const connecte = await reponseNavigateur(NAV(UA_ANDROID), `${j}.ics`, deps(true, true).d);
+  assert.equal(connecte?.status, 302);
+  assert.equal(connecte?.headers.get("location"), "https://pacevo.fr/dashboard/settings?onglet=connexions&agenda=lien");
+  const anonyme = await reponseNavigateur(NAV("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0"), `${j}.ics`, deps(true, false).d);
+  assert.equal(anonyme?.headers.get("location"), `https://pacevo.fr/login?next=${encodeURIComponent("/dashboard/settings?onglet=connexions&agenda=lien")}`);
+  // Sans agent utilisateur : pas d'Apple supposé.
+  assert.equal(ouvertureNavigateur(new Headers({ "sec-fetch-dest": "document" }), `${j}.ics`)?.apple, false);
+});
+
+await test("les agendas eux-mêmes (Apple, Google, Outlook) et les jetons mal formés ne sont pas détournés, ni la base lue", async () => {
+  const j = nouveauJeton();
+  const agendas: Record<string, string>[] = [
+    { "user-agent": "macOS/15.1 (24B83) CalendarAgent/1000" },
+    { "user-agent": "iOS/18.1 (22B83) dataaccessd/1.0" },
+    { "user-agent": "Google-Calendar-Importer" },
+    { "user-agent": "Microsoft Office/16.0 (Windows NT 10.0; Microsoft Outlook 16.0.17928; Pro)" },
+    { "sec-fetch-dest": "empty", "sec-fetch-mode": "cors", "user-agent": "Mozilla/5.0 (iPhone)" },
+  ];
+  for (const h of agendas) {
+    const { appels, d } = deps(true, true);
+    assert.equal(await reponseNavigateur(new Headers(h), `${j}.ics`, d), null, JSON.stringify(h));
+    assert.deepEqual(appels, []);
+  }
+  assert.equal(await reponseNavigateur(NAV(UA_IPHONE), "abc.ics", deps(true, true).d), null, "jeton mal formé : le 404 habituel");
+});
+
+await test("la route passe par `reponseNavigateur` AVANT de construire le calendrier", () => {
+  const src = codeNu("src/app/api/calendrier/flux/[jeton]/route.ts");
+  const i = src.indexOf("const navigateur = await reponseNavigateur(req.headers, jeton, {");
+  assert.ok(i > 0 && i < src.indexOf("lireFlux(createAdminClient()"), "le fichier serait servi au navigateur");
+  assert.match(src, /if \(navigateur\) return navigateur;/);
+  assert.match(src, /\.eq\("jeton_empreinte", empreinteJeton\(j\)\)\.maybeSingle\(\);\s*return error \? null : !!data;/, "une base illisible prise pour « lien révoqué »");
+});
+
+await test("l'encart dit pourquoi on y arrive depuis le lien, et l'aide Outlook dit « dans l'agenda » (5 langues)", () => {
+  const src = codeNu("src/components/settings/AbonnementCalendrier.tsx");
+  assert.match(src, /get\("agenda"\) === "lien"\) \{\s*setDepuisLien\(true\);/);
+  assert.match(src, /\{depuisLien && <p role="status"[^>]*>\{t\("depuisLien"\)\}<\/p>\}/);
+  for (const mot of ["pas dans le navigateur", "not the browser", "nicht im Browser", "no en el navegador", "não no navegador"]) assert.ok(src.includes(mot), mot);
 });
 
 console.log(`\n${passed} test(s) passé(s), ${fails.length} échec(s)`);
