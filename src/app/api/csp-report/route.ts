@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { lireRapportCsp, rapportLocal, rapportEtranger } from "@/lib/csp/rapport";
+import { extraitSur, lireRapportCsp, rapportLocal, rapportEtranger } from "@/lib/csp/rapport";
+import { sansAdresse } from "@/lib/journal/sansAdresse";
 
 /**
  * COLLECTE DES VIOLATIONS CSP — cible de `report-uri` (voir next.config.ts). La politique est
@@ -42,10 +43,11 @@ export async function POST(req: Request) {
       user_id: null,
       source: "csp",
       // « CSP bloquée » : depuis le 08/11/2026 la politique est APPLIQUÉE, la ressource n'a pas chargé.
-      message: `CSP bloquée — ${directive} ← ${bloque}`.slice(0, 2000),
+      message: sansAdresse(`CSP bloquée — ${directive} ← ${bloque}`.slice(0, 2000)),
       url: page || null,
       user_agent: (req.headers.get("user-agent") ?? "").slice(0, 500) || null,
-      meta: { extrait: brut.slice(0, 2000) },
+      // Jamais le corps brut : ses adresses portent parfois une position ou un jeton (lib/csp/rapport).
+      meta: sansAdresse({ extrait: extraitSur(brut) }),
     });
     if (error) console.error("[csp-report] non écrit :", error.message);
   } catch { /* un rapport ne fait jamais tomber une page */ }

@@ -7,6 +7,7 @@ import fs from "fs";
 import path from "path";
 import { gunzipSync } from "zlib";
 import { filterAndSort, computeFacets, type ParcoursHdf, type SortKey, type Facets, type SportHdf, type DiffHdf, type TypeHdf } from "@/data/parcoursHdf";
+import { arrondiPosition } from "@/lib/geo/arrondi";
 
 // VRAIS parcours France (OpenStreetMap / ODbL). Lu une fois puis gardé en mémoire.
 let CACHE: ParcoursHdf[] | null = null;
@@ -97,7 +98,7 @@ export async function GET(req: NextRequest) {
   const nearRaw = (sp.get("near") ?? "").split(",").map(Number);
   // Une position impossible (latitude 95, crash-test du 27/11/2026) n'ordonne rien : ignorée.
   const near = nearRaw.length === 2 && isFinite(nearRaw[0]) && isFinite(nearRaw[1]) && Math.abs(nearRaw[0]) <= 90 && Math.abs(nearRaw[1]) <= 180
-    ? { lat: nearRaw[0], lng: nearRaw[1] } : undefined;
+    ? { lat: arrondiPosition(nearRaw[0]), lng: arrondiPosition(nearRaw[1]) } : undefined;
   const filtered = filterAndSort(all, {
     q: sp.get("q") ?? undefined,
     sport: sp.get("sport") ?? undefined,
