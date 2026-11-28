@@ -3,10 +3,18 @@
 import { useEffect, useState } from "react";
 import { Cloud, MapPin, Wind } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { arrondiPosition } from "@/lib/geo/arrondi";
 
 // Chips météo + lieu + qualité de l'air — géolocalisation navigateur (avec consentement)
 // + Open-Meteo (météo & air, sans clé) + BigDataCloud (reverse-geocode, sans clé).
-// Si refusé/échec → rien ne s'affiche.
+// Si refusé/échec → rien ne s'affiche ; sans ville lisible, pas de puce « lieu » (jamais une ville inventée).
+//
+// ⚠️ 28/11/2026 : BigDataCloud a déménagé ; `api.bigdatacloud.net` répond 307 vers `api-bdc.io`,
+// absent de la CSP (connect-src) : le navigateur bloquait la redirection, la ville ne s'affichait
+// plus, et le rapport CSP enregistrait la position EXACTE du coureur dans `error_logs`. On appelle
+// donc `api-bdc.io` directement (autorisé dans next.config.ts), et la position envoyée aux services
+// tiers est ARRONDIE au centième de degré (≈ 1 km) : assez pour la météo et la ville, pas plus.
+const BDC = "https://api-bdc.io/data/reverse-geocode-client";
 const chip = "inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200/70 bg-white/70 px-3 py-1 text-xs font-medium text-zinc-600";
 
 const AQ: Record<string, { good: string; fair: string; poor: string }> = {
@@ -27,11 +35,11 @@ export function WeatherChip() {
     let cancelled = false;
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const { latitude: lat, longitude: lon } = pos.coords;
+        const lat = arrondiPosition(pos.coords.latitude), lon = arrondiPosition(pos.coords.longitude);
         try {
           const [w, g, a] = await Promise.all([
             fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m`).then((r) => r.json()),
-            fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=${lang}`).then((r) => r.json()).catch(() => null),
+            fetch(`${BDC}?latitude=${lat}&longitude=${lon}&localityLanguage=${lang}`).then((r) => r.json()).catch(() => null),
             fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=european_aqi`).then((r) => r.json()).catch(() => null),
           ]);
           const temp = Math.round(Number(w?.current?.temperature_2m));

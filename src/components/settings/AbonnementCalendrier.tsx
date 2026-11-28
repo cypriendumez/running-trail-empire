@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CalendarPlus, Check, ChevronDown, Copy, ExternalLink, Loader2 } from "lucide-react";
+import { CalendarPlus, Check, ChevronDown, Copy, Loader2 } from "lucide-react";
 import type { Lang } from "@/lib/i18n/base";
 
 /**
@@ -19,7 +19,9 @@ import type { Lang } from "@/lib/i18n/base";
  * iPhone, ce qui a coupé celui de Google, resté vide. Et un gros bouton « Copier le lien »
  * semblait ne servir à rien : il n'est plus qu'un lien discret pour Outlook et les autres agendas.
  */
-type Liens = { https: string; webcal: string; google: string };
+type Liens = { https: string; webcal: string; google: string; outlook: string; outlookPro: string };
+/** Ce qu'un bouton ouvre : Apple, Google, Outlook.com ou Outlook d'un compte de travail. */
+type Cible = "webcal" | "google" | "outlook" | "outlookPro";
 type Etat =
   | { k: "lecture" }
   | { k: "illisible" }
@@ -49,16 +51,11 @@ const L: Record<Lang, Record<string, string>> = {
     depuisLien: "Ce lien s'ajoute à un agenda, pas dans le navigateur : touche simplement ton agenda ci-dessous.",
     outlookBouton: "Outlook",
     outlookSous: "Outlook.com, Hotmail, Live",
-    guideTitre: "Ajouter à Outlook, en 3 étapes :",
-    etape1: "Copie ton lien.",
-    etape2: "Ouvre ton calendrier Outlook.",
-    ouvrirOutlook: "Ouvrir Outlook",
     pro: "Compte de travail ou d'école ?",
     proLien: "Outlook professionnel",
-    etape3: "Dans Outlook, à gauche, clique « Ajouter un calendrier » › « S'abonner à partir du web », colle le lien dans la case (pas dans la barre d'adresse du navigateur), nomme-le « Pacevo », puis clique « Importer ».",
-    outlookClassique: "Ancienne version d'Outlook pour Windows : Accueil › « Ajouter un calendrier » › « À partir d'Internet », puis colle le lien.",
     outlookTel: "Sur téléphone, Outlook ne permet pas d'ajouter ce calendrier : fais-le une fois depuis un ordinateur, il arrivera ensuite tout seul dans l'appli Outlook.",
-    copieRatee: "Copie impossible ici : touche « Copier le lien » dans les étapes ci-dessous.",
+    outlookAppli: "Appli Outlook installée (Mac, Windows) : elle ne sait pas ajouter ce calendrier elle-même. Touche le bouton « Outlook » ci-dessus : le calendrier arrivera ensuite tout seul dans l'appli. N'utilise pas « Importer ICS », qui ferait une copie qui ne se met jamais à jour.",
+    outlookConnexion: "Outlook te demande de te connecter ? Connecte-toi : le calendrier devrait s'ajouter juste après.",
     arreter: "Arrêter l'envoi", confirmeArret: "Ton agenda ne recevra plus tes séances. Continuer ?", arrete: "Envoi arrêté. Tu peux supprimer le calendrier « Pacevo · séances » de ton agenda.",
     indispo: "Bientôt disponible.", erreur: "Échec, réessaie.", illisible: "État illisible pour le moment, réessaie plus tard.",
   },
@@ -81,16 +78,11 @@ const L: Record<Lang, Record<string, string>> = {
     depuisLien: "This link goes into a calendar, not the browser: just tap your calendar below.",
     outlookBouton: "Outlook",
     outlookSous: "Outlook.com, Hotmail, Live",
-    guideTitre: "Add to Outlook in 3 steps:",
-    etape1: "Copy your link.",
-    etape2: "Open your Outlook calendar.",
-    ouvrirOutlook: "Open Outlook",
     pro: "Work or school account?",
     proLien: "Outlook for work",
-    etape3: "In Outlook, on the left, click “Add calendar” › “Subscribe from web”, paste the link into the box (not into the browser's address bar), name it “Pacevo”, then click “Import”.",
-    outlookClassique: "Classic Outlook for Windows: Home › “Add Calendar” › “From Internet”, then paste the link.",
     outlookTel: "On a phone, Outlook can't add this calendar: do it once from a computer, and it will then show up in the Outlook app by itself.",
-    copieRatee: "Couldn't copy here: tap “Copy link” in the steps below.",
+    outlookAppli: "Outlook app installed (Mac, Windows): it can't add this calendar by itself. Tap the “Outlook” button above: it will then show up in the app on its own. Don't use “Import ICS”, which makes a copy that never updates.",
+    outlookConnexion: "Outlook asks you to sign in? Sign in: the calendar should be added right after.",
     arreter: "Stop sending", confirmeArret: "Your calendar will no longer receive your sessions. Continue?", arrete: "Sending stopped. You can delete the “Pacevo · sessions” calendar from your calendar app.",
     indispo: "Coming soon.", erreur: "Failed, try again.", illisible: "Status unavailable for now, try again later.",
   },
@@ -113,16 +105,11 @@ const L: Record<Lang, Record<string, string>> = {
     depuisLien: "Dieser Link gehört in einen Kalender, nicht in den Browser: Tippe einfach unten auf deinen Kalender.",
     outlookBouton: "Outlook",
     outlookSous: "Outlook.com, Hotmail, Live",
-    guideTitre: "Zu Outlook hinzufügen, in 3 Schritten:",
-    etape1: "Kopiere deinen Link.",
-    etape2: "Öffne deinen Outlook-Kalender.",
-    ouvrirOutlook: "Outlook öffnen",
     pro: "Arbeits- oder Schulkonto?",
     proLien: "Outlook für die Arbeit",
-    etape3: "Klicke in Outlook links auf „Kalender hinzufügen“ › „Aus dem Web abonnieren“, füge den Link in das Feld ein (nicht in die Adresszeile des Browsers), nenne ihn „Pacevo“ und klicke auf „Importieren“.",
-    outlookClassique: "Klassisches Outlook für Windows: Start › „Kalender hinzufügen“ › „Aus dem Internet“, dann den Link einfügen.",
     outlookTel: "Am Handy kann Outlook diesen Kalender nicht hinzufügen: Mach es einmal am Computer, danach erscheint er von selbst in der Outlook-App.",
-    copieRatee: "Kopieren hier nicht möglich: Tippe in den Schritten unten auf „Link kopieren“.",
+    outlookAppli: "Installierte Outlook-App (Mac, Windows): Sie kann diesen Kalender nicht selbst hinzufügen. Tippe oben auf „Outlook“: Danach erscheint er von selbst in der App. Nutze nicht „ICS importieren“, das wäre eine Kopie, die sich nie aktualisiert.",
+    outlookConnexion: "Outlook bittet dich um Anmeldung? Melde dich an: Der Kalender sollte gleich danach hinzugefügt werden.",
     arreter: "Senden beenden", confirmeArret: "Dein Kalender erhält deine Einheiten nicht mehr. Fortfahren?", arrete: "Senden beendet. Du kannst den Kalender „Pacevo · Einheiten“ aus deiner Kalender-App löschen.",
     indispo: "Bald verfügbar.", erreur: "Fehlgeschlagen, versuch es erneut.", illisible: "Status gerade nicht lesbar, versuch es später.",
   },
@@ -145,16 +132,11 @@ const L: Record<Lang, Record<string, string>> = {
     depuisLien: "Este enlace se añade a un calendario, no al navegador: toca tu calendario aquí abajo.",
     outlookBouton: "Outlook",
     outlookSous: "Outlook.com, Hotmail, Live",
-    guideTitre: "Añadir a Outlook en 3 pasos:",
-    etape1: "Copia tu enlace.",
-    etape2: "Abre tu calendario de Outlook.",
-    ouvrirOutlook: "Abrir Outlook",
     pro: "¿Cuenta del trabajo o de estudios?",
     proLien: "Outlook profesional",
-    etape3: "En Outlook, a la izquierda, haz clic en «Agregar calendario» › «Suscribirse desde la web», pega el enlace en la casilla (no en la barra de direcciones del navegador), llámalo «Pacevo» y haz clic en «Importar».",
-    outlookClassique: "Outlook clásico para Windows: Inicio › «Agregar calendario» › «Desde Internet», y pega el enlace.",
     outlookTel: "En el móvil, Outlook no permite añadir este calendario: hazlo una vez desde un ordenador y luego aparecerá solo en la app de Outlook.",
-    copieRatee: "No se pudo copiar aquí: toca «Copiar el enlace» en los pasos de abajo.",
+    outlookAppli: "App de Outlook instalada (Mac, Windows): no puede añadir este calendario por sí sola. Toca el botón «Outlook» de arriba: luego aparecerá solo en la app. No uses «Importar ICS», que haría una copia que nunca se actualiza.",
+    outlookConnexion: "¿Outlook te pide iniciar sesión? Hazlo: el calendario debería añadirse justo después.",
     arreter: "Dejar de enviar", confirmeArret: "Tu calendario dejará de recibir tus sesiones. ¿Continuar?", arrete: "Envío detenido. Puedes borrar el calendario «Pacevo · sesiones» de tu app de calendario.",
     indispo: "Próximamente.", erreur: "Error, inténtalo de nuevo.", illisible: "Estado no disponible por ahora, inténtalo más tarde.",
   },
@@ -177,29 +159,16 @@ const L: Record<Lang, Record<string, string>> = {
     depuisLien: "Este link adiciona-se a um calendário, não ao navegador: toca no teu calendário aqui em baixo.",
     outlookBouton: "Outlook",
     outlookSous: "Outlook.com, Hotmail, Live",
-    guideTitre: "Adicionar ao Outlook em 3 passos:",
-    etape1: "Copia o teu link.",
-    etape2: "Abre o teu calendário do Outlook.",
-    ouvrirOutlook: "Abrir o Outlook",
     pro: "Conta de trabalho ou escola?",
     proLien: "Outlook profissional",
-    etape3: "No Outlook, à esquerda, clica em «Adicionar calendário» › «Subscrever a partir da Web», cola o link na caixa (não na barra de endereço do navegador), dá-lhe o nome «Pacevo» e clica em «Importar».",
-    outlookClassique: "Outlook clássico para Windows: Base › «Adicionar Calendário» › «Da Internet», e cola o link.",
     outlookTel: "No telemóvel, o Outlook não permite adicionar este calendário: fá-lo uma vez num computador e depois aparecerá sozinho na app do Outlook.",
-    copieRatee: "Não foi possível copiar aqui: toca em «Copiar o link» nos passos abaixo.",
+    outlookAppli: "App do Outlook instalada (Mac, Windows): não consegue adicionar este calendário sozinha. Toca no botão «Outlook» acima: depois aparece sozinho na app. Não uses «Importar ICS», que faria uma cópia que nunca se atualiza.",
+    outlookConnexion: "O Outlook pede-te para iniciar sessão? Inicia sessão: o calendário deve ser adicionado logo a seguir.",
     arreter: "Parar o envio", confirmeArret: "O teu calendário deixará de receber as tuas sessões. Continuar?", arrete: "Envio parado. Podes apagar o calendário «Pacevo · sessões» da tua app de calendário.",
     indispo: "Disponível em breve.", erreur: "Falhou, tenta de novo.", illisible: "Estado indisponível de momento, tenta mais tarde.",
   },
 };
 
-/**
- * OUTLOOK (28/11/2026). Microsoft ne documente aucune adresse qui ouvrirait directement « S'abonner à
- * partir du web » : pas de bouton magique comme Apple (webcal) ou Google (?cid=). Cyprien, devant
- * Outlook avec un lien copié, ne savait pas quoi en faire. Le bouton Outlook copie donc le lien,
- * ouvre le calendrier Outlook et affiche les 3 étapes, avec un bouton par étape.
- */
-const OUTLOOK = "https://outlook.live.com/calendar/";
-const OUTLOOK_PRO = "https://outlook.office.com/calendar/";
 
 const gros = "flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left transition-colors disabled:opacity-40 sm:flex-1";
 const discret = "font-semibold underline underline-offset-2 disabled:opacity-40";
@@ -208,13 +177,8 @@ export function AbonnementCalendrier({ lang }: { lang: Lang }) {
   const t = (k: string, d?: string) => (L[lang]?.[k] ?? L.fr[k]).replace("{d}", d ?? "");
   const [etat, setEtat] = useState<Etat>({ k: "lecture" });
   const [occupe, setOccupe] = useState(false);
-  const [enCours, setEnCours] = useState<"webcal" | "google" | "outlook" | null>(null);
-  // Le guide Outlook en 3 étapes, ouvert par le bouton Outlook ; `copie` : l'étape 1 est faite.
-  const [guide, setGuide] = useState(false);
-  const [copie, setCopie] = useState(false);
+  const [enCours, setEnCours] = useState<Cible | null>(null);
   const [mobile, setMobile] = useState(false);
-  const blocGuide = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (guide) blocGuide.current?.scrollIntoView({ block: "nearest" }); }, [guide]);
   // Le bouton de l'appareil passe devant : Apple sur iPhone, iPad (qui se dit « Macintosh ») et Mac,
   // Google ailleurs (Android, Windows…). L'aide repliée ne montre que ce qui concerne l'appareil.
   const [appareil, setAppareil] = useState<Appareil>("apple");
@@ -272,8 +236,6 @@ export function AbonnementCalendrier({ lang }: { lang: Lang }) {
       if (j.ancien) { setEtat({ k: "pret", actif: true, derniereLecture: null, liens: null }); toast(t("ancien")); return null; }
       if (!r.ok || !j.liens) { toast.error(t("erreur")); return null; }
       setEtat({ k: "pret", actif: true, derniereLecture: remplacer ? null : (etat.k === "pret" ? etat.derniereLecture : null), liens: j.liens, rappel: remplacer });
-      // Lien remplacé : ce qui est dans le presse-papiers est l'ANCIEN lien, mort ; l'étape 1 du guide Outlook repart à zéro.
-      if (remplacer) setCopie(false);
       return j.liens as Liens;
     } catch { toast.error(t("erreur")); return null; }
     finally { setOccupe(false); }
@@ -284,7 +246,7 @@ export function AbonnementCalendrier({ lang }: { lang: Lang }) {
    * ancien (impossible à retrouver) : on ne le remplace qu'après confirmation, et on dit de
    * supprimer l'ancien calendrier, resté mort dans l'agenda.
    */
-  async function ajouter(cible: "webcal" | "google") {
+  async function ajouter(cible: Cible) {
     if (occupe || etat.k !== "pret") return;
     const ancien = etat.actif && !etat.liens;
     if (ancien && !window.confirm(t("confirmeAncien"))) return;
@@ -306,40 +268,6 @@ export function AbonnementCalendrier({ lang }: { lang: Lang }) {
     catch { window.prompt(t("copier"), liens.https); }
   }
 
-  /** Copie le lien ; l'étape 1 du guide Outlook passe à « Lien copié ». */
-  async function copierLien(url: string, secours: boolean) {
-    try { await navigator.clipboard.writeText(url); setCopie(true); toast.success(t("copie")); }
-    catch {
-      if (secours) { window.prompt(t("copier"), url); setCopie(true); }
-      else toast.error(t("copieRatee"));
-    }
-  }
-
-  /**
-   * Outlook : le lien connu, on copie ET on ouvre Outlook dans le même geste (sinon le navigateur
-   * bloque l'onglet) ; le guide reste affiché pour la suite. Lien à créer d'abord : le guide
-   * s'affiche, et ses boutons « Copier le lien » et « Ouvrir Outlook » font le reste.
-   */
-  async function ouvrirGuideOutlook() {
-    if (occupe || etat.k !== "pret") return;
-    const ancien = etat.actif && !etat.liens;
-    if (ancien && !window.confirm(t("confirmeAncien"))) return;
-    setCopie(false);
-    if (etat.liens && !ancien) {
-      setGuide(true);
-      void copierLien(etat.liens.https, false);
-      // Sur téléphone, Outlook ne sait pas ajouter un calendrier par lien : pas d'onglet inutile, le guide le dit.
-      if (!mobile) window.open(OUTLOOK, "_blank", "noopener");
-      return;
-    }
-    // Le guide ne s'ouvre qu'avec un lien : sans lui (échec, 409 « ancien »), il ne doit pas surgir plus tard.
-    setGuide(false);
-    setEnCours("outlook");
-    const l = await obtenir(ancien);
-    setEnCours(null);
-    setGuide(!!l);
-  }
-
   async function changer() {
     if (!window.confirm(t("confirmeChanger"))) return;
     await obtenir(true);
@@ -354,20 +282,24 @@ export function AbonnementCalendrier({ lang }: { lang: Lang }) {
       if (!r.ok) { toast.error(t("erreur")); return; }
       toast.success(t("arrete"));
       setEtat({ k: "pret", actif: false, derniereLecture: null, liens: null, rappel: false });
-      setGuide(false);
     } catch { toast.error(t("erreur")); }
     finally { setOccupe(false); }
   }
 
   const liens = etat.k === "pret" ? etat.liens : null;
-  const bouton = (cible: "webcal" | "google", premier: boolean) => {
+  const LIBELLE: Record<Exclude<Cible, "outlookPro">, [string, string]> = {
+    webcal: ["apple", "appleSous"], google: ["google", "googleSous"], outlook: ["outlookBouton", "outlookSous"],
+  };
+  // Les trois gros boutons marchent de la même façon : lien connu → un vrai lien ; sinon on le crée, puis on y va.
+  const bouton = (cible: Exclude<Cible, "outlookPro">, premier: boolean) => {
     const style = `${gros} ${premier ? "bg-zinc-900 text-white hover:bg-zinc-800" : "border border-zinc-200 text-zinc-800 hover:bg-zinc-50"}`;
+    const [titre, sous] = LIBELLE[cible];
     const contenu = (
       <>
         {enCours === cible ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" /> : <CalendarPlus className="h-5 w-5 shrink-0" />}
         <span>
-          <span className="block text-sm font-semibold">{t(cible === "webcal" ? "apple" : "google")}</span>
-          <span className={`block text-xs ${premier ? "text-zinc-300" : "text-zinc-500"}`}>{t(cible === "webcal" ? "appleSous" : "googleSous")}</span>
+          <span className="block text-sm font-semibold">{t(titre)}</span>
+          <span className={`block text-xs ${premier ? "text-zinc-300" : "text-zinc-500"}`}>{t(sous)}</span>
         </span>
       </>
     );
@@ -375,17 +307,6 @@ export function AbonnementCalendrier({ lang }: { lang: Lang }) {
       ? <a key={cible} href={liens[cible]} aria-disabled={occupe} className={`${style} aria-disabled:pointer-events-none aria-disabled:opacity-40`}>{contenu}</a>
       : <button key={cible} type="button" onClick={() => ajouter(cible)} disabled={occupe} className={style}>{contenu}</button>;
   };
-
-  const boutonOutlook = () => (
-    <button key="outlook" type="button" onClick={ouvrirGuideOutlook} disabled={occupe} aria-controls="guide-outlook"
-      className={`${gros} border border-zinc-200 text-zinc-800 hover:bg-zinc-50`}>
-      {enCours === "outlook" ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" /> : <CalendarPlus className="h-5 w-5 shrink-0" />}
-      <span>
-        <span className="block text-sm font-semibold">{t("outlookBouton")}</span>
-        <span className="block text-xs text-zinc-500">{t("outlookSous")}</span>
-      </span>
-    </button>
-  );
 
   return (
     <section ref={section} className="scroll-mt-20 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
@@ -401,36 +322,17 @@ export function AbonnementCalendrier({ lang }: { lang: Lang }) {
           <>
             <div className="flex flex-col gap-2 sm:flex-row">
               {/* Apple : Apple, Google, Outlook. Ailleurs (Android, PC) : Google, Outlook, puis Apple, inutile sur un PC. */}
-              {appleDabord ? [bouton("webcal", true), bouton("google", false), boutonOutlook()] : [bouton("google", true), boutonOutlook(), bouton("webcal", false)]}
+              {appleDabord ? [bouton("webcal", true), bouton("google", false), bouton("outlook", false)] : [bouton("google", true), bouton("outlook", false), bouton("webcal", false)]}
             </div>
-            {guide && liens && (
-              <div ref={blocGuide} id="guide-outlook" role="region" aria-label={t("guideTitre")} className="rounded-xl border border-sky-100 bg-sky-50 p-4 text-sm text-zinc-800">
-                {mobile && <p className="mb-3 font-medium text-amber-800">{t("outlookTel")}</p>}
-                <p className="font-semibold">{t("guideTitre")}</p>
-                <ol className="mt-2 list-decimal space-y-3 pl-5">
-                  <li>
-                    {t("etape1")}{" "}
-                    <button type="button" onClick={() => copierLien(liens.https, true)}
-                      className="ml-1 inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 font-semibold text-white hover:bg-zinc-800">
-                      {copie ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copie ? t("copie") : t("copier")}
-                    </button>
-                  </li>
-                  <li>
-                    {t("etape2")}{" "}
-                    {!mobile && <a href={OUTLOOK} target="_blank" rel="noopener noreferrer"
-                      className="ml-1 inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 font-semibold text-zinc-800 hover:bg-zinc-50">
-                      <ExternalLink className="h-4 w-4" /> {t("ouvrirOutlook")}
-                    </a>}
-                    <span className="mt-1 block text-xs text-zinc-600">
-                      {t("pro")}{" "}
-                      <a href={OUTLOOK_PRO} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2">{t("proLien")}</a>
-                    </span>
-                  </li>
-                  <li>{t("etape3")}</li>
-                </ol>
-                <p className="mt-3 text-xs text-zinc-600">{t("outlookClassique")}</p>
-              </div>
-            )}
+            {/* Outlook d'un compte de travail ou d'école : même ajout en un clic, sur l'autre adresse de Microsoft. */}
+            {!(etat.actif && !liens) && <p className="text-sm text-zinc-500">
+              {t("pro")}{" "}
+              {liens
+                ? <a href={liens.outlookPro} aria-disabled={occupe} className={`${discret} text-zinc-700 hover:text-zinc-900 aria-disabled:pointer-events-none`}>{t("proLien")}</a>
+                : <button type="button" onClick={() => ajouter("outlookPro")} disabled={occupe} className={`${discret} text-zinc-700 hover:text-zinc-900`}>{t("proLien")}</button>}
+            </p>}
+            {/* Téléphone : Outlook n'y ajoute pas de calendrier par lien ; la parade, visible (pas repliée). */}
+            {mobile && <p className="text-sm text-zinc-600">{t("outlookTel")}</p>}
             {/* Android : Google n'offre pas toujours l'ajout dans le navigateur du téléphone ; la parade, visible. */}
             {appareil === "android" && <p className="text-sm text-zinc-600">{t("googleOrdi")}</p>}
             {etat.rappel && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm font-medium text-amber-800 ring-1 ring-amber-100">{t("rappel")}</p>}
@@ -456,6 +358,8 @@ export function AbonnementCalendrier({ lang }: { lang: Lang }) {
                 {appareil !== "autre" && <li>{t("googleTel")}</li>}
                 {appareil === "apple" && <li>{t("iphone")}</li>}
                 {appareil === "autre" && <li>{t("ordiConfirme")}</li>}
+                <li>{t("outlookConnexion")}</li>
+                <li>{t("outlookAppli")}</li>
               </ul>
             </details>
 

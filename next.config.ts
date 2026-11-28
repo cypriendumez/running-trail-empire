@@ -170,7 +170,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
       `img-src 'self' data: blob: ${supabase.https} https://images.unsplash.com https://images.pexels.com https://cdnjs.cloudflare.com https://icons.duckduckgo.com ${tuiles}`,
-      `connect-src 'self' ${supabase.https} ${supabase.wss} https://*.open-meteo.com https://api.bigdatacloud.net https://routing.openstreetmap.de ${tuiles}${turnstile}`,
+      `connect-src 'self' ${supabase.https} ${supabase.wss} https://*.open-meteo.com https://api-bdc.io https://routing.openstreetmap.de ${tuiles}${turnstile}`,
       "worker-src 'self' blob:",
       "manifest-src 'self'",
       "report-uri /api/csp-report",

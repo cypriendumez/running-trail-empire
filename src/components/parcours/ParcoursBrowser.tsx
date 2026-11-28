@@ -17,6 +17,7 @@ import { tileUrl, thumbZoomFor } from "@/data/famousRoutes";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { PX, fillP } from "./parcoursI18n";
 import { IconeSport } from "./IconeSport";
+import { arrondiPosition } from "@/lib/geo/arrondi";
 
 // Onglets sport : clé canonique (libellé traduit et icône au rendu).
 const SPORT_TABS: { key: string }[] = [{ key: "all" }, ...SPORTS.map((s) => ({ key: s }))];
@@ -98,7 +99,8 @@ export function ParcoursBrowser({ initialSearch = "", exportGpx = false }: { ini
       q: debounced, sport, difficulte, type, region, departement,
       distMax: String(distMax), sort, page: String(page), pageSize: "12",
     });
-    if (sort === "proche" && near) params.set("near", `${near.lat.toFixed(4)},${near.lng.toFixed(4)}`);
+    // ≈ 1 km : l'adresse de la requête finit dans les journaux de l'hébergeur (lib/geo/arrondi).
+    if (sort === "proche" && near) params.set("near", `${arrondiPosition(near.lat)},${arrondiPosition(near.lng)}`);
     fetch(`/api/parcours?${params.toString()}`)
       .then((r) => r.json())
       .then((json) => {
